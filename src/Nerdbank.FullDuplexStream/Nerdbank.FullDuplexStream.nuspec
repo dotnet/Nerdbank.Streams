@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>Nerdbank.FullDuplexStream</id>
+    <version>$version$</version>
+    <title>Full duplex Stream</title>
+    <authors>Andrew Arnott</authors>
+    <owners>Andrew Arnott</owners>
+    <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
+    <projectUrl>https://github.com/aarnott/Nerdbank.FullDuplexStream</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <summary>Full duplex Stream for in-proc communication between two components.</summary>
+    <description>Full duplex Stream for in-proc communication between two components.</description>
+    <copyright>Copyright © Andrew Arnott</copyright>
+    <tags>Stream full-duplex</tags>
+  </metadata>
+</package>
