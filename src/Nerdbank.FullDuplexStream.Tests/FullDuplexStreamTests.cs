@@ -1,21 +1,34 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.VisualStudio.Threading;
 using Nerdbank.FullDuplexStream;
 using Xunit;
 
-public class FullDuplexStreamTests
+public class FullDuplexStreamTests : IDisposable
 {
     private static readonly byte[] Data3Bytes = new byte[] { 0x1, 0x3, 0x2 };
 
     private static readonly byte[] Data5Bytes = new byte[] { 0x1, 0x3, 0x2, 0x5, 0x4 };
 
+    /// <summary>
+    /// The time to wait for an async operation to occur within a reasonable time,
+    /// when we expect a passing test to wait the entire time.
+    /// </summary>
+    private static readonly TimeSpan ExpectedAsyncTimeout = TimeSpan.FromMilliseconds(250);
+
+    private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(5);
+
     private readonly Stream stream1;
 
     private readonly Stream stream2;
+
+    private readonly CancellationTokenSource testCancellationSource;
 
     public FullDuplexStreamTests()
     {
@@ -26,6 +39,22 @@ public class FullDuplexStreamTests
 
         this.stream1 = tuple.Item1;
         this.stream2 = tuple.Item2;
+
+        TimeSpan timeout = Debugger.IsAttached ? Timeout.InfiniteTimeSpan : TestTimeout;
+        this.testCancellationSource = new CancellationTokenSource(timeout);
+    }
+
+    protected CancellationToken TestCanceled => this.testCancellationSource.Token;
+
+    /// <summary>
+    /// Gets a new <see cref="CancellationToken"/> that will automatically cancel
+    /// after <see cref="ExpectedAsyncTimeout"/> has elapsed.
+    /// </summary>
+    protected CancellationToken ExpectedAsyncTimeoutToken => new CancellationTokenSource(ExpectedAsyncTimeout).Token;
+
+    public void Dispose()
+    {
+        this.testCancellationSource.Dispose();
     }
 
     [Fact]
@@ -69,6 +98,45 @@ public class FullDuplexStreamTests
         bytesRead = this.stream2.Read(buffer, 0, buffer.Length);
         Assert.Equal(1, bytesRead);
         Assert.Equal(sentBuffer.Skip(4), buffer.Take(1));
+    }
+
+    [Fact]
+    public async Task Read_BeforeWrite()
+    {
+        byte[] buffer = new byte[5];
+        var readTask = this.stream2.ReadAsync(buffer, 0, buffer.Length, this.TestCanceled);
+        Assert.False(readTask.IsCompleted);
+
+        this.stream1.Write(Data3Bytes, 0, Data3Bytes.Length);
+        int bytesRead = await readTask.WithCancellation(this.TestCanceled);
+        Assert.Equal(Data3Bytes.Length, bytesRead);
+        Assert.Equal(Data3Bytes, buffer.Take(bytesRead));
+    }
+
+    [Fact]
+    public async Task Read_ReturnsNoBytesWhenRemoteStreamClosed()
+    {
+        // Verify that closing the transmitting stream after reading has been requested
+        // appropriately ends the read attempt.
+        byte[] buffer = new byte[5];
+        var readTask = this.stream2.ReadAsync(buffer, 0, buffer.Length, this.TestCanceled);
+        Assert.False(readTask.IsCompleted);
+        this.stream1.Close();
+        int bytesRead = await readTask.WithCancellation(this.TestCanceled);
+        Assert.Equal(0, bytesRead);
+
+        // Verify that reading from a closed stream returns 0 bytes.
+        bytesRead = await this.stream2.ReadAsync(buffer, 0, buffer.Length).WithCancellation(this.TestCanceled);
+        Assert.Equal(0, bytesRead);
+    }
+
+    [Fact]
+    public async Task Write_EmptyBufferDoesNotTerminateOtherStream()
+    {
+        this.stream1.Write(Data3Bytes, 0, 0);
+        var buffer = new byte[10];
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => this.stream2.ReadAsync(buffer, 0, buffer.Length, ExpectedAsyncTimeoutToken).WithCancellation(ExpectedAsyncTimeoutToken));
     }
 
     [Fact]

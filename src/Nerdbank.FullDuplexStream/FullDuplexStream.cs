@@ -5,6 +5,7 @@
     using System.Collections.Generic;
     using System.IO;
     using System.Text;
+    using System.Threading;
     using Validation;
 
     /// <summary>
@@ -41,6 +42,9 @@
             set { throw new NotSupportedException(); }
         }
 
+        /// <summary>
+        /// The stream to write to.
+        /// </summary>
         private FullDuplexStream other;
 
         /// <summary>
@@ -72,6 +76,11 @@
 
             lock (this.readQueue)
             {
+                while (this.readQueue.Count == 0)
+                {
+                    Monitor.Wait(this.readQueue);
+                }
+
                 var message = this.readQueue[0];
                 int copiedBytes = message.Consume(buffer, offset, count);
                 if (message.IsConsumed)
@@ -79,6 +88,11 @@
                     this.readQueue.RemoveAt(0);
                 }
 
+                // Note that the message we just read may not have fully filled
+                // our caller's available space in the buffer. But that's OK.
+                // MSDN Stream documentation allows us to return less.
+                // But we should not return 0 bytes back unless the sender has
+                // closed their stream.
                 return copiedBytes;
             }
         }
@@ -91,12 +105,22 @@
             Requires.Range(count >= 0, nameof(count));
             Requires.Range(offset + count <= buffer.Length, nameof(count));
 
-            byte[] queuedBuffer = new byte[count];
-            Array.Copy(buffer, offset, queuedBuffer, 0, count);
-            lock (this.other.readQueue)
+            // Avoid sending an empty buffer because that is the signal of a closed stream.
+            if (count > 0)
             {
-                this.other.readQueue.Add(new Message(queuedBuffer));
+                byte[] queuedBuffer = new byte[count];
+                Array.Copy(buffer, offset, queuedBuffer, 0, count);
+                this.other.PostMessage(new Message(queuedBuffer));
             }
+        }
+
+        /// <inheritdoc />
+        protected override void Dispose(bool disposing)
+        {
+            // Sending an empty buffer is the traditional way to signal
+            // that the transmitting stream has closed.
+            this.other.PostMessage(new Message(Array.Empty<byte>()));
+            base.Dispose(disposing);
         }
 
         /// <inheritdoc />
@@ -111,14 +135,39 @@
             throw new NotSupportedException();
         }
 
+        /// <summary>
+        /// Posts a message to this stream's read queue.
+        /// </summary>
+        /// <param name="message">The message to transmit.</param>
+        private void PostMessage(Message message)
+        {
+            Requires.NotNull(message, nameof(message));
+
+            lock (this.readQueue)
+            {
+                this.readQueue.Add(message);
+                Monitor.PulseAll(this.readQueue);
+            }
+        }
+
         private class Message
         {
             internal Message(byte[] buffer)
             {
+                Requires.NotNull(buffer, nameof(buffer));
+
                 this.Buffer = buffer;
             }
 
-            public bool IsConsumed => this.Position == this.Buffer.Length;
+            /// <summary>
+            /// Gets a value indicating whether this message has been read completely
+            /// and should be removed from the queue.
+            /// </summary>
+            /// <remarks>
+            /// This returns <c>false</c> if the buffer was originally empty,
+            /// since that signifies that the other party closed their sending stream.
+            /// </remarks>
+            public bool IsConsumed => this.Position == this.Buffer.Length && this.Buffer.Length > 0;
 
             /// <summary>
             /// Gets the buffer to read from.
