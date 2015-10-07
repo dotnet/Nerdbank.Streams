@@ -7,6 +7,18 @@ Full duplex .NET Streams
 
 Consume this project by installing the [Nerdbank.FullDuplexStream][1] NuGet package.
 
+The code to set up a full duplex stream is trivial:
+
+```csharp
+    Tuple<Stream, Stream> tuple = FullDuplexStream.CreateStreams();
+    Task party1Simulation = Party1Async(tuple.Item1);
+    Task party2Simulation = Party2Async(tuple.Item2);
+```
+
+In the above code, we create a pair of streams. Each goes to one of two parties.
+They can each read and write to their stream to communicate with the other party,
+who uses their own stream. The two streams in the returned Tuple are interconnected.
+
 ## What and why of full duplex streams
 
 .NET streams are great for accessing files, or communicating with a remote party.
