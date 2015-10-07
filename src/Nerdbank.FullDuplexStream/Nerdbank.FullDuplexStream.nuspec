@@ -1,5 +1,5 @@
-<?xml version="1.0"?>
-<package >
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package>
   <metadata>
     <id>Nerdbank.FullDuplexStream</id>
     <version>$version$</version>
@@ -13,5 +13,17 @@
     <description>Full duplex Stream for in-proc communication between two components.</description>
     <copyright>Copyright © Andrew Arnott</copyright>
     <tags>Stream full-duplex</tags>
+    <dependencies>
+      <group targetFramework="dotnet">
+        <dependency id="System.Collections" version="4.0.10" />
+        <dependency id="System.Diagnostics.Debug" version="4.0.10" />
+        <dependency id="System.IO" version="4.0.10" />
+        <dependency id="System.Resources.ResourceManager" version="4.0.0" />
+        <dependency id="System.Runtime" version="4.0.20" />
+        <dependency id="System.Runtime.Extensions" version="4.0.10" />
+        <dependency id="System.Threading" version="4.0.10" />
+        <dependency id="Validation" version="2.2.4" />
+      </group>
+    </dependencies>
   </metadata>
 </package>
