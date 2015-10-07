@@ -9,7 +9,9 @@ using Xunit;
 
 public class FullDuplexStreamTests
 {
-    private static readonly byte[] Data1 = new byte[3] { 0x1, 0x3, 0x2 };
+    private static readonly byte[] Data3Bytes = new byte[] { 0x1, 0x3, 0x2 };
+
+    private static readonly byte[] Data5Bytes = new byte[] { 0x1, 0x3, 0x2, 0x5, 0x4 };
 
     private readonly Stream stream1;
 
@@ -40,13 +42,52 @@ public class FullDuplexStreamTests
     [Fact]
     public void Write_CanBeReadOnOtherStream()
     {
-        byte[] sentBuffer = Data1;
+        byte[] sentBuffer = Data3Bytes;
 
         this.stream1.Write(sentBuffer, 0, sentBuffer.Length);
         byte[] buffer = new byte[sentBuffer.Length];
         int bytesRead = this.stream2.Read(buffer, 0, buffer.Length);
         Assert.Equal(sentBuffer.Length, bytesRead);
         Assert.Equal<byte>(sentBuffer, buffer);
+    }
+
+    [Fact]
+    public void Read_InSmallerBlocks()
+    {
+        byte[] sentBuffer = Data5Bytes;
+
+        this.stream1.Write(sentBuffer, 0, sentBuffer.Length);
+        byte[] buffer = new byte[2];
+        int bytesRead = this.stream2.Read(buffer, 0, buffer.Length);
+        Assert.Equal(buffer.Length, bytesRead);
+        Assert.Equal(sentBuffer.Take(2), buffer);
+
+        bytesRead = this.stream2.Read(buffer, 0, buffer.Length);
+        Assert.Equal(buffer.Length, bytesRead);
+        Assert.Equal(sentBuffer.Skip(2).Take(2), buffer);
+
+        bytesRead = this.stream2.Read(buffer, 0, buffer.Length);
+        Assert.Equal(1, bytesRead);
+        Assert.Equal(sentBuffer.Skip(4), buffer.Take(1));
+    }
+
+    [Fact]
+    public void Write_TwiceThenRead()
+    {
+        this.stream1.Write(Data3Bytes, 0, Data3Bytes.Length);
+        this.stream1.Write(Data5Bytes, 0, Data5Bytes.Length);
+        byte[] receiveBuffer = new byte[Data3Bytes.Length + Data5Bytes.Length];
+        int bytesRead = 0;
+        do
+        {
+            // Per the MSDN documentation, Read can fill less than the provided buffer.
+            int bytesJustRead = this.stream2.Read(receiveBuffer, bytesRead, receiveBuffer.Length - bytesRead);
+            Assert.NotEqual(0, bytesJustRead);
+            bytesRead += bytesJustRead;
+        } while (bytesRead < receiveBuffer.Length);
+
+        Assert.Equal(Data3Bytes, receiveBuffer.Take(Data3Bytes.Length));
+        Assert.Equal(Data5Bytes, receiveBuffer.Skip(Data3Bytes.Length));
     }
 
     [Fact]
