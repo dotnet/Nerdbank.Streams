@@ -40,6 +40,8 @@ dlldata.c
 
 # DNX
 project.lock.json
+*.nuget.targets
+*.nuget.props
 artifacts/
 
 *_i.c
