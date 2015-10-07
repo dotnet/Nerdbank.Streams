@@ -6,6 +6,7 @@
     using System.IO;
     using System.Text;
     using System.Threading;
+    using System.Threading.Tasks;
     using Validation;
 
     /// <summary>
@@ -19,6 +20,12 @@
         /// for this stream to read.
         /// </summary>
         private readonly List<Message> readQueue = new List<Message>();
+
+        /// <summary>
+        /// The completion source for a Task that completes whenever a message
+        /// is enqueued to <see cref="readQueue"/>.
+        /// </summary>
+        private TaskCompletionSource<object> enqueuedSource = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         /// <inheritdoc />
         public override bool CanRead => true;
@@ -64,6 +71,65 @@
         /// <inheritdoc />
         public override void Flush()
         {
+        }
+
+        /// <inheritdoc />
+        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            Requires.NotNull(buffer, nameof(buffer));
+            Requires.Range(offset >= 0, nameof(offset));
+            Requires.Range(count >= 0, nameof(count));
+            Requires.Range(offset + count <= buffer.Length, nameof(count));
+
+            cancellationToken.ThrowIfCancellationRequested();
+            Message message = null;
+            while (message == null)
+            {
+                Task waitTask = null;
+                lock (this.readQueue)
+                {
+                    if (this.readQueue.Count > 0)
+                    {
+                        message = this.readQueue[0];
+                    }
+                    else
+                    {
+                        waitTask = this.enqueuedSource.Task;
+                    }
+                }
+
+                if (waitTask != null)
+                {
+                    if (cancellationToken.CanBeCanceled)
+                    {
+                        // Arrange to wake up when a new message is posted, or when the caller's CancellationToken is canceled.
+                        var wakeUpEarly = new TaskCompletionSource<object>();
+                        using (cancellationToken.Register(state => ((TaskCompletionSource<object>)state).SetResult(null), wakeUpEarly, false))
+                        {
+                            await Task.WhenAny(waitTask, wakeUpEarly.Task).ConfigureAwait(false);
+                        }
+
+                        cancellationToken.ThrowIfCancellationRequested();
+                    }
+                    else
+                    {
+                        // The caller didn't pass in a CancellationToken. So just do the cheapest thing.
+                        await waitTask.ConfigureAwait(false);
+                    }
+                }
+            }
+
+            int copiedBytes = message.Consume(buffer, offset, count);
+            if (message.IsConsumed)
+            {
+                lock (this.readQueue)
+                {
+                    Assumes.True(this.readQueue[0] == message); // if this fails, the caller is calling Read[Async] in a non-sequential way.
+                    this.readQueue.RemoveAt(0);
+                }
+            }
+
+            return copiedBytes;
         }
 
         /// <inheritdoc />
@@ -115,6 +181,14 @@
         }
 
         /// <inheritdoc />
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            this.Write(buffer, offset, count);
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
             // Sending an empty buffer is the traditional way to signal
@@ -143,11 +217,15 @@
         {
             Requires.NotNull(message, nameof(message));
 
+            TaskCompletionSource<object> enqueuedSource;
             lock (this.readQueue)
             {
                 this.readQueue.Add(message);
                 Monitor.PulseAll(this.readQueue);
+                enqueuedSource = Interlocked.Exchange(ref this.enqueuedSource, new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously));
             }
+
+            enqueuedSource.TrySetResult(null);
         }
 
         private class Message

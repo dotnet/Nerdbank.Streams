@@ -22,6 +22,7 @@
         <dependency id="System.Runtime" version="4.0.20" />
         <dependency id="System.Runtime.Extensions" version="4.0.10" />
         <dependency id="System.Threading" version="4.0.10" />
+        <dependency id="System.Threading.Tasks" version="4.0.10" />
         <dependency id="Validation" version="2.2.4" />
       </group>
     </dependencies>

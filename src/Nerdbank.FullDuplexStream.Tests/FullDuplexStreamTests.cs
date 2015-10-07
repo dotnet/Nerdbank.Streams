@@ -108,7 +108,7 @@ public class FullDuplexStreamTests : IDisposable
         Assert.False(readTask.IsCompleted);
 
         this.stream1.Write(Data3Bytes, 0, Data3Bytes.Length);
-        int bytesRead = await readTask.WithCancellation(this.TestCanceled);
+        int bytesRead = await readTask;
         Assert.Equal(Data3Bytes.Length, bytesRead);
         Assert.Equal(Data3Bytes, buffer.Take(bytesRead));
     }
@@ -122,11 +122,11 @@ public class FullDuplexStreamTests : IDisposable
         var readTask = this.stream2.ReadAsync(buffer, 0, buffer.Length, this.TestCanceled);
         Assert.False(readTask.IsCompleted);
         this.stream1.Close();
-        int bytesRead = await readTask.WithCancellation(this.TestCanceled);
+        int bytesRead = await readTask;
         Assert.Equal(0, bytesRead);
 
         // Verify that reading from a closed stream returns 0 bytes.
-        bytesRead = await this.stream2.ReadAsync(buffer, 0, buffer.Length).WithCancellation(this.TestCanceled);
+        bytesRead = await this.stream2.ReadAsync(buffer, 0, buffer.Length, this.TestCanceled);
         Assert.Equal(0, bytesRead);
     }
 
@@ -136,7 +136,7 @@ public class FullDuplexStreamTests : IDisposable
         this.stream1.Write(Data3Bytes, 0, 0);
         var buffer = new byte[10];
         await Assert.ThrowsAsync<OperationCanceledException>(
-            () => this.stream2.ReadAsync(buffer, 0, buffer.Length, ExpectedAsyncTimeoutToken).WithCancellation(ExpectedAsyncTimeoutToken));
+            () => this.stream2.ReadAsync(buffer, 0, buffer.Length, ExpectedAsyncTimeoutToken));
     }
 
     [Fact]
