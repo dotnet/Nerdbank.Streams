@@ -41,6 +41,9 @@
       <NuPkgSource Include="$(TargetPath);$(DocumentationFile)">
         <TargetDir>lib\dotnet\</TargetDir>
       </NuPkgSource>
+      <NuPkgSource Include="$(TargetPath);$(DocumentationFile)">
+        <TargetDir>lib\portable-net451%2Bwin81%2Bwpa81\</TargetDir>
+      </NuPkgSource>
       <NuPkgSource Include="@(None)" Condition=" '%(None.Extension)' == '.nuspec' "/>
       <NuPkgTarget Include="$(NuGetIntermediatePath)%(NuPkgSource.TargetDir)%(FileName)%(Extension)" />
       <NuPkgFilesToPurge Include="$(NuGetIntermediatePath)**" Exclude="@(NuPkgTarget)" />
