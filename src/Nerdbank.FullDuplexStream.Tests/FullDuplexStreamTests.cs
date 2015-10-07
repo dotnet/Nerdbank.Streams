@@ -175,4 +175,31 @@ public class FullDuplexStreamTests : IDisposable
     {
         this.stream1.Write(new byte[2], 1, 1);
     }
+
+    [Fact]
+    public async Task Read_APM()
+    {
+        byte[] readBuffer = new byte[10];
+        Task<int> readTask = Task.Factory.FromAsync(
+            (cb, state) => this.stream1.BeginRead(readBuffer, 0, readBuffer.Length, cb, state),
+            ar => this.stream1.EndRead(ar),
+            null);
+        this.stream2.Write(Data3Bytes, 0, Data3Bytes.Length);
+        int bytesRead = await readTask;
+        Assert.Equal(Data3Bytes.Length, bytesRead);
+        Assert.Equal(Data3Bytes, readBuffer.Take(bytesRead));
+    }
+
+    [Fact]
+    public async Task Write_APM()
+    {
+        await Task.Factory.FromAsync(
+            (cb, state) => this.stream1.BeginWrite(Data3Bytes, 0, Data3Bytes.Length, cb, state),
+            ar => this.stream1.EndWrite(ar),
+            null);
+        byte[] readBuffer = new byte[10];
+        int bytesRead = this.stream2.Read(readBuffer, 0, readBuffer.Length);
+        Assert.Equal(Data3Bytes.Length, bytesRead);
+        Assert.Equal(Data3Bytes, readBuffer.Take(bytesRead));
+    }
 }
