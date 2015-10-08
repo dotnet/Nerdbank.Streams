@@ -1,7 +1,6 @@
 ﻿namespace Nerdbank.FullDuplexStream
 {
     using System;
-    using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.IO;
     using System.Text;
@@ -15,6 +14,22 @@
     /// </summary>
     public class FullDuplexStream : Stream
     {
+#if LegacyPCL
+        /// <summary>
+        /// The options to use when creating the value for <see cref="enqueuedSource"/>.
+        /// </summary>
+        private const TaskCreationOptions EnqueuedSourceOptions = TaskCreationOptions.None;
+        private static readonly byte[] EmptyByteArray = new byte[0];
+        private static readonly Task CompletedTask = Task.FromResult<object>(null);
+#else
+        /// <summary>
+        /// The options to use when creating the value for <see cref="enqueuedSource"/>.
+        /// </summary>
+        private static readonly byte[] EmptyByteArray = Array.Empty<byte>();
+        private static readonly Task CompletedTask = Task.CompletedTask;
+        private const TaskCreationOptions EnqueuedSourceOptions = TaskCreationOptions.RunContinuationsAsynchronously;
+#endif
+
         /// <summary>
         /// The messages posted by the <see cref="other"/> party,
         /// for this stream to read.
@@ -25,7 +40,7 @@
         /// The completion source for a Task that completes whenever a message
         /// is enqueued to <see cref="readQueue"/>.
         /// </summary>
-        private TaskCompletionSource<object> enqueuedSource = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+        private TaskCompletionSource<object> enqueuedSource = new TaskCompletionSource<object>(EnqueuedSourceOptions);
 
         /// <inheritdoc />
         public override bool CanRead => true;
@@ -185,7 +200,7 @@
         {
             cancellationToken.ThrowIfCancellationRequested();
             this.Write(buffer, offset, count);
-            return Task.CompletedTask;
+            return CompletedTask;
         }
 
         /// <inheritdoc />
@@ -193,7 +208,7 @@
         {
             // Sending an empty buffer is the traditional way to signal
             // that the transmitting stream has closed.
-            this.other.PostMessage(new Message(Array.Empty<byte>()));
+            this.other.PostMessage(new Message(EmptyByteArray));
             base.Dispose(disposing);
         }
 
@@ -222,7 +237,7 @@
             {
                 this.readQueue.Add(message);
                 Monitor.PulseAll(this.readQueue);
-                enqueuedSource = Interlocked.Exchange(ref this.enqueuedSource, new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously));
+                enqueuedSource = Interlocked.Exchange(ref this.enqueuedSource, new TaskCompletionSource<object>(EnqueuedSourceOptions));
             }
 
             enqueuedSource.TrySetResult(null);

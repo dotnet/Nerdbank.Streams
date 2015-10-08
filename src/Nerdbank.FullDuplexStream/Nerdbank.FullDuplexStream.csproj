@@ -31,6 +31,14 @@
     <Compile Include="FullDuplexStream.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Nerdbank.FullDuplexStream.LegacyPCL\Nerdbank.FullDuplexStream.LegacyPCL.csproj">
+      <Project>{5bb80bc2-bb3e-4302-9c51-585f8249310e}</Project>
+      <Name>Nerdbank.FullDuplexStream.LegacyPCL</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <OutputItemType>LegacyPCLTargetPath</OutputItemType>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets" />
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildProjectDirectory), EnlistmentInfo.targets))\EnlistmentInfo.targets" Condition=" '$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildProjectDirectory), EnlistmentInfo.targets))' != '' " />
   <Target Name="NuPkg" AfterTargets="AfterBuild">
@@ -44,13 +52,14 @@
       <NuPkgSource Include="$(TargetPath);$(DocumentationFile)">
         <TargetDir>lib\portable-net451%2Bwin81%2Bwpa81\</TargetDir>
       </NuPkgSource>
-      <NuPkgSource Include="@(None)" Condition=" '%(None.Extension)' == '.nuspec' "/>
+      <NuPkgSource Include="@(LegacyPCLTargetPath);%(LegacyPCLTargetPath.RootDir)%(LegacyPCLTargetPath.Directory)%(LegacyPCLTargetPath.FileName).xml">
+        <TargetDir>lib\portable-net45+win8+wp8+wpa81+dnxcore+MonoAndroid10+MonoTouch10+Xamarin.iOS10\</TargetDir>
+      </NuPkgSource>
+      <NuPkgSource Include="@(None)" Condition=" '%(None.Extension)' == '.nuspec' " />
       <NuPkgTarget Include="$(NuGetIntermediatePath)%(NuPkgSource.TargetDir)%(FileName)%(Extension)" />
       <NuPkgFilesToPurge Include="$(NuGetIntermediatePath)**" Exclude="@(NuPkgTarget)" />
     </ItemGroup>
-
     <Copy SourceFiles="@(NuPkgSource)" DestinationFiles="@(NuPkgTarget)" />
-
     <Delete Files="@(NuPkgFilesToPurge)" />
 
     <Exec Command='nuget.exe pack "%(NuPkgTarget.Identity)" -version "$(NuGetPackageVersion)" -OutputDirectory "$(TargetDir)\"' Condition=" '%(NuPkgTarget.Extension)' == '.nuspec' " />

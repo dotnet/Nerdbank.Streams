@@ -1,0 +1,11 @@
+{
+  "supports": {},
+  "dependencies": {
+    "Nerdbank.GitVersioning": "1.1.47-rc-*",
+    "NuSpec.ReferenceGenerator": "1.3.4",
+    "Validation": "2.2.4"
+  },
+  "frameworks": {
+    ".NETPortable,Version=v4.5,Profile=Profile259": {}
+  }
+}
