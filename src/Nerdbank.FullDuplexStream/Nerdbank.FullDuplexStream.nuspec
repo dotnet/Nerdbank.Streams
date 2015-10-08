@@ -14,6 +14,9 @@
     <copyright>Copyright © Andrew Arnott</copyright>
     <tags>Stream full-duplex</tags>
     <dependencies>
+      <group>
+        <dependency id="Validation" version="2.2.4" />
+      </group>
       <group targetFramework="dotnet">
         <dependency id="System.Collections" version="4.0.10" />
         <dependency id="System.Diagnostics.Debug" version="4.0.10" />
