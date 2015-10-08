@@ -9,7 +9,7 @@
     <ProjectGuid>{588B37F9-4102-4A6B-BA9E-769EDA0E89D5}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Nerdbank.FullDuplexStream</RootNamespace>
+    <RootNamespace>Nerdbank</RootNamespace>
     <AssemblyName>Nerdbank.FullDuplexStream</AssemblyName>
     <DefaultLanguage>en-US</DefaultLanguage>
     <FileAlignment>512</FileAlignment>
@@ -61,7 +61,6 @@
     </ItemGroup>
     <Copy SourceFiles="@(NuPkgSource)" DestinationFiles="@(NuPkgTarget)" />
     <Delete Files="@(NuPkgFilesToPurge)" />
-
-    <Exec Command='nuget.exe pack "%(NuPkgTarget.Identity)" -version "$(NuGetPackageVersion)" -OutputDirectory "$(TargetDir)\"' Condition=" '%(NuPkgTarget.Extension)' == '.nuspec' " />
+    <Exec Command="nuget.exe pack &quot;%(NuPkgTarget.Identity)&quot; -version &quot;$(NuGetPackageVersion)&quot; -OutputDirectory &quot;$(TargetDir)\&quot;" Condition=" '%(NuPkgTarget.Extension)' == '.nuspec' " />
   </Target>
 </Project>

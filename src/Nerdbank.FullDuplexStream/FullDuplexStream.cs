@@ -1,4 +1,4 @@
-﻿namespace Nerdbank.FullDuplexStream
+﻿namespace Nerdbank
 {
     using System;
     using System.Collections.Generic;
