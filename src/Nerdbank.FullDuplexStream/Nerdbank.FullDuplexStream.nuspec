@@ -14,9 +14,6 @@
     <copyright>Copyright © Andrew Arnott</copyright>
     <tags>Stream full-duplex</tags>
     <dependencies>
-      <group>
-        <dependency id="Validation" version="2.2.4" />
-      </group>
       <group targetFramework="dotnet">
         <dependency id="System.Collections" version="4.0.10" />
         <dependency id="System.Diagnostics.Debug" version="4.0.10" />
@@ -26,6 +23,30 @@
         <dependency id="System.Runtime.Extensions" version="4.0.10" />
         <dependency id="System.Threading" version="4.0.10" />
         <dependency id="System.Threading.Tasks" version="4.0.10" />
+        <dependency id="Validation" version="2.2.4" />
+      </group>
+      <group targetFramework="net">
+        <dependency id="Validation" version="2.2.4" />
+      </group>
+      <group targetFramework="win">
+        <dependency id="Validation" version="2.2.4" />
+      </group>
+      <group targetFramework="wpa">
+        <dependency id="Validation" version="2.2.4" />
+      </group>
+      <group targetFramework="wp">
+        <dependency id="Validation" version="2.2.4" />
+      </group>
+      <group targetFramework="MonoAndroid">
+        <dependency id="Validation" version="2.2.4" />
+      </group>
+      <group targetFramework="MonoTouch">
+        <dependency id="Validation" version="2.2.4" />
+      </group>
+      <group targetFramework="XamarinIOS">
+        <dependency id="Validation" version="2.2.4" />
+      </group>
+      <group>
         <dependency id="Validation" version="2.2.4" />
       </group>
     </dependencies>
