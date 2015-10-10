@@ -7,4 +7,6 @@
   <PropertyGroup>
     <DocumentationFile Condition=" '$(NonShipping)' != 'true' and '$(NoDocumentationFile)' != 'true' ">$(OutputPath)$(AssemblyName).xml</DocumentationFile>
   </PropertyGroup>
+
+  <Import Project="$(UserProfile)\.nuget\packages\NuProj.Common\0.10.4-beta\build\NuProj.Common.targets" Condition="Exists('$(UserProfile)\.nuget\packages\NuProj.Common\0.10.4-beta\build\NuProj.Common.targets') and '$(MSBuildProjectExtension)' != '.nuproj' " />
 </Project>

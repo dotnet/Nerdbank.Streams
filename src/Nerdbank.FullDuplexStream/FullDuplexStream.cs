@@ -14,21 +14,12 @@
     /// </summary>
     public class FullDuplexStream : Stream
     {
-#if LegacyPCL
         /// <summary>
         /// The options to use when creating the value for <see cref="enqueuedSource"/>.
         /// </summary>
         private const TaskCreationOptions EnqueuedSourceOptions = TaskCreationOptions.None;
         private static readonly byte[] EmptyByteArray = new byte[0];
         private static readonly Task CompletedTask = Task.FromResult<object>(null);
-#else
-        /// <summary>
-        /// The options to use when creating the value for <see cref="enqueuedSource"/>.
-        /// </summary>
-        private static readonly byte[] EmptyByteArray = Array.Empty<byte>();
-        private static readonly Task CompletedTask = Task.CompletedTask;
-        private const TaskCreationOptions EnqueuedSourceOptions = TaskCreationOptions.RunContinuationsAsynchronously;
-#endif
 
         /// <summary>
         /// The messages posted by the <see cref="other"/> party,

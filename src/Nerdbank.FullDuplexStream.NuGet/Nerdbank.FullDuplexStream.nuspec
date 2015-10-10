@@ -3,16 +3,13 @@
   <metadata>
     <id>Nerdbank.FullDuplexStream</id>
     <version>$version$</version>
-    <title>Full duplex Stream</title>
-    <authors>Andrew Arnott</authors>
-    <owners>Andrew Arnott</owners>
-    <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
-    <projectUrl>https://github.com/aarnott/Nerdbank.FullDuplexStream</projectUrl>
+    <authors>andrew</authors>
+    <owners></owners>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
-    <summary>Full duplex Stream for in-proc communication between two components.</summary>
-    <description>Full duplex Stream for in-proc communication between two components.</description>
-    <copyright>Copyright © Andrew Arnott</copyright>
-    <tags>Stream full-duplex</tags>
+    <description>to be overwritten by project file</description>
+    <releaseNotes></releaseNotes>
+    <copyright></copyright>
+    <tags></tags>
     <dependencies>
       <group targetFramework="dotnet">
         <dependency id="System.Collections" version="4.0.10" />
@@ -23,31 +20,31 @@
         <dependency id="System.Runtime.Extensions" version="4.0.10" />
         <dependency id="System.Threading" version="4.0.10" />
         <dependency id="System.Threading.Tasks" version="4.0.10" />
-        <dependency id="Validation" version="2.2.5" />
+        <dependency id="Validation" version="2.2.8-g59ef401e15" />
       </group>
       <group targetFramework="net">
-        <dependency id="Validation" version="2.2.5" />
+        <dependency id="Validation" version="2.2.8-g59ef401e15" />
       </group>
       <group targetFramework="win">
-        <dependency id="Validation" version="2.2.5" />
+        <dependency id="Validation" version="2.2.8-g59ef401e15" />
       </group>
       <group targetFramework="wpa">
-        <dependency id="Validation" version="2.2.5" />
+        <dependency id="Validation" version="2.2.8-g59ef401e15" />
       </group>
       <group targetFramework="wp">
-        <dependency id="Validation" version="2.2.5" />
+        <dependency id="Validation" version="2.2.8-g59ef401e15" />
       </group>
       <group targetFramework="MonoAndroid">
-        <dependency id="Validation" version="2.2.5" />
+        <dependency id="Validation" version="2.2.8-g59ef401e15" />
       </group>
       <group targetFramework="MonoTouch">
-        <dependency id="Validation" version="2.2.5" />
+        <dependency id="Validation" version="2.2.8-g59ef401e15" />
       </group>
       <group targetFramework="XamarinIOS">
-        <dependency id="Validation" version="2.2.5" />
+        <dependency id="Validation" version="2.2.8-g59ef401e15" />
       </group>
       <group>
-        <dependency id="Validation" version="2.2.5" />
+        <dependency id="Validation" version="2.2.8-g59ef401e15" />
       </group>
     </dependencies>
   </metadata>
