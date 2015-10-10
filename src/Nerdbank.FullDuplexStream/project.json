@@ -5,7 +5,7 @@
     "NuProj": "0.10.4-beta-gf7fc34e7d8",
     "NuProj.Common": "0.10.4-beta",
     "NuSpec.ReferenceGenerator": "1.3.4",
-    "Validation": "2.2.8-g59ef401e15"
+    "Validation": "2.2.8"
   },
   "frameworks": {
     ".NETPortable,Version=v4.5,Profile=Profile259": {}
