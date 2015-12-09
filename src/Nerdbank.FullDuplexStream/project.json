@@ -1,13 +1,20 @@
 {
-  "supports": {},
   "dependencies": {
-    "Nerdbank.GitVersioning": "1.1.52-rc",
+    "Nerdbank.GitVersioning": {
+      "version": "1.1.61-rc",
+      "suppressParent": "none"
+    },
     "NuProj": "0.10.4-beta-gf7fc34e7d8",
     "NuProj.Common": "0.10.4-beta",
     "NuSpec.ReferenceGenerator": "1.3.4",
     "Validation": "2.2.8"
   },
   "frameworks": {
-    ".NETPortable,Version=v4.5,Profile=Profile259": {}
+    ".NETPortable,Version=v4.5,Profile=Profile259": { }
+  },
+  "supports": {
+    "dnxcore50.app": { },
+    "net46.app": { },
+    "uwp10.0.app": { }
   }
 }

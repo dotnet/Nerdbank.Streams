@@ -49,9 +49,9 @@
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('$(UserProfile)\.nuget\packages\Nerdbank.GitVersioning\1.1.52-rc\build\NerdBank.GitVersioning.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(UserProfile)\.nuget\packages\Nerdbank.GitVersioning\1.1.52-rc\build\NerdBank.GitVersioning.targets'))" />
+    <Error Condition="!Exists('$(NerdbankGitVersioningPath)build\NerdBank.GitVersioning.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NerdbankGitVersioningPath)build\NerdBank.GitVersioning.targets'))" />
   </Target>
-  <Import Project="$(UserProfile)\.nuget\packages\Nerdbank.GitVersioning\1.1.52-rc\build\NerdBank.GitVersioning.targets" Condition="Exists('$(UserProfile)\.nuget\packages\Nerdbank.GitVersioning\1.1.52-rc\build\NerdBank.GitVersioning.targets')" />
+  <Import Project="$(NerdbankGitVersioningPath)build\NerdBank.GitVersioning.targets" Condition="Exists('$(NerdbankGitVersioningPath)build\NerdBank.GitVersioning.targets')" />
   <Target Name="GetNuPkgVersion" DependsOnTargets="GetBuildVersion">
     <PropertyGroup>
       <Version>$(NuGetPackageVersion)</Version>
