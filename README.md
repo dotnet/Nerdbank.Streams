@@ -2,6 +2,7 @@ Full duplex .NET Streams
 =========================
 
 [![Build status](https://ci.appveyor.com/api/projects/status/849r1unf4tnjbpy8?svg=true)](https://ci.appveyor.com/project/AArnott/nerdbank-fullduplexstream)
+[![NuGet package](https://img.shields.io/nuget/v/nerdbank.fullduplexstream.svg)](https://nuget.org/packages/nerdbank.fullduplexstream)
 
 ## Installation
 
