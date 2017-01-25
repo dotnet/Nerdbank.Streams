@@ -48,6 +48,10 @@
         <!--<TargetFramework>dotnet</TargetFramework>-->
         <TargetPath>lib\dotnet\%(FileName)%(Extension)</TargetPath>
       </File>
+      <File Include="@(File)" Condition=" '%(File.TargetFrameworkMoniker)' == '.NETPortable,Version=v4.5,Profile=Profile259' ">
+        <!--<TargetFramework>dotnet</TargetFramework>-->
+        <TargetPath>lib\netstandard1.0\%(FileName)%(Extension)</TargetPath>
+      </File>
     </ItemGroup>
   </Target>
 </Project>

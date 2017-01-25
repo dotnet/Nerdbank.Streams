@@ -43,6 +43,9 @@
       <group targetFramework="XamarinIOS">
         <dependency id="Validation" version="2.3.7" />
       </group>
+      <group targetFramework="netstandard1.0">
+        <dependency id="Validation" version="2.3.7" />
+      </group>
       <group>
         <dependency id="Validation" version="2.3.7" />
       </group>
