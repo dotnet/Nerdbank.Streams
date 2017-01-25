@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "Nerdbank.GitVersioning": "1.5.62",
+    "ReadOnlySourceTree": "0.1.37-beta"
+  },
+  "frameworks": {
+    "net451": {}
+  },
+  "runtimes": {
+    "win": {}
+  }
+}

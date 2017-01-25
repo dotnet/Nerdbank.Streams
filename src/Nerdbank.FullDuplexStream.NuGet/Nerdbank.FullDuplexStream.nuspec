@@ -12,39 +12,39 @@
     <tags></tags>
     <dependencies>
       <group targetFramework="dotnet">
-        <dependency id="System.Collections" version="4.0.10" />
-        <dependency id="System.Diagnostics.Debug" version="4.0.10" />
-        <dependency id="System.IO" version="4.0.10" />
+        <dependency id="System.Collections" version="4.0.0" />
+        <dependency id="System.Diagnostics.Debug" version="4.0.0" />
+        <dependency id="System.IO" version="4.0.0" />
         <dependency id="System.Resources.ResourceManager" version="4.0.0" />
-        <dependency id="System.Runtime" version="4.0.20" />
-        <dependency id="System.Runtime.Extensions" version="4.0.10" />
-        <dependency id="System.Threading" version="4.0.10" />
-        <dependency id="System.Threading.Tasks" version="4.0.10" />
-        <dependency id="Validation" version="2.2.8" />
+        <dependency id="System.Runtime" version="4.0.0" />
+        <dependency id="System.Runtime.Extensions" version="4.0.0" />
+        <dependency id="System.Threading" version="4.0.0" />
+        <dependency id="System.Threading.Tasks" version="4.0.0" />
+        <dependency id="Validation" version="2.3.7" />
       </group>
       <group targetFramework="net">
-        <dependency id="Validation" version="2.2.8" />
+        <dependency id="Validation" version="2.3.7" />
       </group>
       <group targetFramework="win">
-        <dependency id="Validation" version="2.2.8" />
+        <dependency id="Validation" version="2.3.7" />
       </group>
       <group targetFramework="wpa">
-        <dependency id="Validation" version="2.2.8" />
+        <dependency id="Validation" version="2.3.7" />
       </group>
       <group targetFramework="wp">
-        <dependency id="Validation" version="2.2.8" />
+        <dependency id="Validation" version="2.3.7" />
       </group>
       <group targetFramework="MonoAndroid">
-        <dependency id="Validation" version="2.2.8" />
+        <dependency id="Validation" version="2.3.7" />
       </group>
       <group targetFramework="MonoTouch">
-        <dependency id="Validation" version="2.2.8" />
+        <dependency id="Validation" version="2.3.7" />
       </group>
       <group targetFramework="XamarinIOS">
-        <dependency id="Validation" version="2.2.8" />
+        <dependency id="Validation" version="2.3.7" />
       </group>
       <group>
-        <dependency id="Validation" version="2.2.8" />
+        <dependency id="Validation" version="2.3.7" />
       </group>
     </dependencies>
   </metadata>
