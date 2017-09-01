@@ -203,4 +203,34 @@ public class FullDuplexStreamTests : IDisposable
         Assert.Equal(Data3Bytes.Length, bytesRead);
         Assert.Equal(Data3Bytes, readBuffer.Take(bytesRead));
     }
+
+    [Fact]
+    public void Dispose_TwiceDoesNotThrow()
+    {
+        this.stream1.Dispose();
+        this.stream2.Dispose();
+        this.stream1.Dispose();
+        this.stream2.Dispose();
+    }
+
+    [Fact]
+    public async Task Dispose_CausesOtherMethodsToThrow()
+    {
+        this.stream1.Dispose();
+
+        byte[] buffer = new byte[1];
+        Assert.Throws<ObjectDisposedException>(() => this.stream1.Write(buffer, 0, 1));
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream1.WriteAsync(buffer, 0, 1));
+        Assert.Throws<ObjectDisposedException>(() => this.stream1.ReadByte());
+        Assert.Throws<ObjectDisposedException>(() => this.stream1.Read(buffer, 0, 1));
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream1.ReadAsync(buffer, 0, 1));
+    }
+
+    [Fact]
+    public void Dispose_LeadsOtherStreamToEnd()
+    {
+        this.stream1.Dispose();
+        byte[] buffer = new byte[1];
+        Assert.Equal(0, this.stream2.Read(buffer, 0, 1));
+    }
 }
