@@ -1,12 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
+﻿// Copyright (c) Andrew Arnott. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.Threading;
 using Nerdbank;
 using Xunit;
 
@@ -136,7 +136,7 @@ public class FullDuplexStreamTests : IDisposable
         this.stream1.Write(Data3Bytes, 0, 0);
         var buffer = new byte[10];
         await Assert.ThrowsAsync<OperationCanceledException>(
-            () => this.stream2.ReadAsync(buffer, 0, buffer.Length, ExpectedAsyncTimeoutToken));
+            () => this.stream2.ReadAsync(buffer, 0, buffer.Length, this.ExpectedAsyncTimeoutToken));
     }
 
     [Fact]
@@ -152,7 +152,8 @@ public class FullDuplexStreamTests : IDisposable
             int bytesJustRead = this.stream2.Read(receiveBuffer, bytesRead, receiveBuffer.Length - bytesRead);
             Assert.NotEqual(0, bytesJustRead);
             bytesRead += bytesJustRead;
-        } while (bytesRead < receiveBuffer.Length);
+        }
+        while (bytesRead < receiveBuffer.Length);
 
         Assert.Equal(Data3Bytes, receiveBuffer.Take(Data3Bytes.Length));
         Assert.Equal(Data5Bytes, receiveBuffer.Skip(Data3Bytes.Length));

@@ -1,4 +1,7 @@
-﻿namespace Nerdbank
+﻿// Copyright (c) Andrew Arnott. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+namespace Nerdbank
 {
     using System;
     using System.Collections.Generic;
@@ -52,6 +55,11 @@
             /// </summary>
             private TaskCompletionSource<object> enqueuedSource = new TaskCompletionSource<object>(EnqueuedSourceOptions);
 
+            /// <summary>
+            /// The stream to write to.
+            /// </summary>
+            private MyStream other;
+
             /// <inheritdoc />
             public override bool CanRead => true;
 
@@ -73,11 +81,6 @@
                 get { throw new NotSupportedException(); }
                 set { throw new NotSupportedException(); }
             }
-
-            /// <summary>
-            /// The stream to write to.
-            /// </summary>
-            private MyStream other;
 
             /// <inheritdoc />
             public override void Flush()

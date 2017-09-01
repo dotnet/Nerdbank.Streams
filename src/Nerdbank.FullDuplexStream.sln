@@ -1,23 +1,21 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.23107.0
+# Visual Studio 15
+VisualStudioVersion = 15.0.26823.1
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nerdbank.FullDuplexStream", "Nerdbank.FullDuplexStream\Nerdbank.FullDuplexStream.csproj", "{588B37F9-4102-4A6B-BA9E-769EDA0E89D5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nerdbank.FullDuplexStream", "Nerdbank.FullDuplexStream\Nerdbank.FullDuplexStream.csproj", "{588B37F9-4102-4A6B-BA9E-769EDA0E89D5}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{2B416DBB-F2EF-4815-A851-E14D5579055C}"
 	ProjectSection(SolutionItems) = preProject
+		..\.appveyor.yml = ..\.appveyor.yml
 		..\.gitignore = ..\.gitignore
-		..\EnlistmentInfo.props = ..\EnlistmentInfo.props
-		..\EnlistmentInfo.targets = ..\EnlistmentInfo.targets
+		Directory.Build.props = Directory.Build.props
 		..\LICENSE.txt = ..\LICENSE.txt
 		..\README.md = ..\README.md
-		..\version.json = ..\version.json
+		version.json = version.json
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nerdbank.FullDuplexStream.Tests", "Nerdbank.FullDuplexStream.Tests\Nerdbank.FullDuplexStream.Tests.csproj", "{266AC3D0-164A-47C7-87E6-06302291900B}"
-EndProject
-Project("{FF286327-C783-4F7A-AB73-9BCBAD0D4460}") = "Nerdbank.FullDuplexStream.NuGet", "Nerdbank.FullDuplexStream.NuGet\Nerdbank.FullDuplexStream.NuGet.nuproj", "{FE77A900-F249-479F-B241-0EAB975B15D5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nerdbank.FullDuplexStream.Tests", "Nerdbank.FullDuplexStream.Tests\Nerdbank.FullDuplexStream.Tests.csproj", "{266AC3D0-164A-47C7-87E6-06302291900B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,12 +31,11 @@ Global
 		{266AC3D0-164A-47C7-87E6-06302291900B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{266AC3D0-164A-47C7-87E6-06302291900B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{266AC3D0-164A-47C7-87E6-06302291900B}.Release|Any CPU.Build.0 = Release|Any CPU
-		{FE77A900-F249-479F-B241-0EAB975B15D5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{FE77A900-F249-479F-B241-0EAB975B15D5}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{FE77A900-F249-479F-B241-0EAB975B15D5}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{FE77A900-F249-479F-B241-0EAB975B15D5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {6A2B15D3-B237-4B5B-BB63-16E6A06EC019}
 	EndGlobalSection
 EndGlobal

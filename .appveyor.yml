@@ -1,0 +1,42 @@
+version: '{build}'
+branches:
+  only:
+  - master
+  - /^v\d+(?:\.\d+)?$/
+  - /[\b_]validate\b/
+skip_tags: true
+nuget:
+  disable_publish_on_pr: true
+image: Visual Studio 2017
+configuration: Release
+environment:
+  VisualStudioVersion: 15.0
+before_build:
+- ps: msbuild src /nologo /m /v:quiet /t:restore
+build_script:
+- ps: msbuild src /nologo /m /v:minimal /fl /flp:verbosity=detailed /t:build,pack
+test_script:
+- cmd: >-
+    SET testdir=bin\Nerdbank.FullDuplexStream.Tests\%configuration%\net46\
+
+    "%userprofile%\.nuget\packages\OpenCover\4.6.519\tools\OpenCover.Console.exe"
+    -register:user
+    -target:"%xunit20%\xunit.console.x86.exe"
+    -targetargs:"%testdir%Nerdbank.FullDuplexStream.Tests.dll -noshadow -parallel all -html %testdir%testresults.html -xml %testdir%testresults.xml -appveyor -nologo"
+    -returntargetcode
+    -excludebyattribute:*.ExcludeFromCodeCoverage*
+    -excludebyfile:*\*Designer.cs
+    -filter:"+[Nerdbank]*"
+    -hideskipped:All
+    -output:%testdir%code_coverage.xml
+
+    SET PATH=C:\Python34;C:\Python34\Scripts;%PATH%
+
+    pip install codecov
+
+    codecov -f "%testdir%code_coverage.xml"
+
+    dotnet test src\Nerdbank.FullDuplexStream.Tests --no-build -f netcoreapp2.0
+artifacts:
+- path: bin\**\*.nupkg
+  name: NuGet Package
