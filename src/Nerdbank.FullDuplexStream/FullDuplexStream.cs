@@ -34,7 +34,7 @@ namespace Nerdbank
         /// <summary>
         /// The full duplex stream.
         /// </summary>
-        private class MyStream : Stream
+        private class MyStream : Stream, IDisposableObservable
         {
             /// <summary>
             /// The options to use when creating the value for <see cref="enqueuedSource"/>.
@@ -59,6 +59,16 @@ namespace Nerdbank
             /// The stream to write to.
             /// </summary>
             private MyStream other;
+
+            /// <summary>
+            /// A value indicating whether this instance has been disposed.
+            /// </summary>
+            private bool isDisposed;
+
+            /// <summary>
+            /// Gets a value indicating whether this instance has been disposed.
+            /// </summary>
+            bool IDisposableObservable.IsDisposed => this.isDisposed;
 
             /// <inheritdoc />
             public override bool CanRead => true;
@@ -94,6 +104,7 @@ namespace Nerdbank
                 Requires.Range(offset >= 0, nameof(offset));
                 Requires.Range(count >= 0, nameof(count));
                 Requires.Range(offset + count <= buffer.Length, nameof(count));
+                Verify.NotDisposed(this);
 
                 cancellationToken.ThrowIfCancellationRequested();
                 Message message = null;
@@ -153,6 +164,7 @@ namespace Nerdbank
                 Requires.Range(offset >= 0, nameof(offset));
                 Requires.Range(count >= 0, nameof(count));
                 Requires.Range(offset + count <= buffer.Length, nameof(count));
+                Verify.NotDisposed(this);
 
                 lock (this.readQueue)
                 {
@@ -184,6 +196,7 @@ namespace Nerdbank
                 Requires.Range(offset >= 0, nameof(offset));
                 Requires.Range(count >= 0, nameof(count));
                 Requires.Range(offset + count <= buffer.Length, nameof(count));
+                Verify.NotDisposed(this);
 
                 // Avoid sending an empty buffer because that is the signal of a closed stream.
                 if (count > 0)
@@ -231,6 +244,7 @@ namespace Nerdbank
                 // Sending an empty buffer is the traditional way to signal
                 // that the transmitting stream has closed.
                 this.other.PostMessage(new Message(EmptyByteArray));
+                this.isDisposed = true;
                 base.Dispose(disposing);
             }
 
