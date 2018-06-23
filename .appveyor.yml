@@ -11,10 +11,8 @@ image: Visual Studio 2017
 configuration: Release
 environment:
   VisualStudioVersion: 15.0
-before_build:
-- ps: msbuild src /nologo /m /v:quiet /t:restore
 build_script:
-- ps: msbuild src /nologo /m /v:minimal /fl /flp:verbosity=detailed /t:build,pack
+- ps: msbuild src /nologo /m /v:minimal /fl /flp:verbosity=detailed /restore /t:build,pack
 test_script:
 - cmd: >-
     SET testdir=bin\Nerdbank.FullDuplexStream.Tests\%configuration%\net46\
