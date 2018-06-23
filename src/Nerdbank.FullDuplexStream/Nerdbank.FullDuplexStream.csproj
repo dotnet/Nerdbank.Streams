@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Validation" Version="2.3.7" />
+    <PackageReference Include="Validation" Version="2.3.7" PrivateAssets="build;analyzers;compile" />
     <PackageReference Include="MSBuild.Sdk.Extras" Version="1.0.6" PrivateAssets="all" />
   </ItemGroup>
 
