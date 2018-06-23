@@ -34,7 +34,7 @@ namespace Nerdbank
         /// <summary>
         /// The full duplex stream.
         /// </summary>
-        private class MyStream : Stream
+        private class MyStream : Stream, IDisposableObservable
         {
             /// <summary>
             /// The options to use when creating the value for <see cref="enqueuedSource"/>.
@@ -61,25 +61,28 @@ namespace Nerdbank
             private MyStream other;
 
             /// <inheritdoc />
-            public override bool CanRead => true;
+            public bool IsDisposed { get; private set; }
+
+            /// <inheritdoc />
+            public override bool CanRead => !this.IsDisposed;
 
             /// <inheritdoc />
             public override bool CanSeek => false;
 
             /// <inheritdoc />
-            public override bool CanWrite => true;
+            public override bool CanWrite => !this.IsDisposed;
 
             /// <inheritdoc />
             public override long Length
             {
-                get { throw new NotSupportedException(); }
+                get => throw this.ThrowDisposedOr(new NotSupportedException());
             }
 
             /// <inheritdoc />
             public override long Position
             {
-                get { throw new NotSupportedException(); }
-                set { throw new NotSupportedException(); }
+                get => throw this.ThrowDisposedOr(new NotSupportedException());
+                set => throw this.ThrowDisposedOr(new NotSupportedException());
             }
 
             /// <inheritdoc />
@@ -94,6 +97,7 @@ namespace Nerdbank
                 Requires.Range(offset >= 0, nameof(offset));
                 Requires.Range(count >= 0, nameof(count));
                 Requires.Range(offset + count <= buffer.Length, nameof(count));
+                Verify.NotDisposed(this);
 
                 cancellationToken.ThrowIfCancellationRequested();
                 Message message = null;
@@ -153,6 +157,7 @@ namespace Nerdbank
                 Requires.Range(offset >= 0, nameof(offset));
                 Requires.Range(count >= 0, nameof(count));
                 Requires.Range(offset + count <= buffer.Length, nameof(count));
+                Verify.NotDisposed(this);
 
                 lock (this.readQueue)
                 {
@@ -184,6 +189,7 @@ namespace Nerdbank
                 Requires.Range(offset >= 0, nameof(offset));
                 Requires.Range(count >= 0, nameof(count));
                 Requires.Range(offset + count <= buffer.Length, nameof(count));
+                Verify.NotDisposed(this);
 
                 // Avoid sending an empty buffer because that is the signal of a closed stream.
                 if (count > 0)
@@ -197,6 +203,7 @@ namespace Nerdbank
             /// <inheritdoc />
             public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
             {
+                Verify.NotDisposed(this);
                 cancellationToken.ThrowIfCancellationRequested();
                 this.Write(buffer, offset, count);
                 return CompletedTask;
@@ -205,12 +212,14 @@ namespace Nerdbank
             /// <inheritdoc />
             public override long Seek(long offset, SeekOrigin origin)
             {
+                Verify.NotDisposed(this);
                 throw new NotSupportedException();
             }
 
             /// <inheritdoc />
             public override void SetLength(long value)
             {
+                Verify.NotDisposed(this);
                 throw new NotSupportedException();
             }
 
@@ -231,6 +240,7 @@ namespace Nerdbank
                 // Sending an empty buffer is the traditional way to signal
                 // that the transmitting stream has closed.
                 this.other.PostMessage(new Message(EmptyByteArray));
+                this.IsDisposed = true;
                 base.Dispose(disposing);
             }
 
@@ -251,6 +261,18 @@ namespace Nerdbank
                 }
 
                 enqueuedSource.TrySetResult(null);
+            }
+
+            /// <summary>
+            /// Throws <see cref="ObjectDisposedException"/> if the object is disposed,
+            /// otherwise throws the given exception.
+            /// </summary>
+            /// <param name="ex">The new exception to throw.</param>
+            /// <returns>No value is ever returned. This method always throws.</returns>
+            private Exception ThrowDisposedOr(Exception ex)
+            {
+                Verify.NotDisposed(this);
+                throw ex;
             }
         }
 

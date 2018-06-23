@@ -203,4 +203,116 @@ public class FullDuplexStreamTests : IDisposable
         Assert.Equal(Data3Bytes.Length, bytesRead);
         Assert.Equal(Data3Bytes, readBuffer.Take(bytesRead));
     }
+
+    [Fact]
+    public void Position_Throws()
+    {
+        Assert.Throws<NotSupportedException>(() => this.stream1.Position);
+        Assert.Throws<NotSupportedException>(() => this.stream1.Position = 0);
+        this.stream1.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => GetDisposedMemoryStream().Position);
+        Assert.Throws<ObjectDisposedException>(() => this.stream1.Position);
+        Assert.Throws<ObjectDisposedException>(() => GetDisposedMemoryStream().Position = 0);
+        Assert.Throws<ObjectDisposedException>(() => this.stream1.Position = 0);
+    }
+
+    [Fact]
+    public void Length_ThrowsObjectDisposedException()
+    {
+        Assert.Throws<NotSupportedException>(() => this.stream1.Length);
+        this.stream1.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => GetDisposedMemoryStream().Length);
+        Assert.Throws<ObjectDisposedException>(() => this.stream1.Length);
+    }
+
+    [Fact]
+    public void CanSeek()
+    {
+        Assert.False(this.stream1.CanSeek);
+        this.stream1.Dispose();
+
+        Assert.False(GetDisposedMemoryStream().CanSeek);
+        Assert.False(this.stream1.CanSeek);
+    }
+
+    [Fact]
+    public void CanWrite()
+    {
+        Assert.True(this.stream1.CanWrite);
+        this.stream1.Dispose();
+
+        Assert.False(GetDisposedMemoryStream().CanWrite);
+        Assert.False(this.stream1.CanWrite);
+    }
+
+    [Fact]
+    public void CanRead()
+    {
+        Assert.True(this.stream1.CanRead);
+        this.stream1.Dispose();
+
+        Assert.False(GetDisposedMemoryStream().CanRead);
+        Assert.False(this.stream1.CanRead);
+    }
+
+    [Fact]
+    public void Seek()
+    {
+        Assert.Throws<NotSupportedException>(() => this.stream1.Seek(0, SeekOrigin.Begin));
+        this.stream1.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => GetDisposedMemoryStream().Seek(0, SeekOrigin.Begin));
+        Assert.Throws<ObjectDisposedException>(() => this.stream1.Seek(0, SeekOrigin.Begin));
+    }
+
+    [Fact]
+    public void SetLength()
+    {
+        Assert.Throws<NotSupportedException>(() => this.stream1.SetLength(0));
+        this.stream1.Dispose();
+
+        Assert.Throws<NotSupportedException>(() => GetDisposedMemoryStream().SetLength(0));
+        Assert.Throws<ObjectDisposedException>(() => this.stream1.SetLength(0));
+    }
+
+    [Fact]
+    public void Read_ThrowsObjectDisposedException()
+    {
+        this.stream1.Dispose();
+        var buffer = new byte[1];
+        Assert.Throws<ObjectDisposedException>(() => this.stream1.Read(buffer, 0, buffer.Length));
+    }
+
+    [Fact]
+    public async Task ReadAsync_ThrowsObjectDisposedException()
+    {
+        this.stream1.Dispose();
+        var buffer = new byte[1];
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream1.ReadAsync(buffer, 0, buffer.Length));
+    }
+
+    [Fact]
+    public void Write_ThrowsObjectDisposedException()
+    {
+        this.stream1.Dispose();
+        var buffer = new byte[1];
+        Assert.Throws<ObjectDisposedException>(() => this.stream1.Write(buffer, 0, buffer.Length));
+    }
+
+    [Fact]
+    public async Task WriteAsync_ThrowsObjectDisposedException()
+    {
+        this.stream1.Dispose();
+        var buffer = new byte[1];
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream1.WriteAsync(buffer, 0, buffer.Length));
+    }
+
+    private static MemoryStream GetDisposedMemoryStream()
+    {
+        var ms = new MemoryStream();
+        ms.Dispose();
+        return ms;
+    }
 }
