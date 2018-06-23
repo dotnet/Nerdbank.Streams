@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="MSBuild.Sdk.Extras">
   <PropertyGroup>
     <RootNamespace>Nerdbank</RootNamespace>
     <AssemblyName>Nerdbank.FullDuplexStream</AssemblyName>
@@ -23,7 +23,6 @@
 
   <ItemGroup>
     <PackageReference Include="Validation" Version="2.3.7" PrivateAssets="build;analyzers;compile" />
-    <PackageReference Include="MSBuild.Sdk.Extras" Version="1.0.6" PrivateAssets="all" />
   </ItemGroup>
 
   <Target Name="SetNuSpecProperties" BeforeTargets="GenerateNuspec" DependsOnTargets="GetBuildVersion">
@@ -33,6 +32,4 @@
       <PackageLicenseUrl>https://raw.githubusercontent.com/AArnott/Nerdbank.FullDuplexStream/$(GitCommitIdShort)/LICENSE.txt</PackageLicenseUrl>
     </PropertyGroup>
   </Target>
-
-  <Import Project="$(MSBuildSDKExtrasTargets)" Condition="Exists('$(MSBuildSDKExtrasTargets)')" />
 </Project>
