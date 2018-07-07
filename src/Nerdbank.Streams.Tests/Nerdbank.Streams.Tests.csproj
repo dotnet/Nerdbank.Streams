@@ -5,14 +5,11 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    <CodeAnalysisRuleSet>Nerdbank.FullDuplexStream.Tests.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet>Nerdbank.Streams.Tests.ruleset</CodeAnalysisRuleSet>
 
     <!-- VS2017 Test Explorer test navigation and callstack links don't work with portable PDBs yet. -->
     <DebugType>Full</DebugType>
   </PropertyGroup>
-  <ItemGroup>
-    <AdditionalFiles Include="..\Nerdbank.FullDuplexStream\stylecop.json" Link="stylecop.json" />
-  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="xunit" Version="2.3.1" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.3.1" />
@@ -20,6 +17,6 @@
     <PackageReference Include="OpenCover" Version="4.6.519" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Nerdbank.FullDuplexStream\Nerdbank.FullDuplexStream.csproj" />
+    <ProjectReference Include="..\Nerdbank.Streams\Nerdbank.Streams.csproj" />
   </ItemGroup>
 </Project>

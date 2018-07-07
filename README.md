@@ -2,11 +2,11 @@ Full duplex .NET Streams
 =========================
 
 [![Build status](https://ci.appveyor.com/api/projects/status/849r1unf4tnjbpy8?svg=true)](https://ci.appveyor.com/project/AArnott/nerdbank-fullduplexstream)
-[![NuGet package](https://img.shields.io/nuget/v/nerdbank.fullduplexstream.svg)](https://nuget.org/packages/nerdbank.fullduplexstream)
+[![NuGet package](https://img.shields.io/nuget/v/Nerdbank.Streams.svg)](https://nuget.org/packages/Nerdbank.Streams)
 
 ## Installation
 
-Consume this project by installing the [Nerdbank.FullDuplexStream][1] NuGet package.
+Consume this project by installing the [Nerdbank.Streams][1] NuGet package.
 
 The code to set up a full duplex stream is trivial:
 
@@ -49,4 +49,4 @@ they would not see the data previously written by the other party.
 Named pipes carry the overhead of operating system handles and are not portable.
 The concept of full duplex streaming is simple and can be implemented in a portable way.
 
-[1]: https://nuget.org/packages/Nerdbank.FullDuplexStream
+[1]: https://nuget.org/packages/Nerdbank.Streams

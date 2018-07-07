@@ -7,7 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Nerdbank;
+using Nerdbank.Streams;
 using Xunit;
 
 public class FullDuplexStreamTests : IDisposable
