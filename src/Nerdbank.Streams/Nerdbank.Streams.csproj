@@ -10,7 +10,8 @@
     <Description>Streams for full duplex in-proc communication, wrap a WebSocket, etc.</Description>
     <Company>Andrew Arnott</Company>
     <Authors>Andrew Arnott</Authors>
-    <RepositoryUrl>https://github.com/AArnott/Nerdbank.Streams</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/AArnott/Nerdbank.Streams</PackageProjectUrl>
+    <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>Stream full-duplex websocket</PackageTags>
   </PropertyGroup>
