@@ -15,12 +15,12 @@ build_script:
 - ps: msbuild src /nologo /m /v:minimal /fl /flp:verbosity=detailed /restore /t:build,pack
 test_script:
 - cmd: >-
-    SET testdir=bin\Nerdbank.FullDuplexStream.Tests\%configuration%\net46\
+    SET testdir=bin\Nerdbank.Streams.Tests\%configuration%\net46\
 
     "%userprofile%\.nuget\packages\OpenCover\4.6.519\tools\OpenCover.Console.exe"
     -register:user
     -target:"%xunit20%\xunit.console.x86.exe"
-    -targetargs:"%testdir%Nerdbank.FullDuplexStream.Tests.dll -noshadow -parallel all -html %testdir%testresults.html -xml %testdir%testresults.xml -appveyor -nologo"
+    -targetargs:"%testdir%Nerdbank.Streams.Tests.dll -noshadow -parallel all -html %testdir%testresults.html -xml %testdir%testresults.xml -appveyor -nologo"
     -returntargetcode
     -excludebyattribute:*.ExcludeFromCodeCoverage*
     -excludebyfile:*\*Designer.cs
@@ -34,7 +34,7 @@ test_script:
 
     codecov -f "%testdir%code_coverage.xml"
 
-    dotnet test src\Nerdbank.FullDuplexStream.Tests --no-build -f netcoreapp2.0
+    dotnet test src\Nerdbank.Streams.Tests --no-build -f netcoreapp2.0
 artifacts:
 - path: bin\**\*.nupkg
   name: NuGet Package

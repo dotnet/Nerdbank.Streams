@@ -1,36 +1,32 @@
 ﻿<Project Sdk="MSBuild.Sdk.Extras">
   <PropertyGroup>
-    <RootNamespace>Nerdbank</RootNamespace>
-    <AssemblyName>Nerdbank.FullDuplexStream</AssemblyName>
-    <TargetFrameworks>netstandard1.0;portable-net45+win8+wpa81+wp8</TargetFrameworks>
+    <TargetFrameworks>netstandard1.0;netstandard1.3;net45</TargetFrameworks>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\Release.snk</AssemblyOriginatorKeyFile>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <CodeAnalysisRuleSet>Nerdbank.FullDuplexStream.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet>..\Nerdbank.Streams.Tests\Nerdbank.Streams.Tests.ruleset</CodeAnalysisRuleSet>
 
     <Summary>Full duplex Stream for in-proc communication between two components.</Summary>
     <Description>Full duplex Stream for in-proc communication between two components.</Description>
     <Company>Andrew Arnott</Company>
     <Authors>Andrew Arnott</Authors>
-    <RepositoryUrl>https://github.com/AArnott/Nerdbank.FullDuplexStream</RepositoryUrl>
+    <RepositoryUrl>https://github.com/AArnott/Nerdbank.Streams</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>Stream full-duplex</PackageTags>
     <PackageReleaseNotes>This package is obsolete. Please reference the Nerdbank.Streams package for newer versions and additional functionality.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
-    <AdditionalFiles Include="stylecop.json" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="Validation" Version="2.3.7" PrivateAssets="build;analyzers;compile" />
+    <PackageReference Include="AsyncUsageAnalyzers" Version="1.0.0-alpha003" PrivateAssets="all" />
+    <PackageReference Include="System.Net.WebSockets" Version="4.3.0" Condition=" '$(TargetFramework)' == 'netstandard1.3' " />
   </ItemGroup>
 
   <Target Name="SetNuSpecProperties" BeforeTargets="GenerateNuspec" DependsOnTargets="GetBuildVersion">
     <PropertyGroup>
       <!-- https://github.com/NuGet/Home/issues/4649 -->
       <!--<NuSpecProperties>$(NuSpecProperties);GitCommitIdShort=$(GitCommitIdShort)</NuSpecProperties>-->
-      <PackageLicenseUrl>https://raw.githubusercontent.com/AArnott/Nerdbank.FullDuplexStream/$(GitCommitIdShort)/LICENSE.txt</PackageLicenseUrl>
+      <PackageLicenseUrl>https://raw.githubusercontent.com/AArnott/Nerdbank.Streams/$(GitCommitIdShort)/LICENSE.txt</PackageLicenseUrl>
     </PropertyGroup>
   </Target>
 </Project>

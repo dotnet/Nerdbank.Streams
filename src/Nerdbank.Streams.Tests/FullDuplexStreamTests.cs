@@ -7,7 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Nerdbank;
+using Nerdbank.Streams;
 using Xunit;
 
 public class FullDuplexStreamTests : IDisposable
@@ -107,7 +107,7 @@ public class FullDuplexStreamTests : IDisposable
         var readTask = this.stream2.ReadAsync(buffer, 0, buffer.Length, this.TestCanceled);
         Assert.False(readTask.IsCompleted);
 
-        this.stream1.Write(Data3Bytes, 0, Data3Bytes.Length);
+        await this.stream1.WriteAsync(Data3Bytes, 0, Data3Bytes.Length);
         int bytesRead = await readTask;
         Assert.Equal(Data3Bytes.Length, bytesRead);
         Assert.Equal(Data3Bytes, buffer.Take(bytesRead));
@@ -133,7 +133,7 @@ public class FullDuplexStreamTests : IDisposable
     [Fact]
     public async Task Write_EmptyBufferDoesNotTerminateOtherStream()
     {
-        this.stream1.Write(Data3Bytes, 0, 0);
+        await this.stream1.WriteAsync(Data3Bytes, 0, 0);
         var buffer = new byte[10];
         await Assert.ThrowsAsync<OperationCanceledException>(
             () => this.stream2.ReadAsync(buffer, 0, buffer.Length, this.ExpectedAsyncTimeoutToken));
@@ -185,7 +185,7 @@ public class FullDuplexStreamTests : IDisposable
             (cb, state) => this.stream1.BeginRead(readBuffer, 0, readBuffer.Length, cb, state),
             ar => this.stream1.EndRead(ar),
             null);
-        this.stream2.Write(Data3Bytes, 0, Data3Bytes.Length);
+        await this.stream2.WriteAsync(Data3Bytes, 0, Data3Bytes.Length);
         int bytesRead = await readTask;
         Assert.Equal(Data3Bytes.Length, bytesRead);
         Assert.Equal(Data3Bytes, readBuffer.Take(bytesRead));
@@ -199,7 +199,7 @@ public class FullDuplexStreamTests : IDisposable
             ar => this.stream1.EndWrite(ar),
             null);
         byte[] readBuffer = new byte[10];
-        int bytesRead = this.stream2.Read(readBuffer, 0, readBuffer.Length);
+        int bytesRead = await this.stream2.ReadAsync(readBuffer, 0, readBuffer.Length);
         Assert.Equal(Data3Bytes.Length, bytesRead);
         Assert.Equal(Data3Bytes, readBuffer.Take(bytesRead));
     }
