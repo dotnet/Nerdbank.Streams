@@ -15,6 +15,7 @@
     <RepositoryUrl>https://github.com/AArnott/Nerdbank.FullDuplexStream</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>Stream full-duplex</PackageTags>
+    <PackageReleaseNotes>This package is obsolete. Please reference the Nerdbank.Streams package for newer versions and additional functionality.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
