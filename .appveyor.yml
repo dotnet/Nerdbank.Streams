@@ -2,6 +2,7 @@ version: '{build}'
 branches:
   only:
   - master
+  - fullduplexstream
   - /^v\d+(?:\.\d+)?$/
   - /[\b_]validate\b/
 skip_tags: true
