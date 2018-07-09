@@ -13,10 +13,11 @@ configuration: Release
 environment:
   VisualStudioVersion: 15.0
 build_script:
-- ps: msbuild src /nologo /m /v:minimal /fl /flp:verbosity=detailed /restore /t:build,pack
+- dotnet build src
+- dotnet pack src --no-build
 test_script:
 - cmd: >-
-    SET testdir=bin\Nerdbank.Streams.Tests\%configuration%\net46\
+    SET testdir=bin\Nerdbank.Streams.Tests\%configuration%\net461\
 
     "%userprofile%\.nuget\packages\OpenCover\4.6.519\tools\OpenCover.Console.exe"
     -register:user
