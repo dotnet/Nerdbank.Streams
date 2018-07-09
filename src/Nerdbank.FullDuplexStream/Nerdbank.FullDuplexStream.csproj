@@ -12,7 +12,8 @@
     <Description>Full duplex Stream for in-proc communication between two components.</Description>
     <Company>Andrew Arnott</Company>
     <Authors>Andrew Arnott</Authors>
-    <RepositoryUrl>https://github.com/AArnott/Nerdbank.FullDuplexStream</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/AArnott/Nerdbank.FullDuplexStream</PackageProjectUrl>
+    <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>Stream full-duplex</PackageTags>
     <PackageReleaseNotes>This package is obsolete. Please reference the Nerdbank.Streams package for newer versions and additional functionality.</PackageReleaseNotes>
