@@ -36,6 +36,12 @@ public abstract class TestBase
         Requires.NotNull(buffer, nameof(buffer));
 
         count = count ?? buffer.Length;
+
+        if (count == 0)
+        {
+            return;
+        }
+
         int bytesRead = 0;
         while (bytesRead < count)
         {
