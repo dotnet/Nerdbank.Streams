@@ -36,7 +36,7 @@ test_script:
 
     codecov -f "%testdir%code_coverage.xml"
 
-    dotnet test src\Nerdbank.Streams.Tests --no-build -f netcoreapp2.0
+    dotnet test src\Nerdbank.Streams.Tests --no-build
 artifacts:
 - path: bin\**\*.nupkg
   name: NuGet Package
