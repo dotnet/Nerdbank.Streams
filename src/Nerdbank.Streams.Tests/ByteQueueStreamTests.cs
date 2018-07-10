@@ -96,67 +96,64 @@ public class ByteQueueStreamTests : TestBase
         Assert.True(this.stream.FlushAsync().IsCompleted);
     }
 
-    [Fact]
-    public async Task WriteThenRead()
+    [Theory]
+    [PairwiseData]
+    public async Task WriteThenRead(bool useAsync)
     {
         byte[] sendBuffer = this.GetRandomBuffer();
-        await this.stream.WriteAsync(sendBuffer, 0, sendBuffer.Length).WithCancellation(this.TimeoutToken);
+        await this.WriteAsync(sendBuffer, 0, sendBuffer.Length, useAsync);
         byte[] recvBuffer = new byte[sendBuffer.Length];
-        await this.ReadAsync(this.stream, recvBuffer);
+        await this.ReadAsync(this.stream, recvBuffer, isAsync: useAsync);
         Assert.Equal(sendBuffer, recvBuffer);
-    }
-
-    [Fact]
-    public void Write_InputValidation()
-    {
-        Assert.Throws<ArgumentNullException>(() => this.stream.Write(null, 0, 0));
-        Assert.Throws<ArgumentOutOfRangeException>(() => this.stream.Write(new byte[MaxBufferSize + 1], 0, MaxBufferSize + 1));
-        Assert.Throws<ArgumentOutOfRangeException>(() => this.stream.Write(new byte[5], 0, 6));
-        Assert.Throws<ArgumentOutOfRangeException>(() => this.stream.Write(new byte[5], 5, 1));
-        Assert.Throws<ArgumentOutOfRangeException>(() => this.stream.Write(new byte[5], 3, 3));
-        Assert.Throws<ArgumentOutOfRangeException>(() => this.stream.Write(new byte[5], -1, 2));
-        Assert.Throws<ArgumentOutOfRangeException>(() => this.stream.Write(new byte[5], 2, -1));
-
-        this.stream.Write(new byte[5], 5, 0);
-    }
-
-    [Fact]
-    public void Write_ThrowsObjectDisposedException()
-    {
-        this.stream.Dispose();
-        Assert.Throws<ObjectDisposedException>(() => this.stream.Write(new byte[1], 0, 1));
     }
 
     [Theory]
     [PairwiseData]
-    public async Task WriteManyThenRead([CombinatorialValues(InitialBufferSize / 2, InitialBufferSize - 1, InitialBufferSize, InitialBufferSize + 1, MaxBufferSize - 1, MaxBufferSize)] int bytes, [CombinatorialValues(1, 2, 3)] int steps)
+    public async Task Write_InputValidation(bool useAsync)
+    {
+        await Assert.ThrowsAsync<ArgumentNullException>(() => this.WriteAsync(null, 0, 0, isAsync: useAsync));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.WriteAsync(new byte[MaxBufferSize + 1], 0, MaxBufferSize + 1, isAsync: useAsync));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.WriteAsync(new byte[5], 0, 6, isAsync: useAsync));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.WriteAsync(new byte[5], 5, 1, isAsync: useAsync));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.WriteAsync(new byte[5], 3, 3, isAsync: useAsync));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.WriteAsync(new byte[5], -1, 2, isAsync: useAsync));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.WriteAsync(new byte[5], 2, -1, isAsync: useAsync));
+
+        await this.WriteAsync(new byte[5], 5, 0, useAsync);
+    }
+
+    [Theory]
+    [PairwiseData]
+    public async Task Write_ThrowsObjectDisposedException(bool useAsync)
+    {
+        this.stream.Dispose();
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.WriteAsync(new byte[1], 0, 1, useAsync));
+    }
+
+    [Theory]
+    [CombinatorialData]
+    public async Task WriteManyThenRead([CombinatorialValues(InitialBufferSize / 2, InitialBufferSize - 1, InitialBufferSize, InitialBufferSize + 1, MaxBufferSize - 1, MaxBufferSize)] int bytes, [CombinatorialValues(1, 2, 3)] int steps, bool useAsync)
     {
         int typicalWriteSize = bytes / steps;
         byte[] sendBuffer = this.GetRandomBuffer(bytes);
         int bytesWritten = 0;
         for (int i = 0; i < steps; i++)
         {
-            await this.stream.WriteAsync(sendBuffer, bytesWritten, typicalWriteSize).WithCancellation(this.TimeoutToken);
+            await this.WriteAsync(sendBuffer, bytesWritten, typicalWriteSize, useAsync);
             bytesWritten += typicalWriteSize;
         }
 
         // Write the balance of the bytes
-        await this.stream.WriteAsync(sendBuffer, bytesWritten, bytes - bytesWritten).WithCancellation(this.TimeoutToken);
+        await this.WriteAsync(sendBuffer, bytesWritten, bytes - bytesWritten, useAsync);
 
         byte[] recvBuffer = new byte[sendBuffer.Length];
-        await this.ReadAsync(this.stream, recvBuffer);
+        await this.ReadAsync(this.stream, recvBuffer, isAsync: useAsync);
         Assert.Equal(sendBuffer, recvBuffer);
     }
 
     [Theory]
-    [InlineData(2)]
-    [InlineData(2.1)]
-    [InlineData(2.9)]
-    [InlineData(3)]
-    [InlineData(4)]
-    [InlineData(5)]
-    [InlineData(6)]
-    public async Task WriteWriteRead_Loop_WriteRead(float stepsPerBuffer)
+    [CombinatorialData]
+    public async Task WriteWriteRead_Loop_WriteRead([CombinatorialValues(2, 2.1, 2.9, 3, 4, 5, 6)] float stepsPerBuffer, bool useAsync)
     {
         const int maxBufferMultiplier = 3;
         float steps = stepsPerBuffer * maxBufferMultiplier;
@@ -168,28 +165,28 @@ public class ByteQueueStreamTests : TestBase
         int bytesRead = 0;
         for (int i = 0; i < Math.Floor(steps); i++)
         {
-            await this.stream.WriteAsync(sendBuffer, bytesWritten, typicalWriteSize).WithCancellation(this.TimeoutToken);
+            await this.WriteAsync(sendBuffer, bytesWritten, typicalWriteSize, useAsync);
             bytesWritten += typicalWriteSize;
 
             if (i > 0)
             {
-                await this.ReadAsync(this.stream, recvBuffer, typicalWriteSize, bytesRead);
+                await this.ReadAsync(this.stream, recvBuffer, typicalWriteSize, bytesRead, useAsync);
                 bytesRead += typicalWriteSize;
                 Assert.Equal(sendBuffer.Take(bytesRead), recvBuffer.Take(bytesRead));
             }
         }
 
         // Write the balance of the bytes
-        await this.stream.WriteAsync(sendBuffer, bytesWritten, sendBuffer.Length - bytesWritten).WithCancellation(this.TimeoutToken);
+        await this.WriteAsync(sendBuffer, bytesWritten, sendBuffer.Length - bytesWritten, useAsync);
 
         // Read the balance
-        await this.ReadAsync(this.stream, recvBuffer, recvBuffer.Length - bytesRead, bytesRead);
+        await this.ReadAsync(this.stream, recvBuffer, recvBuffer.Length - bytesRead, bytesRead, useAsync);
 
         Assert.Equal(sendBuffer, recvBuffer);
     }
 
-    [Fact(Skip = "Deadlocks till we implement async I/O methods")]
-    public async Task ReadThenWrite()
+    [Fact]
+    public async Task ReadAsyncThenWriteAsync()
     {
         byte[] sendBuffer = this.GetRandomBuffer();
         byte[] recvBuffer = new byte[sendBuffer.Length];
@@ -204,5 +201,17 @@ public class ByteQueueStreamTests : TestBase
         byte[] buffer = new byte[size];
         this.random.NextBytes(buffer);
         return buffer;
+    }
+
+    private async Task WriteAsync(byte[] buffer, int offset, int count, bool isAsync)
+    {
+        if (isAsync)
+        {
+            await this.stream.WriteAsync(buffer, offset, count, this.TimeoutToken).WithCancellation(this.TimeoutToken);
+        }
+        else
+        {
+            this.stream.Write(buffer, offset, count);
+        }
     }
 }

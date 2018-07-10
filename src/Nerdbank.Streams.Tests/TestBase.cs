@@ -30,7 +30,7 @@ public abstract class TestBase
 
     private static TimeSpan TestTimeout => UnexpectedTimeout;
 
-    public async Task ReadAsync(Stream stream, byte[] buffer, int? count = null, int offset = 0)
+    public async Task ReadAsync(Stream stream, byte[] buffer, int? count = null, int offset = 0, bool isAsync = true)
     {
         Requires.NotNull(stream, nameof(stream));
         Requires.NotNull(buffer, nameof(buffer));
@@ -39,7 +39,9 @@ public abstract class TestBase
         int bytesRead = 0;
         while (bytesRead < count)
         {
-            int bytesJustRead = await stream.ReadAsync(buffer, offset + bytesRead, count.Value - bytesRead, this.TimeoutToken).WithCancellation(this.TimeoutToken);
+            int bytesJustRead = isAsync
+                ? await stream.ReadAsync(buffer, offset + bytesRead, count.Value - bytesRead, this.TimeoutToken).WithCancellation(this.TimeoutToken)
+                : stream.Read(buffer, offset + bytesRead, count.Value - bytesRead);
             if (bytesJustRead == 0)
             {
                 throw new EndOfStreamException();
