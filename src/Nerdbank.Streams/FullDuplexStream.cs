@@ -9,7 +9,7 @@ namespace Nerdbank.Streams
     using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
-    using Validation;
+    using Microsoft;
 
     /// <summary>
     /// Provides a full duplex stream which may be shared by two parties to

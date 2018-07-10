@@ -1,6 +1,6 @@
 ﻿<Project Sdk="MSBuild.Sdk.Extras">
   <PropertyGroup>
-    <TargetFrameworks>netstandard1.0;netstandard1.3;net45</TargetFrameworks>
+    <TargetFrameworks>netstandard1.3</TargetFrameworks>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\Release.snk</AssemblyOriginatorKeyFile>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -17,9 +17,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Validation" Version="2.3.7" PrivateAssets="build;analyzers;compile" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading" Version="15.7.23" PrivateAssets="build;analyzers;compile" />
+    <PackageReference Include="System.IO.Pipelines" Version="4.5.0" />
     <PackageReference Include="AsyncUsageAnalyzers" Version="1.0.0-alpha003" PrivateAssets="all" />
-    <PackageReference Include="System.Net.WebSockets" Version="4.3.0" Condition=" '$(TargetFramework)' == 'netstandard1.3' " />
+    <PackageReference Include="System.Net.WebSockets" Version="4.3.0" />
   </ItemGroup>
 
   <Target Name="SetNuSpecProperties" BeforeTargets="GenerateNuspec" DependsOnTargets="GetBuildVersion">

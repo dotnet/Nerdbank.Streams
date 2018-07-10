@@ -13,19 +13,24 @@ using Validation;
 using Xunit;
 using Xunit.Abstractions;
 
-public class ByteQueueStreamTests : TestBase
+public class HalfDuplexStreamTests : TestBase, IDisposable
 {
-    private const int InitialBufferSize = 16;
+    private const int ResumeThreshold = 39;
 
-    private const int MaxBufferSize = 40;
+    private const int PauseThreshold = 40;
 
     private readonly Random random = new Random();
 
-    private ByteQueueStream stream = new ByteQueueStream(InitialBufferSize, MaxBufferSize);
+    private HalfDuplexStream stream = new HalfDuplexStream(ResumeThreshold, PauseThreshold);
 
-    public ByteQueueStreamTests(ITestOutputHelper logger)
+    public HalfDuplexStreamTests(ITestOutputHelper logger)
         : base(logger)
     {
+    }
+
+    public void Dispose()
+    {
+        this.stream.Dispose();
     }
 
     [Fact]
@@ -112,7 +117,6 @@ public class ByteQueueStreamTests : TestBase
     public async Task Write_InputValidation(bool useAsync)
     {
         await Assert.ThrowsAsync<ArgumentNullException>(() => this.WriteAsync(null, 0, 0, isAsync: useAsync));
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.WriteAsync(new byte[MaxBufferSize + 1], 0, MaxBufferSize + 1, isAsync: useAsync));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.WriteAsync(new byte[5], 0, 6, isAsync: useAsync));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.WriteAsync(new byte[5], 5, 1, isAsync: useAsync));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.WriteAsync(new byte[5], 3, 3, isAsync: useAsync));
@@ -132,7 +136,7 @@ public class ByteQueueStreamTests : TestBase
 
     [Theory]
     [CombinatorialData]
-    public async Task WriteManyThenRead([CombinatorialValues(InitialBufferSize / 2, InitialBufferSize - 1, InitialBufferSize, InitialBufferSize + 1, MaxBufferSize - 1, MaxBufferSize)] int bytes, [CombinatorialValues(1, 2, 3)] int steps, bool useAsync)
+    public async Task WriteManyThenRead([CombinatorialValues(PauseThreshold / 2, PauseThreshold - 1)] int bytes, [CombinatorialValues(1, 2, 3)] int steps, bool useAsync)
     {
         int typicalWriteSize = bytes / steps;
         byte[] sendBuffer = this.GetRandomBuffer(bytes);
@@ -153,20 +157,22 @@ public class ByteQueueStreamTests : TestBase
 
     [Theory]
     [CombinatorialData]
-    public async Task WriteWriteRead_Loop_WriteRead([CombinatorialValues(2, 2.1, 2.9, 3, 4, 5, 6)] float stepsPerBuffer, bool useAsync)
+    public async Task WriteWriteRead_Loop_WriteRead([CombinatorialValues(2, 2.1, 2.9, 3, 4, 5, 6)] float stepsPerBuffer)
     {
+        bool useAsync = true;
         const int maxBufferMultiplier = 3;
         float steps = stepsPerBuffer * maxBufferMultiplier;
-        byte[] sendBuffer = this.GetRandomBuffer(MaxBufferSize * maxBufferMultiplier);
+        byte[] sendBuffer = this.GetRandomBuffer(PauseThreshold * maxBufferMultiplier);
         byte[] recvBuffer = new byte[sendBuffer.Length];
         int typicalWriteSize = (int)(sendBuffer.Length / steps);
-        Assumes.True(typicalWriteSize * 2 <= MaxBufferSize, "We need to be able to write twice in a row.");
+        typicalWriteSize = Math.Min(typicalWriteSize, (PauseThreshold / 2) - 1); // We need to be able to write twice in a row.
         int bytesWritten = 0;
         int bytesRead = 0;
         for (int i = 0; i < Math.Floor(steps); i++)
         {
             await this.WriteAsync(sendBuffer, bytesWritten, typicalWriteSize, useAsync);
             bytesWritten += typicalWriteSize;
+            await this.stream.FlushAsync();
 
             if (i > 0)
             {
@@ -178,11 +184,33 @@ public class ByteQueueStreamTests : TestBase
 
         // Write the balance of the bytes
         await this.WriteAsync(sendBuffer, bytesWritten, sendBuffer.Length - bytesWritten, useAsync);
+        await this.stream.FlushAsync();
 
         // Read the balance
         await this.ReadAsync(this.stream, recvBuffer, recvBuffer.Length - bytesRead, bytesRead, useAsync);
 
         Assert.Equal(sendBuffer, recvBuffer);
+    }
+
+    [Theory]
+    [CombinatorialData]
+    public async Task Write_ThenReadMore(bool useAsync)
+    {
+        byte[] sendBuffer = new byte[] { 0x1, 0x2 };
+        await this.WriteAsync(sendBuffer, 0, sendBuffer.Length, useAsync);
+        int bytesRead;
+        byte[] recvBuffer = new byte[5];
+        if (useAsync)
+        {
+            bytesRead = await this.stream.ReadAsync(recvBuffer, 0, recvBuffer.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken);
+        }
+        else
+        {
+            bytesRead = this.stream.Read(recvBuffer, 0, recvBuffer.Length);
+        }
+
+        Assert.Equal(sendBuffer.Length, bytesRead);
+        Assert.Equal(sendBuffer, recvBuffer.Take(bytesRead));
     }
 
     [Fact]
@@ -194,6 +222,18 @@ public class ByteQueueStreamTests : TestBase
         await this.stream.WriteAsync(sendBuffer, 0, sendBuffer.Length).WithCancellation(this.TimeoutToken);
         await readTask.WithCancellation(this.TimeoutToken);
         Assert.Equal(sendBuffer, recvBuffer);
+    }
+
+    [Theory]
+    [CombinatorialData]
+    public async Task CompleteWriting(bool useAsync)
+    {
+        await this.WriteAsync(new byte[3], 0, 3, useAsync);
+        this.stream.CompleteWriting();
+        byte[] recvbuffer = new byte[5];
+        await this.ReadAsync(this.stream, recvbuffer, count: 3, isAsync: useAsync);
+        Assert.Equal(0, await this.stream.ReadAsync(recvbuffer, 3, 2, this.TimeoutToken).WithCancellation(this.TimeoutToken));
+        Assert.Equal(0, this.stream.Read(recvbuffer, 3, 2));
     }
 
     private byte[] GetRandomBuffer(int size = 20)

@@ -10,7 +10,7 @@ namespace Nerdbank.Streams
     using System.Net.WebSockets;
     using System.Threading;
     using System.Threading.Tasks;
-    using Validation;
+    using Microsoft;
 
     /// <summary>
     /// Exposes a <see cref="WebSocket"/> as a <see cref="Stream"/>.
@@ -74,9 +74,6 @@ namespace Nerdbank.Streams
         public override Task FlushAsync(CancellationToken cancellationToken) => CompletedTask;
 
         /// <inheritdoc />
-        public override int Read(byte[] buffer, int offset, int count) => this.ReadAsync(buffer, offset, count, CancellationToken.None).GetAwaiter().GetResult();
-
-        /// <inheritdoc />
         public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
             Verify.NotDisposed(this);
@@ -97,14 +94,21 @@ namespace Nerdbank.Streams
         public override void SetLength(long value) => throw this.ThrowDisposedOr(new NotSupportedException());
 
         /// <inheritdoc />
-        public override void Write(byte[] buffer, int offset, int count) => this.WriteAsync(buffer, offset, count).GetAwaiter().GetResult();
-
-        /// <inheritdoc />
         public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
             Verify.NotDisposed(this);
             return this.webSocket.SendAsync(new ArraySegment<byte>(buffer, offset, count), WebSocketMessageType.Binary, true, cancellationToken);
         }
+
+#pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
+
+        /// <inheritdoc />
+        public override int Read(byte[] buffer, int offset, int count) => this.ReadAsync(buffer, offset, count, CancellationToken.None).GetAwaiter().GetResult();
+
+        /// <inheritdoc />
+        public override void Write(byte[] buffer, int offset, int count) => this.WriteAsync(buffer, offset, count).GetAwaiter().GetResult();
+
+#pragma warning restore VSTHRD002 // Avoid problematic synchronous waits
 
         /// <inheritdoc />
         protected override void Dispose(bool disposing)

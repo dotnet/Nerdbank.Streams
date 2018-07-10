@@ -121,7 +121,11 @@ public class FullDuplexStreamTests : IDisposable
         byte[] buffer = new byte[5];
         var readTask = this.stream2.ReadAsync(buffer, 0, buffer.Length, this.TestCanceled);
         Assert.False(readTask.IsCompleted);
+#if NETCOREAPP1_0
+        this.stream1.Dispose();
+#else
         this.stream1.Close();
+#endif
         int bytesRead = await readTask;
         Assert.Equal(0, bytesRead);
 
@@ -177,6 +181,7 @@ public class FullDuplexStreamTests : IDisposable
         this.stream1.Write(new byte[2], 1, 1);
     }
 
+#if !NETCOREAPP1_0
     [Fact]
     public async Task Read_APM()
     {
@@ -203,6 +208,7 @@ public class FullDuplexStreamTests : IDisposable
         Assert.Equal(Data3Bytes.Length, bytesRead);
         Assert.Equal(Data3Bytes, readBuffer.Take(bytesRead));
     }
+#endif
 
     [Fact]
     public void Position_Throws()

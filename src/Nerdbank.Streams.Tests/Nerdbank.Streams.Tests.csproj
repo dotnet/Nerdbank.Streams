@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net461;net452;netcoreapp2.0</TargetFrameworks>
+    <TargetFrameworks>net461;netcoreapp1.0;netcoreapp2.0;netcoreapp2.1</TargetFrameworks>
     <IsPackable>false</IsPackable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
@@ -8,7 +8,7 @@
     <CodeAnalysisRuleSet>Nerdbank.Streams.Tests.ruleset</CodeAnalysisRuleSet>
     <RootNamespace />
 
-    <AspNetCoreHost Condition=" '$(TargetFramework)' == 'netcoreapp2.0' or '$(TargetFramework)' == 'net461' ">true</AspNetCoreHost>
+    <AspNetCoreHost Condition=" '$(TargetFramework)' != 'netcoreapp1.0' ">true</AspNetCoreHost>
     <DefineConstants Condition=" '$(AspNetCoreHost)' == 'true' ">$(DefineConstants);ASPNETCORE</DefineConstants>
 
     <!-- VS2017 Test Explorer test navigation and callstack links don't work with portable PDBs yet. -->
