@@ -3,7 +3,11 @@
 
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.VisualStudio.Threading;
+using Validation;
 using Xunit.Abstractions;
 
 public abstract class TestBase
@@ -25,4 +29,23 @@ public abstract class TestBase
     protected CancellationToken TimeoutToken => Debugger.IsAttached ? CancellationToken.None : this.timeoutTokenSource.Token;
 
     private static TimeSpan TestTimeout => UnexpectedTimeout;
+
+    public async Task ReadAsync(Stream stream, byte[] buffer, int? count = null, int offset = 0)
+    {
+        Requires.NotNull(stream, nameof(stream));
+        Requires.NotNull(buffer, nameof(buffer));
+
+        count = count ?? buffer.Length;
+        int bytesRead = 0;
+        while (bytesRead < count)
+        {
+            int bytesJustRead = await stream.ReadAsync(buffer, offset + bytesRead, count.Value - bytesRead, this.TimeoutToken).WithCancellation(this.TimeoutToken);
+            if (bytesJustRead == 0)
+            {
+                throw new EndOfStreamException();
+            }
+
+            bytesRead += bytesJustRead;
+        }
+    }
 }
