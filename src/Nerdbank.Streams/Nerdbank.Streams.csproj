@@ -1,10 +1,13 @@
 ﻿<Project Sdk="MSBuild.Sdk.Extras">
   <PropertyGroup>
-    <TargetFrameworks>netstandard1.3</TargetFrameworks>
+    <TargetFrameworks>netstandard1.3;netstandard1.6;net46</TargetFrameworks>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\Release.snk</AssemblyOriginatorKeyFile>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <CodeAnalysisRuleSet>..\Nerdbank.Streams.Tests\Nerdbank.Streams.Tests.ruleset</CodeAnalysisRuleSet>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>7.3</LangVersion>
+    <DefineConstants Condition=" '$(TargetFramework)' == 'net46' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netstandard1.6' ">$(DefineConstants);WEBSOCKET;TRACESOURCE</DefineConstants>
 
     <Summary>Streams for full duplex in-proc communication, wrap a WebSocket, etc.</Summary>
     <Description>Streams for full duplex in-proc communication, wrap a WebSocket, etc.</Description>
@@ -21,6 +24,9 @@
     <PackageReference Include="System.IO.Pipelines" Version="4.5.0" />
     <PackageReference Include="AsyncUsageAnalyzers" Version="1.0.0-alpha003" PrivateAssets="all" />
     <PackageReference Include="System.Net.WebSockets" Version="4.3.0" />
+  </ItemGroup>
+  <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard1.6' ">
+    <PackageReference Include="System.Diagnostics.TraceSource" Version="4.3.0" />
   </ItemGroup>
 
   <Target Name="SetNuSpecProperties" BeforeTargets="GenerateNuspec" DependsOnTargets="GetBuildVersion">

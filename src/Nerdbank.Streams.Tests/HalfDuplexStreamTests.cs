@@ -9,7 +9,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
-using Validation;
 using Xunit;
 using Xunit.Abstractions;
 
