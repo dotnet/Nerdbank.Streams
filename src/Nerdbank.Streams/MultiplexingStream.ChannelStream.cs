@@ -5,6 +5,7 @@ namespace Nerdbank.Streams
 {
     using System;
     using System.IO;
+    using System.IO.Pipelines;
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft;
@@ -27,12 +28,12 @@ namespace Nerdbank.Streams
             /// <summary>
             /// The stream we read from.
             /// </summary>
-            private readonly Stream readStream;
+            private readonly PipeReader dataReceivedReader;
 
             /// <summary>
-            /// A stream we write to when messages are received from the transport stream so that we can later read them from <see cref="readStream"/>.
+            /// A stream we write to when messages are received from the transport stream so that we can later read them from <see cref="dataReceivedReader"/>.
             /// </summary>
-            private readonly Stream receivedStream;
+            private readonly PipeWriter dataReceivedWriter;
 
             /// <summary>
             /// The semaphore acquired while writing.
@@ -56,9 +57,9 @@ namespace Nerdbank.Streams
             internal ChannelStream(Channel channel)
             {
                 this.channel = channel ?? throw new ArgumentNullException(nameof(channel));
-                var streams = FullDuplexStream.CreateStreams();
-                this.readStream = streams.Item1;
-                this.receivedStream = streams.Item2;
+                Pipe pipe = new Pipe(new PipeOptions(pauseWriterThreshold: long.MaxValue));
+                this.dataReceivedReader = pipe.Reader;
+                this.dataReceivedWriter = pipe.Writer;
                 this.writeBuffer = new byte[channel.UnderlyingMultiplexingStream.maxFrameLength - FrameHeader.HeaderLength];
             }
 
@@ -104,15 +105,27 @@ namespace Nerdbank.Streams
             }
 
             /// <inheritdoc />
-            public override int ReadByte() => this.readStream.ReadByte();
-
-            /// <inheritdoc />
-            public override int Read(byte[] buffer, int offset, int count) => this.readStream.Read(buffer, offset, count);
-
-            /// <inheritdoc />
-            public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+            public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
             {
-                return this.readStream.ReadAsync(buffer, offset, count, cancellationToken);
+                Requires.NotNull(buffer, nameof(buffer));
+                Requires.Range(offset + count <= buffer.Length, nameof(count));
+                Requires.Range(offset >= 0, nameof(offset));
+                Requires.Range(count > 0, nameof(count));
+
+                ReadResult readResult = await this.dataReceivedReader.ReadAsync(cancellationToken);
+                int bytesRead = 0;
+                System.Buffers.ReadOnlySequence<byte> slice = readResult.Buffer.Slice(0, Math.Min(count, readResult.Buffer.Length));
+                foreach (ReadOnlyMemory<byte> span in slice)
+                {
+                    int bytesToCopy = Math.Min(count, span.Length);
+                    span.CopyTo(new Memory<byte>(buffer, offset, bytesToCopy));
+                    offset += bytesToCopy;
+                    count -= bytesToCopy;
+                    bytesRead += bytesToCopy;
+                }
+
+                this.dataReceivedReader.AdvanceTo(slice.End);
+                return bytesRead;
             }
 
             /// <inheritdoc />
@@ -121,13 +134,34 @@ namespace Nerdbank.Streams
             /// <inheritdoc />
             public override void SetLength(long value) => this.ThrowDisposedOr(new NotSupportedException());
 
+#pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
+
+            /// <inheritdoc />
+            public override int ReadByte()
+            {
+                ReadResult readResult = this.dataReceivedReader.ReadAsync().GetAwaiter().GetResult();
+                if (readResult.Buffer.Length == 0)
+                {
+                    return -1;
+                }
+                else
+                {
+                    int result = readResult.Buffer.First.Span[0];
+                    this.dataReceivedReader.AdvanceTo(readResult.Buffer.GetPosition(1));
+                    return result;
+                }
+            }
+
+            /// <inheritdoc />
+            public override int Read(byte[] buffer, int offset, int count) => this.ReadAsync(buffer, offset, count).GetAwaiter().GetResult();
+
             /// <inheritdoc />
             public override void Write(byte[] buffer, int offset, int count)
             {
-#pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
                 this.WriteAsync(buffer, offset, count, CancellationToken.None).GetAwaiter().GetResult();
-#pragma warning restore VSTHRD002 // Avoid problematic synchronous waits
             }
+
+#pragma warning restore VSTHRD002 // Avoid problematic synchronous waits
 
             /// <inheritdoc />
             public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
@@ -165,7 +199,7 @@ namespace Nerdbank.Streams
                         }
                         else
                         {
-                            var header = new FrameHeader
+                            FrameHeader header = new FrameHeader
                             {
                                 Code = ControlCode.Content,
                                 ChannelId = this.channel.Id.Value,
@@ -191,11 +225,11 @@ namespace Nerdbank.Streams
                 }
             }
 
-            internal void AddReadMessage(ArraySegment<byte> message) => this.receivedStream.Write(message.Array, message.Offset, message.Count);
+            internal ValueTask<FlushResult> AddReadMessage(ArraySegment<byte> message) => this.dataReceivedWriter.WriteAsync(new ReadOnlyMemory<byte>(message.Array, message.Offset, message.Count));
 
             internal void RemoteEnded()
             {
-                this.receivedStream.Dispose(); // This signals to any Read calls to return 0 bytes.
+                this.dataReceivedWriter.Complete();
             }
 
             /// <inheritdoc />
@@ -206,8 +240,8 @@ namespace Nerdbank.Streams
                     this.Flush();
 
                     this.IsDisposed = true;
-                    this.readStream.Dispose();
-                    this.receivedStream.Dispose();
+                    this.dataReceivedWriter.Complete();
+                    this.dataReceivedReader.Complete();
                     this.channel.OnStreamDisposed();
                     base.Dispose(disposing);
                 }
@@ -222,7 +256,7 @@ namespace Nerdbank.Streams
             {
                 if (this.writeBufferBytesUsed > 0)
                 {
-                    var header = new FrameHeader
+                    FrameHeader header = new FrameHeader
                     {
                         Code = ControlCode.Content,
                         ChannelId = this.channel.Id.Value,

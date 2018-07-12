@@ -7,6 +7,7 @@ namespace Nerdbank.Streams
     using System.Collections.Generic;
     using System.Diagnostics;
     using System.IO;
+    using System.IO.Pipelines;
     using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
@@ -463,7 +464,7 @@ namespace Nerdbank.Streams
                         this.OnChannelCreated(header.ChannelId, contentPayload);
                         break;
                     case ControlCode.Content:
-                        this.OnContent(header.ChannelId, contentPayload);
+                        await this.OnContent(header.ChannelId, contentPayload);
                         break;
                     case ControlCode.ChannelTerminated:
                         this.OnChannelTerminated(header.ChannelId);
@@ -494,7 +495,7 @@ namespace Nerdbank.Streams
             }
         }
 
-        private void OnContent(int channelId, ArraySegment<byte> payload)
+        private ValueTask<FlushResult> OnContent(int channelId, ArraySegment<byte> payload)
         {
             Channel channel;
             lock (this.syncObject)
@@ -504,13 +505,13 @@ namespace Nerdbank.Streams
 #if TRACESOURCE
                     this.TraceSource.TraceEvent(TraceEventType.Warning, (int)TraceEventId.MessageReceivedForUnknownChannel, "Message content received for unknown channel {0}.", channelId);
 #endif
-                    return;
+                    return default;
                 }
             }
 
             Assumes.True(channel.Stream.IsCompleted);
 #pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
-            channel.Stream.Result.AddReadMessage(payload);
+            return channel.Stream.Result.AddReadMessage(payload);
 #pragma warning restore VSTHRD002 // Avoid problematic synchronous waits
         }
 
