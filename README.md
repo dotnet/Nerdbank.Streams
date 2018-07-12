@@ -21,6 +21,8 @@ The streams in this package focus on communication (not persistence).
    efficient binary transfers.
 4. [`WebSocketStream`](doc/WebSocketStream.md) wraps a `WebSocket` to conform to a `Stream` 
    API for interop with many APIs that accept streams.
+5. [`PipeStream`](doc/PipeStream.md) wraps a `System.IO.Pipelines.PipeReader` and/or
+   `System.IO.Pipelines.PipeWriter` within the API of a `System.IO.Stream`.
 
 ## Installation
 
