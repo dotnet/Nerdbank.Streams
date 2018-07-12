@@ -12,6 +12,7 @@ namespace Nerdbank.Streams
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft;
+    using Microsoft.VisualStudio.Threading;
 
     /// <summary>
     /// Encodes multiple channels over a single transport.
@@ -778,7 +779,7 @@ namespace Nerdbank.Streams
                     this,
                     CancellationToken.None,
                     TaskContinuationOptions.OnlyOnFaulted,
-                    TaskScheduler.Default);
+                    TaskScheduler.Default).Forget();
             }
         }
 

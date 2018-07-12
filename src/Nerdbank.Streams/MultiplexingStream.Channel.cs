@@ -9,6 +9,7 @@ namespace Nerdbank.Streams
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft;
+    using Microsoft.VisualStudio.Threading;
 
     /// <content>
     /// Contains the <see cref="Channel"/> nested type.
@@ -52,7 +53,7 @@ namespace Nerdbank.Streams
                         t => t.Result.Dispose(),
                         CancellationToken.None,
                         TaskContinuationOptions.OnlyOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously,
-                        TaskScheduler.Default);
+                        TaskScheduler.Default).Forget();
                 }
             }
 
