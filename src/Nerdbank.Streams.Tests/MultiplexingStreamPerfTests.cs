@@ -220,6 +220,7 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
                                 var channelTask = mxClient.AcceptChannelAsync(this.TimeoutToken).WithCancellation(this.TimeoutToken);
                                 acceptingChannelReady[c - 1].Set();
                                 var channel = await channelTask;
+                                int expectedTotalBytesRead = segmentCount / channelCount * SegmentSize;
                                 int totalBytesRead = 0;
                                 int bytesJustRead;
                                 do
@@ -227,8 +228,8 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
                                     bytesJustRead = await channel.ReadAsync(clientBuffer, 0, clientBuffer.Length, this.TimeoutToken);
                                     totalBytesRead += bytesJustRead;
                                 }
-                                while (totalBytesRead < segmentCount * SegmentSize);
-                                Assert.Equal(segmentCount / channelCount * SegmentSize, totalBytesRead);
+                                while (totalBytesRead < expectedTotalBytesRead);
+                                Assert.Equal(expectedTotalBytesRead, totalBytesRead);
                             })));
                     })).WithCancellation(this.TimeoutToken);
             }
