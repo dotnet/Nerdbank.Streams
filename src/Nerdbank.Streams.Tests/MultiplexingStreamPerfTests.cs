@@ -9,6 +9,7 @@ using System.IO.Pipes;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft;
 using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
@@ -111,7 +112,7 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
             await this.WaitForQuietPeriodAsync();
 
             // Warm up
-            await RunAsync(2);
+            await RunAsync(channelCount * 2);
 
             long memory1 = GC.GetTotalMemory(true);
             var sw = Stopwatch.StartNew();
@@ -124,6 +125,7 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
 
             async Task RunAsync(int segmentCount)
             {
+                Requires.Argument(segmentCount >= channelCount, nameof(segmentCount), "Cannot send {0} segments over {1} channels.", segmentCount, channelCount);
                 await Task.WhenAll(
                     Task.Run(async delegate
                     {
