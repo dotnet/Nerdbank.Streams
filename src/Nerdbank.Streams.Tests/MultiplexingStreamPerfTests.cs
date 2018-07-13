@@ -182,7 +182,7 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
             await this.WaitForQuietPeriodAsync();
 
             // Warm up
-            await RunAsync(2);
+            await RunAsync(channelCount * 2);
 
             long memory1 = GC.GetTotalMemory(true);
             var sw = Stopwatch.StartNew();
@@ -195,7 +195,7 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
 
             async Task RunAsync(int segmentCount)
             {
-                var acceptingChannelReady = Enumerable.Range(1, channelCount).Select(i => new AsyncManualResetEvent()).ToArray();
+                Requires.Argument(segmentCount >= channelCount, nameof(segmentCount), "Cannot send {0} segments over {1} channels.", segmentCount, channelCount);
                 await Task.WhenAll(
                     Task.Run(async delegate
                     {
@@ -203,7 +203,6 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
                             Enumerable.Range(1, channelCount).Select(c => Task.Run(async delegate
                              {
                                  byte[] serverBuffer = serverBuffers[c - 1];
-                                 await acceptingChannelReady[c - 1];
                                  var channel = await mxServer.OpenChannelAsync(this.TimeoutToken).WithCancellation(this.TimeoutToken);
                                  for (int i = 0; i < segmentCount / channelCount; i++)
                                  {
@@ -220,7 +219,6 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
                             {
                                 byte[] clientBuffer = clientBuffers[c - 1];
                                 var channelTask = mxClient.AcceptChannelAsync(this.TimeoutToken).WithCancellation(this.TimeoutToken);
-                                acceptingChannelReady[c - 1].Set();
                                 var channel = await channelTask;
                                 int expectedTotalBytesRead = segmentCount / channelCount * SegmentSize;
                                 int totalBytesRead = 0;
