@@ -16,7 +16,7 @@ using Nerdbank.Streams;
 using Xunit;
 using Xunit.Abstractions;
 
-public class PipeStreamTests : TestBase, IDisposable
+public class PipeStreamTests : TestBase
 {
     private readonly Random random = new Random();
 
@@ -30,11 +30,6 @@ public class PipeStreamTests : TestBase, IDisposable
         // This stream will act as a loopback
         this.pipe = new Pipe();
         this.stream = new PipeStream(this.pipe.Writer, this.pipe.Reader);
-    }
-
-    public void Dispose()
-    {
-        this.stream.Dispose();
     }
 
     [Fact]
@@ -187,6 +182,12 @@ public class PipeStreamTests : TestBase, IDisposable
 
         await readTask;
         Assert.Equal(sendBuffer.Take(3), recvBuffer.Take(3));
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        this.stream.Dispose();
+        base.Dispose(disposing);
     }
 
     private async Task WriteAsync(byte[] buffer, int offset, int count, bool isAsync)

@@ -14,11 +14,15 @@ using Microsoft.VisualStudio.Threading;
 using Xunit;
 using Xunit.Abstractions;
 
-public abstract class TestBase
+public abstract class TestBase : IDisposable
 {
     protected static readonly TimeSpan ExpectedTimeout = TimeSpan.FromMilliseconds(200);
 
     protected static readonly TimeSpan UnexpectedTimeout = Debugger.IsAttached ? Timeout.InfiniteTimeSpan : TimeSpan.FromSeconds(5);
+
+#if NETFRAMEWORK
+    private readonly ProcessJobTracker processJobTracker = new ProcessJobTracker();
+#endif
 
     private readonly CancellationTokenSource timeoutTokenSource;
 
@@ -35,6 +39,13 @@ public abstract class TestBase
     protected CancellationToken TimeoutToken => Debugger.IsAttached ? CancellationToken.None : this.timeoutTokenSource.Token;
 
     private static TimeSpan TestTimeout => UnexpectedTimeout;
+
+    public void Dispose()
+    {
+#if NETFRAMEWORK
+        this.processJobTracker.Dispose();
+#endif
+    }
 
     public async Task ReadAsync(Stream stream, byte[] buffer, int? count = null, int offset = 0, bool isAsync = true)
     {
@@ -76,7 +87,7 @@ public abstract class TestBase
     /// </returns>
     /// <exception cref="Xunit.Sdk.XunitException">Thrown if the isolated test result is a Failure.</exception>
     /// <exception cref="SkipException">Thrown if on a platform that we do not yet support test isolation on.</exception>
-    internal static Task<bool> ExecuteInIsolationAsync(string testClassName, string testMethodName, ITestOutputHelper logger)
+    internal Task<bool> ExecuteInIsolationAsync(string testClassName, string testMethodName, ITestOutputHelper logger)
     {
         Requires.NotNullOrEmpty(testClassName, nameof(testClassName));
         Requires.NotNullOrEmpty(testMethodName, nameof(testMethodName));
@@ -122,6 +133,7 @@ public abstract class TestBase
 
         logger?.WriteLine("Test host launched with: \"{0}\" {1}", Path.GetFullPath(startInfo.FileName), startInfo.Arguments);
         Assert.True(isolatedTestProcess.Start());
+        this.processJobTracker.AddProcess(isolatedTestProcess);
 
         if (logger != null)
         {
@@ -163,10 +175,10 @@ public abstract class TestBase
     /// </returns>
     /// <exception cref="Xunit.Sdk.XunitException">Thrown if the isolated test result is a Failure.</exception>
     /// <exception cref="SkipException">Thrown if on a platform that we do not yet support test isolation on.</exception>
-    internal static Task<bool> ExecuteInIsolationAsync(object testClass, string testMethodName, ITestOutputHelper logger)
+    internal Task<bool> ExecuteInIsolationAsync(object testClass, string testMethodName, ITestOutputHelper logger)
     {
         Requires.NotNull(testClass, nameof(testClass));
-        return ExecuteInIsolationAsync(testClass.GetType().FullName, testMethodName, logger);
+        return this.ExecuteInIsolationAsync(testClass.GetType().FullName, testMethodName, logger);
     }
 
     /// <summary>
@@ -182,7 +194,7 @@ public abstract class TestBase
     /// <exception cref="SkipException">Thrown if on a platform that we do not yet support test isolation on.</exception>
     protected Task<bool> ExecuteInIsolationAsync([CallerMemberName] string testMethodName = null)
     {
-        return ExecuteInIsolationAsync(this, testMethodName, this.Logger);
+        return this.ExecuteInIsolationAsync(this, testMethodName, this.Logger);
     }
 
     /// <summary>
@@ -199,7 +211,7 @@ public abstract class TestBase
     protected bool ExecuteInIsolation([CallerMemberName] string testMethodName = null)
     {
 #pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
-        return ExecuteInIsolationAsync(this, testMethodName, this.Logger).GetAwaiter().GetResult();
+        return this.ExecuteInIsolationAsync(this, testMethodName, this.Logger).GetAwaiter().GetResult();
 #pragma warning restore VSTHRD002 // Avoid problematic synchronous waits
     }
 
@@ -223,6 +235,13 @@ public abstract class TestBase
         {
             this.Logger.WriteLine("WARNING: Unable to establish a quiet period.");
         }
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+#if NETFRAMEWORK
+        this.processJobTracker.Dispose();
+#endif
     }
 
     private static Task MaybeShouldBeComplete(Task task, bool shouldBeSynchronous)

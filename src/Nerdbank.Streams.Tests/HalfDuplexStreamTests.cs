@@ -12,7 +12,7 @@ using Nerdbank.Streams;
 using Xunit;
 using Xunit.Abstractions;
 
-public class HalfDuplexStreamTests : TestBase, IDisposable
+public class HalfDuplexStreamTests : TestBase
 {
     private const int ResumeThreshold = 39;
 
@@ -25,11 +25,6 @@ public class HalfDuplexStreamTests : TestBase, IDisposable
     public HalfDuplexStreamTests(ITestOutputHelper logger)
         : base(logger)
     {
-    }
-
-    public void Dispose()
-    {
-        this.stream.Dispose();
     }
 
     [Fact]
@@ -233,6 +228,12 @@ public class HalfDuplexStreamTests : TestBase, IDisposable
         await this.ReadAsync(this.stream, recvbuffer, count: 3, isAsync: useAsync);
         Assert.Equal(0, await this.stream.ReadAsync(recvbuffer, 3, 2, this.TimeoutToken).WithCancellation(this.TimeoutToken));
         Assert.Equal(0, this.stream.Read(recvbuffer, 3, 2));
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        this.stream.Dispose();
+        base.Dispose(disposing);
     }
 
     private byte[] GetRandomBuffer(int size = 20)
