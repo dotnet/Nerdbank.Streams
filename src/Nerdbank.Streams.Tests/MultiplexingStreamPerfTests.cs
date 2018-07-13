@@ -170,10 +170,8 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
     {
         if (await this.ExecuteInIsolationAsync())
         {
-            const int channelCount = 1;
-
-            byte[][] clientBuffers = Enumerable.Range(1, channelCount).Select(i => new byte[SegmentSize]).ToArray();
-            byte[][] serverBuffers = Enumerable.Range(1, channelCount).Select(i => new byte[SegmentSize]).ToArray();
+            byte[][] clientBuffers = Enumerable.Range(1, ChannelCount).Select(i => new byte[SegmentSize]).ToArray();
+            byte[][] serverBuffers = Enumerable.Range(1, ChannelCount).Select(i => new byte[SegmentSize]).ToArray();
 
             var mxServer = new Microsoft.Cascade.Ssh.MultiChannelStream(this.serverPipe);
             var mxClient = new Microsoft.Cascade.Ssh.MultiChannelStream(this.clientPipe);
@@ -181,7 +179,7 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
             await this.WaitForQuietPeriodAsync();
 
             // Warm up
-            await RunAsync(channelCount * 2);
+            await RunAsync(ChannelCount * 2);
 
             long memory1 = GC.GetTotalMemory(true);
             var sw = Stopwatch.StartNew();
@@ -190,20 +188,20 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
             long memory2 = GC.GetTotalMemory(false);
             long allocated = memory2 - memory1;
             this.Logger.WriteLine("{0} bytes allocated ({1} per segment)", allocated, allocated / SegmentCount);
-            this.Logger.WriteLine("{0} bytes transmitted in each of {1} segments in {2}ms", SegmentSize, SegmentCount, sw.ElapsedMilliseconds);
+            this.Logger.WriteLine("{0} bytes transmitted in each of {1} segments in {2}ms on {3} channel(s)", SegmentSize, SegmentCount, sw.ElapsedMilliseconds, ChannelCount);
 
             async Task RunAsync(int segmentCount)
             {
-                Requires.Argument(segmentCount >= channelCount, nameof(segmentCount), "Cannot send {0} segments over {1} channels.", segmentCount, channelCount);
+                Requires.Argument(segmentCount >= ChannelCount, nameof(segmentCount), "Cannot send {0} segments over {1} channels.", segmentCount, ChannelCount);
                 await Task.WhenAll(
                     Task.Run(async delegate
                     {
                         await Task.WhenAll(
-                            Enumerable.Range(1, channelCount).Select(c => Task.Run(async delegate
+                            Enumerable.Range(1, ChannelCount).Select(c => Task.Run(async delegate
                              {
                                  byte[] serverBuffer = serverBuffers[c - 1];
                                  var channel = await mxServer.OpenChannelAsync(this.TimeoutToken).WithCancellation(this.TimeoutToken);
-                                 for (int i = 0; i < segmentCount / channelCount; i++)
+                                 for (int i = 0; i < segmentCount / ChannelCount; i++)
                                  {
                                      await channel.WriteAsync(serverBuffer, 0, serverBuffer.Length, this.TimeoutToken);
                                  }
@@ -214,12 +212,12 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
                     Task.Run(async delegate
                     {
                         await Task.WhenAll(
-                            Enumerable.Range(1, channelCount).Select(c => Task.Run(async delegate
+                            Enumerable.Range(1, ChannelCount).Select(c => Task.Run(async delegate
                             {
                                 byte[] clientBuffer = clientBuffers[c - 1];
                                 var channelTask = mxClient.AcceptChannelAsync(this.TimeoutToken).WithCancellation(this.TimeoutToken);
                                 var channel = await channelTask;
-                                int expectedTotalBytesRead = segmentCount / channelCount * SegmentSize;
+                                int expectedTotalBytesRead = segmentCount / ChannelCount * SegmentSize;
                                 int totalBytesRead = 0;
                                 int bytesJustRead;
                                 do
