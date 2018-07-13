@@ -161,4 +161,73 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
             }
         }
     }
+
+#if !NETCOREAPP1_0
+    [SkippableFact]
+    public async Task SendLargePayloadOnManyChannels_Ssh()
+    {
+        if (await this.ExecuteInIsolationAsync())
+        {
+            const int channelCount = 1;
+
+            byte[][] clientBuffers = Enumerable.Range(1, channelCount).Select(i => new byte[SegmentSize]).ToArray();
+            byte[][] serverBuffers = Enumerable.Range(1, channelCount).Select(i => new byte[SegmentSize]).ToArray();
+
+            var mxServer = new Microsoft.Cascade.Ssh.MultiChannelStream(this.serverPipe);
+            var mxClient = new Microsoft.Cascade.Ssh.MultiChannelStream(this.clientPipe);
+
+            await this.WaitForQuietPeriodAsync();
+
+            // Warm up
+            await RunAsync(2);
+
+            long memory1 = GC.GetTotalMemory(true);
+            var sw = Stopwatch.StartNew();
+            await RunAsync(SegmentCount);
+            sw.Stop();
+            long memory2 = GC.GetTotalMemory(false);
+            long allocated = memory2 - memory1;
+            this.Logger.WriteLine("{0} bytes allocated ({1} per segment)", allocated, allocated / SegmentCount);
+            this.Logger.WriteLine("{0} bytes transmitted in each of {1} segments in {2}ms", SegmentSize, SegmentCount, sw.ElapsedMilliseconds);
+
+            async Task RunAsync(int segmentCount)
+            {
+                await Task.WhenAll(
+                    Task.Run(async delegate
+                    {
+                        await Task.WhenAll(
+                            Enumerable.Range(1, channelCount).Select(c => Task.Run(async delegate
+                             {
+                                 byte[] serverBuffer = serverBuffers[c - 1];
+                                 var channel = await mxServer.OpenChannelAsync(this.TimeoutToken).WithCancellation(this.TimeoutToken);
+                                 for (int i = 0; i < segmentCount / channelCount; i++)
+                                 {
+                                     await channel.WriteAsync(serverBuffer, 0, serverBuffer.Length, this.TimeoutToken);
+                                 }
+
+                                 await channel.FlushAsync();
+                             })));
+                    }),
+                    Task.Run(async delegate
+                    {
+                        await Task.WhenAll(
+                            Enumerable.Range(1, channelCount).Select(c => Task.Run(async delegate
+                            {
+                                byte[] clientBuffer = clientBuffers[c - 1];
+                                var channel = await mxClient.AcceptChannelAsync(this.TimeoutToken).WithCancellation(this.TimeoutToken);
+                                int totalBytesRead = 0;
+                                int bytesJustRead;
+                                do
+                                {
+                                    bytesJustRead = await channel.ReadAsync(clientBuffer, 0, clientBuffer.Length, this.TimeoutToken);
+                                    totalBytesRead += bytesJustRead;
+                                }
+                                while (totalBytesRead < segmentCount * SegmentSize);
+                                Assert.Equal(segmentCount / channelCount * SegmentSize, totalBytesRead);
+                            })));
+                    })).WithCancellation(this.TimeoutToken);
+            }
+        }
+    }
+#endif
 }

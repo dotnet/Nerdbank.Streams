@@ -36,4 +36,9 @@
     </ProjectReference>
     <ProjectReference Include="..\Nerdbank.Streams\Nerdbank.Streams.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.Cascade.Ssh">
+      <HintPath>..\..\..\Cascade\bin\Release\Microsoft.Cascade.Ssh\Microsoft.Cascade.Ssh.dll</HintPath>
+    </Reference>
+  </ItemGroup>
 </Project>
