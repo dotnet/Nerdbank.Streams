@@ -38,7 +38,7 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Microsoft.Cascade.Ssh">
-      <HintPath>..\..\..\Cascade\bin\Release\Microsoft.Cascade.Ssh\Microsoft.Cascade.Ssh.dll</HintPath>
+      <HintPath>..\..\..\Cascade\bin\Debug\Microsoft.Cascade.Ssh\Microsoft.Cascade.Ssh.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>
