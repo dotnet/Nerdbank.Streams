@@ -98,15 +98,7 @@ internal class ProcessJobTracker : IDisposable
     /// </summary>
     public void Dispose()
     {
-        if (this.jobHandle != null)
-        {
-            if (!CloseHandle(this.jobHandle.DangerousGetHandle()))
-            {
-                throw new Win32Exception();
-            }
-
-            this.jobHandle = null;
-        }
+        this.jobHandle?.Dispose();
     }
 }
 
