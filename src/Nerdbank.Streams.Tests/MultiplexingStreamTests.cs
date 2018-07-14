@@ -262,6 +262,16 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
+    public async Task ReadByte()
+    {
+        var (a, b) = await this.EstablishChannelAsync("a");
+        var buffer = new byte[] { 5 };
+        await a.WriteAsync(buffer, 0, buffer.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken);
+        await a.FlushAsync(this.TimeoutToken).WithCancellation(this.TimeoutToken);
+        Assert.Equal(5, b.ReadByte());
+    }
+
+    [Fact]
     [Trait("SkipInCodeCoverage", "true")]
     public async Task TransmitAndCloseChannel()
     {
@@ -284,6 +294,21 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
+    public async Task WriteLargeBuffer()
+    {
+        var sendBuffer = new byte[1024 * 1024];
+        var random = new Random();
+        random.NextBytes(sendBuffer);
+        var (a, b) = await this.EstablishChannelAsync("a");
+        await a.WriteAsync(sendBuffer, 0, sendBuffer.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken);
+        await a.FlushAsync(this.TimeoutToken).WithCancellation(this.TimeoutToken);
+
+        var recvBuffer = new byte[sendBuffer.Length];
+        await this.ReadAsync(b, recvBuffer);
+        Assert.Equal(sendBuffer, recvBuffer);
+    }
+
+    [Fact]
     public async Task CanProperties()
     {
         var (s1, s2) = await this.EstablishChannelAsync(string.Empty);
@@ -302,11 +327,13 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         var (s1, s2) = await this.EstablishChannelAsync(string.Empty);
         Assert.Throws<NotSupportedException>(() => s1.Length);
         Assert.Throws<NotSupportedException>(() => s1.Position);
+        Assert.Throws<NotSupportedException>(() => s1.Position = 0);
         Assert.Throws<NotSupportedException>(() => s1.SetLength(0));
         Assert.Throws<NotSupportedException>(() => s1.Seek(0, SeekOrigin.Begin));
         s1.Dispose();
         Assert.Throws<ObjectDisposedException>(() => s1.Length);
         Assert.Throws<ObjectDisposedException>(() => s1.Position);
+        Assert.Throws<ObjectDisposedException>(() => s1.Position = 0);
         Assert.Throws<ObjectDisposedException>(() => s1.SetLength(0));
         Assert.Throws<ObjectDisposedException>(() => s1.Seek(0, SeekOrigin.Begin));
     }

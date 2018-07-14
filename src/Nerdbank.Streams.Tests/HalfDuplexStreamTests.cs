@@ -28,6 +28,13 @@ public class HalfDuplexStreamTests : TestBase
     }
 
     [Fact]
+    public void DefaultCtor()
+    {
+        var stream = new HalfDuplexStream();
+        stream.Dispose();
+    }
+
+    [Fact]
     public void CanSeek() => Assert.False(this.stream.CanSeek);
 
     [Fact]
