@@ -139,7 +139,7 @@ namespace Nerdbank.Streams
             /// <inheritdoc />
             public override int ReadByte()
             {
-                ReadResult readResult = this.dataReceivedReader.ReadAsync().GetAwaiter().GetResult();
+                ReadResult readResult = this.dataReceivedReader.ReadAsync().AsTask().GetAwaiter().GetResult();
                 if (readResult.Buffer.Length == 0)
                 {
                     return -1;
@@ -271,12 +271,6 @@ namespace Nerdbank.Streams
                 }
 
                 return Utilities.CompletedTask;
-            }
-
-            private T ReturnIfNotDisposed<T>(T value)
-            {
-                Verify.NotDisposed(this);
-                return value;
             }
 
             private Exception ThrowDisposedOr(Exception ex)
