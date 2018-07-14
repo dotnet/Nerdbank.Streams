@@ -216,6 +216,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
+    [Trait("SkipInCodeCoverage", "true")] // far too slow and times out
     public async Task ConcurrentChatOverManyChannels()
     {
         // Avoid tracing because it slows things down significantly for this test.
@@ -261,6 +262,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
+    [Trait("SkipInCodeCoverage", "true")]
     public async Task TransmitAndCloseChannel()
     {
         var buffer = new byte[1024 * 1024];

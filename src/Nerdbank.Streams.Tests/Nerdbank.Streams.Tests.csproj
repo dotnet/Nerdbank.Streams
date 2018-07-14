@@ -10,9 +10,6 @@
 
     <AspNetCoreHost Condition=" '$(TargetFramework)' != 'netcoreapp1.0' ">true</AspNetCoreHost>
     <DefineConstants Condition=" '$(AspNetCoreHost)' == 'true' ">$(DefineConstants);ASPNETCORE</DefineConstants>
-
-    <!-- VS2017 Test Explorer test navigation and callstack links don't work with portable PDBs yet. -->
-    <DebugType>Full</DebugType>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.VisualStudio.Threading" Version="15.8.122" />

@@ -12,6 +12,7 @@ image: Visual Studio 2017
 configuration: Release
 environment:
   VisualStudioVersion: 15.0
+  codecov_token: b8be69b5-6dc3-40f8-a4c7-4e13a42654a3
 build_script:
 - dotnet build src
 - dotnet pack src --no-build
@@ -22,11 +23,11 @@ test_script:
     "%userprofile%\.nuget\packages\OpenCover\4.6.519\tools\OpenCover.Console.exe"
     -register:user
     -target:"%xunit20%\xunit.console.x86.exe"
-    -targetargs:"%testdir%Nerdbank.Streams.Tests.dll -noshadow -parallel all -html %testdir%testresults.html -xml %testdir%testresults.xml -appveyor -nologo"
+    -targetargs:"%testdir%Nerdbank.Streams.Tests.dll -noshadow -parallel all -notrait \"SkipInCodeCoverage=true\" -html %testdir%testresults.html -xml %testdir%testresults.xml -appveyor -nologo"
     -returntargetcode
     -excludebyattribute:*.ExcludeFromCodeCoverage*
     -excludebyfile:*\*Designer.cs
-    -filter:"+[Nerdbank]*"
+    -filter:"+[Nerdbank.Streams]*"
     -hideskipped:All
     -output:%testdir%code_coverage.xml
 
