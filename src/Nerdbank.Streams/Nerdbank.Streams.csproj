@@ -9,14 +9,14 @@
     <LangVersion>7.3</LangVersion>
     <DefineConstants Condition=" '$(TargetFramework)' == 'net46' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netstandard1.6' ">$(DefineConstants);WEBSOCKET;TRACESOURCE</DefineConstants>
 
-    <Summary>Streams for full duplex in-proc communication, wrap a WebSocket, etc.</Summary>
-    <Description>Streams for full duplex in-proc communication, wrap a WebSocket, etc.</Description>
+    <Summary>Streams for full duplex in-proc communication, wrap a WebSocket, split a stream into multiple channels, etc.</Summary>
+    <Description>$(Summary)</Description>
     <Company>Andrew Arnott</Company>
     <Authors>Andrew Arnott</Authors>
     <PackageProjectUrl>https://github.com/AArnott/Nerdbank.Streams</PackageProjectUrl>
     <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageTags>Stream full-duplex websocket</PackageTags>
+    <PackageTags>Stream full-duplex websocket multiplexing</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
