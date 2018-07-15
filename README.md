@@ -25,6 +25,8 @@ The streams in this package focus on communication (not persistence).
    API for interop with many APIs that accept streams.
 5. [`PipeStream`](doc/PipeStream.md) wraps a `System.IO.Pipelines.PipeReader` and/or
    `System.IO.Pipelines.PipeWriter` within the API of a `System.IO.Stream`.
+6. [`Stream.ReadSlice(int)`](doc/ReadSlice.md) creates a sub-stream that ends after
+   a given number of bypes.
 
 ## Installation
 

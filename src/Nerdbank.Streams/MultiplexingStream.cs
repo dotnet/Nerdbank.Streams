@@ -626,11 +626,6 @@ namespace Nerdbank.Streams
             }
         }
 
-        private void RejectChannelDueToConflict(int channelId)
-        {
-            throw new NotImplementedException();
-        }
-
         private async Task<int> ReadThisAtLeastAsync(ArraySegment<byte> buffer, int requiredLength)
         {
             int bytesRead = await ReadAtLeastAsync(this.stream, buffer, requiredLength).ConfigureAwait(false);
