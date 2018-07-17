@@ -18,12 +18,19 @@
     <RepositoryType>git</RepositoryType>
     <PackageTags>Stream full-duplex websocket multiplexing</PackageTags>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="MultiplexingStream.ChannelOptions.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="MultiplexingStream.ChannelOptions.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.VisualStudio.Threading" Version="15.8.122" PrivateAssets="build;analyzers;compile" />
     <PackageReference Include="System.IO.Pipelines" Version="4.5.0" />
     <PackageReference Include="AsyncUsageAnalyzers" Version="1.0.0-alpha003" PrivateAssets="all" />
     <PackageReference Include="System.Net.WebSockets" Version="4.3.0" />
+    <PackageReference Include="System.ValueTuple" Version="4.5.0" />
   </ItemGroup>
   <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard1.6' ">
     <PackageReference Include="System.Diagnostics.TraceSource" Version="4.3.0" />

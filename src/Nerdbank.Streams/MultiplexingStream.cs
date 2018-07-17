@@ -96,11 +96,6 @@ namespace Nerdbank.Streams
         private readonly byte[] sendingHeaderBuffer = new byte[FrameHeader.HeaderLength];
 
         /// <summary>
-        /// The backing field for the <see cref="DefaultChannelPriority"/> property.
-        /// </summary>
-        private int defaultChannelPriority = 100;
-
-        /// <summary>
         /// The last number assigned to a channel.
         /// Each use of this should increment by two.
         /// </summary>
@@ -111,45 +106,34 @@ namespace Nerdbank.Streams
         /// </summary>
         /// <param name="stream">The stream to multiplex multiple channels over.</param>
         /// <param name="isOdd">A value indicating whether this party is the "odd" one.</param>
-        /// <param name="traceSource">The logger to use.</param>
-        private MultiplexingStream(Stream stream, bool isOdd, TraceSource traceSource)
+        /// <param name="options">The options for this instance.</param>
+        private MultiplexingStream(Stream stream, bool isOdd, MultiplexingStreamOptions options)
         {
             Requires.NotNull(stream, nameof(stream));
+            Requires.NotNull(options, nameof(options));
 
             this.stream = stream;
             this.isOdd = isOdd;
             this.lastOfferedChannelId = isOdd ? -1 : 0; // the first channel created should be 1 or 2
-#if TRACESOURCE
-            this.TraceSource = traceSource;
-#endif
+            this.Options = options;
 
             // Initiate reading from the transport stream. This will not end until the stream does, or we're disposed.
             // If reading the stream fails, we'll dispose ourselves.
             this.DisposeSelfOnFailure(this.ReadStreamAsync());
         }
 
+        /// <summary>
+        /// Occurs when the remote party offers to establish a channel.
+        /// </summary>
+        public event EventHandler<ChannelOfferEventArgs> ChannelOffered;
+
         private enum TraceEventId
         {
             MessageReceivedForUnknownChannel = 1,
-        }
-
-        /// <summary>
-        /// Gets or sets the priority to use for new channels.
-        /// </summary>
-        public int DefaultChannelPriority
-        {
-            get
-            {
-                Verify.NotDisposed(this);
-                return this.defaultChannelPriority;
-            }
-
-            set
-            {
-                Requires.Range(value > 0, nameof(value), "A positive number is required.");
-                Verify.NotDisposed(this);
-                this.defaultChannelPriority = value;
-            }
+            HandshakeSuccessful = 2,
+            UnexpectedEndOfStream = 3,
+            HandshakeFailed = 4,
+            FatalError = 5,
         }
 
         /// <summary>
@@ -157,13 +141,11 @@ namespace Nerdbank.Streams
         /// </summary>
         public Task Completion => this.completionSource.Task;
 
-#if TRACESOURCE
         /// <summary>
-        /// Gets the logger used by this instance.
+        /// Gets the options this multiplexing stream was created with.
         /// </summary>
         /// <value>Never null.</value>
-        public TraceSource TraceSource { get; }
-#endif
+        public MultiplexingStreamOptions Options { get; }
 
         /// <inheritdoc />
         bool IDisposableObservable.IsDisposed => this.Completion.IsCompleted;
@@ -172,37 +154,15 @@ namespace Nerdbank.Streams
         /// Initializes a new instance of the <see cref="MultiplexingStream"/> class.
         /// </summary>
         /// <param name="stream">The stream to multiplex multiple channels over.</param>
+        /// <param name="options">Options to define behavior for the multiplexing stream.</param>
         /// <param name="cancellationToken">A cancellation token.</param>
         /// <returns>The multiplexing stream, once the handshake is complete.</returns>
         /// <exception cref="EndOfStreamException">Thrown if the remote end disconnects before the handshake is complete.</exception>
-        public static Task<MultiplexingStream> CreateAsync(Stream stream, CancellationToken cancellationToken) => CreateAsync(stream, null, cancellationToken);
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="MultiplexingStream"/> class.
-        /// </summary>
-        /// <param name="stream">The stream to multiplex multiple channels over.</param>
-        /// <param name="traceSource">The logger to use. May be null.</param>
-        /// <param name="cancellationToken">A cancellation token.</param>
-        /// <returns>The multiplexing stream, once the handshake is complete.</returns>
-        /// <exception cref="EndOfStreamException">Thrown if the remote end disconnects before the handshake is complete.</exception>
-#if TRACESOURCE
-        public
-#else
-#pragma warning disable SA1202
-        private
-#endif
-        static async Task<MultiplexingStream> CreateAsync(Stream stream, TraceSource traceSource, CancellationToken cancellationToken)
+        public static async Task<MultiplexingStream> CreateAsync(Stream stream, MultiplexingStreamOptions options = null, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(stream, nameof(stream));
             Requires.Argument(stream.CanRead, nameof(stream), "Stream must be readable.");
             Requires.Argument(stream.CanWrite, nameof(stream), "Stream must be writable.");
-
-#if TRACESOURCE
-            if (traceSource == null)
-            {
-                traceSource = new TraceSource(nameof(MultiplexingStream), SourceLevels.Critical);
-            }
-#endif
 
             // Send the protocol magic number, and a random GUID to establish even/odd assignments.
             var randomSendBuffer = Guid.NewGuid().ToByteArray();
@@ -218,10 +178,7 @@ namespace Nerdbank.Streams
             {
                 // The remote end hung up.
 #if TRACESOURCE
-                if (traceSource.Switch.ShouldTrace(TraceEventType.Critical))
-                {
-                    traceSource.TraceInformation("Stream closed during handshake.");
-                }
+                options.TraceSource.TraceEvent(TraceEventType.Critical, (int)TraceEventId.UnexpectedEndOfStream, "Stream closed during handshake.");
 #endif
                 throw new EndOfStreamException();
             }
@@ -235,10 +192,7 @@ namespace Nerdbank.Streams
                 {
                     string message = "Protocol handshake mismatch.";
 #if TRACESOURCE
-                    if (traceSource.Switch.ShouldTrace(TraceEventType.Critical))
-                    {
-                        traceSource.TraceInformation(message);
-                    }
+                    options.TraceSource.TraceEvent(TraceEventType.Critical, (int)TraceEventId.HandshakeFailed, message);
 #endif
                     throw new MultiplexingProtocolException(message);
                 }
@@ -265,34 +219,65 @@ namespace Nerdbank.Streams
             {
                 string message = "Unable to determine even/odd party.";
 #if TRACESOURCE
-                if (traceSource.Switch.ShouldTrace(TraceEventType.Critical))
-                {
-                    traceSource.TraceInformation(message);
-                }
+                options.TraceSource.TraceEvent(TraceEventType.Critical, (int)TraceEventId.HandshakeFailed, message);
 #endif
                 throw new MultiplexingProtocolException(message);
             }
 
 #if TRACESOURCE
-            if (traceSource.Switch.ShouldTrace(TraceEventType.Information))
-            {
-                traceSource.TraceInformation("Multiplexing protocol established successfully.");
-            }
+            options.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.HandshakeSuccessful, "Multiplexing protocol established successfully.");
 #endif
-            return new MultiplexingStream(stream, isOdd.Value, traceSource);
+            return new MultiplexingStream(stream, isOdd.Value, options);
         }
 
         /// <summary>
-        /// Creates a new channel.
+        /// Creates an anonymous channel that may be accepted by <see cref="AcceptChannel(int, ChannelOptions)"/>.
+        /// Its existance must be communicated by other means (typically another, existing channel) to encourage acceptance.
         /// </summary>
-        /// <param name="name">The channel identifier, which must be accepted on the remote end to complete creation.</param>
+        /// <param name="options">A set of options that describe local treatment of this channel.</param>
+        /// <returns>The anonymous channel.</returns>
+        /// <remarks>
+        /// Note that while the channel is created immediately, any local write to that channel will be buffered locally
+        /// until the remote party accepts the channel.
+        /// </remarks>
+        public Channel CreateChannel(ChannelOptions options = default)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Accepts a channel with a specific ID.
+        /// </summary>
+        /// <param name="id">The <see cref="Channel.Id"/> of the channel to accept.</param>
+        /// <param name="options">A set of options that describe local treatment of this channel.</param>
+        /// <returns>The accepted <see cref="Channel"/>.</returns>
+        /// <remarks>
+        /// This method can be used to accept anonymous channels created with <see cref="CreateChannel"/>.
+        /// </remarks>
+        public Channel AcceptChannel(int id, ChannelOptions options = default)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Rejects an offer for the channel with a specified ID.
+        /// </summary>
+        /// <param name="id">The ID of the channel whose offer should be rejected.</param>
+        /// <exception cref="InvalidOperationException">Thrown if the channel was already accepted.</exception>
+        public void RejectChannel(int id) => throw new NotImplementedException();
+
+        /// <summary>
+        /// Offers a new, named channel to the remote party so they may accept it with <see cref="AcceptChannelAsync"/>.
+        /// </summary>
+        /// <param name="name">A name for the channel, which must be accepted on the remote end to complete creation. It need not be unique, and may be empty but must not be null.</param>
+        /// <param name="options">A set of options that describe local treatment of this channel.</param>
         /// <param name="cancellationToken">A cancellation token.</param>
         /// <returns>
-        /// A task that completes with the <see cref="Stream"/> if the channel is accepted on the remote end
+        /// A task that completes with the <see cref="Channel"/> if the offer is accepted on the remote end
         /// or faults with <see cref="MultiplexingProtocolException"/> if the remote end rejects the channel.
         /// </returns>
         /// <exception cref="OperationCanceledException">Thrown if <paramref name="cancellationToken"/> is canceled before the channel is accepted by the remote end.</exception>
-        public async Task<Stream> CreateChannelAsync(string name, CancellationToken cancellationToken)
+        public async Task<Channel> OfferChannelAsync(string name, ChannelOptions options = default, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(name, nameof(name));
 
@@ -300,32 +285,34 @@ namespace Nerdbank.Streams
             Channel channel = new Channel(this, this.GetUnusedChannelId(), name);
             lock (this.syncObject)
             {
-                this.channelsOfferedByUs.Add(channel.Id.Value, channel);
+                this.channelsOfferedByUs.Add(channel.Id, channel);
             }
 
             var header = new FrameHeader
             {
                 Code = ControlCode.CreatingChannel,
                 FramePayloadLength = ControlFrameEncoding.GetByteCount(name),
-                ChannelId = channel.Id.Value,
+                ChannelId = channel.Id,
             };
             byte[] payload = ControlFrameEncoding.GetBytes(name);
 
             using (cancellationToken.Register(this.CreateChannelCanceled, channel))
             {
                 await this.SendFrameAsync(header, new ArraySegment<byte>(payload), flush: true, cancellationToken).ConfigureAwait(false);
-                return await channel.Stream.ConfigureAwait(false);
+                await channel.Acceptance.ConfigureAwaitRunInline();
+                return channel;
             }
         }
 
         /// <summary>
         /// Accepts a channel that the remote end has attempted or may attempt to create.
         /// </summary>
-        /// <param name="name">The identifier of the channel to accept.</param>
+        /// <param name="name">The name of the channel to accept.</param>
+        /// <param name="options">A set of options that describe local treatment of this channel.</param>
         /// <param name="cancellationToken">A token to indicate lost interest in accepting the channel.</param>
-        /// <returns>A task whose result is a full-duplex <see cref="Stream"/> when the channel is created by the remote end and accepted by this end.</returns>
+        /// <returns>The <see cref="Channel"/>, after its offer has been received from the remote party and accepted.</returns>
         /// <exception cref="OperationCanceledException">Thrown if <paramref name="cancellationToken"/> is canceled before a request to create the channel has been received.</exception>
-        public async Task<Stream> AcceptChannelAsync(string name, CancellationToken cancellationToken)
+        public async Task<Channel> AcceptChannelAsync(string name, ChannelOptions options = default, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(name, nameof(name));
             Verify.NotDisposed(this);
@@ -355,16 +342,20 @@ namespace Nerdbank.Streams
 
             if (offerFound)
             {
-                return channel.AcceptOffer(null);
+                channel.AcceptOffer(null);
             }
 
             using (cancellationToken.Register(this.AcceptChannelCanceled, channel, false))
             {
-                return await channel.Stream.ConfigureAwait(false);
+                await channel.GetStreamAsync().ConfigureAwait(false);
             }
+
+            return channel;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Immediately closes the underlying transport stream and releases all resources associated with this object and any open channels.
+        /// </summary>
         public void Dispose()
         {
             this.Dispose(true);
@@ -489,9 +480,8 @@ namespace Nerdbank.Streams
 
             if (channel != null)
             {
-                Assumes.True(channel.Stream.IsCompleted);
 #pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
-                channel.Stream.Result.RemoteEnded();
+                channel.RemoteEnded();
 #pragma warning restore VSTHRD002 // Avoid problematic synchronous waits
             }
         }
@@ -504,15 +494,14 @@ namespace Nerdbank.Streams
                 if (!this.openChannels.TryGetValue(channelId, out channel))
                 {
 #if TRACESOURCE
-                    this.TraceSource.TraceEvent(TraceEventType.Warning, (int)TraceEventId.MessageReceivedForUnknownChannel, "Message content received for unknown channel {0}.", channelId);
+                    this.Options.TraceSource.TraceEvent(TraceEventType.Warning, (int)TraceEventId.MessageReceivedForUnknownChannel, "Message content received for unknown channel {0}.", channelId);
 #endif
                     return default;
                 }
             }
 
-            Assumes.True(channel.Stream.IsCompleted);
 #pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
-            return channel.Stream.Result.AddReadMessage(payload);
+            return channel.AddReadMessage(payload);
 #pragma warning restore VSTHRD002 // Avoid problematic synchronous waits
         }
 
@@ -616,12 +605,12 @@ namespace Nerdbank.Streams
                 bool removed;
                 lock (this.syncObject)
                 {
-                    removed = this.openChannels.Remove(channel.Id.Value);
+                    removed = this.openChannels.Remove(channel.Id);
                 }
 
                 if (removed)
                 {
-                    this.SendFrame(ControlCode.ChannelTerminated, channel.Id.Value);
+                    this.SendFrame(ControlCode.ChannelTerminated, channel.Id);
                 }
             }
         }
@@ -719,18 +708,18 @@ namespace Nerdbank.Streams
             {
                 if (channel.TryCancel())
                 {
-                    this.TraceInformation("Cancelling " + nameof(this.CreateChannelAsync) + " for \"{0}\"", channel.Name);
-                    removed = this.channelsOfferedByUs.Remove(channel.Id.Value);
+                    this.TraceInformation("Cancelling " + nameof(this.OfferChannelAsync) + " for \"{0}\"", channel.Name);
+                    removed = this.channelsOfferedByUs.Remove(channel.Id);
                 }
                 else
                 {
-                    this.TraceInformation("Cancelling " + nameof(this.CreateChannelAsync) + " for \"{0}\" attempted but failed.", channel.Name);
+                    this.TraceInformation("Cancelling " + nameof(this.OfferChannelAsync) + " for \"{0}\" attempted but failed.", channel.Name);
                 }
             }
 
             if (removed)
             {
-                this.SendFrame(ControlCode.CreatingChannelCanceled, channel.Id.Value);
+                this.SendFrame(ControlCode.CreatingChannelCanceled, channel.Id);
             }
         }
 
@@ -780,7 +769,7 @@ namespace Nerdbank.Streams
 
         private void Fault(Exception exception)
         {
-            this.TraceCritical("Disposing self due to exception: {0}", exception);
+            this.TraceCritical(TraceEventId.FatalError, "Disposing self due to exception: {0}", exception);
             this.completionSource.TrySetException(exception);
             this.Dispose();
         }
@@ -789,21 +778,18 @@ namespace Nerdbank.Streams
         private void TraceCritical(string message)
         {
 #if TRACESOURCE
-            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Critical))
+            if (this.Options.TraceSource.Switch.ShouldTrace(TraceEventType.Critical))
             {
-                this.TraceSource.TraceInformation(message);
+                this.Options.TraceSource.TraceInformation(message);
             }
 #endif
         }
 
         [Conditional("TRACESOURCE")]
-        private void TraceCritical(string message, object arg)
+        private void TraceCritical(TraceEventId traceEventId, string message, object arg)
         {
 #if TRACESOURCE
-            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Critical))
-            {
-                this.TraceSource.TraceInformation(message, arg);
-            }
+            this.Options.TraceSource.TraceEvent(TraceEventType.Critical, (int)traceEventId, message, arg);
 #endif
         }
 
@@ -811,9 +797,9 @@ namespace Nerdbank.Streams
         private void TraceInformation(string message)
         {
 #if TRACESOURCE
-            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+            if (this.Options.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
             {
-                this.TraceSource.TraceInformation(message);
+                this.Options.TraceSource.TraceInformation(message);
             }
 #endif
         }
@@ -822,9 +808,9 @@ namespace Nerdbank.Streams
         private void TraceInformation(string message, object arg)
         {
 #if TRACESOURCE
-            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+            if (this.Options.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
             {
-                this.TraceSource.TraceInformation(message, arg);
+                this.Options.TraceSource.TraceInformation(message, arg);
             }
 #endif
         }
@@ -833,9 +819,9 @@ namespace Nerdbank.Streams
         private void TraceInformation(string message, object arg1, int arg2)
         {
 #if TRACESOURCE
-            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+            if (this.Options.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
             {
-                this.TraceSource.TraceInformation(message, arg1, arg2);
+                this.Options.TraceSource.TraceInformation(message, arg1, arg2);
             }
 #endif
         }
@@ -844,9 +830,9 @@ namespace Nerdbank.Streams
         private void TraceInformation(string unformattedMessage, ControlCode code, int channelId, int contentLength = 0)
         {
 #if TRACESOURCE
-            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+            if (this.Options.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
             {
-                this.TraceSource.TraceInformation(unformattedMessage, code, channelId, contentLength);
+                this.Options.TraceSource.TraceInformation(unformattedMessage, code, channelId, contentLength);
             }
 #endif
         }

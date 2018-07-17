@@ -227,11 +227,6 @@ namespace Nerdbank.Streams
 
             internal ValueTask<FlushResult> AddReadMessage(ArraySegment<byte> message) => this.dataReceivedWriter.WriteAsync(new ReadOnlyMemory<byte>(message.Array, message.Offset, message.Count));
 
-            internal void RemoteEnded()
-            {
-                this.dataReceivedWriter.Complete();
-            }
-
             /// <inheritdoc />
             protected override void Dispose(bool disposing)
             {

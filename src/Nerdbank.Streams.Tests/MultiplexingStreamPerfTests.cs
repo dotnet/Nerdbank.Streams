@@ -132,7 +132,7 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
                             Enumerable.Range(1, ChannelCount).Select(c => Task.Run(async delegate
                              {
                                  byte[] serverBuffer = serverBuffers[c - 1];
-                                 var channel = await mxServer.CreateChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
+                                 var channel = await mxServer.OfferChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
                                  for (int i = 0; i < segmentCount / ChannelCount; i++)
                                  {
                                      await channel.WriteAsync(serverBuffer, 0, serverBuffer.Length, this.TimeoutToken);

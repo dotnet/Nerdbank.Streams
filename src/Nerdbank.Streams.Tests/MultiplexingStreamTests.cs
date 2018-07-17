@@ -85,7 +85,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     public async Task CreateChannelAsync_ThrowsAfterDisposal()
     {
         this.mx1.Dispose();
-        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.mx1.CreateChannelAsync(string.Empty, this.TimeoutToken)).WithCancellation(this.TimeoutToken);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.mx1.OfferChannelAsync(string.Empty, this.TimeoutToken)).WithCancellation(this.TimeoutToken);
     }
 
     [Fact]
@@ -116,7 +116,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task CreateChannelAsync_NullId()
     {
-        await Assert.ThrowsAsync<ArgumentNullException>(() => this.mx1.CreateChannelAsync(null, this.TimeoutToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => this.mx1.OfferChannelAsync(null, this.TimeoutToken));
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     public async Task CreateChannelAsync_EmptyId()
     {
         var stream2Task = this.mx2.AcceptChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
-        var channel1 = await this.mx1.CreateChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
+        var channel1 = await this.mx1.OfferChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
         var channel2 = await stream2Task.WithCancellation(this.TimeoutToken);
         Assert.NotNull(channel1);
         Assert.NotNull(channel2);
@@ -139,7 +139,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     public async Task CreateChannelAsync_CanceledBeforeAcceptance()
     {
         var cts = new CancellationTokenSource();
-        Task<Stream> channel1Task = this.mx1.CreateChannelAsync("1st", cts.Token);
+        Task<Stream> channel1Task = this.mx1.OfferChannelAsync("1st", cts.Token);
         Assert.False(channel1Task.IsCompleted);
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => channel1Task).WithCancellation(this.TimeoutToken);
@@ -162,8 +162,8 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task CreateChannelAsync_IdCollidesWithPendingRequest()
     {
-        Task<Stream> channel1aTask = this.mx1.CreateChannelAsync("1st", this.TimeoutToken);
-        Task<Stream> channel2aTask = this.mx1.CreateChannelAsync("1st", this.TimeoutToken);
+        Task<Stream> channel1aTask = this.mx1.OfferChannelAsync("1st", this.TimeoutToken);
+        Task<Stream> channel2aTask = this.mx1.OfferChannelAsync("1st", this.TimeoutToken);
 
         var channel1b = await this.mx2.AcceptChannelAsync("1st", this.TimeoutToken).WithCancellation(this.TimeoutToken);
         var channel2b = await this.mx2.AcceptChannelAsync("1st", this.TimeoutToken).WithCancellation(this.TimeoutToken);
@@ -176,7 +176,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     {
         for (int i = 0; i < 10; i++)
         {
-            Task<Stream> channel1aTask = this.mx1.CreateChannelAsync("1st", this.TimeoutToken);
+            Task<Stream> channel1aTask = this.mx1.OfferChannelAsync("1st", this.TimeoutToken);
             Task<Stream> channel1bTask = this.mx2.AcceptChannelAsync("1st", this.TimeoutToken);
             await Task.WhenAll(channel1aTask, channel1bTask).WithCancellation(this.TimeoutToken);
         }
@@ -185,13 +185,13 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task CreateChannelAsync_IdRecycledFromPriorChannel()
     {
-        Task<Stream> channel1aTask = this.mx1.CreateChannelAsync("1st", this.TimeoutToken);
+        Task<Stream> channel1aTask = this.mx1.OfferChannelAsync("1st", this.TimeoutToken);
         Task<Stream> channel1bTask = this.mx2.AcceptChannelAsync("1st", this.TimeoutToken);
         var streams = await Task.WhenAll(channel1aTask, channel1bTask).WithCancellation(this.TimeoutToken);
         streams[0].Dispose();
         streams[1].Dispose();
 
-        channel1aTask = this.mx1.CreateChannelAsync("1st", this.TimeoutToken);
+        channel1aTask = this.mx1.OfferChannelAsync("1st", this.TimeoutToken);
         channel1bTask = this.mx2.AcceptChannelAsync("1st", this.TimeoutToken);
         streams = await Task.WhenAll(channel1aTask, channel1bTask).WithCancellation(this.TimeoutToken);
     }
@@ -199,7 +199,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task CreateChannelAsync_AcceptByAnotherId()
     {
-        Task<Stream> createTask = this.mx1.CreateChannelAsync("1st", ExpectedTimeoutToken);
+        Task<Stream> createTask = this.mx1.OfferChannelAsync("1st", ExpectedTimeoutToken);
         Task<Stream> acceptTask = this.mx2.AcceptChannelAsync("2nd", ExpectedTimeoutToken);
         Assert.False(createTask.IsCompleted);
         Assert.False(acceptTask.IsCompleted);
@@ -370,7 +370,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         // TODO: We need to test both the race condition where acceptance is sent before cancellation is received,
         //       and the case where cancellation is received before we call AcceptChannelAsync.
         var cts = new CancellationTokenSource();
-        var offer = this.mx1.CreateChannelAsync(string.Empty, cts.Token);
+        var offer = this.mx1.OfferChannelAsync(string.Empty, cts.Token);
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => offer).WithCancellation(this.TimeoutToken);
         Stream acceptedStream = null;
@@ -443,7 +443,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
     private async Task<(Stream, Stream)> EstablishChannelAsync(string identifier)
     {
-        Task<Stream> mx1ChannelTask = this.mx1.CreateChannelAsync(identifier, this.TimeoutToken);
+        Task<Stream> mx1ChannelTask = this.mx1.OfferChannelAsync(identifier, this.TimeoutToken);
         Task<Stream> mx2ChannelTask = this.mx2.AcceptChannelAsync(identifier, this.TimeoutToken);
         var channels = await Task.WhenAll(mx1ChannelTask, mx2ChannelTask).WithCancellation(this.TimeoutToken);
         Assert.NotNull(channels[0]);
