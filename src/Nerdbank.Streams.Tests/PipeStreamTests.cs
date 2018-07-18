@@ -22,14 +22,13 @@ public class PipeStreamTests : TestBase
 
     private Pipe pipe;
 
-    private PipeStream stream;
+    private Stream stream;
 
     public PipeStreamTests(ITestOutputHelper logger)
         : base(logger)
     {
-        // This stream will act as a loopback
         this.pipe = new Pipe();
-        this.stream = new PipeStream(this.pipe.Writer, this.pipe.Reader);
+        this.stream = new LoopbackPipe(this.pipe).AsStream();
     }
 
     [Fact]
@@ -56,9 +55,10 @@ public class PipeStreamTests : TestBase
     [Fact]
     public void IsDisposed()
     {
-        Assert.False(this.stream.IsDisposed);
-        this.stream.Dispose();
-        Assert.True(this.stream.IsDisposed);
+        var disposableObservable = (IDisposableObservable)this.stream;
+        Assert.False(disposableObservable.IsDisposed);
+        disposableObservable.Dispose();
+        Assert.True(disposableObservable.IsDisposed);
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public class PipeStreamTests : TestBase
     public void Dispose_NoWriter()
     {
         // Verify that we don't throw when disposing a stream without a writer.
-        PipeStream stream = new PipeStream(writer: null, reader: this.pipe.Reader);
+        var stream = this.pipe.Reader.AsStream();
         stream.Dispose();
     }
 
@@ -113,9 +113,9 @@ public class PipeStreamTests : TestBase
         this.stream.Dispose();
         Assert.False(this.stream.CanRead);
 
-        PipeStream stream = new PipeStream(this.pipe.Writer, reader: null);
+        var stream = this.pipe.Writer.AsStream();
         Assert.False(stream.CanRead);
-        stream = new PipeStream(null, reader: this.pipe.Reader);
+        stream = this.pipe.Reader.AsStream();
         Assert.True(stream.CanRead);
     }
 
@@ -126,9 +126,9 @@ public class PipeStreamTests : TestBase
         this.stream.Dispose();
         Assert.False(this.stream.CanWrite);
 
-        PipeStream stream = new PipeStream(this.pipe.Writer, reader: null);
+        var stream = this.pipe.Writer.AsStream();
         Assert.True(stream.CanWrite);
-        stream = new PipeStream(null, reader: this.pipe.Reader);
+        stream = this.pipe.Reader.AsStream();
         Assert.False(stream.CanWrite);
     }
 
@@ -200,5 +200,19 @@ public class PipeStreamTests : TestBase
         {
             this.stream.Write(buffer, offset, count);
         }
+    }
+
+    private class LoopbackPipe : IDuplexPipe
+    {
+        private readonly Pipe pipe;
+
+        internal LoopbackPipe(Pipe pipe)
+        {
+            this.pipe = pipe ?? throw new ArgumentNullException(nameof(pipe));
+        }
+
+        public PipeReader Input => this.pipe.Reader;
+
+        public PipeWriter Output => this.pipe.Writer;
     }
 }
