@@ -26,5 +26,7 @@ The streams in this package focus on communication (not persistence).
 5. [`Stream.AsStream`](doc/AsStream.md) wraps a `System.IO.Pipelines.PipeReader`,
    `System.IO.Pipelines.PipeWriter`, or `System.IO.Pipelines.IDuplexPipe` with a
    `System.IO.Stream` for reading and/or writing.
-6. [`Stream.ReadSlice(int)`](doc/ReadSlice.md) creates a sub-stream that ends after
+6. [`Stream.UsePipeReader()` and `Stream.UsePipeWriter()`](doc/StreamAsPipe.md) enables reading from
+   and writing to a stream using the `PipeReader` and `PipeWriter` APIs.
+7. [`Stream.ReadSlice(int)`](doc/ReadSlice.md) creates a sub-stream that ends after
    a given number of bytes.
