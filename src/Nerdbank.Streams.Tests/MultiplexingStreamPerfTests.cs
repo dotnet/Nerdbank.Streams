@@ -132,13 +132,14 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
                             Enumerable.Range(1, ChannelCount).Select(c => Task.Run(async delegate
                              {
                                  byte[] serverBuffer = serverBuffers[c - 1];
-                                 var channel = await mxServer.CreateChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
+                                 var channel = await mxServer.OfferChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
+                                 var stream = channel.AsStream();
                                  for (int i = 0; i < segmentCount / ChannelCount; i++)
                                  {
-                                     await channel.WriteAsync(serverBuffer, 0, serverBuffer.Length, this.TimeoutToken);
+                                     await stream.WriteAsync(serverBuffer, 0, serverBuffer.Length, this.TimeoutToken);
                                  }
 
-                                 await channel.FlushAsync();
+                                 await stream.FlushAsync();
                              })));
                     }),
                     Task.Run(async delegate
@@ -148,12 +149,13 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
                             {
                                 byte[] clientBuffer = clientBuffers[c - 1];
                                 var channel = await mxClient.AcceptChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
+                                var stream = channel.AsStream();
                                 int expectedTotalBytesRead = segmentCount / ChannelCount * SegmentSize;
                                 int totalBytesRead = 0;
                                 int bytesJustRead;
                                 do
                                 {
-                                    bytesJustRead = await channel.ReadAsync(clientBuffer, 0, clientBuffer.Length, this.TimeoutToken);
+                                    bytesJustRead = await stream.ReadAsync(clientBuffer, 0, clientBuffer.Length, this.TimeoutToken);
                                     totalBytesRead += bytesJustRead;
                                 }
                                 while (totalBytesRead < expectedTotalBytesRead);

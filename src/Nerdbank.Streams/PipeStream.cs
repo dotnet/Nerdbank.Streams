@@ -144,6 +144,7 @@ namespace Nerdbank.Streams
         protected override void Dispose(bool disposing)
         {
             this.IsDisposed = true;
+            this.reader?.Complete();
             this.writer?.Complete();
             base.Dispose(disposing);
         }

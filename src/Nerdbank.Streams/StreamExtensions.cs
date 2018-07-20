@@ -142,6 +142,28 @@ namespace Nerdbank.Streams
             return pipe.Writer;
         }
 
+        /// <summary>
+        /// Copies a sequence into a contiguous memory structure.
+        /// </summary>
+        /// <typeparam name="T">The type of element in the sequence.</typeparam>
+        /// <param name="sequence">The sequence to read from.</param>
+        /// <param name="memory">The memory to read from.</param>
+        internal static void CopyTo<T>(this ReadOnlySequence<T> sequence, Memory<T> memory)
+        {
+            if (sequence.IsSingleSegment)
+            {
+                sequence.First.CopyTo(memory);
+            }
+            else
+            {
+                foreach (ReadOnlyMemory<T> segment in sequence)
+                {
+                    segment.CopyTo(memory);
+                    memory = memory.Slice(segment.Length);
+                }
+            }
+        }
+
 #if !SPAN_BUILTIN
 #pragma warning disable AvoidAsyncSuffix // Avoid Async suffix
 

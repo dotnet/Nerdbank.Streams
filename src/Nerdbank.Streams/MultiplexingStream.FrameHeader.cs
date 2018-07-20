@@ -33,77 +33,51 @@ namespace Nerdbank.Streams
             /// </remarks>
             internal int FramePayloadLength { get; set; }
 
-            internal static unsafe int Deserialize(ArraySegment<byte> buffer, out FrameHeader header)
+            internal static FrameHeader Deserialize(ReadOnlySpan<byte> buffer)
             {
-                Requires.Argument(buffer.Count >= HeaderLength, nameof(buffer), "Buffer must be at least as long as the header.");
-                header = default;
-                fixed (byte* pBuffer = &buffer.Array[buffer.Offset])
+                Requires.Argument(buffer.Length == HeaderLength, nameof(buffer), "Buffer must be header length.");
+                return new FrameHeader
                 {
-                    byte* ptr = pBuffer;
-                    header.Code = (ControlCode)(*ptr++);
-                    header.ChannelId = ReadInt32(ref ptr);
-                    header.FramePayloadLength = ReadInt16(ref ptr);
-
-                    Assumes.True(ptr - pBuffer <= HeaderLength);
-                    return (int)(ptr - pBuffer);
-                }
+                    Code = (ControlCode)buffer[0],
+                    ChannelId = ReadInt(buffer.Slice(1, 4)),
+                    FramePayloadLength = ReadInt(buffer.Slice(5, 2)),
+                };
             }
 
-            internal unsafe int Serialize(ArraySegment<byte> buffer)
+            internal void Serialize(Span<byte> buffer)
             {
-                Requires.Argument(buffer.Count >= HeaderLength, nameof(buffer), "Buffer must be at least as long as the header.");
-                fixed (byte* pBuffer = &buffer.Array[buffer.Offset])
-                {
-                    byte* ptr = pBuffer;
-                    *ptr++ = (byte)this.Code;
-                    WriteInt32(ref ptr, this.ChannelId);
-                    WriteInt16(ref ptr, this.FramePayloadLength);
-
-                    Assumes.True(ptr - pBuffer <= HeaderLength);
-                    return (int)(ptr - pBuffer);
-                }
+                Requires.Argument(buffer.Length == HeaderLength, nameof(buffer), "Buffer must be header length.");
+                buffer[0] = (byte)this.Code;
+                Write(buffer.Slice(1, 4), this.ChannelId);
+                Write(buffer.Slice(5, 2), (ushort)this.FramePayloadLength);
             }
 
-            private static unsafe int ReadInt32(ref byte* ptr)
+            private static int ReadInt(ReadOnlySpan<byte> buffer)
             {
+                Requires.Argument(buffer.Length <= 4, nameof(buffer), "Int32 length exceeded.");
+
                 int local = 0;
-                local |= *ptr++;
-                local <<= 8;
-                local |= *ptr++;
-                local <<= 8;
-                local |= *ptr++;
-                local <<= 8;
-                local |= *ptr++;
+                for (int offset = 0; offset < buffer.Length; offset++)
+                {
+                    local <<= 8;
+                    local |= buffer[offset];
+                }
+
                 return local;
             }
 
-            private static unsafe void WriteInt32(ref byte* ptr, int value)
+            private static void Write(Span<byte> buffer, int value)
             {
-                unchecked
-                {
-                    *ptr++ = (byte)(value >> 24);
-                    *ptr++ = (byte)(value >> 16);
-                    *ptr++ = (byte)(value >> 8);
-                    *ptr++ = (byte)value;
-                }
+                buffer[0] = (byte)(value >> 24);
+                buffer[1] = (byte)(value >> 16);
+                buffer[2] = (byte)(value >> 8);
+                buffer[3] = (byte)value;
             }
 
-            private static unsafe int ReadInt16(ref byte* ptr)
+            private static void Write(Span<byte> buffer, ushort value)
             {
-                int local = 0;
-                local |= *ptr++;
-                local <<= 8;
-                local |= *ptr++;
-                return local;
-            }
-
-            private static unsafe void WriteInt16(ref byte* ptr, int value)
-            {
-                unchecked
-                {
-                    *ptr++ = (byte)(value >> 8);
-                    *ptr++ = (byte)value;
-                }
+                buffer[0] = (byte)(value >> 8);
+                buffer[1] = (byte)value;
             }
         }
     }
