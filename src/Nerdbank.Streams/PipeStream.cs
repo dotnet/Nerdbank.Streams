@@ -4,13 +4,13 @@
 namespace Nerdbank.Streams
 {
     using System;
-    using System.Collections.Generic;
+    using System.Buffers;
     using System.IO;
     using System.IO.Pipelines;
-    using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft;
+    using Microsoft.VisualStudio.Threading;
 
     /// <summary>
     /// Wraps a <see cref="PipeReader"/> and/or <see cref="PipeWriter"/> as a <see cref="Stream"/> for
@@ -92,7 +92,7 @@ namespace Nerdbank.Streams
         public override void SetLength(long value) => throw this.ThrowDisposedOr(new NotSupportedException());
 
         /// <inheritdoc />
-        public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
             Requires.NotNull(buffer, nameof(buffer));
             Requires.Range(offset + count <= buffer.Length, nameof(count));
@@ -100,7 +100,9 @@ namespace Nerdbank.Streams
             Requires.Range(count >= 0, nameof(count));
             Verify.NotDisposed(this);
 
-            await this.writer.WriteAsync(new ReadOnlyMemory<byte>(buffer, offset, count), cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            this.writer.Write(buffer.AsSpan(offset, count));
+            return TplExtensions.CompletedTask;
         }
 
         /// <inheritdoc />
