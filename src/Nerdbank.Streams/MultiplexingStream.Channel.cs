@@ -215,7 +215,10 @@ namespace Nerdbank.Streams
             private async Task AutoCloseOnPipesClosureAsync()
             {
 #if TRACESOURCE
-                this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelAutoClosing, "Channel self-closing because both parties have completed transmission.");
+                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelAutoClosing, "Channel self-closing because both parties have completed transmission.");
+                }
 #endif
 
                 // We want to close when all *readers* are completed, so that there is adequate chance for all transmissions to have been fully received.

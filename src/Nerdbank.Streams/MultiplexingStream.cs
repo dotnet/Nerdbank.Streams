@@ -216,7 +216,10 @@ namespace Nerdbank.Streams
                 {
                     string message = "Protocol handshake mismatch.";
 #if TRACESOURCE
-                    options.TraceSource.TraceEvent(TraceEventType.Critical, (int)TraceEventId.HandshakeFailed, message);
+                    if (options.TraceSource.Switch.ShouldTrace(TraceEventType.Critical))
+                    {
+                        options.TraceSource.TraceEvent(TraceEventType.Critical, (int)TraceEventId.HandshakeFailed, message);
+                    }
 #endif
                     throw new MultiplexingProtocolException(message);
                 }
@@ -243,13 +246,19 @@ namespace Nerdbank.Streams
             {
                 string message = "Unable to determine even/odd party.";
 #if TRACESOURCE
-                options.TraceSource.TraceEvent(TraceEventType.Critical, (int)TraceEventId.HandshakeFailed, message);
+                if (options.TraceSource.Switch.ShouldTrace(TraceEventType.Critical))
+                {
+                    options.TraceSource.TraceEvent(TraceEventType.Critical, (int)TraceEventId.HandshakeFailed, message);
+                }
 #endif
                 throw new MultiplexingProtocolException(message);
             }
 
 #if TRACESOURCE
-            options.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.HandshakeSuccessful, "Multiplexing protocol established successfully.");
+            if (options.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+            {
+                options.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.HandshakeSuccessful, "Multiplexing protocol established successfully.");
+            }
 #endif
             return new MultiplexingStream(stream, isOdd.Value, options);
         }
