@@ -16,7 +16,7 @@ namespace Nerdbank.Streams
     /// Wraps a <see cref="PipeReader"/> and/or <see cref="PipeWriter"/> as a <see cref="Stream"/> for
     /// easier interop with existing APIs.
     /// </summary>
-    public class PipeStream : Stream, IDisposableObservable
+    internal class PipeStream : Stream, IDisposableObservable
     {
         /// <summary>
         /// The <see cref="PipeWriter"/> to use when writing to this stream. May be null.
@@ -32,11 +32,32 @@ namespace Nerdbank.Streams
         /// Initializes a new instance of the <see cref="PipeStream"/> class.
         /// </summary>
         /// <param name="writer">The <see cref="PipeWriter"/> to use when writing to this stream. May be null.</param>
-        /// <param name="reader">The <see cref="PipeReader"/> to use when reading from this stream. May be null.</param>
-        public PipeStream(PipeWriter writer, PipeReader reader)
+        internal PipeStream(PipeWriter writer)
         {
+            Requires.NotNull(writer, nameof(writer));
             this.writer = writer;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PipeStream"/> class.
+        /// </summary>
+        /// <param name="reader">The <see cref="PipeReader"/> to use when reading from this stream. May be null.</param>
+        internal PipeStream(PipeReader reader)
+        {
+            Requires.NotNull(reader, nameof(reader));
             this.reader = reader;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PipeStream"/> class.
+        /// </summary>
+        /// <param name="pipe">A full duplex pipe that will serve as the transport for this stream.</param>
+        internal PipeStream(IDuplexPipe pipe)
+        {
+            Requires.NotNull(pipe, nameof(pipe));
+
+            this.writer = pipe.Output;
+            this.reader = pipe.Input;
         }
 
         /// <inheritdoc />

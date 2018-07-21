@@ -27,6 +27,27 @@ namespace Nerdbank.Streams
         public static Stream ReadSlice(this Stream stream, long length) => new NestedStream(stream, length);
 
         /// <summary>
+        /// Exposes a full-duplex pipe as a <see cref="Stream"/>.
+        /// </summary>
+        /// <param name="pipe">The pipe to wrap as a stream.</param>
+        /// <returns>The wrapping stream.</returns>
+        public static Stream AsStream(this IDuplexPipe pipe) => new PipeStream(pipe);
+
+        /// <summary>
+        /// Exposes a pipe reader as a <see cref="Stream"/>.
+        /// </summary>
+        /// <param name="pipeReader">The pipe to read from when <see cref="Stream.ReadAsync(byte[], int, int, CancellationToken)"/> is invoked.</param>
+        /// <returns>The wrapping stream.</returns>
+        public static Stream AsStream(this PipeReader pipeReader) => new PipeStream(pipeReader);
+
+        /// <summary>
+        /// Exposes a pipe writer as a <see cref="Stream"/>.
+        /// </summary>
+        /// <param name="pipeWriter">The pipe to write to when <see cref="Stream.WriteAsync(byte[], int, int, CancellationToken)"/> is invoked.</param>
+        /// <returns>The wrapping stream.</returns>
+        public static Stream AsStream(this PipeWriter pipeWriter) => new PipeStream(pipeWriter);
+
+        /// <summary>
         /// Enables efficiently reading a stream using <see cref="PipeReader"/>.
         /// </summary>
         /// <param name="stream">The stream to read from using a pipe.</param>
