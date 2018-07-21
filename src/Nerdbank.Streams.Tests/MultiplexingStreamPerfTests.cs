@@ -76,6 +76,7 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
                         for (int i = 0; i < segmentCount; i++)
                         {
                             await this.serverPipe.WriteAsync(serverBuffer, 0, serverBuffer.Length, this.TimeoutToken);
+                            await this.serverPipe.FlushAsync();
                         }
 
                         await this.serverPipe.FlushAsync();
@@ -137,6 +138,7 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
                                  for (int i = 0; i < segmentCount / ChannelCount; i++)
                                  {
                                      await stream.WriteAsync(serverBuffer, 0, serverBuffer.Length, this.TimeoutToken);
+                                     await stream.FlushAsync();
                                  }
 
                                  await stream.FlushAsync();
