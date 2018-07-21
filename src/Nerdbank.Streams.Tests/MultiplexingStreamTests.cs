@@ -233,7 +233,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
             {
                 await s.WriteAsync(send, 0, send.Length).WithCancellation(this.TimeoutToken);
                 await s.FlushAsync(this.TimeoutToken).WithCancellation(this.TimeoutToken);
-                Assert.Equal(recvBuffer.Length, await ReadAtLeastAsync(s, new ArraySegment<byte>(recvBuffer), recvBuffer.Length).WithCancellation(this.TimeoutToken));
+                Assert.Equal(recvBuffer.Length, await ReadAtLeastAsync(s, new ArraySegment<byte>(recvBuffer), recvBuffer.Length, this.TimeoutToken));
                 Assert.Equal(receive, recvBuffer);
             }
         }
@@ -278,7 +278,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         a.Dispose();
 
         var receivingBuffer = new byte[(1024 * 1024) + 1];
-        int readBytes = await ReadAtLeastAsync(b, new ArraySegment<byte>(receivingBuffer), buffer.Length).WithCancellation(this.TimeoutToken);
+        int readBytes = await ReadAtLeastAsync(b, new ArraySegment<byte>(receivingBuffer), buffer.Length, this.TimeoutToken);
         Assert.Equal(buffer.Length, readBytes);
         Assert.Equal(buffer, receivingBuffer.Take(buffer.Length));
 
@@ -351,7 +351,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
             s1.Flush();
         }
 
-        await ReadAtLeastAsync(s2, new ArraySegment<byte>(recvBuffer), recvBuffer.Length).WithCancellation(this.TimeoutToken);
+        await ReadAtLeastAsync(s2, new ArraySegment<byte>(recvBuffer), recvBuffer.Length, this.TimeoutToken);
     }
 
     [SkippableTheory]
@@ -391,7 +391,36 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         }
     }
 
-    private static async Task<int> ReadAtLeastAsync(Stream stream, ArraySegment<byte> buffer, int requiredLength)
+    [Fact]
+    public async Task EphemeralChannels()
+    {
+        var ephemeralMessage = new byte[10];
+        var random = new Random();
+        random.NextBytes(ephemeralMessage);
+
+        await Task.WhenAll(
+            Task.Run(async delegate
+            {
+                var rpcChannel = await this.mx1.OfferChannelAsync(string.Empty, this.TimeoutToken);
+                var eph = this.mx1.CreateChannel();
+                await rpcChannel.Output.WriteAsync(BitConverter.GetBytes(eph.Id), this.TimeoutToken);
+                await eph.Output.WriteAsync(ephemeralMessage, this.TimeoutToken);
+                await eph.Acceptance;
+            }),
+            Task.Run(async delegate
+            {
+                var rpcChannel = await this.mx2.AcceptChannelAsync(string.Empty, this.TimeoutToken);
+                var buffer = new byte[ephemeralMessage.Length];
+                var readResult = await ReadAtLeastAsync(rpcChannel.AsStream(), new ArraySegment<byte>(buffer), sizeof(int), this.TimeoutToken);
+                int channelId = BitConverter.ToInt32(buffer, 0);
+                var eph = this.mx2.AcceptChannel(channelId);
+                Assert.True(eph.Acceptance.IsCompleted);
+                readResult = await ReadAtLeastAsync(eph.AsStream(), new ArraySegment<byte>(buffer), ephemeralMessage.Length, this.TimeoutToken);
+                Assert.Equal(ephemeralMessage, buffer);
+            }));
+    }
+
+    private static async Task<int> ReadAtLeastAsync(Stream stream, ArraySegment<byte> buffer, int requiredLength, CancellationToken cancellationToken)
     {
         Requires.NotNull(stream, nameof(stream));
         Requires.NotNull(buffer.Array, nameof(buffer));
@@ -400,7 +429,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         int bytesRead = 0;
         while (bytesRead < requiredLength)
         {
-            int bytesReadJustNow = await stream.ReadAsync(buffer.Array, buffer.Offset + bytesRead, buffer.Count - bytesRead).ConfigureAwait(false);
+            int bytesReadJustNow = await stream.ReadAsync(buffer.Array, buffer.Offset + bytesRead, buffer.Count - bytesRead, cancellationToken).ConfigureAwait(false);
             Assert.NotEqual(0, bytesReadJustNow);
             bytesRead += bytesReadJustNow;
         }
@@ -426,7 +455,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         await writeTo.WriteAsync(data, 0, data.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken);
         await writeTo.FlushAsync().WithCancellation(this.TimeoutToken);
         var readBuffer = new byte[data.Length * 2];
-        int readBytes = await ReadAtLeastAsync(readFrom, new ArraySegment<byte>(readBuffer), data.Length);
+        int readBytes = await ReadAtLeastAsync(readFrom, new ArraySegment<byte>(readBuffer), data.Length, this.TimeoutToken);
         Assert.Equal(data.Length, readBytes);
         for (int i = 0; i < data.Length; i++)
         {

@@ -275,7 +275,14 @@ namespace Nerdbank.Streams
         /// </remarks>
         public Channel CreateChannel(ChannelOptions options = default)
         {
-            throw new NotImplementedException();
+            Channel channel = new Channel(this, this.GetUnusedChannelId(), null, offeredByRemote: false, options ?? DefaultChannelOptions);
+            lock (this.syncObject)
+            {
+                this.openChannels.Add(channel.Id, channel);
+            }
+
+            this.SendFrame(ControlCode.Offer, channel.Id);
+            return channel;
         }
 
         /// <summary>
@@ -289,8 +296,25 @@ namespace Nerdbank.Streams
         /// </remarks>
         public Channel AcceptChannel(int id, ChannelOptions options = default)
         {
-            // When implementing this, take care to remove the channel from the offeredByName dictionary if it's there.
-            throw new NotImplementedException();
+            Channel channel;
+            lock (this.syncObject)
+            {
+                channel = this.openChannels[id];
+                if (channel.Name != null && this.channelsOfferedByThemByName.TryGetValue(channel.Name, out var queue))
+                {
+                    queue.RemoveMidQueue(channel);
+                }
+            }
+
+            if (channel.TryAcceptOffer(options))
+            {
+                this.SendFrame(ControlCode.OfferAccepted, channel.Id);
+                return channel;
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
         }
 
         /// <summary>
@@ -393,8 +417,8 @@ namespace Nerdbank.Streams
             {
                 if (this.channelsOfferedByThemByName.TryGetValue(name, out var channelsOfferedByThem) && channelsOfferedByThem.Count > 0)
                 {
-                    this.TraceInformation("Accepting channel \"{0}\" which is already offered by the other side.", name);
                     channel = channelsOfferedByThem.Dequeue();
+                    this.TraceInformation("Accepting channel {1} \"{0}\" which is already offered by the other side.", name, channel.Id);
                 }
                 else
                 {
@@ -663,7 +687,7 @@ namespace Nerdbank.Streams
 
                 if (!acceptingChannelAlreadyPresent)
                 {
-                    this.TraceInformation("Remote party offers channel \"{0}\" which has no pending " + nameof(this.AcceptChannelAsync), name);
+                    this.TraceInformation("Remote party offers channel {1} \"{0}\" which has no pending " + nameof(this.AcceptChannelAsync), name, channelId);
                     if (!this.channelsOfferedByThemByName.TryGetValue(name, out var offeredChannels))
                     {
                         this.channelsOfferedByThemByName.Add(name, offeredChannels = new Queue<Channel>());
