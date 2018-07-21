@@ -514,7 +514,7 @@ namespace Nerdbank.Streams
             }
             else
             {
-                sequence.CopyTo(backupBuffer);
+                sequence.CopyTo(backupBuffer.Span);
                 return backupBuffer.Slice(0, (int)sequence.Length);
             }
         }
