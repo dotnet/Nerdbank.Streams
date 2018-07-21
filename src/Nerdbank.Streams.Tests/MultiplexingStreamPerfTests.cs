@@ -2,15 +2,12 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 
 using System;
-using System.Collections.Generic;
+using System.Buffers;
 using System.Diagnostics;
-using System.IO;
 using System.IO.Pipes;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Microsoft;
-using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
@@ -102,7 +99,6 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
     {
         if (await this.ExecuteInIsolationAsync())
         {
-            byte[][] clientBuffers = Enumerable.Range(1, ChannelCount).Select(i => new byte[SegmentSize]).ToArray();
             byte[][] serverBuffers = Enumerable.Range(1, ChannelCount).Select(i => new byte[SegmentSize]).ToArray();
 
             var (mxServer, mxClient) = await Task.WhenAll(
@@ -134,14 +130,10 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
                              {
                                  byte[] serverBuffer = serverBuffers[c - 1];
                                  var channel = await mxServer.OfferChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
-                                 var stream = channel.AsStream();
                                  for (int i = 0; i < segmentCount / ChannelCount; i++)
                                  {
-                                     await stream.WriteAsync(serverBuffer, 0, serverBuffer.Length, this.TimeoutToken);
-                                     await stream.FlushAsync();
+                                     await channel.Output.WriteAsync(serverBuffer, this.TimeoutToken);
                                  }
-
-                                 await stream.FlushAsync();
                              })));
                     }),
                     Task.Run(async delegate
@@ -149,16 +141,14 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
                         await Task.WhenAll(
                             Enumerable.Range(1, ChannelCount).Select(c => Task.Run(async delegate
                             {
-                                byte[] clientBuffer = clientBuffers[c - 1];
                                 var channel = await mxClient.AcceptChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
-                                var stream = channel.AsStream();
                                 int expectedTotalBytesRead = segmentCount / ChannelCount * SegmentSize;
                                 int totalBytesRead = 0;
-                                int bytesJustRead;
                                 do
                                 {
-                                    bytesJustRead = await stream.ReadAsync(clientBuffer, 0, clientBuffer.Length, this.TimeoutToken);
-                                    totalBytesRead += bytesJustRead;
+                                    var readResult = await channel.Input.ReadAsync(this.TimeoutToken);
+                                    channel.Input.AdvanceTo(readResult.Buffer.End);
+                                    totalBytesRead += (int)readResult.Buffer.Length;
                                 }
                                 while (totalBytesRead < expectedTotalBytesRead);
                                 Assert.Equal(expectedTotalBytesRead, totalBytesRead);
