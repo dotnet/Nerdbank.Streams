@@ -417,12 +417,22 @@ namespace Nerdbank.Streams
             TaskCompletionSource<Channel> pendingAcceptChannel = null;
             lock (this.syncObject)
             {
-                if (this.channelsOfferedByThemByName.TryGetValue(name, out var channelsOfferedByThem) && channelsOfferedByThem.Count > 0)
+                if (this.channelsOfferedByThemByName.TryGetValue(name, out var channelsOfferedByThem))
                 {
-                    channel = channelsOfferedByThem.Dequeue();
-                    this.TraceInformation("Accepting channel {1} \"{0}\" which is already offered by the other side.", name, channel.Id);
+                    while (channelsOfferedByThem.Count > 0)
+                    {
+                        channel = channelsOfferedByThem.Dequeue();
+                        if (channel.Acceptance.IsCompleted)
+                        {
+                            channel = null;
+                            continue;
+                        }
+
+                        this.TraceInformation("Accepting channel {1} \"{0}\" which is already offered by the other side.", name, channel.Id);
+                    }
                 }
-                else
+
+                if (channel == null)
                 {
                     this.TraceInformation("Waiting to accept channel \"{0}\", when offered by the other side.", name);
                     if (!this.acceptingChannels.TryGetValue(name, out var acceptingChannels))
@@ -831,8 +841,10 @@ namespace Nerdbank.Streams
                 this.TraceInformation("Cancelling " + nameof(this.AcceptChannelAsync) + " for \"{0}\"", name);
                 lock (this.syncObject)
                 {
-                    var queue = this.acceptingChannels[name];
-                    Assumes.True(queue.RemoveMidQueue(channelSource));
+                    if (this.acceptingChannels.TryGetValue(name, out var queue))
+                    {
+                        Assumes.True(queue.RemoveMidQueue(channelSource));
+                    }
                 }
             }
             else
