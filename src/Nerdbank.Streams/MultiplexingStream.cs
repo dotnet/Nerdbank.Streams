@@ -117,7 +117,7 @@ namespace Nerdbank.Streams
         /// <param name="stream">The stream to multiplex multiple channels over.</param>
         /// <param name="isOdd">A value indicating whether this party is the "odd" one.</param>
         /// <param name="options">The options for this instance.</param>
-        private MultiplexingStream(Stream stream, bool isOdd, MultiplexingStreamOptions options)
+        private MultiplexingStream(Stream stream, bool isOdd, Options options)
         {
             Requires.NotNull(stream, nameof(stream));
             Requires.NotNull(options, nameof(options));
@@ -174,7 +174,7 @@ namespace Nerdbank.Streams
         /// <param name="cancellationToken">A cancellation token.</param>
         /// <returns>The multiplexing stream, once the handshake is complete.</returns>
         /// <exception cref="EndOfStreamException">Thrown if the remote end disconnects before the handshake is complete.</exception>
-        public static Task<MultiplexingStream> CreateAsync(Stream stream, CancellationToken cancellationToken) => CreateAsync(stream, options: null, cancellationToken);
+        public static Task<MultiplexingStream> CreateAsync(Stream stream, CancellationToken cancellationToken = default) => CreateAsync(stream, options: null, cancellationToken);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MultiplexingStream"/> class.
@@ -184,13 +184,13 @@ namespace Nerdbank.Streams
         /// <param name="cancellationToken">A cancellation token.</param>
         /// <returns>The multiplexing stream, once the handshake is complete.</returns>
         /// <exception cref="EndOfStreamException">Thrown if the remote end disconnects before the handshake is complete.</exception>
-        public static async Task<MultiplexingStream> CreateAsync(Stream stream, MultiplexingStreamOptions options = null, CancellationToken cancellationToken = default)
+        public static async Task<MultiplexingStream> CreateAsync(Stream stream, Options options, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(stream, nameof(stream));
             Requires.Argument(stream.CanRead, nameof(stream), "Stream must be readable.");
             Requires.Argument(stream.CanWrite, nameof(stream), "Stream must be writable.");
 
-            options = options ?? new MultiplexingStreamOptions();
+            options = options ?? new Options();
 
             // Send the protocol magic number, and a random GUID to establish even/odd assignments.
             var randomSendBuffer = Guid.NewGuid().ToByteArray();
