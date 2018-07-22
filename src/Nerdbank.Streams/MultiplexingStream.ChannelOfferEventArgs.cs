@@ -23,6 +23,19 @@ namespace Nerdbank.Streams
         public class ChannelOfferEventArgs : EventArgs
         {
             /// <summary>
+            /// Initializes a new instance of the <see cref="ChannelOfferEventArgs"/> class.
+            /// </summary>
+            /// <param name="id">The unique ID of the channel.</param>
+            /// <param name="name">The name of the channel.</param>
+            /// <param name="isAccepted">A value indicating whether the channel has already been accepted.</param>
+            internal ChannelOfferEventArgs(int id, string name, bool isAccepted)
+            {
+                this.Id = id;
+                this.Name = name;
+                this.IsAccepted = isAccepted;
+            }
+
+            /// <summary>
             /// Gets the unique ID of the channel.
             /// </summary>
             public int Id { get; }

@@ -502,6 +502,12 @@ namespace Nerdbank.Streams
         }
 
         /// <summary>
+        /// Raises the <see cref="ChannelOffered"/> event.
+        /// </summary>
+        /// <param name="args">The arguments to pass to the event handlers.</param>
+        protected virtual void OnChannelOffered(ChannelOfferEventArgs args) => this.ChannelOffered?.Invoke(this, args);
+
+        /// <summary>
         /// Reads to fill a buffer.
         /// </summary>
         /// <param name="stream">The stream to read from.</param>
@@ -651,13 +657,12 @@ namespace Nerdbank.Streams
             {
                 // This may be an acceptance of a channel that we canceled an offer for, and a race condition
                 // led to our cancellation notification crossing in transit with their acceptance notification.
-                // In this case, all we can do is inform them that we've closed the channel.
+                // In this case, do nothing since we already sent a channel termination message, and the remote side
+                // should notice it soon.
                 if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Warning))
                 {
-                    this.TraceSource.TraceEvent(TraceEventType.Warning, (int)TraceEventId.UnexpectedChannelAccept, "Remote party accepted channel {0} that we were not expecting an accept for.", channel.Id);
+                    this.TraceSource.TraceEvent(TraceEventType.Warning, (int)TraceEventId.UnexpectedChannelAccept, "Ignoring " + nameof(ControlCode.OfferAccepted) + " message for channel {0} that we already canceled our offer for.", channel.Id);
                 }
-
-                this.SendFrame(ControlCode.ChannelTerminated, channel.Id);
             }
         }
 
@@ -671,7 +676,7 @@ namespace Nerdbank.Streams
             ChannelOptions options = null;
             lock (this.syncObject)
             {
-                if (this.acceptingChannels.TryGetValue(name, out var acceptingChannels))
+                if (name != null && this.acceptingChannels.TryGetValue(name, out var acceptingChannels))
                 {
                     while (acceptingChannels.Count > 0)
                     {
@@ -688,13 +693,20 @@ namespace Nerdbank.Streams
 
                 if (!acceptingChannelAlreadyPresent)
                 {
-                    this.TraceInformation("Remote party offers channel {1} \"{0}\" which has no pending " + nameof(this.AcceptChannelAsync), name, channelId);
-                    if (!this.channelsOfferedByThemByName.TryGetValue(name, out var offeredChannels))
+                    if (name != null)
                     {
-                        this.channelsOfferedByThemByName.Add(name, offeredChannels = new Queue<Channel>());
-                    }
+                        this.TraceInformation("Remote party offers channel {1} \"{0}\" which has no pending " + nameof(this.AcceptChannelAsync), name, channelId);
+                        if (!this.channelsOfferedByThemByName.TryGetValue(name, out var offeredChannels))
+                        {
+                            this.channelsOfferedByThemByName.Add(name, offeredChannels = new Queue<Channel>());
+                        }
 
-                    offeredChannels.Enqueue(channel);
+                        offeredChannels.Enqueue(channel);
+                    }
+                    else
+                    {
+                        this.TraceInformation("Remote party offers anonymous channel {1}", null, channelId);
+                    }
                 }
 
                 this.openChannels.Add(channelId, channel);
@@ -704,6 +716,9 @@ namespace Nerdbank.Streams
             {
                 this.AcceptChannelOrThrow(channel, options);
             }
+
+            var args = new ChannelOfferEventArgs(channel.Id, channel.Name, acceptingChannelAlreadyPresent);
+            this.OnChannelOffered(args);
         }
 
         private void AcceptChannelOrThrow(Channel channel, ChannelOptions options)
@@ -825,11 +840,8 @@ namespace Nerdbank.Streams
         {
             Requires.NotNull(state, nameof(state));
             var channel = (Channel)state;
-            lock (this.syncObject)
-            {
-                this.TraceInformation("Offer of channel {1} (\"{0}\") canceled.", channel.Name, channel.Id);
-                channel.Dispose();
-            }
+            this.TraceInformation("Offer of channel {1} (\"{0}\") canceled.", channel.Name, channel.Id);
+            channel.Dispose();
         }
 
         private void AcceptChannelCanceled(object state)

@@ -472,6 +472,68 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         Assert.Throws<InvalidOperationException>(() => this.mx1.AcceptChannel(15));
     }
 
+    [Fact]
+    public async Task ChannelOfferedEvent_Anonymous_NotYetAccepted()
+    {
+        var mx1EventArgsSource = new TaskCompletionSource<MultiplexingStream.ChannelOfferEventArgs>();
+        var mx2EventArgsSource = new TaskCompletionSource<MultiplexingStream.ChannelOfferEventArgs>();
+        this.mx1.ChannelOffered += (s, e) =>
+        {
+            mx1EventArgsSource.SetResult(e);
+        };
+        this.mx2.ChannelOffered += (s, e) =>
+        {
+            mx2EventArgsSource.SetResult(e);
+        };
+
+        var channel = this.mx1.CreateChannel();
+        var mx2EventArgs = await mx2EventArgsSource.Task.WithCancellation(this.TimeoutToken);
+        Assert.Equal(channel.Id, mx2EventArgs.Id);
+        Assert.Equal(string.Empty, mx2EventArgs.Name);
+        Assert.False(mx2EventArgs.IsAccepted);
+
+        Assert.False(mx1EventArgsSource.Task.IsCompleted);
+    }
+
+    [Theory]
+    [PairwiseData]
+    public async Task ChannelOfferedEvent_Named(bool alreadyAccepted)
+    {
+        var mx1EventArgsSource = new TaskCompletionSource<MultiplexingStream.ChannelOfferEventArgs>();
+        var mx2EventArgsSource = new TaskCompletionSource<MultiplexingStream.ChannelOfferEventArgs>();
+        this.mx1.ChannelOffered += (s, e) =>
+        {
+            mx1EventArgsSource.SetResult(e);
+        };
+        this.mx2.ChannelOffered += (s, e) =>
+        {
+            mx2EventArgsSource.SetResult(e);
+        };
+
+        string channelName = "abc";
+        Task acceptTask = null;
+        if (alreadyAccepted)
+        {
+            acceptTask = this.mx2.AcceptChannelAsync(channelName, this.TimeoutToken);
+        }
+
+        var channelOfferTask = this.mx1.OfferChannelAsync(channelName, this.TimeoutToken);
+
+        var mx2EventArgs = await mx2EventArgsSource.Task.WithCancellation(this.TimeoutToken);
+        if (!alreadyAccepted)
+        {
+            acceptTask = this.mx2.AcceptChannelAsync(channelName, this.TimeoutToken);
+        }
+
+        var offeredChannel = await channelOfferTask;
+        Assert.Equal(offeredChannel.Id, mx2EventArgs.Id);
+        Assert.Equal(channelName, mx2EventArgs.Name);
+        Assert.Equal(alreadyAccepted, mx2EventArgs.IsAccepted);
+
+        Assert.False(mx1EventArgsSource.Task.IsCompleted);
+        await acceptTask.WithCancellation(this.TimeoutToken); // Rethrow any exceptions
+    }
+
     private static async Task<int> ReadAtLeastAsync(Stream stream, ArraySegment<byte> buffer, int requiredLength, CancellationToken cancellationToken)
     {
         Requires.NotNull(stream, nameof(stream));
