@@ -293,28 +293,24 @@ namespace Nerdbank.Streams
         /// <returns>The accepted <see cref="Channel"/>.</returns>
         /// <remarks>
         /// This method can be used to accept anonymous channels created with <see cref="CreateChannel"/>.
+        /// Unlike <see cref="AcceptChannelAsync(string, ChannelOptions, CancellationToken)"/> which will await
+        /// for a channel offer if a matching one has not been made yet, this method only accepts an offer
+        /// for a channel that has already been made.
         /// </remarks>
         public Channel AcceptChannel(int id, ChannelOptions options = default)
         {
             Channel channel;
             lock (this.syncObject)
             {
-                channel = this.openChannels[id];
+                Verify.Operation(this.openChannels.TryGetValue(id, out channel), "No channel with that ID found.");
                 if (channel.Name != null && this.channelsOfferedByThemByName.TryGetValue(channel.Name, out var queue))
                 {
                     queue.RemoveMidQueue(channel);
                 }
             }
 
-            if (channel.TryAcceptOffer(options))
-            {
-                this.SendFrame(ControlCode.OfferAccepted, channel.Id);
-                return channel;
-            }
-            else
-            {
-                throw new NotImplementedException();
-            }
+            this.AcceptChannelOrThrow(channel, options);
+            return channel;
         }
 
         /// <summary>
@@ -322,7 +318,20 @@ namespace Nerdbank.Streams
         /// </summary>
         /// <param name="id">The ID of the channel whose offer should be rejected.</param>
         /// <exception cref="InvalidOperationException">Thrown if the channel was already accepted.</exception>
-        public void RejectChannel(int id) => throw new NotImplementedException();
+        public void RejectChannel(int id)
+        {
+            Channel channel;
+            lock (this.syncObject)
+            {
+                Verify.Operation(this.openChannels.TryGetValue(id, out channel), "No channel with that ID found.");
+                if (channel.Name != null && this.channelsOfferedByThemByName.TryGetValue(channel.Name, out var queue))
+                {
+                    queue.RemoveMidQueue(channel);
+                }
+            }
+
+            channel.Dispose();
+        }
 
         /// <summary>
         /// Offers a new, named channel to the remote party so they may accept it with <see cref="AcceptChannelAsync(string, ChannelOptions, CancellationToken)"/>.
@@ -435,15 +444,7 @@ namespace Nerdbank.Streams
 
             if (channel != null)
             {
-                if (channel.TryAcceptOffer(options))
-                {
-                    this.SendFrame(ControlCode.OfferAccepted, channel.Id);
-                }
-                else
-                {
-                    throw new NotImplementedException();
-                }
-
+                this.AcceptChannelOrThrow(channel, options);
                 return channel;
             }
             else
@@ -701,14 +702,29 @@ namespace Nerdbank.Streams
 
             if (acceptingChannelAlreadyPresent)
             {
-                if (channel.TryAcceptOffer(options))
-                {
-                    this.SendFrame(ControlCode.OfferAccepted, channel.Id);
-                }
-                else
-                {
-                    throw new NotImplementedException();
-                }
+                this.AcceptChannelOrThrow(channel, options);
+            }
+        }
+
+        private void AcceptChannelOrThrow(Channel channel, ChannelOptions options)
+        {
+            Requires.NotNull(channel, nameof(channel));
+
+            if (channel.TryAcceptOffer(options))
+            {
+                this.SendFrame(ControlCode.OfferAccepted, channel.Id);
+            }
+            else if (channel.IsAccepted)
+            {
+                throw new InvalidOperationException("Channel is already accepted.");
+            }
+            else if (channel.IsRejectedOrCanceled)
+            {
+                throw new InvalidOperationException("Channel is no longer available for acceptance.");
+            }
+            else
+            {
+                throw new InvalidOperationException("Channel could not be accepted.");
             }
         }
 

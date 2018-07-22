@@ -420,6 +420,58 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
             }));
     }
 
+    [Fact]
+    public async Task EphemeralChannels_AcceptTwice_Throws()
+    {
+        await Task.WhenAll(
+            Task.Run(async delegate
+            {
+                var rpcChannel = await this.mx1.OfferChannelAsync(string.Empty, this.TimeoutToken);
+                var eph = this.mx1.CreateChannel();
+                await rpcChannel.Output.WriteAsync(BitConverter.GetBytes(eph.Id), this.TimeoutToken);
+                await eph.Acceptance;
+            }),
+            Task.Run(async delegate
+            {
+                var buffer = new byte[sizeof(int)];
+                var rpcChannel = await this.mx2.AcceptChannelAsync(string.Empty, this.TimeoutToken);
+                var readResult = await ReadAtLeastAsync(rpcChannel.AsStream(), new ArraySegment<byte>(buffer), sizeof(int), this.TimeoutToken);
+                int channelId = BitConverter.ToInt32(buffer, 0);
+                var eph = this.mx2.AcceptChannel(channelId);
+                Assert.Throws<InvalidOperationException>(() => this.mx2.AcceptChannel(channelId));
+            }));
+    }
+
+    [Fact]
+    public async Task EphemeralChannels_Rejected()
+    {
+        await Task.WhenAll(
+            Task.Run(async delegate
+            {
+                var rpcChannel = await this.mx1.OfferChannelAsync(string.Empty, this.TimeoutToken);
+                var eph = this.mx1.CreateChannel();
+                await rpcChannel.Output.WriteAsync(BitConverter.GetBytes(eph.Id), this.TimeoutToken);
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => eph.Acceptance).WithCancellation(this.TimeoutToken);
+            }),
+            Task.Run(async delegate
+            {
+                var buffer = new byte[sizeof(int)];
+                var rpcChannel = await this.mx2.AcceptChannelAsync(string.Empty, this.TimeoutToken);
+                var readResult = await ReadAtLeastAsync(rpcChannel.AsStream(), new ArraySegment<byte>(buffer), sizeof(int), this.TimeoutToken);
+                int channelId = BitConverter.ToInt32(buffer, 0);
+                this.mx2.RejectChannel(channelId);
+
+                // At this point, it's too late to accept
+                Assert.Throws<InvalidOperationException>(() => this.mx2.AcceptChannel(channelId));
+            }));
+    }
+
+    [Fact]
+    public void AcceptChannel_NeverExisted()
+    {
+        Assert.Throws<InvalidOperationException>(() => this.mx1.AcceptChannel(15));
+    }
+
     private static async Task<int> ReadAtLeastAsync(Stream stream, ArraySegment<byte> buffer, int requiredLength, CancellationToken cancellationToken)
     {
         Requires.NotNull(stream, nameof(stream));
