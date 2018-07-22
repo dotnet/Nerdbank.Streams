@@ -11,12 +11,10 @@ namespace Nerdbank.Streams
     /// </summary>
     public class MultiplexingStreamOptions
     {
-#if TRACESOURCE
         /// <summary>
         /// Backing field for the <see cref="TraceSource"/> property.
         /// </summary>
         private TraceSource traceSource = new TraceSource(nameof(MultiplexingStream), SourceLevels.Critical);
-#endif
 
         /////// <summary>
         /////// Gets or sets the maximum number of channel offers from the remote party that are allowed before the
@@ -25,7 +23,6 @@ namespace Nerdbank.Streams
         /////// <value>The default value is 100.</value>
         ////public int MaximumAllowedChannelOffers { get; set; } = 100;
 
-#if TRACESOURCE
         /// <summary>
         /// Gets or sets the logger used by this instance.
         /// </summary>
@@ -39,6 +36,5 @@ namespace Nerdbank.Streams
                 this.traceSource = value;
             }
         }
-#endif
     }
 }

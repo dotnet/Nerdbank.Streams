@@ -47,9 +47,7 @@ namespace Nerdbank.Streams
                 this.Id = id;
                 this.Name = name;
                 this.OfferedByThem = offeredByRemote;
-#if TRACESOURCE
                 this.TraceSource = channelOptions.TraceSource ?? new TraceSource($"{nameof(MultiplexingStream)}.{nameof(Channel)} {id} ({name})", SourceLevels.Critical);
-#endif
 
                 this.receivingPipe = new Pipe();
                 this.transmissionPipe = new Pipe();
@@ -67,13 +65,11 @@ namespace Nerdbank.Streams
             /// </remarks>
             public int Id { get; }
 
-#if TRACESOURCE
             /// <summary>
             /// Gets the mechanism used for tracing activity related to this channel.
             /// </summary>
             /// <value>A non-null value.</value>
             public TraceSource TraceSource { get; private set; }
-#endif
 
             /// <inheritdoc />
             public bool IsDisposed { get; private set; }
@@ -149,12 +145,10 @@ namespace Nerdbank.Streams
                 {
                     if (options != null)
                     {
-#if TRACESOURCE
                         if (options.TraceSource != null)
                         {
                             this.TraceSource = options.TraceSource;
                         }
-#endif
                     }
 
                     return true;
@@ -214,12 +208,10 @@ namespace Nerdbank.Streams
 
             private async Task AutoCloseOnPipesClosureAsync()
             {
-#if TRACESOURCE
                 if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
                 {
                     this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelAutoClosing, "Channel self-closing because both parties have completed transmission.");
                 }
-#endif
 
                 // We want to close when all *readers* are completed, so that there is adequate chance for all transmissions to have been fully received.
                 await Task.WhenAll(this.transmissionPipe.Writer.WaitForReaderCompletionAsync(), this.receivingPipe.Writer.WaitForReaderCompletionAsync()).ConfigureAwait(false);
@@ -229,9 +221,7 @@ namespace Nerdbank.Streams
 
             private void Fault(Exception exception)
             {
-#if TRACESOURCE
                 this.UnderlyingMultiplexingStream.TraceCritical(TraceEventId.FatalError, "Channel Closing self due to exception: {0}", exception);
-#endif
                 this.transmissionPipe.Reader.Complete(exception);
                 this.Dispose();
             }

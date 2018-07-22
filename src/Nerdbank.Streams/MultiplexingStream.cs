@@ -125,9 +125,7 @@ namespace Nerdbank.Streams
             this.stream = stream;
             this.isOdd = isOdd;
             this.lastOfferedChannelId = isOdd ? -1 : 0; // the first channel created should be 1 or 2
-#if TRACESOURCE
             this.TraceSource = options.TraceSource;
-#endif
 
             // Initiate reading from the transport stream. This will not end until the stream does, or we're disposed.
             // If reading the stream fails, we'll dispose ourselves.
@@ -155,13 +153,11 @@ namespace Nerdbank.Streams
         /// </summary>
         public Task Completion => this.completionSource.Task;
 
-#if TRACESOURCE
         /// <summary>
         /// Gets the logger used by this instance.
         /// </summary>
         /// <value>Never null.</value>
         public TraceSource TraceSource { get; }
-#endif
 
         /// <inheritdoc />
         bool IDisposableObservable.IsDisposed => this.Completion.IsCompleted;
@@ -215,12 +211,11 @@ namespace Nerdbank.Streams
                 if (recvBuffer[i] != ProtocolMagicNumber[i])
                 {
                     string message = "Protocol handshake mismatch.";
-#if TRACESOURCE
                     if (options.TraceSource.Switch.ShouldTrace(TraceEventType.Critical))
                     {
                         options.TraceSource.TraceEvent(TraceEventType.Critical, (int)TraceEventId.HandshakeFailed, message);
                     }
-#endif
+
                     throw new MultiplexingProtocolException(message);
                 }
             }
@@ -245,21 +240,19 @@ namespace Nerdbank.Streams
             if (!isOdd.HasValue)
             {
                 string message = "Unable to determine even/odd party.";
-#if TRACESOURCE
                 if (options.TraceSource.Switch.ShouldTrace(TraceEventType.Critical))
                 {
                     options.TraceSource.TraceEvent(TraceEventType.Critical, (int)TraceEventId.HandshakeFailed, message);
                 }
-#endif
+
                 throw new MultiplexingProtocolException(message);
             }
 
-#if TRACESOURCE
             if (options.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
             {
                 options.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.HandshakeSuccessful, "Multiplexing protocol established successfully.");
             }
-#endif
+
             return new MultiplexingStream(stream, isOdd.Value, options);
         }
 
@@ -620,9 +613,7 @@ namespace Nerdbank.Streams
             {
                 if (!this.openChannels.TryGetValue(header.ChannelId, out channel))
                 {
-#if TRACESOURCE
                     this.TraceSource.TraceEvent(TraceEventType.Warning, (int)TraceEventId.MessageReceivedForUnknownChannel, "Message content received for unknown channel {0}.", header.ChannelId);
-#endif
                     return default;
                 }
             }
@@ -651,12 +642,11 @@ namespace Nerdbank.Streams
                 // This may be an acceptance of a channel that we canceled an offer for, and a race condition
                 // led to our cancellation notification crossing in transit with their acceptance notification.
                 // In this case, all we can do is inform them that we've closed the channel.
-#if TRACESOURCE
                 if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Warning))
                 {
                     this.TraceSource.TraceEvent(TraceEventType.Warning, (int)TraceEventId.UnexpectedChannelAccept, "Remote party accepted channel {0} that we were not expecting an accept for.", channel.Id);
                 }
-#endif
+
                 this.SendFrame(ControlCode.ChannelTerminated, channel.Id);
             }
         }
@@ -880,67 +870,49 @@ namespace Nerdbank.Streams
             this.Dispose();
         }
 
-        [Conditional("TRACESOURCE")]
         private void TraceCritical(string message)
         {
-#if TRACESOURCE
             if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Critical))
             {
                 this.TraceSource.TraceInformation(message);
             }
-#endif
         }
 
-        [Conditional("TRACESOURCE")]
         private void TraceCritical(TraceEventId traceEventId, string message, object arg)
         {
-#if TRACESOURCE
             this.TraceSource.TraceEvent(TraceEventType.Critical, (int)traceEventId, message, arg);
-#endif
         }
 
-        [Conditional("TRACESOURCE")]
         private void TraceInformation(string message)
         {
-#if TRACESOURCE
             if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
             {
                 this.TraceSource.TraceInformation(message);
             }
-#endif
         }
 
-        [Conditional("TRACESOURCE")]
         private void TraceInformation(string message, object arg)
         {
-#if TRACESOURCE
             if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
             {
                 this.TraceSource.TraceInformation(message, arg);
             }
-#endif
         }
 
-        [Conditional("TRACESOURCE")]
         private void TraceInformation(string message, object arg1, int arg2)
         {
-#if TRACESOURCE
             if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
             {
                 this.TraceSource.TraceInformation(message, arg1, arg2);
             }
-#endif
         }
 
-        [Conditional("TRACESOURCE")]
         private void TraceInformation(string unformattedMessage, ControlCode code, int channelId, int contentLength = 0)
         {
-#if TRACESOURCE
             if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
             {
                 this.TraceSource.TraceInformation(unformattedMessage, code, channelId, contentLength);
             }
-#endif
         }
     }
 }

@@ -23,13 +23,11 @@ namespace Nerdbank.Streams
             {
             }
 
-#if TRACESOURCE
             /// <summary>
             /// Gets or sets the mechanism used for tracing activity related to this channel.
             /// </summary>
             /// <value>The trace source. May be null.</value>
             public TraceSource TraceSource { get; set; }
-#endif
         }
     }
 }
