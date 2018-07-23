@@ -42,6 +42,7 @@ namespace Nerdbank.Streams
             {
                 Requires.NotNull(multiplexingStream, nameof(multiplexingStream));
                 Requires.NotNull(channelOptions, nameof(channelOptions));
+                Requires.NotNull(name, nameof(name));
 
                 this.UnderlyingMultiplexingStream = multiplexingStream;
                 this.Id = id;

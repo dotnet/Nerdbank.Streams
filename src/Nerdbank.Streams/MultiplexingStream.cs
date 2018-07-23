@@ -268,7 +268,7 @@ namespace Nerdbank.Streams
         /// </remarks>
         public Channel CreateChannel(ChannelOptions options = default)
         {
-            Channel channel = new Channel(this, this.GetUnusedChannelId(), null, offeredByRemote: false, options ?? DefaultChannelOptions);
+            Channel channel = new Channel(this, this.GetUnusedChannelId(), string.Empty, offeredByRemote: false, options ?? DefaultChannelOptions);
             lock (this.syncObject)
             {
                 this.openChannels.Add(channel.Id, channel);
