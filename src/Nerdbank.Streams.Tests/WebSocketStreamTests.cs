@@ -253,6 +253,7 @@ public class WebSocketStreamTests : TestBase
             int bytesJustRead = await this.stream.ReadAsync(recvBuffer, bytesRead, recvBuffer.Length - bytesRead, this.TimeoutToken).WithCancellation(this.TimeoutToken);
             Assert.NotEqual(0, bytesJustRead);
             bytesRead += bytesJustRead;
+            this.Logger.WriteLine("Just received {0} bytes. Received {1} bytes in total of {2} expected bytes.", bytesJustRead, bytesRead, recvBuffer.Length);
         }
     }
 #endif
