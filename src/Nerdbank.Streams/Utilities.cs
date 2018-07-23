@@ -4,8 +4,10 @@
 namespace Nerdbank.Streams
 {
     using System.Collections.Generic;
+    using System.IO.Pipelines;
     using System.Threading.Tasks;
     using Microsoft;
+    using Microsoft.VisualStudio.Threading;
 
     /// <summary>
     /// Internal utilities.
@@ -51,6 +53,48 @@ namespace Nerdbank.Streams
             }
 
             return found;
+        }
+
+        internal static Task WaitForReaderCompletionAsync(this PipeWriter writer)
+        {
+            Requires.NotNull(writer, nameof(writer));
+
+            var readerDone = new TaskCompletionSource<object>();
+            writer.OnReaderCompleted(
+                (ex, tcs) =>
+                {
+                    if (ex != null)
+                    {
+                        readerDone.SetException(ex);
+                    }
+                    else
+                    {
+                        readerDone.SetResult(null);
+                    }
+                },
+                null);
+            return readerDone.Task;
+        }
+
+        internal static Task WaitForWriterCompletionAsync(this PipeReader reader)
+        {
+            Requires.NotNull(reader, nameof(reader));
+
+            var writerDone = new TaskCompletionSource<object>();
+            reader.OnWriterCompleted(
+                (ex, tcs) =>
+                {
+                    if (ex != null)
+                    {
+                        writerDone.SetException(ex);
+                    }
+                    else
+                    {
+                        writerDone.SetResult(null);
+                    }
+                },
+                null);
+            return writerDone.Task;
         }
     }
 }

@@ -12,6 +12,9 @@
     <DefineConstants Condition=" '$(AspNetCoreHost)' == 'true' ">$(DefineConstants);ASPNETCORE</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\Nerdbank.Streams\Utilities.cs" Link="Utilities.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.VisualStudio.Threading" Version="15.8.122" />
     <PackageReference Include="PInvoke.Kernel32" Version="0.5.152" />
     <PackageReference Include="xunit" Version="2.3.1" />
@@ -22,7 +25,6 @@
     <PackageReference Include="Moq" Version="4.8.3" />
     <PackageReference Include="OpenCover" Version="4.6.519" />
     <PackageReference Include="System.IO.Pipes" Version="4.3.0" />
-    <PackageReference Include="System.ValueTuple" Version="4.5.0" />
   </ItemGroup>
   <ItemGroup Condition=" '$(AspNetCoreHost)' == 'true' ">
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="2.0.2" />

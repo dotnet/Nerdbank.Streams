@@ -16,17 +16,12 @@ namespace Nerdbank.Streams
             /// <summary>
             /// A channel is proposed to the remote party.
             /// </summary>
-            CreatingChannel,
-
-            /// <summary>
-            /// A previous channel proposal is rescinded.
-            /// </summary>
-            CreatingChannelCanceled,
+            Offer,
 
             /// <summary>
             /// A channel proposal has been accepted.
             /// </summary>
-            ChannelCreated,
+            OfferAccepted,
 
             /// <summary>
             /// The payload of the frame is a payload intended for channel consumption.
@@ -34,7 +29,7 @@ namespace Nerdbank.Streams
             Content,
 
             /// <summary>
-            /// Sent when a channel is disposed of.
+            /// Sent when a channel is closed, an incoming offer is rejected, or an outgoing offer is canceled.
             /// </summary>
             ChannelTerminated,
         }

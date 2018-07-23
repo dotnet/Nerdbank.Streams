@@ -79,7 +79,7 @@ public class StreamExtensionsTests : TestBase
 #endif
 
         var reader = unreadableStream.Object.UsePipeReader();
-        var actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => this.WaitForWriterCompletion(reader));
+        var actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => reader.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken));
         Assert.Same(expectedException, actualException);
     }
 
@@ -110,7 +110,7 @@ public class StreamExtensionsTests : TestBase
         // As a means of waiting for the async process that copies what we write onto the stream,
         // complete our writer and wait for the reader to complete also.
         writer.Complete();
-        await this.WaitForReaderCompletion(writer);
+        await writer.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken);
 
         Assert.Equal(expectedBuffer, stream.ToArray());
     }
@@ -131,7 +131,7 @@ public class StreamExtensionsTests : TestBase
 
         var writer = unreadableStream.Object.UsePipeWriter();
         await writer.WriteAsync(new byte[1], this.TimeoutToken);
-        var actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => this.WaitForReaderCompletion(writer));
+        var actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => writer.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken));
         Assert.Same(expectedException, actualException);
     }
 
@@ -141,47 +141,5 @@ public class StreamExtensionsTests : TestBase
         var random = new Random();
         random.NextBytes(buffer);
         return buffer;
-    }
-
-    private Task WaitForReaderCompletion(PipeWriter writer)
-    {
-        Requires.NotNull(writer, nameof(writer));
-
-        var readerDone = new TaskCompletionSource<object>();
-        writer.OnReaderCompleted(
-            (ex, tcs) =>
-            {
-                if (ex != null)
-                {
-                    readerDone.SetException(ex);
-                }
-                else
-                {
-                    readerDone.SetResult(null);
-                }
-            },
-            null);
-        return readerDone.Task.WithCancellation(this.TimeoutToken);
-    }
-
-    private Task WaitForWriterCompletion(PipeReader reader)
-    {
-        Requires.NotNull(reader, nameof(reader));
-
-        var writerDone = new TaskCompletionSource<object>();
-        reader.OnWriterCompleted(
-            (ex, tcs) =>
-            {
-                if (ex != null)
-                {
-                    writerDone.SetException(ex);
-                }
-                else
-                {
-                    writerDone.SetResult(null);
-                }
-            },
-            null);
-        return writerDone.Task.WithCancellation(this.TimeoutToken);
     }
 }
