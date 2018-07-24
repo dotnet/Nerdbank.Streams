@@ -31,6 +31,11 @@ namespace Nerdbank.Streams
         private readonly PipeReader reader;
 
         /// <summary>
+        /// Indicates whether reading was completed.
+        /// </summary>
+        private bool readingCompleted;
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="PipeStream"/> class.
         /// </summary>
         /// <param name="writer">The <see cref="PipeWriter"/> to use when writing to this stream. May be null.</param>
@@ -126,6 +131,11 @@ namespace Nerdbank.Streams
                 throw new NotSupportedException();
             }
 
+            if (this.readingCompleted)
+            {
+                return 0;
+            }
+
             ReadResult readResult = await this.reader.ReadAsync(cancellationToken);
             return this.ReadHelper(buffer.AsSpan(offset, count), readResult);
         }
@@ -200,6 +210,13 @@ namespace Nerdbank.Streams
             ReadOnlySequence<byte> slice = readResult.Buffer.Slice(0, bytesToCopyCount);
             slice.CopyTo(buffer);
             this.reader.AdvanceTo(slice.End);
+
+            if (readResult.IsCompleted)
+            {
+                this.reader.Complete();
+                this.readingCompleted = true;
+            }
+
             return (int)bytesToCopyCount;
         }
     }

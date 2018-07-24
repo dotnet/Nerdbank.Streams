@@ -83,6 +83,21 @@ public class PipeStreamTests : TestBase
     }
 
     [Fact]
+    public async Task EndOfStreamCompletesReader()
+    {
+        var readerCompletionTask = this.pipe.Writer.WaitForReaderCompletionAsync();
+        this.pipe.Writer.Complete();
+
+        // Test ReadAsync twice because in the realization that the end of the stream is reached,
+        // the state of the PipeReader changes, so we want to try it again to make sure it still works.
+        Assert.Equal(0, await this.stream.ReadAsync(new byte[1], 0, 1, this.TimeoutToken));
+        Assert.Equal(0, await this.stream.ReadAsync(new byte[1], 0, 1, this.TimeoutToken));
+        Assert.Equal(0, this.stream.Read(new byte[1], 0, 1));
+        Assert.Equal(-1, this.stream.ReadByte());
+        await readerCompletionTask.WithCancellation(this.TimeoutToken);
+    }
+
+    [Fact]
     public void Dispose_NoWriter()
     {
         // Verify that we don't throw when disposing a stream without a writer.
