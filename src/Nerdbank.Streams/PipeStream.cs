@@ -102,6 +102,11 @@ namespace Nerdbank.Streams
             Requires.Range(count >= 0, nameof(count));
             Verify.NotDisposed(this);
 
+            if (this.writer == null)
+            {
+                throw new NotSupportedException();
+            }
+
             cancellationToken.ThrowIfCancellationRequested();
             this.writer.Write(buffer.AsSpan(offset, count));
             return TplExtensions.CompletedTask;
@@ -114,6 +119,12 @@ namespace Nerdbank.Streams
             Requires.Range(offset + count <= buffer.Length, nameof(count));
             Requires.Range(offset >= 0, nameof(offset));
             Requires.Range(count > 0, nameof(count));
+            Verify.NotDisposed(this);
+
+            if (this.reader == null)
+            {
+                throw new NotSupportedException();
+            }
 
             ReadResult readResult = await this.reader.ReadAsync(cancellationToken);
             return this.ReadHelper(buffer.AsSpan(offset, count), readResult);
@@ -123,6 +134,13 @@ namespace Nerdbank.Streams
         /// <inheritdoc />
         public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            Verify.NotDisposed(this);
+            if (this.reader == null)
+            {
+                throw new NotSupportedException();
+            }
+
             ReadResult readResult = await this.reader.ReadAsync(cancellationToken);
             return this.ReadHelper(buffer.Span, readResult);
         }
@@ -131,6 +149,12 @@ namespace Nerdbank.Streams
         public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            Verify.NotDisposed(this);
+            if (this.writer == null)
+            {
+                throw new NotSupportedException();
+            }
+
             this.writer.Write(buffer.Span);
             return default;
         }
