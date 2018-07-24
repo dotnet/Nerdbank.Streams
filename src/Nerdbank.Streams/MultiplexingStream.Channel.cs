@@ -29,6 +29,11 @@ namespace Nerdbank.Streams
             private readonly TaskCompletionSource<object> acceptanceSource = new TaskCompletionSource<object>();
 
             /// <summary>
+            /// The source for the <see cref="Completion"/> property.
+            /// </summary>
+            private readonly TaskCompletionSource<object> completionSource = new TaskCompletionSource<object>();
+
+            /// <summary>
             /// This pipe relays remote party's data to the local channel owner.
             /// </summary>
             private readonly Pipe receivingPipe;
@@ -73,7 +78,7 @@ namespace Nerdbank.Streams
             public TraceSource TraceSource { get; private set; }
 
             /// <inheritdoc />
-            public bool IsDisposed { get; private set; }
+            public bool IsDisposed => this.Completion.IsCompleted;
 
             /// <inheritdoc />
             public PipeReader Input => this.receivingPipe.Reader;
@@ -90,6 +95,13 @@ namespace Nerdbank.Streams
             /// If the channel offer is rejected, this task transitions to a <see cref="TaskStatus.Canceled"/> state.
             /// </remarks>
             public Task Acceptance => this.acceptanceSource.Task;
+
+            /// <summary>
+            /// Gets a <see cref="Task"/> that completes when the channel is disposed,
+            /// which occurs when <see cref="Dispose()"/> is invoked or when both sides
+            /// have indicated they are done writing to the channel.
+            /// </summary>
+            public Task Completion => this.completionSource.Task;
 
             internal MultiplexingStream UnderlyingMultiplexingStream { get; }
 
@@ -123,15 +135,14 @@ namespace Nerdbank.Streams
             {
                 if (!this.IsDisposed)
                 {
-                    this.IsDisposed = true;
-
-                    this.UnderlyingMultiplexingStream.OnChannelDisposed(this);
-
                     this.acceptanceSource.TrySetCanceled();
 
                     // For the pipes, we Complete *our* ends, and leave the user's ends alone. The completion will propagate when it's ready to.
                     this.receivingPipe.Writer.Complete();
                     this.transmissionPipe.Reader.Complete();
+
+                    this.completionSource.TrySetResult(null);
+                    this.UnderlyingMultiplexingStream.OnChannelDisposed(this);
                 }
             }
 
@@ -200,6 +211,7 @@ namespace Nerdbank.Streams
 
                     if (result.IsCompleted)
                     {
+                        this.UnderlyingMultiplexingStream.OnChannelWritingCompleted(this);
                         break;
                     }
                 }
