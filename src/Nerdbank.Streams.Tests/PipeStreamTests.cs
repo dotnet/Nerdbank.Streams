@@ -83,6 +83,21 @@ public class PipeStreamTests : TestBase
     }
 
     [Fact]
+    public async Task EndOfStreamCompletesReader()
+    {
+        var readerCompletionTask = this.pipe.Writer.WaitForReaderCompletionAsync();
+        this.pipe.Writer.Complete();
+
+        // Test ReadAsync twice because in the realization that the end of the stream is reached,
+        // the state of the PipeReader changes, so we want to try it again to make sure it still works.
+        Assert.Equal(0, await this.stream.ReadAsync(new byte[1], 0, 1, this.TimeoutToken));
+        Assert.Equal(0, await this.stream.ReadAsync(new byte[1], 0, 1, this.TimeoutToken));
+        Assert.Equal(0, this.stream.Read(new byte[1], 0, 1));
+        Assert.Equal(-1, this.stream.ReadByte());
+        await readerCompletionTask.WithCancellation(this.TimeoutToken);
+    }
+
+    [Fact]
     public void Dispose_NoWriter()
     {
         // Verify that we don't throw when disposing a stream without a writer.
@@ -146,12 +161,48 @@ public class PipeStreamTests : TestBase
         await this.WriteAsync(new byte[5], 5, 0, useAsync);
     }
 
-    [Theory]
-    [PairwiseData]
-    public async Task Write_ThrowsObjectDisposedException(bool useAsync)
+    [Fact]
+    public async Task Write_ThrowsObjectDisposedException()
     {
         this.stream.Dispose();
-        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.WriteAsync(new byte[1], 0, 1, useAsync));
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream.WriteAsync(new byte[1], 0, 1));
+#if SPAN_BUILTIN
+        await Assert.ThrowsAsync<ObjectDisposedException>(async () => await this.stream.WriteAsync(new Memory<byte>(new byte[1])));
+#endif
+        Assert.Throws<ObjectDisposedException>(() => this.stream.Write(new byte[1], 0, 1));
+    }
+
+    [Fact]
+    public async Task Write_ThrowsNotSupportedException()
+    {
+        this.stream = this.pipe.Reader.AsStream();
+        await Assert.ThrowsAsync<NotSupportedException>(() => this.stream.WriteAsync(new byte[1], 0, 1));
+#if SPAN_BUILTIN
+        await Assert.ThrowsAsync<NotSupportedException>(async () => await this.stream.WriteAsync(new Memory<byte>(new byte[1])));
+#endif
+        Assert.Throws<NotSupportedException>(() => this.stream.Write(new byte[1], 0, 1));
+    }
+
+    [Fact]
+    public async Task Read_ThrowsObjectDisposedException()
+    {
+        this.stream.Dispose();
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream.ReadAsync(new byte[1], 0, 1));
+#if SPAN_BUILTIN
+        await Assert.ThrowsAsync<ObjectDisposedException>(async () => await this.stream.ReadAsync(new Memory<byte>(new byte[1])));
+#endif
+        Assert.Throws<ObjectDisposedException>(() => this.stream.Read(new byte[1], 0, 1));
+    }
+
+    [Fact]
+    public async Task Read_ThrowsNotSupportedException()
+    {
+        this.stream = this.pipe.Writer.AsStream();
+        await Assert.ThrowsAsync<NotSupportedException>(() => this.stream.ReadAsync(new byte[1], 0, 1));
+#if SPAN_BUILTIN
+        await Assert.ThrowsAsync<NotSupportedException>(async () => await this.stream.ReadAsync(new Memory<byte>(new byte[1])));
+#endif
+        Assert.Throws<NotSupportedException>(() => this.stream.Read(new byte[1], 0, 1));
     }
 
     [Theory]

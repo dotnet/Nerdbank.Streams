@@ -12,6 +12,8 @@ namespace Nerdbank.Streams
     using Microsoft;
     using Microsoft.VisualStudio.Threading;
 
+#pragma warning disable AvoidAsyncSuffix // Avoid Async suffix
+
     /// <summary>
     /// Wraps a <see cref="PipeReader"/> and/or <see cref="PipeWriter"/> as a <see cref="Stream"/> for
     /// easier interop with existing APIs.
@@ -27,6 +29,11 @@ namespace Nerdbank.Streams
         /// The <see cref="PipeReader"/> to use when reading from this stream. May be null.
         /// </summary>
         private readonly PipeReader reader;
+
+        /// <summary>
+        /// Indicates whether reading was completed.
+        /// </summary>
+        private bool readingCompleted;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PipeStream"/> class.
@@ -100,6 +107,11 @@ namespace Nerdbank.Streams
             Requires.Range(count >= 0, nameof(count));
             Verify.NotDisposed(this);
 
+            if (this.writer == null)
+            {
+                throw new NotSupportedException();
+            }
+
             cancellationToken.ThrowIfCancellationRequested();
             this.writer.Write(buffer.AsSpan(offset, count));
             return TplExtensions.CompletedTask;
@@ -112,22 +124,51 @@ namespace Nerdbank.Streams
             Requires.Range(offset + count <= buffer.Length, nameof(count));
             Requires.Range(offset >= 0, nameof(offset));
             Requires.Range(count > 0, nameof(count));
+            Verify.NotDisposed(this);
 
-            ReadResult readResult = await this.reader.ReadAsync(cancellationToken);
-            int bytesRead = 0;
-            System.Buffers.ReadOnlySequence<byte> slice = readResult.Buffer.Slice(0, Math.Min(count, readResult.Buffer.Length));
-            foreach (ReadOnlyMemory<byte> span in slice)
+            if (this.reader == null)
             {
-                int bytesToCopy = Math.Min(count, span.Length);
-                span.CopyTo(new Memory<byte>(buffer, offset, bytesToCopy));
-                offset += bytesToCopy;
-                count -= bytesToCopy;
-                bytesRead += bytesToCopy;
+                throw new NotSupportedException();
             }
 
-            this.reader.AdvanceTo(slice.End);
-            return bytesRead;
+            if (this.readingCompleted)
+            {
+                return 0;
+            }
+
+            ReadResult readResult = await this.reader.ReadAsync(cancellationToken);
+            return this.ReadHelper(buffer.AsSpan(offset, count), readResult);
         }
+
+#if SPAN_BUILTIN
+        /// <inheritdoc />
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Verify.NotDisposed(this);
+            if (this.reader == null)
+            {
+                throw new NotSupportedException();
+            }
+
+            ReadResult readResult = await this.reader.ReadAsync(cancellationToken);
+            return this.ReadHelper(buffer.Span, readResult);
+        }
+
+        /// <inheritdoc />
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Verify.NotDisposed(this);
+            if (this.writer == null)
+            {
+                throw new NotSupportedException();
+            }
+
+            this.writer.Write(buffer.Span);
+            return default;
+        }
+#endif
 
 #pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
 
@@ -161,6 +202,22 @@ namespace Nerdbank.Streams
         {
             Verify.NotDisposed(this);
             throw ex;
+        }
+
+        private int ReadHelper(Span<byte> buffer, ReadResult readResult)
+        {
+            long bytesToCopyCount = Math.Min(buffer.Length, readResult.Buffer.Length);
+            ReadOnlySequence<byte> slice = readResult.Buffer.Slice(0, bytesToCopyCount);
+            slice.CopyTo(buffer);
+            this.reader.AdvanceTo(slice.End);
+
+            if (readResult.IsCompleted)
+            {
+                this.reader.Complete();
+                this.readingCompleted = true;
+            }
+
+            return (int)bytesToCopyCount;
         }
     }
 }

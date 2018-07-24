@@ -29,6 +29,12 @@ namespace Nerdbank.Streams
             Content,
 
             /// <summary>
+            /// Sent after all bytes have been transmitted on a given channel. Either or both sides may send this.
+            /// A channel may be automatically closed when each side has both transmitted and received this message.
+            /// </summary>
+            ContentWritingCompleted,
+
+            /// <summary>
             /// Sent when a channel is closed, an incoming offer is rejected, or an outgoing offer is canceled.
             /// </summary>
             ChannelTerminated,

@@ -88,6 +88,17 @@ namespace Nerdbank.Streams
             return bytesRead;
         }
 
+#if SPAN_BUILTIN
+        /// <inheritdoc />
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            buffer = buffer.Slice(0, (int)Math.Min(buffer.Length, this.length));
+            int bytesRead = await this.underlyingStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            this.length -= bytesRead;
+            return bytesRead;
+        }
+#endif
+
         /// <inheritdoc />
         public override long Seek(long offset, SeekOrigin origin) => throw this.ThrowDisposedOr(new NotSupportedException());
 

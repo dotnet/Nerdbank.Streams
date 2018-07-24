@@ -534,6 +534,34 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         await acceptTask.WithCancellation(this.TimeoutToken); // Rethrow any exceptions
     }
 
+    [Fact]
+    public async Task ChannelAutoCloses_WhenBothEndsCompleteWriting()
+    {
+        var aMsg = new byte[] { 0x1 };
+        var bMsg = new byte[] { 0x2 };
+        var (a, b) = await this.EstablishChannelsAsync("a");
+
+        await a.Output.WriteAsync(aMsg, this.TimeoutToken);
+        a.Output.Complete();
+        var aMsgReceived = await b.Input.ReadAsync(this.TimeoutToken);
+        Assert.Equal(aMsg, aMsgReceived.Buffer.First.Span.ToArray());
+        b.Input.AdvanceTo(aMsgReceived.Buffer.End);
+        await b.Input.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
+        Assert.True((await b.Input.ReadAsync(this.TimeoutToken)).IsCompleted);
+        b.Input.Complete(); // ack the last message we received
+
+        await b.Output.WriteAsync(bMsg, this.TimeoutToken);
+        b.Output.Complete();
+        var bMsgReceived = await a.Input.ReadAsync(this.TimeoutToken);
+        Assert.Equal(bMsg, bMsgReceived.Buffer.First.Span.ToArray());
+        a.Input.AdvanceTo(bMsgReceived.Buffer.End);
+        await a.Input.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
+        Assert.True((await a.Input.ReadAsync(this.TimeoutToken)).IsCompleted);
+        a.Input.Complete(); // ack the last message we received
+
+        await Task.WhenAll(a.Completion, b.Completion).WithCancellation(this.TimeoutToken);
+    }
+
     private static async Task<int> ReadAtLeastAsync(Stream stream, ArraySegment<byte> buffer, int requiredLength, CancellationToken cancellationToken)
     {
         Requires.NotNull(stream, nameof(stream));

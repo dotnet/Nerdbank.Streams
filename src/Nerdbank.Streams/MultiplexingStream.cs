@@ -586,6 +586,9 @@ namespace Nerdbank.Streams
                     case ControlCode.Content:
                         await this.OnContent(header, this.DisposalToken);
                         break;
+                    case ControlCode.ContentWritingCompleted:
+                        this.OnContentWritingCompleted(header.ChannelId);
+                        break;
                     case ControlCode.ChannelTerminated:
                         this.OnChannelTerminated(header.ChannelId);
                         break;
@@ -622,16 +625,23 @@ namespace Nerdbank.Streams
             channel?.Dispose();
         }
 
+        private void OnContentWritingCompleted(int channelId)
+        {
+            Channel channel;
+            lock (this.syncObject)
+            {
+                channel = this.openChannels[channelId];
+            }
+
+            channel.ReceivedMessagePipeWriter.Complete();
+        }
+
         private async ValueTask<FlushResult> OnContent(FrameHeader header, CancellationToken cancellationToken)
         {
             Channel channel;
             lock (this.syncObject)
             {
-                if (!this.openChannels.TryGetValue(header.ChannelId, out channel))
-                {
-                    this.TraceSource.TraceEvent(TraceEventType.Warning, (int)TraceEventId.MessageReceivedForUnknownChannel, "Message content received for unknown channel {0}.", header.ChannelId);
-                    return default;
-                }
+                channel = this.openChannels[header.ChannelId];
             }
 
             // Read directly from the transport stream to memory that the targeted channel's reader will read from for 0 extra buffer copies.
@@ -751,6 +761,19 @@ namespace Nerdbank.Streams
             {
                 this.TraceInformation("Local channel \"{0}\" stream disposed.", channel.Name);
                 this.SendFrame(ControlCode.ChannelTerminated, channel.Id);
+            }
+        }
+
+        private void OnChannelWritingCompleted(Channel channel)
+        {
+            Requires.NotNull(channel, nameof(channel));
+            lock (this.syncObject)
+            {
+                // Only inform the remote side if this channel has not already been terminated.
+                if (!channel.IsDisposed && this.openChannels.ContainsKey(channel.Id))
+                {
+                    this.SendFrame(ControlCode.ContentWritingCompleted, channel.Id);
+                }
             }
         }
 
