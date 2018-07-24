@@ -7,6 +7,7 @@ namespace Nerdbank.Streams
     using System.Buffers;
     using System.IO;
     using System.IO.Pipelines;
+    using System.Net.WebSockets;
     using System.Runtime.InteropServices;
     using System.Threading;
     using System.Threading.Tasks;
@@ -46,6 +47,13 @@ namespace Nerdbank.Streams
         /// <param name="pipeWriter">The pipe to write to when <see cref="Stream.WriteAsync(byte[], int, int, CancellationToken)"/> is invoked.</param>
         /// <returns>The wrapping stream.</returns>
         public static Stream AsStream(this PipeWriter pipeWriter) => new PipeStream(pipeWriter);
+
+        /// <summary>
+        /// Exposes a <see cref="WebSocket"/> as a <see cref="Stream"/>.
+        /// </summary>
+        /// <param name="webSocket">The <see cref="WebSocket"/> to use as a transport for the returned <see cref="Stream"/>.</param>
+        /// <returns>A bidirectional <see cref="Stream"/>.</returns>
+        public static Stream AsStream(this WebSocket webSocket) => new WebSocketStream(webSocket);
 
         /// <summary>
         /// Enables efficiently reading a stream using <see cref="PipeReader"/>.

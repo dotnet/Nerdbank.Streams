@@ -13,7 +13,7 @@ namespace Nerdbank.Streams
     /// <summary>
     /// Exposes a <see cref="WebSocket"/> as a <see cref="Stream"/>.
     /// </summary>
-    public class WebSocketStream : Stream, IDisposableObservable
+    internal class WebSocketStream : Stream, IDisposableObservable
     {
         /// <summary>
         /// A completed task.

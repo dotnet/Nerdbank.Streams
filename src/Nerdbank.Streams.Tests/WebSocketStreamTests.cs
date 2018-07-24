@@ -9,6 +9,7 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft;
 #if ASPNETCORE
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Builder;
@@ -30,19 +31,19 @@ public class WebSocketStreamTests : TestBase
 
     private MockWebSocket socket;
 
-    private WebSocketStream stream;
+    private Stream stream;
 
     public WebSocketStreamTests(ITestOutputHelper logger)
         : base(logger)
     {
         this.socket = new MockWebSocket();
-        this.stream = new WebSocketStream(this.socket);
+        this.stream = this.socket.AsStream();
     }
 
     [Fact]
     public void Ctor_ThrowsANE()
     {
-        Assert.Throws<ArgumentNullException>(() => new WebSocketStream(null));
+        Assert.Throws<ArgumentNullException>(() => StreamExtensions.AsStream((WebSocket)null));
     }
 
     [Fact]
@@ -69,9 +70,9 @@ public class WebSocketStreamTests : TestBase
     [Fact]
     public void IsDisposed()
     {
-        Assert.False(this.stream.IsDisposed);
+        Assert.False(((IDisposableObservable)this.stream).IsDisposed);
         this.stream.Dispose();
-        Assert.True(this.stream.IsDisposed);
+        Assert.True(((IDisposableObservable)this.stream).IsDisposed);
     }
 
     [Fact]
@@ -209,7 +210,7 @@ public class WebSocketStreamTests : TestBase
         bytesRead = await this.stream.ReadAsync(buffer, 0, buffer.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken);
         Assert.Equal(0, bytesRead);
 
-        Assert.False(this.stream.IsDisposed);
+        Assert.False(((IDisposableObservable)this.stream).IsDisposed);
     }
 
     [Fact(Skip = "Unstable test. I'm not sure how valuable it is to verify that we get server messages *after* we've closed the connection anyway.")]
@@ -233,7 +234,7 @@ public class WebSocketStreamTests : TestBase
         bytesRead = await this.stream.ReadAsync(recvBuffer, 0, recvBuffer.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken);
         Assert.Equal(0, bytesRead);
 
-        Assert.False(this.stream.IsDisposed);
+        Assert.False(((IDisposableObservable)this.stream).IsDisposed);
     }
 
     [Fact]
@@ -259,7 +260,7 @@ public class WebSocketStreamTests : TestBase
 #endif
 
 #if ASPNETCORE
-    private async Task<(WebSocketStream, WebSocket)> EstablishWebSocket()
+    private async Task<(Stream, WebSocket)> EstablishWebSocket()
     {
         IWebHostBuilder webHostBuilder = WebHost.CreateDefaultBuilder(Array.Empty<string>())
             .UseStartup<AspNetStartup>();
@@ -267,7 +268,7 @@ public class WebSocketStreamTests : TestBase
         WebSocketClient testClient = testServer.CreateWebSocketClient();
         WebSocket webSocket = await testClient.ConnectAsync(testServer.BaseAddress, this.TimeoutToken);
 
-        WebSocketStream webSocketStream = new WebSocketStream(webSocket);
+        Stream webSocketStream = webSocket.AsStream();
         return (webSocketStream, webSocket);
     }
 #endif
