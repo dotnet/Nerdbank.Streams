@@ -23,7 +23,7 @@ using Nerdbank.Streams;
 using Xunit;
 using Xunit.Abstractions;
 
-public class WebSocketStreamTests : TestBase
+public partial class WebSocketStreamTests : TestBase
 {
     private static readonly byte[] CloseRequestMessage = new byte[] { 0x1, 0x0, 0x1 };
 
@@ -122,7 +122,7 @@ public class WebSocketStreamTests : TestBase
         byte[] buffer = new byte[bufferSize];
         this.random.NextBytes(buffer);
         await this.stream.WriteAsync(buffer, 0, buffer.Length, this.TimeoutToken);
-        Message message = this.socket.WrittenQueue.Dequeue();
+        var message = this.socket.WrittenQueue.Dequeue();
         Assert.NotSame(buffer, message.Buffer.Array);
         Assert.Equal(buffer, message.Buffer);
     }
@@ -176,7 +176,7 @@ public class WebSocketStreamTests : TestBase
     {
         this.stream.Dispose();
         ArraySegment<byte> buffer = new ArraySegment<byte>(new byte[500]);
-        Assert.Empty(this.socket.ReadQueue);
+        Assert.Equal(0, this.socket.ReadQueue.Count);
     }
 
     [Fact]
@@ -272,97 +272,6 @@ public class WebSocketStreamTests : TestBase
         return (webSocketStream, webSocket);
     }
 #endif
-
-    private class Message
-    {
-        internal ArraySegment<byte> Buffer { get; set; }
-    }
-
-    private class MockWebSocket : WebSocket
-    {
-        private Message writingInProgress;
-
-        private bool closed;
-
-        public override WebSocketCloseStatus? CloseStatus => (this.closed |= this.ReadQueue.Count == 1 && this.ReadQueue.Peek().Buffer.Count == 0) ? (WebSocketCloseStatus?)WebSocketCloseStatus.Empty : null;
-
-        public override string CloseStatusDescription => throw new NotImplementedException();
-
-        public override string SubProtocol => throw new NotImplementedException();
-
-        public override WebSocketState State => throw new NotImplementedException();
-
-        /// <summary>
-        /// Gets the queue of messages to be returned from the <see cref="ReceiveAsync(ArraySegment{byte}, CancellationToken)"/> method.
-        /// </summary>
-        internal Queue<Message> ReadQueue { get; } = new Queue<Message>();
-
-        internal Queue<Message> WrittenQueue { get; } = new Queue<Message>();
-
-        internal int DisposalCount { get; private set; }
-
-        public override void Abort() => throw new NotImplementedException();
-
-        public override Task CloseAsync(WebSocketCloseStatus closeStatus, string statusDescription, CancellationToken cancellationToken) => Task.FromResult(0);
-
-        public override Task CloseOutputAsync(WebSocketCloseStatus closeStatus, string statusDescription, CancellationToken cancellationToken) => throw new NotImplementedException();
-
-        public override void Dispose() => this.DisposalCount++;
-
-        public override Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> output, CancellationToken cancellationToken)
-        {
-            Message input = this.ReadQueue.Peek();
-            int bytesToCopy = Math.Min(input.Buffer.Count, output.Count);
-            Buffer.BlockCopy(input.Buffer.Array, input.Buffer.Offset, output.Array, output.Offset, bytesToCopy);
-            bool finishedMessage = bytesToCopy == input.Buffer.Count;
-            if (finishedMessage)
-            {
-                this.ReadQueue.Dequeue();
-            }
-            else
-            {
-                input.Buffer = new ArraySegment<byte>(input.Buffer.Array, input.Buffer.Offset + bytesToCopy, input.Buffer.Count - bytesToCopy);
-            }
-
-            WebSocketReceiveResult result = new WebSocketReceiveResult(
-                bytesToCopy,
-                WebSocketMessageType.Text,
-                finishedMessage,
-                bytesToCopy == 0 ? (WebSocketCloseStatus?)WebSocketCloseStatus.Empty : null,
-                bytesToCopy == 0 ? "empty" : null);
-            return Task.FromResult(result);
-        }
-
-        public override Task SendAsync(ArraySegment<byte> input, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken)
-        {
-            if (this.writingInProgress == null)
-            {
-                byte[] bufferCopy = new byte[input.Count];
-                Buffer.BlockCopy(input.Array, input.Offset, bufferCopy, 0, input.Count);
-                this.writingInProgress = new Message { Buffer = new ArraySegment<byte>(bufferCopy) };
-            }
-            else
-            {
-                byte[] bufferCopy = this.writingInProgress.Buffer.Array;
-                Array.Resize(ref bufferCopy, bufferCopy.Length + input.Count);
-                Buffer.BlockCopy(input.Array, input.Offset, bufferCopy, this.writingInProgress.Buffer.Count, input.Count);
-                this.writingInProgress.Buffer = new ArraySegment<byte>(bufferCopy);
-            }
-
-            if (endOfMessage)
-            {
-                this.WrittenQueue.Enqueue(this.writingInProgress);
-                this.writingInProgress = null;
-            }
-
-            return Task.FromResult(0);
-        }
-
-        internal void EnqueueRead(byte[] buffer)
-        {
-            this.ReadQueue.Enqueue(new Message { Buffer = new ArraySegment<byte>(buffer) });
-        }
-    }
 
 #if ASPNETCORE
     private class AspNetStartup

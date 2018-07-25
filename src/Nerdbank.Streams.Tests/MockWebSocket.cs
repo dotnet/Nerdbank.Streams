@@ -1,0 +1,108 @@
+﻿// Copyright (c) Andrew Arnott. All rights reserved.
+// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.WebSockets;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.VisualStudio.Threading;
+
+internal class MockWebSocket : WebSocket
+{
+    private Message writingInProgress;
+
+    private Message readingInProgress;
+
+    private bool closed;
+
+    public override WebSocketCloseStatus? CloseStatus => (this.closed |= this.ReadQueue.Count == 1 && this.ReadQueue.Peek().Buffer.Count == 0) ? (WebSocketCloseStatus?)WebSocketCloseStatus.Empty : null;
+
+    public override string CloseStatusDescription => throw new NotImplementedException();
+
+    public override string SubProtocol => throw new NotImplementedException();
+
+    public override WebSocketState State => throw new NotImplementedException();
+
+    /// <summary>
+    /// Gets the queue of messages to be returned from the <see cref="ReceiveAsync(ArraySegment{byte}, CancellationToken)"/> method.
+    /// </summary>
+    internal AsyncQueue<Message> ReadQueue { get; } = new AsyncQueue<Message>();
+
+    internal Queue<Message> WrittenQueue { get; } = new Queue<Message>();
+
+    internal int DisposalCount { get; private set; }
+
+    public override void Abort() => throw new NotImplementedException();
+
+    public override Task CloseAsync(WebSocketCloseStatus closeStatus, string statusDescription, CancellationToken cancellationToken) => Task.FromResult(0);
+
+    public override Task CloseOutputAsync(WebSocketCloseStatus closeStatus, string statusDescription, CancellationToken cancellationToken) => throw new NotImplementedException();
+
+    public override void Dispose() => this.DisposalCount++;
+
+    public override async Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> output, CancellationToken cancellationToken)
+    {
+        Message input = this.readingInProgress;
+        if (this.readingInProgress == null)
+        {
+            input = this.readingInProgress = await this.ReadQueue.DequeueAsync(cancellationToken);
+        }
+
+        int bytesToCopy = Math.Min(input.Buffer.Count, output.Count);
+        Buffer.BlockCopy(input.Buffer.Array, input.Buffer.Offset, output.Array, output.Offset, bytesToCopy);
+        bool finishedMessage = bytesToCopy == input.Buffer.Count;
+        if (finishedMessage)
+        {
+            this.readingInProgress = null;
+        }
+        else
+        {
+            input.Buffer = new ArraySegment<byte>(input.Buffer.Array, input.Buffer.Offset + bytesToCopy, input.Buffer.Count - bytesToCopy);
+        }
+
+        WebSocketReceiveResult result = new WebSocketReceiveResult(
+            bytesToCopy,
+            WebSocketMessageType.Text,
+            finishedMessage,
+            bytesToCopy == 0 ? (WebSocketCloseStatus?)WebSocketCloseStatus.Empty : null,
+            bytesToCopy == 0 ? "empty" : null);
+        return result;
+    }
+
+    public override Task SendAsync(ArraySegment<byte> input, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken)
+    {
+        if (this.writingInProgress == null)
+        {
+            byte[] bufferCopy = new byte[input.Count];
+            Buffer.BlockCopy(input.Array, input.Offset, bufferCopy, 0, input.Count);
+            this.writingInProgress = new Message { Buffer = new ArraySegment<byte>(bufferCopy) };
+        }
+        else
+        {
+            byte[] bufferCopy = this.writingInProgress.Buffer.Array;
+            Array.Resize(ref bufferCopy, bufferCopy.Length + input.Count);
+            Buffer.BlockCopy(input.Array, input.Offset, bufferCopy, this.writingInProgress.Buffer.Count, input.Count);
+            this.writingInProgress.Buffer = new ArraySegment<byte>(bufferCopy);
+        }
+
+        if (endOfMessage)
+        {
+            this.WrittenQueue.Enqueue(this.writingInProgress);
+            this.writingInProgress = null;
+        }
+
+        return Task.FromResult(0);
+    }
+
+    internal void EnqueueRead(byte[] buffer)
+    {
+        this.ReadQueue.Enqueue(new Message { Buffer = new ArraySegment<byte>(buffer) });
+    }
+
+    internal class Message
+    {
+        internal ArraySegment<byte> Buffer { get; set; }
+    }
+}

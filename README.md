@@ -21,12 +21,10 @@ The streams in this package focus on communication (not persistence).
    just one transport stream (e.g. named pipe or web socket) and use it for many independent
    protocols. For example, one might set up JSON-RPC on one channel and use other channels for
    efficient binary transfers.
-4. [`WebSocketStream`](doc/WebSocketStream.md) wraps a `WebSocket` to conform to a `Stream`
-   API for interop with many APIs that accept streams.
-5. [`Stream.AsStream`](doc/AsStream.md) wraps a `System.IO.Pipelines.PipeReader`,
+5. [`AsStream()`](doc/AsStream.md) wraps a `WebSocket`, `System.IO.Pipelines.PipeReader`,
    `System.IO.Pipelines.PipeWriter`, or `System.IO.Pipelines.IDuplexPipe` with a
    `System.IO.Stream` for reading and/or writing.
-6. [`Stream.UsePipeReader()` and `Stream.UsePipeWriter()`](doc/StreamAsPipe.md) enables reading from
-   and writing to a stream using the `PipeReader` and `PipeWriter` APIs.
+6. [`UsePipe()`](doc/UsePipe.md) enables reading from
+   and writing to a `Stream` or `WebSocket` using the `PipeReader` and `PipeWriter` APIs.
 7. [`Stream.ReadSlice(int)`](doc/ReadSlice.md) creates a sub-stream that ends after
    a given number of bytes.

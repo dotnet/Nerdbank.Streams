@@ -4,6 +4,7 @@
 using System;
 using System.IO;
 using System.IO.Pipelines;
+using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft;
@@ -23,7 +24,8 @@ public class StreamExtensionsTests : TestBase
     [Fact]
     public void UsePipeReader_ThrowsOnNull()
     {
-        Assert.Throws<ArgumentNullException>(() => StreamExtensions.UsePipeReader(null));
+        Assert.Throws<ArgumentNullException>(() => StreamExtensions.UsePipeReader((Stream)null));
+        Assert.Throws<ArgumentNullException>(() => StreamExtensions.UsePipeReader((WebSocket)null));
     }
 
     [Fact]
@@ -36,7 +38,7 @@ public class StreamExtensionsTests : TestBase
     }
 
     [Fact]
-    public async Task UsePipeReader()
+    public async Task UsePipeReader_Stream()
     {
         byte[] expectedBuffer = GetRandomBuffer(2048);
         var stream = new MemoryStream(expectedBuffer);
@@ -86,7 +88,8 @@ public class StreamExtensionsTests : TestBase
     [Fact]
     public void UsePipeWriter_ThrowsOnNull()
     {
-        Assert.Throws<ArgumentNullException>(() => StreamExtensions.UsePipeWriter(null));
+        Assert.Throws<ArgumentNullException>(() => StreamExtensions.UsePipeWriter((Stream)null));
+        Assert.Throws<ArgumentNullException>(() => StreamExtensions.UsePipeWriter((WebSocket)null));
     }
 
     [Fact]
@@ -99,7 +102,7 @@ public class StreamExtensionsTests : TestBase
     }
 
     [Fact]
-    public async Task UsePipeWriter()
+    public async Task UsePipeWriter_Stream()
     {
         byte[] expectedBuffer = GetRandomBuffer(2048);
         var stream = new MemoryStream(expectedBuffer.Length);
@@ -133,6 +136,61 @@ public class StreamExtensionsTests : TestBase
         await writer.WriteAsync(new byte[1], this.TimeoutToken);
         var actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => writer.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken));
         Assert.Same(expectedException, actualException);
+    }
+
+    [Fact]
+    public async Task UsePipe_Stream()
+    {
+        var ms = new HalfDuplexStream();
+        IDuplexPipe pipe = ms.UsePipe(cancellationToken: this.TimeoutToken);
+        await pipe.Output.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
+        var readResult = await pipe.Input.ReadAsync(this.TimeoutToken);
+        Assert.Equal(3, readResult.Buffer.Length);
+        pipe.Input.AdvanceTo(readResult.Buffer.End);
+    }
+
+    [Fact]
+    public async Task UsePipeReader_WebSocket()
+    {
+        var expectedBuffer = new byte[] { 4, 5, 6 };
+        var webSocket = new MockWebSocket();
+        webSocket.EnqueueRead(expectedBuffer);
+        var pipeReader = webSocket.UsePipeReader(cancellationToken: this.TimeoutToken);
+        var readResult = await pipeReader.ReadAsync(this.TimeoutToken);
+        Assert.Equal(expectedBuffer, readResult.Buffer.First.Span.ToArray());
+        pipeReader.AdvanceTo(readResult.Buffer.End);
+    }
+
+    [Fact]
+    public async Task UsePipeWriter_WebSocket()
+    {
+        var expectedBuffer = new byte[] { 4, 5, 6 };
+        var webSocket = new MockWebSocket();
+        var pipeWriter = webSocket.UsePipeWriter(this.TimeoutToken);
+        await pipeWriter.WriteAsync(expectedBuffer, this.TimeoutToken);
+        pipeWriter.Complete();
+        await pipeWriter.WaitForReaderCompletionAsync();
+        var message = webSocket.WrittenQueue.Dequeue();
+        Assert.Equal(expectedBuffer, message.Buffer);
+    }
+
+    [Fact]
+    public async Task UsePipe_WebSocket()
+    {
+        var expectedBuffer = new byte[] { 4, 5, 6 };
+        var webSocket = new MockWebSocket();
+        webSocket.EnqueueRead(expectedBuffer);
+        var pipe = webSocket.UsePipe(cancellationToken: this.TimeoutToken);
+
+        var readResult = await pipe.Input.ReadAsync(this.TimeoutToken);
+        Assert.Equal(expectedBuffer, readResult.Buffer.First.Span.ToArray());
+        pipe.Input.AdvanceTo(readResult.Buffer.End);
+
+        await pipe.Output.WriteAsync(expectedBuffer, this.TimeoutToken);
+        pipe.Output.Complete();
+        await pipe.Output.WaitForReaderCompletionAsync();
+        var message = webSocket.WrittenQueue.Dequeue();
+        Assert.Equal(expectedBuffer, message.Buffer);
     }
 
     private static byte[] GetRandomBuffer(int length)
