@@ -4,6 +4,7 @@
     <IsPackable>false</IsPackable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <CodeAnalysisRuleSet>Nerdbank.Streams.Tests.ruleset</CodeAnalysisRuleSet>
     <RootNamespace />

@@ -155,6 +155,8 @@ namespace Nerdbank.Streams
             OfferChannelCanceled = 14,
             FrameSent = 15,
             FrameReceived = 16,
+            FrameSentPayload = 17,
+            FrameReceivedPayload = 18,
         }
 
         /// <summary>
@@ -671,7 +673,14 @@ namespace Nerdbank.Streams
             // Read directly from the transport stream to memory that the targeted channel's reader will read from for 0 extra buffer copies.
             PipeWriter writer = channel.ReceivedMessagePipeWriter;
             Memory<byte> memory = writer.GetMemory(header.FramePayloadLength);
-            await ReadToFillAsync(this.stream, memory.Slice(0, header.FramePayloadLength), throwOnEmpty: true, cancellationToken);
+            var payload = memory.Slice(0, header.FramePayloadLength);
+            await ReadToFillAsync(this.stream, payload, throwOnEmpty: true, cancellationToken);
+
+            if (!payload.IsEmpty && this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
+            {
+                this.TraceSource.TraceData(TraceEventType.Verbose, (int)TraceEventId.FrameReceivedPayload, payload);
+            }
+
             writer.Advance(header.FramePayloadLength);
             return await writer.FlushAsync(cancellationToken);
         }
@@ -859,6 +868,11 @@ namespace Nerdbank.Streams
                 if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
                 {
                     this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.FrameSent, "Sending {0} frame for channel {1}, carrying {2} bytes of content.", header.Code, header.ChannelId, (int)payload.Length);
+                }
+
+                if (!payload.IsEmpty && this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
+                {
+                    this.TraceSource.TraceData(TraceEventType.Verbose, (int)TraceEventId.FrameSentPayload, payload);
                 }
 
                 header.Serialize(this.sendingHeaderBuffer.Span);
