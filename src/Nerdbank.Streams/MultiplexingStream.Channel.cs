@@ -234,7 +234,11 @@ namespace Nerdbank.Streams
 
             private void Fault(Exception exception)
             {
-                this.UnderlyingMultiplexingStream.TraceCritical(TraceEventId.FatalError, "Channel Closing self due to exception: {0}", exception);
+                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Critical))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Channel Closing self due to exception: {0}", exception);
+                }
+
                 this.transmissionPipe.Reader.Complete(exception);
                 this.Dispose();
             }

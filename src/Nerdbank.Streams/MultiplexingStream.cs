@@ -146,6 +146,15 @@ namespace Nerdbank.Streams
             FatalError = 5,
             UnexpectedChannelAccept = 6,
             ChannelAutoClosing = 7,
+            StreamDisposed = 8,
+            AcceptChannelWaiting = 9,
+            AcceptChannelAlreadyOffered = 10,
+            AcceptChannelCanceled = 11,
+            ChannelOfferReceived = 12,
+            ChannelDisposed = 13,
+            OfferChannelCanceled = 14,
+            FrameSent = 15,
+            FrameReceived = 16,
         }
 
         /// <summary>
@@ -428,13 +437,20 @@ namespace Nerdbank.Streams
                             continue;
                         }
 
-                        this.TraceInformation("Accepting channel {1} \"{0}\" which is already offered by the other side.", name, channel.Id);
+                        if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                        {
+                            this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.AcceptChannelAlreadyOffered, "Accepting channel {1} \"{0}\" which is already offered by the other side.", name, channel.Id);
+                        }
                     }
                 }
 
                 if (channel == null)
                 {
-                    this.TraceInformation("Waiting to accept channel \"{0}\", when offered by the other side.", name);
+                    if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                    {
+                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.AcceptChannelWaiting, "Waiting to accept channel \"{0}\", when offered by the other side.", name);
+                    }
+
                     if (!this.acceptingChannels.TryGetValue(name, out var acceptingChannels))
                     {
                         this.acceptingChannels.Add(name, acceptingChannels = new Queue<TaskCompletionSource<Channel>>());
@@ -477,7 +493,11 @@ namespace Nerdbank.Streams
             {
                 this.disposalTokenSource.Cancel();
                 this.completionSource.TrySetResult(null);
-                this.TraceInformation("Disposing.");
+                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.StreamDisposed, "Disposing.");
+                }
+
                 this.stream.Dispose();
                 lock (this.syncObject)
                 {
@@ -574,7 +594,11 @@ namespace Nerdbank.Streams
                 }
 
                 var header = FrameHeader.Deserialize(headerBuffer.Span);
-                this.TraceInformation("Received {0} frame for channel {1} with {2} bytes of content.", header.Code, header.ChannelId, header.FramePayloadLength);
+                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.FrameReceived, "Received {0} frame for channel {1} with {2} bytes of content.", header.Code, header.ChannelId, header.FramePayloadLength);
+                }
+
                 switch (header.Code)
                 {
                     case ControlCode.Offer:
@@ -693,7 +717,11 @@ namespace Nerdbank.Streams
                         var candidate = acceptingChannels.Dequeue();
                         if (candidate.TrySetResult(channel))
                         {
-                            this.TraceInformation("Remote party offers channel {1} \"{0}\" which matches up with a pending " + nameof(this.AcceptChannelAsync), name, channelId);
+                            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                            {
+                                this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelOfferReceived, "Remote party offers channel {1} \"{0}\" which matches up with a pending " + nameof(this.AcceptChannelAsync), name, channelId);
+                            }
+
                             acceptingChannelAlreadyPresent = true;
                             options = (ChannelOptions)candidate.Task.AsyncState;
                             break;
@@ -705,7 +733,11 @@ namespace Nerdbank.Streams
                 {
                     if (name != null)
                     {
-                        this.TraceInformation("Remote party offers channel {1} \"{0}\" which has no pending " + nameof(this.AcceptChannelAsync), name, channelId);
+                        if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                        {
+                            this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelOfferReceived, "Remote party offers channel {1} \"{0}\" which has no pending " + nameof(this.AcceptChannelAsync), name, channelId);
+                        }
+
                         if (!this.channelsOfferedByThemByName.TryGetValue(name, out var offeredChannels))
                         {
                             this.channelsOfferedByThemByName.Add(name, offeredChannels = new Queue<Channel>());
@@ -715,7 +747,10 @@ namespace Nerdbank.Streams
                     }
                     else
                     {
-                        this.TraceInformation("Remote party offers anonymous channel {1}", null, channelId);
+                        if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                        {
+                            this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelOfferReceived, "Remote party offers anonymous channel {0}", channelId);
+                        }
                     }
                 }
 
@@ -759,7 +794,11 @@ namespace Nerdbank.Streams
 
             if (!this.Completion.IsCompleted)
             {
-                this.TraceInformation("Local channel \"{0}\" stream disposed.", channel.Name);
+                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelDisposed, "Local channel \"{0}\" stream disposed.", channel.Name);
+                }
+
                 this.SendFrame(ControlCode.ChannelTerminated, channel.Id);
             }
         }
@@ -817,7 +856,11 @@ namespace Nerdbank.Streams
             await this.sendingSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                this.TraceInformation("Sending {0} frame for channel {1}, carrying {2} bytes of content.", header.Code, header.ChannelId, (int)payload.Length);
+                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.FrameSent, "Sending {0} frame for channel {1}, carrying {2} bytes of content.", header.Code, header.ChannelId, (int)payload.Length);
+                }
+
                 header.Serialize(this.sendingHeaderBuffer.Span);
 
                 // Don't propagate the CancellationToken any more to avoid corrupting the stream with a half-written frame.
@@ -863,7 +906,11 @@ namespace Nerdbank.Streams
         {
             Requires.NotNull(state, nameof(state));
             var channel = (Channel)state;
-            this.TraceInformation("Offer of channel {1} (\"{0}\") canceled.", channel.Name, channel.Id);
+            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+            {
+                this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.OfferChannelCanceled, "Offer of channel {1} (\"{0}\") canceled.", channel.Name, channel.Id);
+            }
+
             channel.Dispose();
         }
 
@@ -873,7 +920,11 @@ namespace Nerdbank.Streams
             var (channelSource, name) = (Tuple<TaskCompletionSource<Channel>, string>)state;
             if (channelSource.TrySetCanceled())
             {
-                this.TraceInformation("Cancelling " + nameof(this.AcceptChannelAsync) + " for \"{0}\"", name);
+                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.AcceptChannelCanceled, "Cancelling " + nameof(this.AcceptChannelAsync) + " for \"{0}\"", name);
+                }
+
                 lock (this.syncObject)
                 {
                     if (this.acceptingChannels.TryGetValue(name, out var queue))
@@ -884,7 +935,10 @@ namespace Nerdbank.Streams
             }
             else
             {
-                this.TraceInformation("Cancelling " + nameof(this.AcceptChannelAsync) + " for \"{0}\" attempted but failed.", name);
+                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.AcceptChannelCanceled, "Cancelling " + nameof(this.AcceptChannelAsync) + " for \"{0}\" attempted but failed.", name);
+                }
             }
         }
 
@@ -912,54 +966,13 @@ namespace Nerdbank.Streams
 
         private void Fault(Exception exception)
         {
-            this.TraceCritical(TraceEventId.FatalError, "Disposing self due to exception: {0}", exception);
-            this.completionSource.TrySetException(exception);
-            this.Dispose();
-        }
-
-        private void TraceCritical(string message)
-        {
             if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Critical))
             {
-                this.TraceSource.TraceInformation(message);
+                this.TraceSource.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Disposing self due to exception: {0}", exception);
             }
-        }
 
-        private void TraceCritical(TraceEventId traceEventId, string message, object arg)
-        {
-            this.TraceSource.TraceEvent(TraceEventType.Critical, (int)traceEventId, message, arg);
-        }
-
-        private void TraceInformation(string message)
-        {
-            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
-            {
-                this.TraceSource.TraceInformation(message);
-            }
-        }
-
-        private void TraceInformation(string message, object arg)
-        {
-            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
-            {
-                this.TraceSource.TraceInformation(message, arg);
-            }
-        }
-
-        private void TraceInformation(string message, object arg1, int arg2)
-        {
-            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
-            {
-                this.TraceSource.TraceInformation(message, arg1, arg2);
-            }
-        }
-
-        private void TraceInformation(string unformattedMessage, ControlCode code, int channelId, int contentLength = 0)
-        {
-            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
-            {
-                this.TraceSource.TraceInformation(unformattedMessage, code, channelId, contentLength);
-            }
+            this.completionSource.TrySetException(exception);
+            this.Dispose();
         }
     }
 }
