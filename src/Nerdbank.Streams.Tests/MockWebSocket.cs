@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.WebSockets;
@@ -17,7 +18,7 @@ internal class MockWebSocket : WebSocket
 
     private bool closed;
 
-    public override WebSocketCloseStatus? CloseStatus => (this.closed |= this.ReadQueue.Count == 1 && this.ReadQueue.Peek().Buffer.Count == 0) ? (WebSocketCloseStatus?)WebSocketCloseStatus.Empty : null;
+    public override WebSocketCloseStatus? CloseStatus => (this.closed |= this.ReadQueue.Count == 1 && this.ReadQueue.Peek().Buffer.Length == 0) ? (WebSocketCloseStatus?)WebSocketCloseStatus.Empty : null;
 
     public override string CloseStatusDescription => throw new NotImplementedException();
 
@@ -50,16 +51,16 @@ internal class MockWebSocket : WebSocket
             input = this.readingInProgress = await this.ReadQueue.DequeueAsync(cancellationToken);
         }
 
-        int bytesToCopy = Math.Min(input.Buffer.Count, output.Count);
-        Buffer.BlockCopy(input.Buffer.Array, input.Buffer.Offset, output.Array, output.Offset, bytesToCopy);
-        bool finishedMessage = bytesToCopy == input.Buffer.Count;
+        int bytesToCopy = Math.Min(input.Buffer.Length, output.Count);
+        input.Buffer.Slice(0, bytesToCopy).CopyTo(output.Array.AsMemory(output.Offset, output.Count));
+        bool finishedMessage = bytesToCopy == input.Buffer.Length;
         if (finishedMessage)
         {
             this.readingInProgress = null;
         }
         else
         {
-            input.Buffer = new ArraySegment<byte>(input.Buffer.Array, input.Buffer.Offset + bytesToCopy, input.Buffer.Count - bytesToCopy);
+            input.Buffer = input.Buffer.Slice(bytesToCopy);
         }
 
         WebSocketReceiveResult result = new WebSocketReceiveResult(
@@ -81,10 +82,10 @@ internal class MockWebSocket : WebSocket
         }
         else
         {
-            byte[] bufferCopy = this.writingInProgress.Buffer.Array;
-            Array.Resize(ref bufferCopy, bufferCopy.Length + input.Count);
-            Buffer.BlockCopy(input.Array, input.Offset, bufferCopy, this.writingInProgress.Buffer.Count, input.Count);
-            this.writingInProgress.Buffer = new ArraySegment<byte>(bufferCopy);
+            Memory<byte> memory = new byte[this.writingInProgress.Buffer.Length + input.Count];
+            this.writingInProgress.Buffer.CopyTo(memory);
+            input.Array.CopyTo(memory.Slice(this.writingInProgress.Buffer.Length));
+            this.writingInProgress.Buffer = memory;
         }
 
         if (endOfMessage)
@@ -103,6 +104,6 @@ internal class MockWebSocket : WebSocket
 
     internal class Message
     {
-        internal ArraySegment<byte> Buffer { get; set; }
+        internal Memory<byte> Buffer { get; set; }
     }
 }

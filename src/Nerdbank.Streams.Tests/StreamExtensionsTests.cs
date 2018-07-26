@@ -171,7 +171,7 @@ public class StreamExtensionsTests : TestBase
         pipeWriter.Complete();
         await pipeWriter.WaitForReaderCompletionAsync();
         var message = webSocket.WrittenQueue.Dequeue();
-        Assert.Equal(expectedBuffer, message.Buffer);
+        Assert.Equal(expectedBuffer, message.Buffer.ToArray());
     }
 
     [Fact]
@@ -190,7 +190,7 @@ public class StreamExtensionsTests : TestBase
         pipe.Output.Complete();
         await pipe.Output.WaitForReaderCompletionAsync();
         var message = webSocket.WrittenQueue.Dequeue();
-        Assert.Equal(expectedBuffer, message.Buffer);
+        Assert.Equal(expectedBuffer, message.Buffer.ToArray());
     }
 
     private static byte[] GetRandomBuffer(int length)

@@ -123,8 +123,7 @@ public partial class WebSocketStreamTests : TestBase
         this.random.NextBytes(buffer);
         await this.stream.WriteAsync(buffer, 0, buffer.Length, this.TimeoutToken);
         var message = this.socket.WrittenQueue.Dequeue();
-        Assert.NotSame(buffer, message.Buffer.Array);
-        Assert.Equal(buffer, message.Buffer);
+        Assert.Equal(buffer, message.Buffer.ToArray());
     }
 
     [Theory]
