@@ -4,12 +4,15 @@
 using System;
 using System.Buffers;
 using System.Diagnostics;
+using System.IO;
 using System.IO.Pipes;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft;
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
+using StreamJsonRpc;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -42,6 +45,12 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
         this.clientPipe.Dispose();
         return TplExtensions.CompletedTask;
     }
+
+    [SkippableFact]
+    public Task JsonRpcPerf_Pipe() => this.JsonRpcPerf(useChannel: false);
+
+    [SkippableFact]
+    public Task JsonRpcPerf_Channel() => this.JsonRpcPerf(useChannel: true);
 
     [SkippableFact]
     public async Task SendLargePayloadOnOneStream()
@@ -156,5 +165,63 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
                     })).WithCancellation(this.TimeoutToken);
             }
         }
+    }
+
+    private async Task JsonRpcPerf(bool useChannel, [CallerMemberName] string testMethodName = null)
+    {
+        if (await this.ExecuteInIsolationAsync(testMethodName))
+        {
+            Stream serverStream;
+            Stream clientStream;
+            if (useChannel)
+            {
+                var (mxServer, mxClient) = await Task.WhenAll(
+                    MultiplexingStream.CreateAsync(this.serverPipe, this.TimeoutToken).WithCancellation(this.TimeoutToken),
+                    MultiplexingStream.CreateAsync(this.clientPipe, this.TimeoutToken).WithCancellation(this.TimeoutToken));
+
+                var (serverChannel, clientChannel) = await Task.WhenAll(
+                    mxServer.AcceptChannelAsync(string.Empty, this.TimeoutToken),
+                    mxClient.OfferChannelAsync(string.Empty, this.TimeoutToken));
+
+                clientStream = clientChannel.AsStream();
+                serverStream = serverChannel.AsStream();
+            }
+            else
+            {
+                clientStream = this.clientPipe;
+                serverStream = this.serverPipe;
+            }
+
+            var clientRpc = JsonRpc.Attach(clientStream);
+            var serverRpc = JsonRpc.Attach(serverStream, new RpcServer());
+
+            await this.WaitForQuietPeriodAsync();
+
+            // Warm up
+            await RunAsync(1);
+
+            const int iterations = 1000;
+            long memory1 = GC.GetTotalMemory(true);
+            var sw = Stopwatch.StartNew();
+            await RunAsync(iterations);
+            sw.Stop();
+            long memory2 = GC.GetTotalMemory(false);
+            long allocated = memory2 - memory1;
+            this.Logger.WriteLine("{0} bytes allocated ({1} per iteration)", allocated, allocated / iterations);
+            this.Logger.WriteLine("Elapsed time: {0}ms ({1}ms per iteration)", sw.ElapsedMilliseconds, (double)sw.ElapsedMilliseconds / iterations);
+
+            async Task RunAsync(int repetitions)
+            {
+                for (int i = 0; i < repetitions; i++)
+                {
+                    int sum = await clientRpc.InvokeAsync<int>(nameof(RpcServer.Add), 1, 2);
+                }
+            }
+        }
+    }
+
+    private class RpcServer
+    {
+        public int Add(int a, int b) => a + b;
     }
 }
