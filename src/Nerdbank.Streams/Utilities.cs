@@ -4,6 +4,7 @@
 namespace Nerdbank.Streams
 {
     using System.Collections.Generic;
+    using System.IO;
     using System.IO.Pipelines;
     using System.Threading;
     using System.Threading.Tasks;
@@ -96,6 +97,23 @@ namespace Nerdbank.Streams
                 },
                 null);
             return writerDone.Task;
+        }
+
+        internal static Task FlushIfNecessaryAsync(this Stream stream, CancellationToken cancellationToken = default)
+        {
+            Requires.NotNull(stream, nameof(stream));
+
+#if !NETSTANDARD1_6
+            // PipeStream.Flush does nothing, and its FlushAsync method isn't overridden
+            // so calling FlushAsync simply allocates memory to schedule a no-op sync method.
+            // So skip the call in that case.
+            if (stream is System.IO.Pipes.PipeStream)
+            {
+                return Task.CompletedTask;
+            }
+#endif
+
+            return stream.FlushAsync();
         }
     }
 }

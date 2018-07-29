@@ -897,7 +897,7 @@ namespace Nerdbank.Streams
                 }
 
                 await writeHeaderTask.ConfigureAwait(false); // rethrow any exception
-                flushTask = this.stream.FlushAsync(CancellationToken.None);
+                flushTask = this.stream.FlushIfNecessaryAsync(CancellationToken.None);
             }
             finally
             {
