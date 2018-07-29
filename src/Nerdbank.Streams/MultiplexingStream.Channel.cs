@@ -188,7 +188,7 @@ namespace Nerdbank.Streams
             {
                 while (!this.IsDisposed)
                 {
-                    var result = await this.transmissionPipe.Reader.ReadAsync();
+                    var result = await this.transmissionPipe.Reader.ReadAsync().ConfigureAwait(false);
 
                     // We'll send whatever we've got, up to the maximum size of the frame.
                     // Anything in excess of that we'll pick up next time the loop runs.

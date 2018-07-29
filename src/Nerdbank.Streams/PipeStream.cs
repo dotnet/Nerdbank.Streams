@@ -90,7 +90,7 @@ namespace Nerdbank.Streams
         }
 
         /// <inheritdoc />
-        public override async Task FlushAsync(CancellationToken cancellationToken) => await this.writer.FlushAsync(cancellationToken);
+        public override async Task FlushAsync(CancellationToken cancellationToken) => await this.writer.FlushAsync(cancellationToken).ConfigureAwait(false);
 
         /// <inheritdoc />
         public override long Seek(long offset, SeekOrigin origin) => throw this.ThrowDisposedOr(new NotSupportedException());
@@ -136,7 +136,7 @@ namespace Nerdbank.Streams
                 return 0;
             }
 
-            ReadResult readResult = await this.reader.ReadAsync(cancellationToken);
+            ReadResult readResult = await this.reader.ReadAsync(cancellationToken).ConfigureAwait(false);
             return this.ReadHelper(buffer.AsSpan(offset, count), readResult);
         }
 
@@ -151,7 +151,7 @@ namespace Nerdbank.Streams
                 throw new NotSupportedException();
             }
 
-            ReadResult readResult = await this.reader.ReadAsync(cancellationToken);
+            ReadResult readResult = await this.reader.ReadAsync(cancellationToken).ConfigureAwait(false);
             return this.ReadHelper(buffer.Span, readResult);
         }
 

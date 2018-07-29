@@ -604,13 +604,13 @@ namespace Nerdbank.Streams
                 switch (header.Code)
                 {
                     case ControlCode.Offer:
-                        await this.OnOffer(header.ChannelId, payloadBuffer.Slice(0, header.FramePayloadLength), this.DisposalToken);
+                        await this.OnOffer(header.ChannelId, payloadBuffer.Slice(0, header.FramePayloadLength), this.DisposalToken).ConfigureAwait(false);
                         break;
                     case ControlCode.OfferAccepted:
                         this.OnOfferAccepted(header.ChannelId);
                         break;
                     case ControlCode.Content:
-                        await this.OnContent(header, this.DisposalToken);
+                        await this.OnContent(header, this.DisposalToken).ConfigureAwait(false);
                         break;
                     case ControlCode.ContentWritingCompleted:
                         this.OnContentWritingCompleted(header.ChannelId);
@@ -674,7 +674,7 @@ namespace Nerdbank.Streams
             PipeWriter writer = channel.ReceivedMessagePipeWriter;
             Memory<byte> memory = writer.GetMemory(header.FramePayloadLength);
             var payload = memory.Slice(0, header.FramePayloadLength);
-            await ReadToFillAsync(this.stream, payload, throwOnEmpty: true, cancellationToken);
+            await ReadToFillAsync(this.stream, payload, throwOnEmpty: true, cancellationToken).ConfigureAwait(false);
 
             if (!payload.IsEmpty && this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
             {
@@ -682,7 +682,7 @@ namespace Nerdbank.Streams
             }
 
             writer.Advance(header.FramePayloadLength);
-            return await writer.FlushAsync(cancellationToken);
+            return await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
 
         private void OnOfferAccepted(int channelId)
@@ -711,7 +711,7 @@ namespace Nerdbank.Streams
 
         private async ValueTask OnOffer(int channelId, Memory<byte> payloadBuffer, CancellationToken cancellationToken)
         {
-            await ReadToFillAsync(this.stream, payloadBuffer, throwOnEmpty: true, cancellationToken);
+            await ReadToFillAsync(this.stream, payloadBuffer, throwOnEmpty: true, cancellationToken).ConfigureAwait(false);
             string name = DecodeString(payloadBuffer);
 
             var channel = new Channel(this, channelId, name, offeredByRemote: true, channelOptions: DefaultChannelOptions);
