@@ -56,6 +56,7 @@ namespace Nerdbank.Streams
 
             var segment = this.segmentPool.Count > 0 ? this.segmentPool.Pop() : new SequenceSegment();
             segment.SetMemory(array, start, start + length);
+
             if (this.last == null)
             {
                 this.first = this.last = segment;
@@ -67,7 +68,7 @@ namespace Nerdbank.Streams
             }
         }
 
-        public void Advance(SequencePosition position)
+        public void AdvanceTo(SequencePosition position)
         {
             // TODO: protect against SequencePosition arguments that do not represent a FORWARD position for THIS sequence.
 

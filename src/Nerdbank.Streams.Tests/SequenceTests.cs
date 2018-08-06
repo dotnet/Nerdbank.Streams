@@ -70,9 +70,9 @@ public class SequenceTests : TestBase
 
         Assert.Equal("abcd".ToCharArray(), seq.AsReadOnlySequence().ToArray());
 
-        seq.Advance(seq.AsReadOnlySequence().GetPosition(1));
+        seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(1));
         Assert.Equal("bcd".ToCharArray(), seq.AsReadOnlySequence().ToArray());
-        seq.Advance(seq.AsReadOnlySequence().GetPosition(2));
+        seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(2));
         Assert.Equal("d".ToCharArray(), seq.AsReadOnlySequence().ToArray());
     }
 
@@ -105,7 +105,7 @@ public class SequenceTests : TestBase
     }
 
     [Fact]
-    public void Advance_ReturnsArraysToPool()
+    public void AdvanceTo_ReturnsArraysToPool()
     {
         MockPool<char> mockPool = new MockPool<char>();
         var seq = new Sequence<char>(mockPool);
@@ -126,23 +126,23 @@ public class SequenceTests : TestBase
         Assert.Empty(mockPool.Contents);
 
         // Advance, but don't go beyond the first array.
-        seq.Advance(seq.AsReadOnlySequence().GetPosition(mem1.Memory.Length - 1));
+        seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(mem1.Memory.Length - 1));
         Assert.Empty(mockPool.Contents);
 
         // Now advance beyond the first array and assert that it has been returned to the pool.
-        seq.Advance(seq.AsReadOnlySequence().GetPosition(1));
+        seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(1));
         Assert.Equal(new[] { mem1 }, mockPool.Contents);
 
         // Skip past the second array.
-        seq.Advance(seq.AsReadOnlySequence().GetPosition(mem2.Memory.Length));
+        seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(mem2.Memory.Length));
         Assert.Equal(new[] { mem1, mem2 }, mockPool.Contents);
 
         // Advance part way through the third array.
-        seq.Advance(seq.AsReadOnlySequence().GetPosition(mem3.Memory.Length - 1));
+        seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(mem3.Memory.Length - 1));
         Assert.Equal(new[] { mem1, mem2 }, mockPool.Contents);
 
         // Now advance to the end.
-        seq.Advance(seq.AsReadOnlySequence().GetPosition(1));
+        seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(1));
         Assert.True(seq.AsReadOnlySequence().IsEmpty);
         Assert.Equal(new[] { mem1, mem2, mem3 }, mockPool.Contents);
     }
