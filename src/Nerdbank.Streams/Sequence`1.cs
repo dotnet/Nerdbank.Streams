@@ -27,17 +27,28 @@ namespace Nerdbank.Streams
 
         private SequenceSegment last;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Sequence{T}"/> class.
+        /// </summary>
         public Sequence()
             : this(MemoryPool<T>.Shared)
         {
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Sequence{T}"/> class.
+        /// </summary>
+        /// <param name="memoryPool">The pool to use for recycling backing arrays.</param>
         public Sequence(MemoryPool<T> memoryPool)
         {
             Requires.NotNull(memoryPool, nameof(memoryPool));
             this.memoryPool = memoryPool;
         }
 
+        /// <summary>
+        /// Expresses this sequence as a <see cref="ReadOnlySequence{T}"/>.
+        /// </summary>
+        /// <param name="sequence">The sequence to convert.</param>
         public static implicit operator ReadOnlySequence<T>(Sequence<T> sequence)
         {
             return sequence.first != null
@@ -45,29 +56,14 @@ namespace Nerdbank.Streams
                 : ReadOnlySequence<T>.Empty;
         }
 
-        public void Append(IMemoryOwner<T> array) => this.Append(array, 0, Requires.NotNull(array, nameof(array)).Memory.Length);
-
-        public void Append(IMemoryOwner<T> array, int length) => this.Append(array, 0, length);
-
-        public void Append(IMemoryOwner<T> array, int start, int length)
-        {
-            Requires.NotNull(array, nameof(array));
-            Requires.Range(length >= 0 && start + length <= array.Memory.Length, nameof(length));
-
-            var segment = this.segmentPool.Count > 0 ? this.segmentPool.Pop() : new SequenceSegment();
-            segment.SetMemory(array, start, start + length);
-
-            if (this.last == null)
-            {
-                this.first = this.last = segment;
-            }
-            else
-            {
-                this.last.SetNext(segment);
-                this.last = segment;
-            }
-        }
-
+        /// <summary>
+        /// Removes all elements from the sequence from its beginning to the specified position,
+        /// considering that data to have been fully processed.
+        /// </summary>
+        /// <param name="position">
+        /// The position of the first element that has not yet been processed.
+        /// This is typically <see cref="ReadOnlySequence{T}.End"/> after reading all elements from that instance.
+        /// </param>
         public void AdvanceTo(SequencePosition position)
         {
             // TODO: protect against SequencePosition arguments that do not represent a FORWARD position for THIS sequence.
@@ -97,19 +93,43 @@ namespace Nerdbank.Streams
             }
         }
 
-        // TODO: change return type to Memory<T>
-        public IMemoryOwner<T> GetMemory(int minimumLength)
+        /// <summary>
+        /// Advances the sequence to include the specified number of elements initialized into memory
+        /// returned by a prior call to <see cref="GetMemory(int)"/>.
+        /// </summary>
+        /// <param name="count">The number of elements written into memory.</param>
+        public void Advance(int count)
+        {
+            Requires.Range(count >= 0, nameof(count));
+            this.last.End += count;
+        }
+
+        /// <summary>
+        /// Gets writable memory that can be initialized and added to the sequence via a subsequent call to <see cref="Advance(int)"/>.
+        /// </summary>
+        /// <param name="minimumLength">The size of the memory required.</param>
+        /// <returns>The requested memory.</returns>
+        public Memory<T> GetMemory(int minimumLength)
         {
             Requires.Range(minimumLength > 0, nameof(minimumLength));
 
-            // TODO: return slack space in this.last if there is adequate.
-            //       Require a pattern of GetMemory/Advance like PipeWriter does.
+            if (this.last == null || this.last.WritableBytes < minimumLength)
+            {
+                this.Append(this.memoryPool.Rent(minimumLength));
+            }
 
-            return this.memoryPool.Rent(minimumLength);
+            return this.last.TrailingSlack;
         }
 
+        /// <summary>
+        /// Expresses this sequence as a <see cref="ReadOnlySequence{T}"/>.
+        /// </summary>
+        /// <returns>A read only sequence representing the data in this object.</returns>
         public ReadOnlySequence<T> AsReadOnlySequence() => this;
 
+        /// <summary>
+        /// Clears the entire sequence and releases associated memory.
+        /// </summary>
         public void Reset()
         {
             var current = this.first;
@@ -119,6 +139,25 @@ namespace Nerdbank.Streams
             }
 
             this.first = this.last = null;
+        }
+
+        private void Append(IMemoryOwner<T> array)
+        {
+            Requires.NotNull(array, nameof(array));
+
+            var segment = this.segmentPool.Count > 0 ? this.segmentPool.Pop() : new SequenceSegment();
+            segment.SetMemory(array, 0, 0);
+
+            if (this.last == null)
+            {
+                this.first = this.last = segment;
+            }
+            else
+            {
+                // TODO: if this.last is completely unused, replace it instead of appending to it.
+                this.last.SetNext(segment);
+                this.last = segment;
+            }
         }
 
         private SequenceSegment RecycleAndGetNext(SequenceSegment segment)
@@ -160,12 +199,14 @@ namespace Nerdbank.Streams
                 get => this.end;
                 set
                 {
-                    Debug.Assert(value - this.Start <= this.AvailableMemory.Length, "value - this.Start <= this.AvailableMemory.Length");
+                    Requires.Range(value - this.Start <= this.AvailableMemory.Length, nameof(value));
 
                     this.end = value;
                     this.UpdateMemory();
                 }
             }
+
+            internal Memory<T> TrailingSlack => this.AvailableMemory.Slice(this.End);
 
             internal IMemoryOwner<T> MemoryOwner { get; private set; }
 
@@ -180,7 +221,8 @@ namespace Nerdbank.Streams
             internal bool ReadOnly { get; private set; }
 
             /// <summary>
-            /// Gets the amount of writable bytes in this segment. It is the amount of bytes between <see cref="Length"/> and <see cref="End"/>.
+            /// Gets the amount of writable bytes in this segment.
+            /// It is the amount of bytes between <see cref="Length"/> and <see cref="End"/>.
             /// </summary>
             internal int WritableBytes
             {
