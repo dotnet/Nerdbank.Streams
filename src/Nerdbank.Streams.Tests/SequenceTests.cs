@@ -28,7 +28,7 @@ public class SequenceTests : TestBase
     }
 
     [Fact]
-    public void Acquire_Sizes()
+    public void GetMemory_Sizes()
     {
         var seq = new Sequence<char>();
 
@@ -40,6 +40,32 @@ public class SequenceTests : TestBase
 
         Assert.Throws<ArgumentOutOfRangeException>(() => seq.GetMemory(-1));
         Assert.Throws<ArgumentOutOfRangeException>(() => seq.GetMemory(0));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void GetMemory_TwiceInARowRecyclesOldArray(int leadingBlocks)
+    {
+        MockPool<char> mockPool = new MockPool<char>();
+        var seq = new Sequence<char>(mockPool);
+
+        for (int i = 0; i < leadingBlocks; i++)
+        {
+            seq.GetMemory(1);
+            seq.Advance(1);
+        }
+
+        var mem1 = seq.GetMemory(16);
+
+        // This second request cannot be satisfied by the first one since it's larger. So the first should be freed.
+        var mem2 = seq.GetMemory(32);
+        mockPool.AssertContents(mem1);
+
+        // This third one *can* be satisfied by the 32 byte array allocation requested previously, so no recycling should take place.
+        var mem3 = seq.GetMemory(24);
+        mockPool.AssertContents(mem1);
     }
 
     [Fact]
@@ -123,20 +149,20 @@ public class SequenceTests : TestBase
 
         // Now advance beyond the first array and assert that it has been returned to the pool.
         seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(1));
-        Assert.Equal(new[] { mem1 }, mockPool.Contents.Select(c => c.Memory));
+        mockPool.AssertContents(mem1);
 
         // Skip past the second array.
         seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(mem2.Length));
-        Assert.Equal(new[] { mem1, mem2 }, mockPool.Contents.Select(c => c.Memory));
+        mockPool.AssertContents(mem1, mem2);
 
         // Advance part way through the third array.
         seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(mem3.Length - 2));
-        Assert.Equal(new[] { mem1, mem2 }, mockPool.Contents.Select(c => c.Memory));
+        mockPool.AssertContents(mem1, mem2);
 
         // Now advance to the end.
         seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(2));
         Assert.True(seq.AsReadOnlySequence().IsEmpty);
-        Assert.Equal(new[] { mem1, mem2, mem3 }, mockPool.Contents.Select(c => c.Memory));
+        mockPool.AssertContents(mem1, mem2, mem3);
     }
 
     [Fact]
@@ -226,7 +252,7 @@ public class SequenceTests : TestBase
 
         seq.Reset();
         Assert.True(seq.AsReadOnlySequence().IsEmpty);
-        Assert.Equal(expected, mockPool.Contents.Select(c => c.Memory));
+        mockPool.AssertContents(expected);
     }
 
     private class MockPool<T> : MemoryPool<T>
@@ -257,6 +283,13 @@ public class SequenceTests : TestBase
             }
 
             return result;
+        }
+
+        internal void AssertContents(params Memory<T>[] expectedArrays) => this.AssertContents((IEnumerable<Memory<T>>)expectedArrays);
+
+        internal void AssertContents(IEnumerable<Memory<T>> expectedArrays)
+        {
+            Assert.Equal(expectedArrays, this.Contents.Select(c => c.Memory));
         }
 
         protected override void Dispose(bool disposing)

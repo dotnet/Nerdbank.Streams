@@ -171,8 +171,31 @@ namespace Nerdbank.Streams
             }
             else
             {
-                // TODO: if this.last is completely unused, replace it instead of appending to it.
-                this.last.SetNext(segment);
+                if (this.last.Length > 0)
+                {
+                    // Add a new block.
+                    this.last.SetNext(segment);
+                }
+                else
+                {
+                    // The last block is completely unused. Replace it instead of appending to it.
+                    var current = this.first;
+                    if (this.first != this.last)
+                    {
+                        while (current.Next != this.last)
+                        {
+                            current = current.Next;
+                        }
+                    }
+                    else
+                    {
+                        this.first = segment;
+                    }
+
+                    current.SetNext(segment);
+                    this.RecycleAndGetNext(this.last);
+                }
+
                 this.last = segment;
             }
         }
@@ -280,8 +303,7 @@ namespace Nerdbank.Streams
 
             internal void SetNext(SequenceSegment segment)
             {
-                Debug.Assert(segment != null, "segment != null");
-                Debug.Assert(this.Next == null, "this.Next == null");
+                Requires.NotNull(segment, nameof(segment));
 
                 this.Next = segment;
 
@@ -296,7 +318,7 @@ namespace Nerdbank.Streams
 
             internal void AdvanceTo(int offset)
             {
-                Debug.Assert(this.Start + offset <= this.End, "this.Start + offset <= this.End");
+                Requires.Range(this.Start + offset <= this.End, nameof(offset));
                 this.Start += offset;
                 this.UpdateMemory();
 
