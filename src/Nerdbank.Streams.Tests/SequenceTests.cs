@@ -75,9 +75,9 @@ public class SequenceTests : TestBase
         var mem1 = seq.GetMemory(3);
         mem1.Span[0] = 'a';
         mem1.Span[1] = 'b';
-        Assert.True(seq.AsReadOnlySequence().IsEmpty);
+        Assert.True(seq.AsReadOnlySequence.IsEmpty);
         seq.Advance(2);
-        Assert.Equal("ab".ToCharArray(), seq.AsReadOnlySequence().ToArray());
+        Assert.Equal("ab".ToCharArray(), seq.AsReadOnlySequence.ToArray());
     }
 
     [Fact]
@@ -95,12 +95,12 @@ public class SequenceTests : TestBase
         mem2.Span[1] = 'd';
         seq.Advance(2);
 
-        Assert.Equal("abcd".ToCharArray(), seq.AsReadOnlySequence().ToArray());
+        Assert.Equal("abcd".ToCharArray(), seq.AsReadOnlySequence.ToArray());
 
-        seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(1));
-        Assert.Equal("bcd".ToCharArray(), seq.AsReadOnlySequence().ToArray());
-        seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(2));
-        Assert.Equal("d".ToCharArray(), seq.AsReadOnlySequence().ToArray());
+        seq.AdvanceTo(seq.AsReadOnlySequence.GetPosition(1));
+        Assert.Equal("bcd".ToCharArray(), seq.AsReadOnlySequence.ToArray());
+        seq.AdvanceTo(seq.AsReadOnlySequence.GetPosition(2));
+        Assert.Equal("d".ToCharArray(), seq.AsReadOnlySequence.ToArray());
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public class SequenceTests : TestBase
         var mem1 = seq.GetMemory(3);
         seq.Advance(0);
 
-        Assert.True(seq.AsReadOnlySequence().IsEmpty);
+        Assert.True(seq.AsReadOnlySequence.IsEmpty);
     }
 
     [Fact]
@@ -144,24 +144,24 @@ public class SequenceTests : TestBase
         Assert.Empty(mockPool.Contents);
 
         // Advance, but don't go beyond the first array.
-        seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(mem1.Length - 1));
+        seq.AdvanceTo(seq.AsReadOnlySequence.GetPosition(mem1.Length - 1));
         Assert.Empty(mockPool.Contents);
 
         // Now advance beyond the first array and assert that it has been returned to the pool.
-        seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(1));
+        seq.AdvanceTo(seq.AsReadOnlySequence.GetPosition(1));
         mockPool.AssertContents(mem1);
 
         // Skip past the second array.
-        seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(mem2.Length));
+        seq.AdvanceTo(seq.AsReadOnlySequence.GetPosition(mem2.Length));
         mockPool.AssertContents(mem1, mem2);
 
         // Advance part way through the third array.
-        seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(mem3.Length - 2));
+        seq.AdvanceTo(seq.AsReadOnlySequence.GetPosition(mem3.Length - 2));
         mockPool.AssertContents(mem1, mem2);
 
         // Now advance to the end.
-        seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(2));
-        Assert.True(seq.AsReadOnlySequence().IsEmpty);
+        seq.AdvanceTo(seq.AsReadOnlySequence.GetPosition(2));
+        Assert.True(seq.AsReadOnlySequence.IsEmpty);
         mockPool.AssertContents(mem1, mem2, mem3);
     }
 
@@ -233,8 +233,8 @@ public class SequenceTests : TestBase
 
         var posB = rosB.GetPosition(2);
         Assert.Throws<ArgumentException>(() => seqA.AdvanceTo(posB));
-        Assert.Equal(3, seqA.AsReadOnlySequence().Length);
-        Assert.Equal(3, seqB.AsReadOnlySequence().Length);
+        Assert.Equal(3, seqA.AsReadOnlySequence.Length);
+        Assert.Equal(3, seqB.AsReadOnlySequence.Length);
     }
 
     [Fact]
@@ -251,7 +251,7 @@ public class SequenceTests : TestBase
         }
 
         seq.Reset();
-        Assert.True(seq.AsReadOnlySequence().IsEmpty);
+        Assert.True(seq.AsReadOnlySequence.IsEmpty);
         mockPool.AssertContents(expected);
     }
 

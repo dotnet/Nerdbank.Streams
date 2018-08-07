@@ -47,9 +47,15 @@ namespace Nerdbank.Streams
         }
 
         /// <summary>
+        /// Gets this sequence expressed as a <see cref="ReadOnlySequence{T}"/>.
+        /// </summary>
+        /// <returns>A read only sequence representing the data in this object.</returns>
+        public ReadOnlySequence<T> AsReadOnlySequence => this;
+
+        /// <summary>
         /// Gets the value to display in a debugger datatip.
         /// </summary>
-        private string DebuggerDisplay => $"Length: {AsReadOnlySequence().Length}";
+        private string DebuggerDisplay => $"Length: {AsReadOnlySequence.Length}";
 
         /// <summary>
         /// Expresses this sequence as a <see cref="ReadOnlySequence{T}"/>.
@@ -137,12 +143,6 @@ namespace Nerdbank.Streams
 
             return this.last.TrailingSlack;
         }
-
-        /// <summary>
-        /// Expresses this sequence as a <see cref="ReadOnlySequence{T}"/>.
-        /// </summary>
-        /// <returns>A read only sequence representing the data in this object.</returns>
-        public ReadOnlySequence<T> AsReadOnlySequence() => this;
 
         /// <summary>
         /// Clears the entire sequence and releases associated memory.
