@@ -130,13 +130,85 @@ public class SequenceTests : TestBase
         Assert.Equal(new[] { mem1, mem2 }, mockPool.Contents.Select(c => c.Memory));
 
         // Advance part way through the third array.
-        seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(mem3.Length - 1));
+        seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(mem3.Length - 2));
         Assert.Equal(new[] { mem1, mem2 }, mockPool.Contents.Select(c => c.Memory));
 
         // Now advance to the end.
-        seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(1));
+        seq.AdvanceTo(seq.AsReadOnlySequence().GetPosition(2));
         Assert.True(seq.AsReadOnlySequence().IsEmpty);
         Assert.Equal(new[] { mem1, mem2, mem3 }, mockPool.Contents.Select(c => c.Memory));
+    }
+
+    [Fact]
+    public void AdvanceTo_PriorPositionWithinBlock()
+    {
+        MockPool<char> mockPool = new MockPool<char>();
+        var seq = new Sequence<char>(mockPool);
+
+        var mem1 = seq.GetMemory(3);
+        mem1.Span.Fill('a');
+        seq.Advance(mem1.Length);
+
+        var mem2 = seq.GetMemory(3);
+        mem2.Span.Fill('b');
+        seq.Advance(mem2.Length);
+
+        ReadOnlySequence<char> ros = seq;
+        SequencePosition pos1 = ros.GetPosition(1);
+        SequencePosition pos2 = ros.GetPosition(2);
+
+        seq.AdvanceTo(pos2);
+        Assert.Throws<ArgumentException>(() => seq.AdvanceTo(pos1));
+        ros = seq;
+        Assert.Equal(4, ros.Length);
+    }
+
+    [Fact]
+    public void AdvanceTo_PriorPositionInPriorBlock()
+    {
+        MockPool<char> mockPool = new MockPool<char>();
+        var seq = new Sequence<char>(mockPool);
+
+        var mem1 = seq.GetMemory(3);
+        mem1.Span.Fill('a');
+        seq.Advance(mem1.Length);
+
+        var mem2 = seq.GetMemory(3);
+        mem2.Span.Fill('b');
+        seq.Advance(mem2.Length);
+
+        ReadOnlySequence<char> ros = seq;
+        SequencePosition pos1 = ros.GetPosition(1);
+        SequencePosition pos4 = ros.GetPosition(4);
+
+        seq.AdvanceTo(pos4);
+        Assert.Throws<ArgumentException>(() => seq.AdvanceTo(pos1));
+        ros = seq;
+        Assert.Equal(2, ros.Length);
+    }
+
+    [Fact]
+    public void AdvanceTo_PositionFromUnrelatedSequence()
+    {
+        MockPool<char> mockPool = new MockPool<char>();
+        var seqA = new Sequence<char>(mockPool);
+        var seqB = new Sequence<char>(mockPool);
+
+        var mem1 = seqA.GetMemory(3);
+        mem1.Span.Fill('a');
+        seqA.Advance(mem1.Length);
+
+        var mem2 = seqB.GetMemory(3);
+        mem2.Span.Fill('b');
+        seqB.Advance(mem2.Length);
+
+        ReadOnlySequence<char> rosA = seqA;
+        ReadOnlySequence<char> rosB = seqB;
+
+        var posB = rosB.GetPosition(2);
+        Assert.Throws<ArgumentException>(() => seqA.AdvanceTo(posB));
+        Assert.Equal(3, seqA.AsReadOnlySequence().Length);
+        Assert.Equal(3, seqB.AsReadOnlySequence().Length);
     }
 
     [Fact]

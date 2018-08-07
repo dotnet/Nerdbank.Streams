@@ -17,6 +17,7 @@ namespace Nerdbank.Streams
     /// <remarks>
     /// Instance members are not thread-safe.
     /// </remarks>
+    [DebuggerDisplay("{" + nameof(DebuggerDisplay) + "}")]
     public class Sequence<T>
     {
         private readonly Stack<SequenceSegment> segmentPool = new Stack<SequenceSegment>();
@@ -46,6 +47,11 @@ namespace Nerdbank.Streams
         }
 
         /// <summary>
+        /// Gets the value to display in a debugger datatip.
+        /// </summary>
+        private string DebuggerDisplay => $"Length: {AsReadOnlySequence().Length}";
+
+        /// <summary>
         /// Expresses this sequence as a <see cref="ReadOnlySequence{T}"/>.
         /// </summary>
         /// <param name="sequence">The sequence to convert.</param>
@@ -66,16 +72,27 @@ namespace Nerdbank.Streams
         /// </param>
         public void AdvanceTo(SequencePosition position)
         {
-            // TODO: protect against SequencePosition arguments that do not represent a FORWARD position for THIS sequence.
-
             var firstSegment = (SequenceSegment)position.GetObject();
             int firstIndex = position.GetInteger();
 
-            var oldFirst = this.first;
-            while (oldFirst != firstSegment)
+            // Before making any mutations, confirm that the block specified belongs to this sequence.
+            var current = this.first;
+            while (current != firstSegment && current != null)
             {
-                oldFirst.ResetMemory();
-                oldFirst = oldFirst.Next;
+                current = current.Next;
+            }
+
+            Requires.Argument(current != null, nameof(position), "Position does not represent a valid position in this sequence.");
+
+            // Also confirm that the position is not a prior position in the block.
+            Requires.Argument(firstIndex >= current.Start, nameof(position), "Position must not be earlier than current position.");
+
+            // Now repeat the loop, performing the mutations.
+            current = this.first;
+            while (current != firstSegment)
+            {
+                current.ResetMemory();
+                current = current.Next;
             }
 
             firstSegment.AdvanceTo(firstIndex);
