@@ -84,18 +84,19 @@ namespace Nerdbank.Streams
 
             var writerDone = new TaskCompletionSource<object>();
             reader.OnWriterCompleted(
-                (ex, tcs) =>
+                (ex, wdObject) =>
                 {
+                    var wd = (TaskCompletionSource<object>)wdObject;
                     if (ex != null)
                     {
-                        writerDone.SetException(ex);
+                        wd.SetException(ex);
                     }
                     else
                     {
-                        writerDone.SetResult(null);
+                        wd.SetResult(null);
                     }
                 },
-                null);
+                writerDone);
             return writerDone.Task;
         }
 
