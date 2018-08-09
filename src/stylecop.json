@@ -8,6 +8,7 @@
         "licenseName": "MIT",
         "licenseFile": "LICENSE.txt"
       },
+      "fileNamingConvention": "metadata",
       "xmlHeader": false
     }
   }
