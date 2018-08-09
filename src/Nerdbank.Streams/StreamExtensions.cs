@@ -5,6 +5,7 @@ namespace Nerdbank.Streams
 {
     using System;
     using System.Buffers;
+    using System.Collections.Generic;
     using System.IO;
     using System.IO.Pipelines;
     using System.Net.WebSockets;
@@ -65,46 +66,13 @@ namespace Nerdbank.Streams
         /// </summary>
         /// <param name="stream">The stream to read from using a pipe.</param>
         /// <param name="readBufferSize">The size of the buffer to ask the stream to fill.</param>
-        /// <param name="cancellationToken">A cancellation token that will cancel task that reads from the stream to fill the pipe.</param>
         /// <returns>A <see cref="PipeReader"/>.</returns>
-        public static PipeReader UsePipeReader(this Stream stream, int readBufferSize = DefaultReadBufferSize, CancellationToken cancellationToken = default)
+        public static PipeReader UsePipeReader(this Stream stream, int readBufferSize = DefaultReadBufferSize)
         {
             Requires.NotNull(stream, nameof(stream));
             Requires.Argument(stream.CanRead, nameof(stream), "Stream must be readable.");
 
-            var pipe = new Pipe();
-            Task.Run(async delegate
-            {
-                while (!cancellationToken.IsCancellationRequested)
-                {
-                    Memory<byte> memory = pipe.Writer.GetMemory(readBufferSize);
-                    try
-                    {
-                        int bytesRead = await stream.ReadAsync(memory, cancellationToken);
-                        if (bytesRead == 0)
-                        {
-                            break;
-                        }
-
-                        pipe.Writer.Advance(bytesRead);
-                    }
-                    catch (Exception ex)
-                    {
-                        pipe.Writer.Complete(ex);
-                        throw;
-                    }
-
-                    FlushResult result = await pipe.Writer.FlushAsync();
-                    if (result.IsCompleted)
-                    {
-                        break;
-                    }
-                }
-
-                // Tell the PipeReader that there's no more data coming
-                pipe.Writer.Complete();
-            }).Forget();
-            return pipe.Reader;
+            return new StreamPipeReader(stream, readBufferSize);
         }
 
         /// <summary>
@@ -164,7 +132,7 @@ namespace Nerdbank.Streams
         /// <returns>An <see cref="IDuplexPipe"/> instance.</returns>
         public static IDuplexPipe UsePipe(this Stream stream, int readBufferSize = DefaultReadBufferSize, CancellationToken cancellationToken = default)
         {
-            return new DuplexPipe(stream.UsePipeReader(readBufferSize, cancellationToken), stream.UsePipeWriter(cancellationToken));
+            return new DuplexPipe(stream.UsePipeReader(readBufferSize), stream.UsePipeWriter(cancellationToken));
         }
 
         /// <summary>
@@ -444,6 +412,190 @@ namespace Nerdbank.Streams
             public PipeReader Input { get; }
 
             public PipeWriter Output { get; }
+        }
+
+        private partial class StreamPipeReader : PipeReader
+        {
+            private readonly object syncObject = new object();
+
+            private readonly Stream stream;
+
+            private readonly int bufferSize;
+
+            private readonly Sequence<byte> buffer = new Sequence<byte>();
+
+            private SequencePosition examined;
+
+            private CancellationTokenSource readCancellationSource;
+
+            private bool isReaderCompleted;
+
+            private Exception readerException;
+
+            private bool isWriterCompleted;
+
+            private Exception writerException;
+
+            private List<(Action<Exception, object>, object)> writerCompletedCallbacks;
+
+            internal StreamPipeReader(Stream stream, int bufferSize = 4096)
+            {
+                Requires.NotNull(stream, nameof(stream));
+                Requires.Argument(stream.CanRead, nameof(stream), "Stream must be readable.");
+                this.stream = stream;
+                this.bufferSize = bufferSize;
+            }
+
+            /// <inheritdoc />
+            public override void AdvanceTo(SequencePosition consumed) => this.AdvanceTo(consumed, consumed);
+
+            /// <inheritdoc />
+            public override void AdvanceTo(SequencePosition consumed, SequencePosition examined)
+            {
+                lock (this.syncObject)
+                {
+                    this.buffer.AdvanceTo(consumed);
+                    this.examined = examined;
+                }
+            }
+
+            /// <inheritdoc />
+            public override void CancelPendingRead() => this.readCancellationSource?.Cancel();
+
+            /// <inheritdoc />
+            public override void Complete(Exception exception = null)
+            {
+                lock (this.syncObject)
+                {
+                    this.isReaderCompleted = true;
+                    this.readerException = exception;
+                    this.buffer.Reset();
+                }
+            }
+
+            /// <inheritdoc />
+            public override void OnWriterCompleted(Action<Exception, object> callback, object state)
+            {
+                bool invokeNow;
+                lock (this.syncObject)
+                {
+                    if (this.isWriterCompleted)
+                    {
+                        invokeNow = true;
+                    }
+                    else
+                    {
+                        invokeNow = false;
+                        if (this.writerCompletedCallbacks == null)
+                        {
+                            this.writerCompletedCallbacks = new List<(Action<Exception, object>, object)>();
+                        }
+
+                        this.writerCompletedCallbacks.Add((callback, state));
+                    }
+                }
+
+                if (invokeNow)
+                {
+                    callback(this.writerException, state);
+                }
+            }
+
+            /// <inheritdoc />
+            public override async ValueTask<ReadResult> ReadAsync(CancellationToken cancellationToken = default)
+            {
+                if (this.TryRead(out ReadResult result))
+                {
+                    return result;
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (this.readCancellationSource?.IsCancellationRequested ?? true)
+                {
+                    this.readCancellationSource = new CancellationTokenSource();
+                }
+
+                Memory<byte> memory;
+                lock (this.syncObject)
+                {
+                    memory = this.buffer.GetMemory(this.bufferSize);
+                }
+
+                using (var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, this.readCancellationSource.Token))
+                {
+                    try
+                    {
+                        int bytesRead = await this.stream.ReadAsync(memory, cts.Token);
+                        if (bytesRead == 0)
+                        {
+                            this.CompleteWriting();
+                            return new ReadResult(this.buffer, isCanceled: false, isCompleted: true);
+                        }
+
+                        lock (this.syncObject)
+                        {
+                            this.buffer.Advance(bytesRead);
+                            return new ReadResult(this.buffer, isCanceled: false, isCompleted: false);
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return new ReadResult(this.buffer, isCanceled: true, isCompleted: this.isReaderCompleted);
+                    }
+                }
+            }
+
+            /// <inheritdoc />
+            public override bool TryRead(out ReadResult result)
+            {
+                lock (this.syncObject)
+                {
+                    if (this.isReaderCompleted)
+                    {
+                        return false;
+                    }
+
+                    if (this.buffer.AsReadOnlySequence.Length > 0 && !this.buffer.AsReadOnlySequence.End.Equals(this.examined))
+                    {
+                        result = new ReadResult(this.buffer, isCanceled: false, isCompleted: this.isWriterCompleted);
+                        return true;
+                    }
+
+                    return false;
+                }
+            }
+
+            private void CompleteWriting(Exception writerException = null)
+            {
+                List<(Action<Exception, object>, object)> writerCompletedCallbacks = null;
+                lock (this.syncObject)
+                {
+                    if (!this.isWriterCompleted)
+                    {
+                        this.isWriterCompleted = true;
+                        this.writerException = writerException;
+
+                        writerCompletedCallbacks = this.writerCompletedCallbacks;
+                        this.writerCompletedCallbacks = null;
+                    }
+                }
+
+                if (writerCompletedCallbacks != null)
+                {
+                    foreach (var callback in writerCompletedCallbacks)
+                    {
+                        try
+                        {
+                            callback.Item1(writerException, callback.Item2);
+                        }
+                        catch
+                        {
+                            // Swallow each exception.
+                        }
+                    }
+                }
+            }
         }
     }
 }
