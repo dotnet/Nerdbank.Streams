@@ -18,8 +18,10 @@ namespace Nerdbank.Streams
     /// Instance members are not thread-safe.
     /// </remarks>
     [DebuggerDisplay("{" + nameof(DebuggerDisplay) + "}")]
-    public class Sequence<T>
+    public class Sequence<T> : IBufferWriter<T>
     {
+        private const int DefaultBufferSize = 4 * 1024;
+
         private readonly Stack<SequenceSegment> segmentPool = new Stack<SequenceSegment>();
 
         private readonly MemoryPool<T> memoryPool;
@@ -130,19 +132,38 @@ namespace Nerdbank.Streams
         /// <summary>
         /// Gets writable memory that can be initialized and added to the sequence via a subsequent call to <see cref="Advance(int)"/>.
         /// </summary>
-        /// <param name="minimumLength">The size of the memory required.</param>
+        /// <param name="sizeHint">The size of the memory required, or 0 to just get a convenient (non-empty) buffer.</param>
         /// <returns>The requested memory.</returns>
-        public Memory<T> GetMemory(int minimumLength)
+        public Memory<T> GetMemory(int sizeHint)
         {
-            Requires.Range(minimumLength > 0, nameof(minimumLength));
+            Requires.Range(sizeHint >= 0, nameof(sizeHint));
 
-            if (this.last == null || this.last.WritableBytes < minimumLength)
+            if (sizeHint == 0)
             {
-                this.Append(this.memoryPool.Rent(minimumLength));
+                if (this.last?.WritableBytes > 0)
+                {
+                    sizeHint = this.last.WritableBytes;
+                }
+                else
+                {
+                    sizeHint = DefaultBufferSize;
+                }
+            }
+
+            if (this.last == null || this.last.WritableBytes < sizeHint)
+            {
+                this.Append(this.memoryPool.Rent(sizeHint));
             }
 
             return this.last.TrailingSlack;
         }
+
+        /// <summary>
+        /// Gets writable memory that can be initialized and added to the sequence via a subsequent call to <see cref="Advance(int)"/>.
+        /// </summary>
+        /// <param name="sizeHint">The size of the memory required, or 0 to just get a convenient (non-empty) buffer.</param>
+        /// <returns>The requested memory.</returns>
+        public Span<T> GetSpan(int sizeHint) => this.GetMemory(sizeHint).Span;
 
         /// <summary>
         /// Clears the entire sequence and releases associated memory.
