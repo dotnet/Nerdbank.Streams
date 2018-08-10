@@ -38,8 +38,10 @@ public class SequenceTests : TestBase
         var mem2 = seq.GetMemory(32);
         Assert.Equal(32, mem2.Length);
 
+        var mem3 = seq.GetMemory(0);
+        Assert.NotEqual(0, mem3.Length);
+
         Assert.Throws<ArgumentOutOfRangeException>(() => seq.GetMemory(-1));
-        Assert.Throws<ArgumentOutOfRangeException>(() => seq.GetMemory(0));
     }
 
     [Theory]

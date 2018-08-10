@@ -42,7 +42,7 @@ public class StreamExtensionsTests : TestBase
     {
         byte[] expectedBuffer = GetRandomBuffer(2048);
         var stream = new MemoryStream(expectedBuffer);
-        var reader = stream.UsePipeReader(readBufferSize: 50);
+        var reader = stream.UsePipeReader(sizeHint: 50);
 
         Task writerCompletedTask = reader.WaitForWriterCompletionAsync();
         Assert.False(writerCompletedTask.IsCompleted);
@@ -71,15 +71,9 @@ public class StreamExtensionsTests : TestBase
 
         // Complete the reader and verify subsequent behavior.
         reader.Complete();
-        Assert.False(reader.TryRead(out lastResult));
-        Assert.True(lastResult.IsCompleted);
-        Assert.False(lastResult.IsCanceled);
-        Assert.Equal(0, lastResult.Buffer.Length);
+        Assert.Throws<InvalidOperationException>(() => reader.TryRead(out lastResult));
 
-        lastResult = await reader.ReadAsync(this.TimeoutToken);
-        Assert.True(lastResult.IsCompleted);
-        Assert.False(lastResult.IsCanceled);
-        Assert.Equal(0, lastResult.Buffer.Length);
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => reader.ReadAsync(this.TimeoutToken).AsTask());
 
         // Verify we got the right content.
         Assert.Equal(expectedBuffer, actualBuffer);
@@ -89,8 +83,9 @@ public class StreamExtensionsTests : TestBase
     public async Task UsePipeReader_Stream_ReadAsyncAfterExamining()
     {
         byte[] expectedBuffer = GetRandomBuffer(2048);
-        var stream = new MemoryStream(expectedBuffer);
-        var reader = stream.UsePipeReader(readBufferSize: 50);
+        var stream = new HalfDuplexStream();
+        stream.Write(expectedBuffer, 0, 50);
+        var reader = stream.UsePipeReader(sizeHint: 50);
         byte[] actualBuffer = new byte[expectedBuffer.Length];
 
         ReadResult result = await reader.ReadAsync(this.TimeoutToken);
@@ -100,16 +95,19 @@ public class StreamExtensionsTests : TestBase
         // and shouldn't give us any more buffer.
         ValueTask<ReadResult> resultTask = reader.ReadAsync(this.TimeoutToken);
         Assert.True(resultTask.IsCompleted);
-        Assert.Equal(result.Buffer.End, resultTask.Result.Buffer.End);
+        Assert.Equal(result.Buffer.Length, resultTask.Result.Buffer.Length);
 
         // Now examine everything, but don't consume it. We should get more.
         reader.AdvanceTo(resultTask.Result.Buffer.Start, resultTask.Result.Buffer.End);
-        ReadResult result2 = await reader.ReadAsync(this.TimeoutToken);
-        Assert.NotEqual(result.Buffer.End, result2.Buffer.End);
+        ValueTask<ReadResult> resultTask2 = reader.ReadAsync(this.TimeoutToken);
+        Assert.False(resultTask2.IsCompleted);
+        stream.Write(expectedBuffer, 50, 50);
+        var result2 = await resultTask2;
         Assert.True(result2.Buffer.Length > result.Buffer.Length);
 
         // Now consume everything and get even more.
         reader.AdvanceTo(result2.Buffer.End);
+        stream.Write(expectedBuffer, 100, expectedBuffer.Length - 100);
         ReadResult result3 = await reader.ReadAsync(this.TimeoutToken);
         Assert.True(result3.Buffer.Length > 0);
     }
@@ -119,21 +117,17 @@ public class StreamExtensionsTests : TestBase
     {
         byte[] expectedBuffer = GetRandomBuffer(2048);
         var stream = new MemoryStream(expectedBuffer);
-        var reader = stream.UsePipeReader(readBufferSize: 50);
+        var reader = stream.UsePipeReader(sizeHint: 50);
         byte[] actualBuffer = new byte[expectedBuffer.Length];
 
-        Assert.False(reader.TryRead(out ReadResult result));
-        result = await reader.ReadAsync(this.TimeoutToken);
+        ReadResult result = await reader.ReadAsync(this.TimeoutToken);
         reader.AdvanceTo(result.Buffer.GetPosition(1), result.Buffer.GetPosition(2)); // do not "examine" all the bytes so that TryRead will find it.
 
         Assert.True(reader.TryRead(out result));
         Assert.False(result.IsCanceled);
-        Assert.False(result.IsCompleted);
         Assert.Equal(expectedBuffer.AsSpan(1, 20).ToArray(), result.Buffer.First.Span.Slice(0, 20).ToArray());
 
         reader.AdvanceTo(result.Buffer.End);
-
-        Assert.False(reader.TryRead(out result));
     }
 
     [Fact]
@@ -151,7 +145,7 @@ public class StreamExtensionsTests : TestBase
 #endif
 
         var reader = unreadableStream.Object.UsePipeReader();
-        var actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => reader.ReadAsync(this.TimeoutToken).AsTask());
+        var actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => reader.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken));
         Assert.Same(expectedException, actualException);
     }
 
@@ -160,11 +154,12 @@ public class StreamExtensionsTests : TestBase
     {
         byte[] expectedBuffer = GetRandomBuffer(50);
         var stream = new MemoryStream(expectedBuffer);
-        var reader = stream.UsePipeReader(readBufferSize: 50);
+        var reader = stream.UsePipeReader(sizeHint: 50);
         byte[] actualBuffer = new byte[expectedBuffer.Length];
 
-        // This will verify that a callback that throws doesn't stop subsequent callbacks from being invoked.
-        reader.OnWriterCompleted((ex, s) => throw new InvalidOperationException(), null);
+        // The exception throwing test is disabled due to https://github.com/dotnet/corefx/issues/31695
+        ////// This will verify that a callback that throws doesn't stop subsequent callbacks from being invoked.
+        ////reader.OnWriterCompleted((ex, s) => throw new InvalidOperationException(), null);
         Task writerCompletedTask = reader.WaitForWriterCompletionAsync();
 
         // Read everything.
@@ -185,16 +180,17 @@ public class StreamExtensionsTests : TestBase
         await reader.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
     }
 
-    [Fact]
+    [Fact(Skip = "Bizarre behavior when using the built-in Pipe class: https://github.com/dotnet/corefx/issues/31696")]
     public async Task UsePipeReader_Stream_CancelPendingRead()
     {
         var stream = new HalfDuplexStream();
-        var reader = stream.UsePipeReader(readBufferSize: 50);
+        var reader = stream.UsePipeReader(sizeHint: 50);
 
         ValueTask<ReadResult> readTask = reader.ReadAsync(this.TimeoutToken);
         reader.CancelPendingRead();
         var readResult = await readTask.AsTask().WithCancellation(this.TimeoutToken);
         Assert.True(readResult.IsCanceled);
+        ////reader.AdvanceTo(readResult.Buffer.End);
 
         // Verify we can read after that without cancellation.
         readTask = reader.ReadAsync(this.TimeoutToken);
@@ -216,13 +212,12 @@ public class StreamExtensionsTests : TestBase
     public async Task UsePipeReader_Stream_CancelPendingRead_WithCancellationToken()
     {
         var stream = new HalfDuplexStream();
-        var reader = stream.UsePipeReader(readBufferSize: 50);
+        var reader = stream.UsePipeReader(sizeHint: 50);
 
         var cts = new CancellationTokenSource();
         ValueTask<ReadResult> readTask = reader.ReadAsync(cts.Token);
         cts.Cancel();
-        var readResult = await readTask;
-        Assert.True(readResult.IsCanceled);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => readTask.AsTask());
     }
 
     [Fact]
@@ -276,6 +271,31 @@ public class StreamExtensionsTests : TestBase
         await writer.WriteAsync(new byte[1], this.TimeoutToken);
         var actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => writer.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken));
         Assert.Same(expectedException, actualException);
+    }
+
+    [Fact]
+    public async Task UsePipeWriter_Stream_TryWriteAfterComplete()
+    {
+        byte[] expectedBuffer = GetRandomBuffer(2048);
+        var stream = new MemoryStream(expectedBuffer.Length);
+        var writer = stream.UsePipeWriter();
+        await writer.WriteAsync(expectedBuffer, this.TimeoutToken);
+        writer.Complete();
+        Assert.Throws<InvalidOperationException>(() => writer.GetMemory());
+        Assert.Throws<InvalidOperationException>(() => writer.GetSpan());
+        Assert.Throws<InvalidOperationException>(() => writer.Advance(0));
+    }
+
+    [Fact]
+    public async Task UsePipeWriter_Stream_Flush_Precanceled()
+    {
+        byte[] expectedBuffer = GetRandomBuffer(2048);
+        var stream = new MemoryStream(expectedBuffer.Length);
+        var writer = stream.UsePipeWriter();
+        var memory = writer.GetMemory(expectedBuffer.Length);
+        expectedBuffer.CopyTo(memory);
+        writer.Advance(expectedBuffer.Length);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => writer.FlushAsync(new CancellationToken(true)).AsTask());
     }
 
     [Fact]
