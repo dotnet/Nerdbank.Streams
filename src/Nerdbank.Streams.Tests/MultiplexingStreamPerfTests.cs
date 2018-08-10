@@ -201,14 +201,43 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
             await RunAsync(1);
 
             const int iterations = 1000;
+            int[] gcCountBefore = new int[GC.MaxGeneration + 1];
+            int[] gcCountAfter = new int[GC.MaxGeneration + 1];
             long memory1 = GC.GetTotalMemory(true);
+
+#if !NETCOREAPP1_0
+            GC.TryStartNoGCRegion(32 * 1024 * 1024);
+#endif
+
+            for (int i = 0; i <= GC.MaxGeneration; i++)
+            {
+                gcCountBefore[i] = GC.CollectionCount(i);
+            }
+
             var sw = Stopwatch.StartNew();
             await RunAsync(iterations);
             sw.Stop();
+
+            for (int i = 0; i < gcCountAfter.Length; i++)
+            {
+                gcCountAfter[i] = GC.CollectionCount(i);
+            }
+
             long memory2 = GC.GetTotalMemory(false);
+#if !NETCOREAPP1_0
+            GC.EndNoGCRegion();
+#endif
             long allocated = memory2 - memory1;
             this.Logger.WriteLine("{0} bytes allocated ({1} per iteration)", allocated, allocated / iterations);
             this.Logger.WriteLine("Elapsed time: {0}ms ({1}ms per iteration)", sw.ElapsedMilliseconds, (double)sw.ElapsedMilliseconds / iterations);
+
+            for (int i = 0; i <= GC.MaxGeneration; i++)
+            {
+                if (gcCountAfter[i] > gcCountBefore[i])
+                {
+                    this.Logger.WriteLine("WARNING: Gen {0} GC occurred {1} times during testing. Results are probably totally wrong.", i, gcCountAfter[i] - gcCountBefore[i]);
+                }
+            }
 
             async Task RunAsync(int repetitions)
             {
