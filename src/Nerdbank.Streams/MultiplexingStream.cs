@@ -31,7 +31,7 @@ namespace Nerdbank.Streams
         /// <remarks>
         /// If the protocol ever changes, change this random number. It serves both as a way to recognize the other end actually supports multiplexing and ensure compatibility.
         /// </remarks>
-        private static readonly byte[] ProtocolMagicNumber = BitConverter.GetBytes(420282205);
+        private static readonly byte[] ProtocolMagicNumber = BitConverter.GetBytes(803151184);
 
         /// <summary>
         /// The encoding used for characters in control frames.
@@ -139,24 +139,22 @@ namespace Nerdbank.Streams
 
         private enum TraceEventId
         {
-            MessageReceivedForUnknownChannel = 1,
-            HandshakeSuccessful = 2,
-            UnexpectedEndOfStream = 3,
-            HandshakeFailed = 4,
-            FatalError = 5,
-            UnexpectedChannelAccept = 6,
-            ChannelAutoClosing = 7,
-            StreamDisposed = 8,
-            AcceptChannelWaiting = 9,
-            AcceptChannelAlreadyOffered = 10,
-            AcceptChannelCanceled = 11,
-            ChannelOfferReceived = 12,
-            ChannelDisposed = 13,
-            OfferChannelCanceled = 14,
-            FrameSent = 15,
-            FrameReceived = 16,
-            FrameSentPayload = 17,
-            FrameReceivedPayload = 18,
+            HandshakeSuccessful,
+            HandshakeFailed,
+            FatalError,
+            UnexpectedChannelAccept,
+            ChannelAutoClosing,
+            StreamDisposed,
+            AcceptChannelWaiting,
+            AcceptChannelAlreadyOffered,
+            AcceptChannelCanceled,
+            ChannelOfferReceived,
+            ChannelDisposed,
+            OfferChannelCanceled,
+            FrameSent,
+            FrameReceived,
+            FrameSentPayload,
+            FrameReceivedPayload,
         }
 
         /// <summary>
