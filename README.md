@@ -28,3 +28,5 @@ The streams in this package focus on communication (not persistence).
    and writing to a `Stream` or `WebSocket` using the `PipeReader` and `PipeWriter` APIs.
 7. [`Stream.ReadSlice(int)`](doc/ReadSlice.md) creates a sub-stream that ends after
    a given number of bytes.
+8. [`MonitoringStream`](doc/MonitoringStream.md) wraps another Stream and raises events for
+   all I/O calls so you can monitor and/or trace the data as it goes by.
