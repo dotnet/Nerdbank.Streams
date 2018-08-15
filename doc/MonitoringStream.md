@@ -4,6 +4,9 @@ The `MonitoringStream` class wraps another `Stream` and raises events when any I
 This allows you to monitor and/or trace the operations including the data actually being sent or received.
 
 Events for reading, writing, seeking, truncating, and disposal are offered.
+For most of these events, both before and after events are offered.
+
+Any exceptions thrown by the event handlers will propagate to the caller.
 
 ## Read logging sample
 
