@@ -3,6 +3,7 @@
 
 namespace Nerdbank.Streams
 {
+    using System.Buffers;
     using System.IO;
     using System.Net.WebSockets;
 
@@ -25,5 +26,12 @@ namespace Nerdbank.Streams
         /// <param name="webSocket">The <see cref="WebSocket"/> to use as a transport for the returned <see cref="Stream"/>.</param>
         /// <returns>A bidirectional <see cref="Stream"/>.</returns>
         public static Stream AsStream(this WebSocket webSocket) => new WebSocketStream(webSocket);
+
+        /// <summary>
+        /// Exposes a <see cref="ReadOnlySequence{T}"/> of <see cref="byte"/> as a <see cref="Stream"/>.
+        /// </summary>
+        /// <param name="readOnlySequence">The sequence of bytes to expose as a stream.</param>
+        /// <returns>The readable stream.</returns>
+        public static Stream AsStream(this ReadOnlySequence<byte> readOnlySequence) => new ReadOnlySequenceStream(readOnlySequence);
     }
 }

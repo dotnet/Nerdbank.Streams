@@ -22,7 +22,6 @@ Streams do *not* have this characteristic in general and their API offers no way
 detect or create message boundaries. It is therefore recommended that a web socket be wrapped
 as a .NET Stream only when message boundaries are not important to your network protocol.
 
-
 ## Pipes
 
 When you have a `System.IO.Pipelines.PipeReader`, a
@@ -63,4 +62,20 @@ await writerStream.WriterAsync(writeBuffer, 0, writeBuffer.Length);
 // Read something
 byte[] readBuffer = new byte[10];
 int bytesRead = await readerStream.ReadAsync(readBuffer, 0, buffer.Length);
+```
+
+## `ReadOnlySequence<byte>`
+
+A `ReadOnlySequence<byte>` can be exposed as a seekable, read-only `Stream`.
+This enables progressive decoding or deserializing data without allocating a single
+array for the entire sequence.
+
+```cs
+ReadOnlySequence<byte> sequence; // obtained some other way
+Stream stream = sequence.AsStream();
+var reader = new StreamReader(stream);
+while ((string line = reader.ReadLine()) != null)
+{
+    Console.WriteLine(line);
+}
 ```
