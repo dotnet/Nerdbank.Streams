@@ -99,8 +99,9 @@ namespace Nerdbank.Streams
             current = this.first;
             while (current != firstSegment)
             {
+                var next = current.Next;
                 current.ResetMemory();
-                current = current.Next;
+                current = next;
             }
 
             firstSegment.AdvanceTo(firstIndex);
@@ -229,9 +230,9 @@ namespace Nerdbank.Streams
 
         private SequenceSegment RecycleAndGetNext(SequenceSegment segment)
         {
-            segment.ResetMemory();
             var recycledSegment = segment;
             segment = segment.Next;
+            recycledSegment.ResetMemory();
             this.segmentPool.Push(recycledSegment);
             return segment;
         }
@@ -326,6 +327,12 @@ namespace Nerdbank.Streams
                 this.MemoryOwner.Dispose();
                 this.MemoryOwner = null;
                 this.AvailableMemory = default;
+
+                this.Memory = default;
+                this.Next = null;
+                this.Start = 0;
+                this.end = 0;
+                this.ReadOnly = false;
             }
 
             internal void SetNext(SequenceSegment segment)
