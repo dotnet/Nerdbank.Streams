@@ -18,7 +18,7 @@ namespace Nerdbank.Streams
     /// Instance members are not thread-safe.
     /// </remarks>
     [DebuggerDisplay("{" + nameof(DebuggerDisplay) + "}")]
-    public class Sequence<T> : IBufferWriter<T>
+    public class Sequence<T> : IBufferWriter<T>, IDisposable
     {
         private const int DefaultBufferSize = 4 * 1024;
 
@@ -99,8 +99,9 @@ namespace Nerdbank.Streams
             current = this.first;
             while (current != firstSegment)
             {
+                var next = current.Next;
                 current.ResetMemory();
-                current = current.Next;
+                current = next;
             }
 
             firstSegment.AdvanceTo(firstIndex);
@@ -166,9 +167,15 @@ namespace Nerdbank.Streams
         public Span<T> GetSpan(int sizeHint) => this.GetMemory(sizeHint).Span;
 
         /// <summary>
-        /// Clears the entire sequence and releases associated memory.
+        /// Clears the entire sequence, recycles associated memory into pools,
+        /// and resets this instance for reuse.
         /// </summary>
-        public void Reset()
+        public void Dispose() => this.Reset();
+
+        /// <summary>
+        /// Clears the entire sequence and recycles associated memory into pools.
+        /// </summary>
+        private void Reset()
         {
             var current = this.first;
             while (current != null)
@@ -223,9 +230,9 @@ namespace Nerdbank.Streams
 
         private SequenceSegment RecycleAndGetNext(SequenceSegment segment)
         {
-            segment.ResetMemory();
             var recycledSegment = segment;
             segment = segment.Next;
+            recycledSegment.ResetMemory();
             this.segmentPool.Push(recycledSegment);
             return segment;
         }
@@ -320,6 +327,12 @@ namespace Nerdbank.Streams
                 this.MemoryOwner.Dispose();
                 this.MemoryOwner = null;
                 this.AvailableMemory = default;
+
+                this.Memory = default;
+                this.Next = null;
+                this.Start = 0;
+                this.end = 0;
+                this.ReadOnly = false;
             }
 
             internal void SetNext(SequenceSegment segment)

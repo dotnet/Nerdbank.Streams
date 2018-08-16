@@ -240,7 +240,7 @@ public class SequenceTests : TestBase
     }
 
     [Fact]
-    public void Reset_ReturnsArraysToPool()
+    public void Dispose_ReturnsArraysToPool()
     {
         MockPool<char> mockPool = new MockPool<char>();
         var seq = new Sequence<char>(mockPool);
@@ -252,9 +252,29 @@ public class SequenceTests : TestBase
             seq.Advance(mem.Length);
         }
 
-        seq.Reset();
+        seq.Dispose();
         Assert.True(seq.AsReadOnlySequence.IsEmpty);
         mockPool.AssertContents(expected);
+    }
+
+    [Fact]
+    public void Dispose_CanHappenTwice()
+    {
+        var seq = new Sequence<char>();
+        seq.Write(new char[3]);
+        seq.Dispose();
+        seq.Dispose();
+    }
+
+    [Fact]
+    public void Dispose_ClearsAndAllowsReuse()
+    {
+        var seq = new Sequence<char>();
+        seq.Write(new char[3]);
+        seq.Dispose();
+        Assert.True(seq.AsReadOnlySequence.IsEmpty);
+        seq.Write(new char[3]);
+        Assert.Equal(3, seq.AsReadOnlySequence.Length);
     }
 
     private class MockPool<T> : MemoryPool<T>
