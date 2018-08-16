@@ -18,7 +18,7 @@ namespace Nerdbank.Streams
     /// Instance members are not thread-safe.
     /// </remarks>
     [DebuggerDisplay("{" + nameof(DebuggerDisplay) + "}")]
-    public class Sequence<T> : IBufferWriter<T>
+    public class Sequence<T> : IBufferWriter<T>, IDisposable
     {
         private const int DefaultBufferSize = 4 * 1024;
 
@@ -166,9 +166,15 @@ namespace Nerdbank.Streams
         public Span<T> GetSpan(int sizeHint) => this.GetMemory(sizeHint).Span;
 
         /// <summary>
-        /// Clears the entire sequence and releases associated memory.
+        /// Clears the entire sequence, recycles associated memory into pools,
+        /// and resets this instance for reuse.
         /// </summary>
-        public void Reset()
+        public void Dispose() => this.Reset();
+
+        /// <summary>
+        /// Clears the entire sequence and recycles associated memory into pools.
+        /// </summary>
+        private void Reset()
         {
             var current = this.first;
             while (current != null)
