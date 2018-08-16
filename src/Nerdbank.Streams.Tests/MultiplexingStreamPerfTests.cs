@@ -206,7 +206,7 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
             long memory1 = GC.GetTotalMemory(true);
 
 #if !NETCOREAPP1_0
-            GC.TryStartNoGCRegion(32 * 1024 * 1024);
+            bool noGCStarted = GC.TryStartNoGCRegion(32 * 1024 * 1024);
 #endif
 
             for (int i = 0; i <= GC.MaxGeneration; i++)
@@ -225,7 +225,17 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
 
             long memory2 = GC.GetTotalMemory(false);
 #if !NETCOREAPP1_0
-            GC.EndNoGCRegion();
+            if (noGCStarted)
+            {
+                try
+                {
+                    GC.EndNoGCRegion();
+                }
+                catch (InvalidOperationException ex)
+                {
+                    this.Logger.WriteLine("WARNING: GC suppression failed with: {0}", ex.Message);
+                }
+            }
 #endif
             long allocated = memory2 - memory1;
             this.Logger.WriteLine("{0} bytes allocated ({1} per iteration)", allocated, allocated / iterations);
