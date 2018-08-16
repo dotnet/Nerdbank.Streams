@@ -79,3 +79,16 @@ while ((string line = reader.ReadLine()) != null)
     Console.WriteLine(line);
 }
 ```
+
+## `IBufferWriter<byte>`
+
+If you're building up a `ReadOnlySequence<byte>` using `Sequence<byte>`, or have another `IBufferWriter<byte>` instance,
+you can add to that sequence with `Stream` APIs using `AsStream()`:
+
+```cs
+var sequence = new Sequence<byte>();
+var stream = sequence.AsStream();
+stream.Write(new byte[] { 1, 2, 3 }, 0, 3);
+var readOnlySequence = sequence.AsReadOnlySequence;
+Assert.Equal(3, readOnlySequence.Length);
+```
