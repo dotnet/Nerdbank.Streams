@@ -6,6 +6,7 @@ namespace Nerdbank.Streams
     using System;
     using System.Buffers;
     using System.Collections.Generic;
+    using System.ComponentModel;
     using System.Diagnostics;
     using System.Runtime.CompilerServices;
     using Microsoft;
@@ -170,12 +171,13 @@ namespace Nerdbank.Streams
         /// Clears the entire sequence, recycles associated memory into pools,
         /// and resets this instance for reuse.
         /// </summary>
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public void Dispose() => this.Reset();
 
         /// <summary>
         /// Clears the entire sequence and recycles associated memory into pools.
         /// </summary>
-        private void Reset()
+        public void Reset()
         {
             var current = this.first;
             while (current != null)
