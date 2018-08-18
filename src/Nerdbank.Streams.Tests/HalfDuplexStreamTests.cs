@@ -106,7 +106,7 @@ public class HalfDuplexStreamTests : TestBase
     [PairwiseData]
     public async Task WriteThenRead(bool useAsync)
     {
-        byte[] sendBuffer = this.GetRandomBuffer();
+        byte[] sendBuffer = this.GetRandomBuffer(20);
         await this.WriteAsync(sendBuffer, 0, sendBuffer.Length, useAsync);
         byte[] recvBuffer = new byte[sendBuffer.Length];
         await this.ReadAsync(this.stream, recvBuffer, isAsync: useAsync);
@@ -217,7 +217,7 @@ public class HalfDuplexStreamTests : TestBase
     [Fact]
     public async Task ReadAsyncThenWriteAsync()
     {
-        byte[] sendBuffer = this.GetRandomBuffer();
+        byte[] sendBuffer = this.GetRandomBuffer(20);
         byte[] recvBuffer = new byte[sendBuffer.Length];
         Task readTask = this.ReadAsync(this.stream, recvBuffer);
         await this.stream.WriteAsync(sendBuffer, 0, sendBuffer.Length).WithCancellation(this.TimeoutToken);
@@ -241,13 +241,6 @@ public class HalfDuplexStreamTests : TestBase
     {
         this.stream.Dispose();
         base.Dispose(disposing);
-    }
-
-    private byte[] GetRandomBuffer(int size = 20)
-    {
-        byte[] buffer = new byte[size];
-        this.random.NextBytes(buffer);
-        return buffer;
     }
 
     private async Task WriteAsync(byte[] buffer, int offset, int count, bool isAsync)

@@ -1,0 +1,177 @@
+﻿// Copyright (c) Andrew Arnott. All rights reserved.
+// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.IO.Pipelines;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.VisualStudio.Threading;
+using Moq;
+using Nerdbank.Streams;
+using Xunit;
+using Xunit.Abstractions;
+
+public abstract class StreamPipeReaderTestBase : TestBase
+{
+    public StreamPipeReaderTestBase(ITestOutputHelper logger)
+        : base(logger)
+    {
+    }
+
+    [Fact]
+    public void ThrowsOnNull()
+    {
+        Assert.Throws<ArgumentNullException>(() => this.CreatePipeReader((Stream)null));
+    }
+
+    [Fact]
+    public void NonReadableStream()
+    {
+        var unreadableStream = new Mock<Stream>(MockBehavior.Strict);
+        unreadableStream.SetupGet(s => s.CanRead).Returns(false);
+        Assert.Throws<ArgumentException>(() => this.CreatePipeReader(unreadableStream.Object));
+        unreadableStream.VerifyAll();
+    }
+
+    [Fact]
+    public async Task Stream()
+    {
+        byte[] expectedBuffer = this.GetRandomBuffer(2048);
+        var stream = new MemoryStream(expectedBuffer);
+        var reader = this.CreatePipeReader(stream, sizeHint: 50);
+
+        Task writerCompletedTask = reader.WaitForWriterCompletionAsync();
+        Assert.False(writerCompletedTask.IsCompleted);
+
+        byte[] actualBuffer = new byte[expectedBuffer.Length];
+        int bytesRead = 0;
+        while (bytesRead < expectedBuffer.Length)
+        {
+            var result = await reader.ReadAsync(this.TimeoutToken);
+            foreach (ReadOnlyMemory<byte> segment in result.Buffer)
+            {
+                segment.CopyTo(new Memory<byte>(actualBuffer, bytesRead, actualBuffer.Length - bytesRead));
+                bytesRead += segment.Length;
+            }
+
+            reader.AdvanceTo(result.Buffer.End);
+        }
+
+        // Verify that the end of the stream causes the reader to report completion.
+        var lastResult = await reader.ReadAsync(this.TimeoutToken);
+        Assert.Equal(0, lastResult.Buffer.Length);
+        Assert.True(lastResult.IsCompleted);
+
+        // Verify that the writer is completed
+        await writerCompletedTask.WithCancellation(this.TimeoutToken);
+
+        // Complete the reader and verify subsequent behavior.
+        reader.Complete();
+        Assert.Throws<InvalidOperationException>(() => reader.TryRead(out lastResult));
+
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => reader.ReadAsync(this.TimeoutToken).AsTask());
+
+        // Verify we got the right content.
+        Assert.Equal(expectedBuffer, actualBuffer);
+    }
+
+    [Fact]
+    public async Task ReadAsyncAfterExamining()
+    {
+        byte[] expectedBuffer = this.GetRandomBuffer(2048);
+        var stream = new HalfDuplexStream();
+        stream.Write(expectedBuffer, 0, 50);
+        var reader = this.CreatePipeReader(stream, sizeHint: 50);
+        byte[] actualBuffer = new byte[expectedBuffer.Length];
+
+        ReadResult result = await reader.ReadAsync(this.TimeoutToken);
+        reader.AdvanceTo(result.Buffer.Start, result.Buffer.GetPosition(1));
+
+        // Since we didn't examine all the bytes already in the buffer, the next read should be synchronous,
+        // and shouldn't give us any more buffer.
+        ValueTask<ReadResult> resultTask = reader.ReadAsync(this.TimeoutToken);
+        Assert.True(resultTask.IsCompleted);
+        Assert.Equal(result.Buffer.Length, resultTask.Result.Buffer.Length);
+
+        // Now examine everything, but don't consume it. We should get more.
+        reader.AdvanceTo(resultTask.Result.Buffer.Start, resultTask.Result.Buffer.End);
+        ValueTask<ReadResult> resultTask2 = reader.ReadAsync(this.TimeoutToken);
+        Assert.False(resultTask2.IsCompleted);
+        stream.Write(expectedBuffer, 50, 50);
+        var result2 = await resultTask2;
+        Assert.True(result2.Buffer.Length > result.Buffer.Length);
+
+        // Now consume everything and get even more.
+        reader.AdvanceTo(result2.Buffer.End);
+        stream.Write(expectedBuffer, 100, expectedBuffer.Length - 100);
+        ReadResult result3 = await reader.ReadAsync(this.TimeoutToken);
+        Assert.True(result3.Buffer.Length > 0);
+    }
+
+    [Fact]
+    public async Task TryRead()
+    {
+        byte[] expectedBuffer = this.GetRandomBuffer(2048);
+        var stream = new MemoryStream(expectedBuffer);
+        var reader = this.CreatePipeReader(stream, sizeHint: 50);
+        byte[] actualBuffer = new byte[expectedBuffer.Length];
+
+        ReadResult result = await reader.ReadAsync(this.TimeoutToken);
+        reader.AdvanceTo(result.Buffer.GetPosition(1), result.Buffer.GetPosition(2)); // do not "examine" all the bytes so that TryRead will find it.
+
+        Assert.True(reader.TryRead(out result));
+        Assert.False(result.IsCanceled);
+        Assert.Equal(expectedBuffer.AsSpan(1, 20).ToArray(), result.Buffer.First.Span.Slice(0, 20).ToArray());
+
+        reader.AdvanceTo(result.Buffer.End);
+    }
+
+    [Fact]
+    public async Task OnWriterCompleted()
+    {
+        byte[] expectedBuffer = this.GetRandomBuffer(50);
+        var stream = new MemoryStream(expectedBuffer);
+        var reader = this.CreatePipeReader(stream, sizeHint: 50);
+        byte[] actualBuffer = new byte[expectedBuffer.Length];
+
+        // The exception throwing test is disabled due to https://github.com/dotnet/corefx/issues/31695
+        ////// This will verify that a callback that throws doesn't stop subsequent callbacks from being invoked.
+        ////reader.OnWriterCompleted((ex, s) => throw new InvalidOperationException(), null);
+        Task writerCompletedTask = reader.WaitForWriterCompletionAsync();
+
+        // Read everything.
+        while (true)
+        {
+            var result = await reader.ReadAsync(this.TimeoutToken).AsTask().WithCancellation(this.TimeoutToken);
+            reader.AdvanceTo(result.Buffer.End);
+            if (result.IsCompleted)
+            {
+                break;
+            }
+        }
+
+        // Verify that our second callback fires:
+        await writerCompletedTask.WithCancellation(this.TimeoutToken);
+
+        // Verify that a callback only registered now gets invoked too:
+        await reader.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
+    }
+
+    [Fact]
+    public async Task CancelPendingRead_WithCancellationToken()
+    {
+        var stream = new HalfDuplexStream();
+        var reader = this.CreatePipeReader(stream, sizeHint: 50);
+
+        var cts = new CancellationTokenSource();
+        ValueTask<ReadResult> readTask = reader.ReadAsync(cts.Token);
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => readTask.AsTask());
+    }
+
+    protected abstract PipeReader CreatePipeReader(Stream stream, int sizeHint = 0);
+}
