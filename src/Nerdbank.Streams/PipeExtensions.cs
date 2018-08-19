@@ -15,8 +15,13 @@ namespace Nerdbank.Streams
     /// <summary>
     /// Stream extension methods.
     /// </summary>
-    public static class PipeExtensions
+    public static partial class PipeExtensions
     {
+        /// <summary>
+        /// The default buffer size to use for pipe readers.
+        /// </summary>
+        private const int DefaultReadBufferSize = 2 * 1024;
+
         /// <summary>
         /// Exposes a full-duplex pipe as a <see cref="Stream"/>.
         /// </summary>
@@ -86,6 +91,24 @@ namespace Nerdbank.Streams
         }
 
         /// <summary>
+        /// Creates a <see cref="PipeReader"/> that reads from the specified <see cref="Stream"/> exactly as told to do so.
+        /// </summary>
+        /// <param name="stream">The stream to read from using a pipe.</param>
+        /// <param name="readBufferSize">The size of the buffer to ask the stream to fill.</param>
+        /// <returns>A <see cref="PipeReader"/>.</returns>
+        /// <remarks>
+        /// This reader may not be as efficient as the <see cref="Pipe"/>-based <see cref="PipeReader"/> returned from <see cref="UsePipeReader(Stream, int, CancellationToken)"/>,
+        /// but its interaction with the underlying <see cref="Stream"/> is closer to how a <see cref="Stream"/> would typically be used which can ease migration from streams to pipes.
+        /// </remarks>
+        public static PipeReader UseStrictPipeReader(this Stream stream, int readBufferSize = DefaultReadBufferSize)
+        {
+            Requires.NotNull(stream, nameof(stream));
+            Requires.Argument(stream.CanRead, nameof(stream), "Stream must be readable.");
+
+            return new StreamPipeReader(stream, readBufferSize);
+        }
+
+        /// <summary>
         /// Enables writing to a stream using <see cref="PipeWriter"/>.
         /// </summary>
         /// <param name="stream">The stream to write to using a pipe.</param>
@@ -131,6 +154,24 @@ namespace Nerdbank.Streams
                 }
             }).Forget();
             return pipe.Writer;
+        }
+
+        /// <summary>
+        /// Creates a <see cref="PipeWriter"/> that writes to an underlying <see cref="Stream"/>
+        /// when <see cref="PipeWriter.FlushAsync(CancellationToken)"/> is called rather than asynchronously sometime later.
+        /// </summary>
+        /// <param name="stream">The stream to write to using a pipe.</param>
+        /// <returns>A <see cref="PipeWriter"/>.</returns>
+        /// <remarks>
+        /// This writer may not be as efficient as the <see cref="Pipe"/>-based <see cref="PipeWriter"/> returned from <see cref="UsePipeWriter(Stream, CancellationToken)"/>,
+        /// but its interaction with the underlying <see cref="Stream"/> is closer to how a <see cref="Stream"/> would typically be used which can ease migration from streams to pipes.
+        /// </remarks>
+        public static PipeWriter UseStrictPipeWriter(this Stream stream)
+        {
+            Requires.NotNull(stream, nameof(stream));
+            Requires.Argument(stream.CanWrite, nameof(stream), "Stream must be writable.");
+
+            return new StreamPipeWriter(stream);
         }
 
         /// <summary>

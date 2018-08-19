@@ -26,6 +26,8 @@ public abstract class TestBase : IDisposable
 
     private readonly CancellationTokenSource timeoutTokenSource;
 
+    private readonly Random random = new Random();
+
     protected TestBase(ITestOutputHelper logger)
     {
         this.Logger = logger;
@@ -242,6 +244,13 @@ public abstract class TestBase : IDisposable
 #if NETFRAMEWORK
         this.processJobTracker.Dispose();
 #endif
+    }
+
+    protected byte[] GetRandomBuffer(int length)
+    {
+        var buffer = new byte[length];
+        this.random.NextBytes(buffer);
+        return buffer;
     }
 
     private static Task MaybeShouldBeComplete(Task task, bool shouldBeSynchronous)
