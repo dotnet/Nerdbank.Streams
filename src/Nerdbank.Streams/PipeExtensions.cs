@@ -157,6 +157,24 @@ namespace Nerdbank.Streams
         }
 
         /// <summary>
+        /// Creates a <see cref="PipeWriter"/> that writes to an underlying <see cref="Stream"/>
+        /// when <see cref="PipeWriter.FlushAsync(CancellationToken)"/> is called rather than asynchronously sometime later.
+        /// </summary>
+        /// <param name="stream">The stream to write to using a pipe.</param>
+        /// <returns>A <see cref="PipeWriter"/>.</returns>
+        /// <remarks>
+        /// This writer may not be as efficient as the <see cref="Pipe"/>-based <see cref="PipeWriter"/> returned from <see cref="UsePipeWriter(Stream, CancellationToken)"/>,
+        /// but its interaction with the underlying <see cref="Stream"/> is closer to how a <see cref="Stream"/> would typically be used which can ease migration from streams to pipes.
+        /// </remarks>
+        public static PipeWriter UseStrictPipeWriter(this Stream stream)
+        {
+            Requires.NotNull(stream, nameof(stream));
+            Requires.Argument(stream.CanWrite, nameof(stream), "Stream must be writable.");
+
+            return new StreamPipeWriter(stream);
+        }
+
+        /// <summary>
         /// Enables reading and writing to a <see cref="Stream"/> using <see cref="PipeWriter"/> and <see cref="PipeReader"/>.
         /// </summary>
         /// <param name="stream">The stream to access using a pipe.</param>

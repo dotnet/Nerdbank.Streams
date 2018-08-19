@@ -28,81 +28,9 @@ public class PipeExtensionsTests : TestBase
     }
 
     [Fact]
-    public void UsePipeWriter_ThrowsOnNull()
+    public void UsePipeWriter_WebSocket_ThrowsOnNull()
     {
-        Assert.Throws<ArgumentNullException>(() => PipeExtensions.UsePipeWriter((Stream)null));
         Assert.Throws<ArgumentNullException>(() => PipeExtensions.UsePipeWriter((WebSocket)null));
-    }
-
-    [Fact]
-    public void UsePipeWriter_NonReadableStream()
-    {
-        var unreadableStream = new Mock<Stream>(MockBehavior.Strict);
-        unreadableStream.SetupGet(s => s.CanWrite).Returns(false);
-        Assert.Throws<ArgumentException>(() => unreadableStream.Object.UsePipeWriter());
-        unreadableStream.VerifyAll();
-    }
-
-    [Fact]
-    public async Task UsePipeWriter_Stream()
-    {
-        byte[] expectedBuffer = this.GetRandomBuffer(2048);
-        var stream = new MemoryStream(expectedBuffer.Length);
-        var writer = stream.UsePipeWriter(this.TimeoutToken);
-        await writer.WriteAsync(expectedBuffer.AsMemory(0, 1024), this.TimeoutToken);
-        await writer.WriteAsync(expectedBuffer.AsMemory(1024, 1024), this.TimeoutToken);
-
-        // As a means of waiting for the async process that copies what we write onto the stream,
-        // complete our writer and wait for the reader to complete also.
-        writer.Complete();
-        await writer.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken);
-
-        Assert.Equal(expectedBuffer, stream.ToArray());
-    }
-
-    [Fact]
-    public async Task UsePipeWriter_StreamFails()
-    {
-        var expectedException = new InvalidOperationException();
-        var unreadableStream = new Mock<Stream>(MockBehavior.Strict);
-        unreadableStream.SetupGet(s => s.CanWrite).Returns(true);
-
-        // Set up for either ReadAsync method to be called. We expect it will be Memory<T> on .NET Core 2.1 and byte[] on all the others.
-#if NETCOREAPP2_1
-        unreadableStream.Setup(s => s.WriteAsync(It.IsAny<ReadOnlyMemory<byte>>(), It.IsAny<CancellationToken>())).Throws(expectedException);
-#else
-        unreadableStream.Setup(s => s.WriteAsync(It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ThrowsAsync(expectedException);
-#endif
-
-        var writer = unreadableStream.Object.UsePipeWriter();
-        await writer.WriteAsync(new byte[1], this.TimeoutToken);
-        var actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => writer.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken));
-        Assert.Same(expectedException, actualException);
-    }
-
-    [Fact]
-    public async Task UsePipeWriter_Stream_TryWriteAfterComplete()
-    {
-        byte[] expectedBuffer = this.GetRandomBuffer(2048);
-        var stream = new MemoryStream(expectedBuffer.Length);
-        var writer = stream.UsePipeWriter();
-        await writer.WriteAsync(expectedBuffer, this.TimeoutToken);
-        writer.Complete();
-        Assert.Throws<InvalidOperationException>(() => writer.GetMemory());
-        Assert.Throws<InvalidOperationException>(() => writer.GetSpan());
-        Assert.Throws<InvalidOperationException>(() => writer.Advance(0));
-    }
-
-    [Fact]
-    public async Task UsePipeWriter_Stream_Flush_Precanceled()
-    {
-        byte[] expectedBuffer = this.GetRandomBuffer(2048);
-        var stream = new MemoryStream(expectedBuffer.Length);
-        var writer = stream.UsePipeWriter();
-        var memory = writer.GetMemory(expectedBuffer.Length);
-        expectedBuffer.CopyTo(memory);
-        writer.Advance(expectedBuffer.Length);
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => writer.FlushAsync(new CancellationToken(true)).AsTask());
     }
 
     [Fact]

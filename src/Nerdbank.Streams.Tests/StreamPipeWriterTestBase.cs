@@ -1,0 +1,109 @@
+﻿// Copyright (c) Andrew Arnott. All rights reserved.
+// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.IO.Pipelines;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.VisualStudio.Threading;
+using Moq;
+using Nerdbank.Streams;
+using Xunit;
+using Xunit.Abstractions;
+
+public abstract class StreamPipeWriterTestBase : TestBase
+{
+    protected StreamPipeWriterTestBase(ITestOutputHelper logger)
+        : base(logger)
+    {
+    }
+
+    [Fact]
+    public void ThrowsOnNull()
+    {
+        Assert.Throws<ArgumentNullException>(() => this.CreatePipeWriter(null));
+    }
+
+    [Fact]
+    public void NonReadableStream()
+    {
+        var unreadableStream = new Mock<Stream>(MockBehavior.Strict);
+        unreadableStream.SetupGet(s => s.CanWrite).Returns(false);
+        Assert.Throws<ArgumentException>(() => this.CreatePipeWriter(unreadableStream.Object));
+        unreadableStream.VerifyAll();
+    }
+
+    [Fact]
+    public async Task Stream()
+    {
+        byte[] expectedBuffer = this.GetRandomBuffer(2048);
+        var stream = new MemoryStream(expectedBuffer.Length);
+        var writer = this.CreatePipeWriter(stream);
+        await writer.WriteAsync(expectedBuffer.AsMemory(0, 1024), this.TimeoutToken);
+        await writer.WriteAsync(expectedBuffer.AsMemory(1024, 1024), this.TimeoutToken);
+
+        // As a means of waiting for the async process that copies what we write onto the stream,
+        // complete our writer and wait for the reader to complete also.
+        writer.Complete();
+        await writer.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken);
+
+        Assert.Equal(expectedBuffer, stream.ToArray());
+    }
+
+    [Fact]
+    public async Task TryWriteAfterComplete()
+    {
+        byte[] expectedBuffer = this.GetRandomBuffer(2048);
+        var stream = new MemoryStream(expectedBuffer.Length);
+        var writer = this.CreatePipeWriter(stream);
+        await writer.WriteAsync(expectedBuffer, this.TimeoutToken);
+        writer.Complete();
+        Assert.Throws<InvalidOperationException>(() => writer.GetMemory());
+        Assert.Throws<InvalidOperationException>(() => writer.GetSpan());
+        Assert.Throws<InvalidOperationException>(() => writer.Advance(0));
+    }
+
+    [Fact]
+    public async Task Flush_Precanceled()
+    {
+        byte[] expectedBuffer = this.GetRandomBuffer(2048);
+        var stream = new MemoryStream(expectedBuffer.Length);
+        var writer = this.CreatePipeWriter(stream);
+        var memory = writer.GetMemory(expectedBuffer.Length);
+        expectedBuffer.CopyTo(memory);
+        writer.Advance(expectedBuffer.Length);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => writer.FlushAsync(new CancellationToken(true)).AsTask());
+    }
+
+    [Fact]
+    public async Task OnReaderCompleted()
+    {
+        var stream = new MemoryStream();
+        var writer = this.CreatePipeWriter(stream);
+        Task readerCompleted = writer.WaitForReaderCompletionAsync();
+        writer.Complete();
+        await readerCompleted.WithCancellation(this.TimeoutToken);
+    }
+
+    [Fact]
+    public async Task Complete_WithUnflushedWrittenBytes()
+    {
+        var stream = new MemoryStream();
+        var writer = this.CreatePipeWriter(stream);
+        Task readerCompleted = writer.WaitForReaderCompletionAsync();
+        var mem = writer.GetMemory(1);
+        writer.Advance(1);
+
+        // Calling Complete implicitly causes the reader to have access to all unflushed buffers.
+        Assert.Equal(0, stream.Length);
+        writer.Complete();
+        await readerCompleted.WithCancellation(this.TimeoutToken);
+        Assert.Equal(1, stream.Length);
+    }
+
+    protected abstract PipeWriter CreatePipeWriter(Stream stream);
+}
