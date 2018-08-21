@@ -39,8 +39,8 @@ namespace Nerdbank.Streams
                 return new FrameHeader
                 {
                     Code = (ControlCode)buffer[0],
-                    ChannelId = ReadInt(buffer.Slice(1, 4)),
-                    FramePayloadLength = ReadInt(buffer.Slice(5, 2)),
+                    ChannelId = Utilities.ReadInt(buffer.Slice(1, 4)),
+                    FramePayloadLength = Utilities.ReadInt(buffer.Slice(5, 2)),
                 };
             }
 
@@ -48,36 +48,8 @@ namespace Nerdbank.Streams
             {
                 Requires.Argument(buffer.Length == HeaderLength, nameof(buffer), "Buffer must be header length.");
                 buffer[0] = (byte)this.Code;
-                Write(buffer.Slice(1, 4), this.ChannelId);
-                Write(buffer.Slice(5, 2), (ushort)this.FramePayloadLength);
-            }
-
-            private static int ReadInt(ReadOnlySpan<byte> buffer)
-            {
-                Requires.Argument(buffer.Length <= 4, nameof(buffer), "Int32 length exceeded.");
-
-                int local = 0;
-                for (int offset = 0; offset < buffer.Length; offset++)
-                {
-                    local <<= 8;
-                    local |= buffer[offset];
-                }
-
-                return local;
-            }
-
-            private static void Write(Span<byte> buffer, int value)
-            {
-                buffer[0] = (byte)(value >> 24);
-                buffer[1] = (byte)(value >> 16);
-                buffer[2] = (byte)(value >> 8);
-                buffer[3] = (byte)value;
-            }
-
-            private static void Write(Span<byte> buffer, ushort value)
-            {
-                buffer[0] = (byte)(value >> 8);
-                buffer[1] = (byte)value;
+                Utilities.Write(buffer.Slice(1, 4), this.ChannelId);
+                Utilities.Write(buffer.Slice(5, 2), (ushort)this.FramePayloadLength);
             }
         }
     }

@@ -3,6 +3,7 @@
 
 namespace Nerdbank.Streams
 {
+    using System;
     using System.Buffers;
     using System.IO;
     using System.Net.WebSockets;
@@ -40,5 +41,25 @@ namespace Nerdbank.Streams
         /// <param name="writer">The buffer writer the stream should write to.</param>
         /// <returns>A <see cref="Stream"/>.</returns>
         public static Stream AsStream(this IBufferWriter<byte> writer) => new BufferWriterStream(writer);
+
+        /// <summary>
+        /// Create a new <see cref="StreamWriter"/> that can be used to write a byte sequence of undetermined length to some underlying <see cref="Stream"/>,
+        /// such that it can later be read back as if it were a <see cref="Stream"/> of its own that ends at the end of this particular sequence.
+        /// </summary>
+        /// <param name="stream">The underlying stream to write to.</param>
+        /// <param name="minimumBufferSize">The buffer size to use.</param>
+        /// <returns>The new <see cref="Stream"/>.</returns>
+        /// <remarks>
+        /// Write to the returned <see cref="Stream"/> until the sub-stream is complete. Call <see cref="Substream.DisposeAsync(System.Threading.CancellationToken)"/>
+        /// when done and resume writing to the parent stream as needed.
+        /// </remarks>
+        public static Substream WriteSubstream(this Stream stream, int minimumBufferSize = Substream.DefaultBufferSize) => new Substream(stream, minimumBufferSize);
+
+        /// <summary>
+        /// Create a new <see cref="StreamReader"/> that will read a sequence previously written to this stream using <see cref="WriteSubstream"/>.
+        /// </summary>
+        /// <param name="stream">The underlying stream to read from.</param>
+        /// <returns>A stream that will read just to the end of the substream and then end.</returns>
+        public static Stream ReadSubstream(this Stream stream) => new SubstreamReader(stream);
     }
 }
