@@ -30,3 +30,7 @@ The streams in this package focus on communication (not persistence).
    a given number of bytes.
 8. [`MonitoringStream`](doc/MonitoringStream.md) wraps another Stream and raises events for
    all I/O calls so you can monitor and/or trace the data as it goes by.
+9. [`WriteSubstream` and `ReadSubstream`](doc/Substream.md) allow you to serialize data of
+   an unknown length as part of a larger stream, and later deserialize it such in reading the
+   substream, you cannot read more bytes than were written to it.
+ 
