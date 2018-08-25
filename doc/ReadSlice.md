@@ -3,6 +3,8 @@
 The `Stream.ReadSlice(int)` extension methods returns a `Stream` instance that will only read up to a fixed set of bytes from an underlying `Stream`.
 This allows you, for example, to pass a `Stream` to a deserializer that will read to the end of the stream, even though your larger stream has more than your deserializer should see.
 
+## Sample
+
 In the following example, `ReadSlice` is used to allow access to just 10 bytes of a larger stream:
 
 ```cs
