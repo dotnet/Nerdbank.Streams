@@ -45,7 +45,14 @@ public abstract class StreamPipeReaderTestBase : TestBase
         var reader = this.CreatePipeReader(stream, sizeHint: 50);
 
         Task writerCompletedTask = reader.WaitForWriterCompletionAsync();
-        Assert.False(writerCompletedTask.IsCompleted);
+
+        // This next assertion is only guaranteeed for the strict pipe reader.
+        // For the normal one, its role of reading from the stream is concurrent with our code,
+        // and thus may have already completed.
+        if (this is StreamUseStrictPipeReaderTests)
+        {
+            Assert.False(writerCompletedTask.IsCompleted);
+        }
 
         byte[] actualBuffer = new byte[expectedBuffer.Length];
         int bytesRead = 0;
