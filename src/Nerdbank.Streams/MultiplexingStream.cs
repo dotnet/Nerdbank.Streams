@@ -428,7 +428,7 @@ namespace Nerdbank.Streams
             {
                 if (this.channelsOfferedByThemByName.TryGetValue(name, out var channelsOfferedByThem))
                 {
-                    while (channelsOfferedByThem.Count > 0)
+                    while (channel == null && channelsOfferedByThem.Count > 0)
                     {
                         channel = channelsOfferedByThem.Dequeue();
                         if (channel.Acceptance.IsCompleted)
