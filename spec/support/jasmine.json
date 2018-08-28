@@ -1,5 +1,5 @@
 {
-  "spec_dir": "out/tests",
+  "spec_dir": "src/nerdbank-streams/out/tests",
   "spec_files": [
     "**/*.js"
   ],
