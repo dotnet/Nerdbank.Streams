@@ -20,9 +20,12 @@ environment:
   VisualStudioVersion: 15.0
   TreatWarningsAsErrors: true
   codecov_token: b8be69b5-6dc3-40f8-a4c7-4e13a42654a3
-build_script:
-- dotnet build src
-- dotnet pack src --no-build
+build_script: |
+  dotnet build src
+  dotnet pack src --no-build
+  yarn install --cwd src/nerdbank-streams
+  .\src\nerdbank-streams\node_modules\.bin\tsc -p src\nerdbank-streams\gulpfile.tsconfig.json
+  .\src\nerdbank-streams\node_modules\.bin\gulp --gulpfile src\nerdbank-streams\gulpfile.js
 test_script:
 - cmd: >-
     SET testdir=bin\Nerdbank.Streams.Tests\%configuration%\net461\
@@ -48,3 +51,5 @@ test_script:
 artifacts:
 - path: bin\**\*.nupkg
   name: NuGet Package
+- path: bin\*.tgz
+  name: NPM Package

@@ -1,0 +1,21 @@
+{
+  "name": "nerdbank-streams",
+  "version": "0.0.0-placeholder",
+  "description": "Multiplexing of streams",
+  "main": "index.js",
+  "repository": "https://github.com/AArnott/Nerdbank.Streams",
+  "author": "Andrew Arnott",
+  "license": "MIT",
+  "private": false,
+  "devDependencies": {
+    "@types/node": "^10.9.2",
+    "@types/promise": "^7.1.30",
+    "gulp": "^3.9.1",
+    "gulp-typescript": "^5.0.0-alpha.3",
+    "jshint": "^2.9.6",
+    "nerdbank-gitversioning": "^2.2.7",
+    "path": "^0.12.7",
+    "promise": "^8.0.1",
+    "typescript": "^3.0.1"
+  }
+}
