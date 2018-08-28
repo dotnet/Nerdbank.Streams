@@ -1,8 +1,5 @@
-export class MultiplexingStream {
-    /**
-     * sayHi
-     */
-    public sayHi() {
-        console.log('hi');
-    }
+import { MultiplexingStream } from './MultiplexingStream'
+
+export {
+    MultiplexingStream
 }
