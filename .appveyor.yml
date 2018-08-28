@@ -48,6 +48,8 @@ test_script:
     codecov -f "%testdir%code_coverage.xml"
 
     dotnet test src\Nerdbank.Streams.Tests --no-build
+
+    pushd src\nerdbank-streams && npm test && popd
 artifacts:
 - path: bin\**\*.nupkg
   name: NuGet Package

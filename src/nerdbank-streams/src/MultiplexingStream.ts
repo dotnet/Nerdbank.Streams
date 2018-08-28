@@ -3,7 +3,7 @@ import { Deferred } from './Deferred';
 export class MultiplexingStream {
     private readonly _completionSource : Deferred<void>;
 
-    private _isDisposed: boolean;
+    private _isDisposed: boolean = false;
 
     private constructor() {
         this._completionSource = new Deferred<void>();

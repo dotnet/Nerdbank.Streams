@@ -6,7 +6,8 @@
         "declaration": true,
         "module": "commonjs"
     },
-    "files": [
-        "src/index.ts"
+    "include": [
+        "src/index.ts",
+        "src/tests/*.ts"
     ]
 }

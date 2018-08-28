@@ -7,11 +7,16 @@
   "author": "Andrew Arnott",
   "license": "MIT",
   "private": false,
+  "scripts": {
+    "test": "jasmine"
+  },
   "devDependencies": {
+    "@types/jasmine": "^2.8.8",
     "@types/node": "^10.9.2",
     "@types/promise": "^7.1.30",
     "gulp": "^3.9.1",
     "gulp-typescript": "^5.0.0-alpha.3",
+    "jasmine": "^3.2.0",
     "jshint": "^2.9.6",
     "nerdbank-gitversioning": "^2.2.7",
     "path": "^0.12.7",
