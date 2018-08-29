@@ -1,26 +1,59 @@
 import { MultiplexingStream } from '../MultiplexingStream';
 import { timeout } from './Timeout';
 import 'jasmine';
+import { Duplex } from 'stream';
+import { log } from 'util';
+import { DuplexPair } from './DuplexPair';
 
 describe('MultiplexingStream', () => {
+    var mx1 : MultiplexingStream;
+    var mx2 : MultiplexingStream;
+    beforeEach(async () => {
+        var underlyingPair = DuplexPair.Create();
+        var mxs = await Promise.all([
+            MultiplexingStream.CreateAsync(underlyingPair.Item1),
+            MultiplexingStream.CreateAsync(underlyingPair.Item2)
+        ]);
+        mx1 = mxs.pop();
+        mx2 = mxs.pop();
+    });
+
+    afterEach(() => {
+        mx1.dispose();
+        mx2.dispose();
+    });
+
+    it('rejects null stream', async () => {
+        try {
+            await MultiplexingStream.CreateAsync(null);
+            fail("expected error not thrown");
+        }
+        catch { }
+    });
 
     it('isDisposed set upon disposal', async () => {
-        var stream = await MultiplexingStream.CreateAsync(null);
-        expect(stream.isDisposed).toBe(false);
-        stream.dispose();
-        expect(stream.isDisposed).toBe(true);
+        expect(mx1.isDisposed).toBe(false);
+        mx1.dispose();
+        expect(mx1.isDisposed).toBe(true);
     });
 
     it('Completion should not complete before disposal', async () => {
-        var stream = await MultiplexingStream.CreateAsync(null);
-
         try {
-            await timeout(stream.completion, 10);
-            throw "completion was already resolved";
+            await timeout(mx1.completion, 10);
+            fail("completion was already resolved");
         }
         catch { }
 
-        stream.dispose();
-        await timeout(stream.completion, 10);
+        mx1.dispose();
+        await timeout(mx1.completion, 10);
+    });
+
+    it('An offered channel is accepted', async () => {
+        var channels = await Promise.all([
+            mx1.offerChannelAsync('test'),
+            mx2.acceptChannelAsync('test'),
+        ]);
+        channels[0].duplex.write('abc');
+        expect(channels[1].duplex.read()).toEqual(new Buffer('abc'));
     });
 });
