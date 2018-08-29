@@ -5,14 +5,14 @@ import 'jasmine';
 describe('MultiplexingStream', () => {
 
     it('isDisposed set upon disposal', async () => {
-        var stream = await MultiplexingStream.CreateAsync();
+        var stream = await MultiplexingStream.CreateAsync(null);
         expect(stream.isDisposed).toBe(false);
         stream.dispose();
         expect(stream.isDisposed).toBe(true);
     });
 
     it('Completion should not complete before disposal', async () => {
-        var stream = await MultiplexingStream.CreateAsync();
+        var stream = await MultiplexingStream.CreateAsync(null);
 
         try {
             await timeout(stream.completion, 10);

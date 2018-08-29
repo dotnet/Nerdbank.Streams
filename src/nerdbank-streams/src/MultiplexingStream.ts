@@ -1,7 +1,10 @@
 import { Deferred } from './Deferred';
+import { CancellationToken } from 'vscode-jsonrpc'
+import './MultiplexingStreamOptions';
+import { MultiplexingStreamOptions } from './MultiplexingStreamOptions';
 
 export class MultiplexingStream {
-    private readonly _completionSource : Deferred<void>;
+    private readonly _completionSource: Deferred<void>;
 
     private _isDisposed: boolean = false;
 
@@ -26,7 +29,7 @@ export class MultiplexingStream {
     /**
      * Initializes a new instance of the MultiplexingStream class.
      */
-    public static async CreateAsync() : Promise<MultiplexingStream> {
+    public static async CreateAsync(stream: NodeJS.ReadWriteStream, options?: MultiplexingStreamOptions, cancellationToken?: CancellationToken): Promise<MultiplexingStream> {
         return new MultiplexingStream();
     };
 
@@ -36,5 +39,5 @@ export class MultiplexingStream {
     public dispose() {
         this._isDisposed = true;
         this._completionSource.resolve();
-    }
+    };
 }

@@ -22,5 +22,8 @@
     "path": "^0.12.7",
     "promise": "^8.0.1",
     "typescript": "^3.0.1"
+  },
+  "dependencies": {
+    "vscode-jsonrpc": "^3.6.2"
   }
 }
