@@ -33,7 +33,7 @@ export class MultiplexingStream {
     /**
      * Disposes the stream.
      */
-    public Dispose() {
+    public dispose() {
         this._isDisposed = true;
         this._completionSource.resolve();
     }

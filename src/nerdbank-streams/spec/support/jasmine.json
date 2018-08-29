@@ -1,10 +1,10 @@
 {
-  "spec_dir": "src/nerdbank-streams/out/tests",
+  "spec_dir": "out/tests",
   "spec_files": [
     "**/*.js"
   ],
   "helpers": [
-    "src/nerdbank-streams/out/helpers/**/*.js"
+    "out/helpers/**/*.js"
   ],
   "stopSpecOnExpectationFailure": false,
   "random": true
