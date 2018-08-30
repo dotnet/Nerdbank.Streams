@@ -1,6 +1,10 @@
 import { Duplex } from "stream";
 import { Deferred } from "./Deferred";
 import { IDisposableObservable } from './IDisposableObservable';
+import { MultiplexingStreamClass } from "./MultiplexingStream";
+import { ChannelOptions } from "./ChannelOptions";
+import { FrameHeader } from "./FrameHeader";
+import { ControlCode } from "./ControlCode";
 
 export interface Channel extends IDisposableObservable {
     duplex: Duplex;
@@ -15,10 +19,22 @@ export class ChannelClass implements Channel {
     private readonly _acceptance = new Deferred<void>();
     private readonly _completion = new Deferred<void>();
 
-    constructor() {
+    constructor(private multiplexingStream: MultiplexingStreamClass, id: number, private name: string, private offeredByThem: boolean, private options: ChannelOptions) {
+        this.id = id;
         this._duplex = new Duplex({
-            write(chunk, encoding, callback) {
+            async write(chunk, encoding, callback) {
+                try {
+                    var payload = Buffer.from(chunk);
 
+                    var header = new FrameHeader();
+                    header.code = ControlCode.Content;
+                    header.channelId = id;
+                    header.framePayloadLength = payload.length;
+                    await multiplexingStream.sendFrameAsync(header, payload);
+                    callback();
+                } catch (err) {
+                    callback(err);
+                }
             },
 
             read(size) {
@@ -39,11 +55,39 @@ export class ChannelClass implements Channel {
         return this._acceptance.promise;
     }
 
+    get acceptanceIsCompleted() {
+        return this._acceptance.isCompleted;
+    }
+
+    get isAccepted() {
+        return this._acceptance.isCompleted
+    }
+
+    get isRejectedOrCanceled() {
+        return this._acceptance.isRejected;
+    }
+
     get completion(): Promise<void> {
         return this._completion.promise;
     }
 
-    public dispose() {
+    tryAcceptOffer(options?: ChannelOptions): boolean {
+        if (this._acceptance.resolve()) {
+            return true;
+        }
+
+        return false;
+    }
+
+    onAccepted() {
+        return this._acceptance.resolve();
+    }
+
+    onContent(buffer: Buffer) {
+        this._duplex.push(buffer);
+    }
+
+    dispose() {
         this._isDisposed = true;
     }
 }

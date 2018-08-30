@@ -81,7 +81,7 @@ namespace Nerdbank.Streams
         private readonly Dictionary<string, Queue<TaskCompletionSource<Channel>>> acceptingChannels = new Dictionary<string, Queue<TaskCompletionSource<Channel>>>(StringComparer.Ordinal);
 
         /// <summary>
-        /// A dictionary of all channels, keyed by their number.
+        /// A dictionary of all channels, keyed by their ID.
         /// </summary>
         private readonly Dictionary<int, Channel> openChannels = new Dictionary<int, Channel>();
 
@@ -371,6 +371,8 @@ namespace Nerdbank.Streams
             Requires.NotNull(name, nameof(name));
 
             cancellationToken.ThrowIfCancellationRequested();
+            Verify.NotDisposed(this);
+
             Memory<byte> payload = ControlFrameEncoding.GetBytes(name);
             Requires.Argument(payload.Length <= this.framePayloadMaxLength, nameof(name), "{0} encoding of value exceeds maximum frame payload length.", ControlFrameEncoding.EncodingName);
             Channel channel = new Channel(this, this.GetUnusedChannelId(), name, offeredByRemote: false, options ?? DefaultChannelOptions);

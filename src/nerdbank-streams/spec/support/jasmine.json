@@ -4,7 +4,6 @@
     "**/*.js"
   ],
   "helpers": [
-    "out/helpers/**/*.js"
   ],
   "stopSpecOnExpectationFailure": false,
   "random": true

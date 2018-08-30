@@ -4,10 +4,12 @@ import 'jasmine';
 import { Duplex } from 'stream';
 import { log } from 'util';
 import { DuplexPair } from './DuplexPair';
+import { Deferred } from '../Deferred';
+import { GetBufferOf } from '../Utilities';
 
 describe('MultiplexingStream', () => {
-    var mx1 : MultiplexingStream;
-    var mx2 : MultiplexingStream;
+    var mx1: MultiplexingStream;
+    var mx2: MultiplexingStream;
     beforeEach(async () => {
         var underlyingPair = DuplexPair.Create();
         var mxs = await Promise.all([
@@ -19,8 +21,13 @@ describe('MultiplexingStream', () => {
     });
 
     afterEach(() => {
-        mx1.dispose();
-        mx2.dispose();
+        if (mx1) {
+            mx1.dispose();
+        }
+
+        if (mx2) {
+            mx2.dispose();
+        }
     });
 
     it('rejects null stream', async () => {
@@ -49,11 +56,36 @@ describe('MultiplexingStream', () => {
     });
 
     it('An offered channel is accepted', async () => {
+        await Promise.all([
+            mx1.offerChannelAsync('test'),
+            mx2.acceptChannelAsync('test'),
+        ]);
+    });
+
+    it('Can exchange data over channel', async () => {
         var channels = await Promise.all([
             mx1.offerChannelAsync('test'),
             mx2.acceptChannelAsync('test'),
         ]);
         channels[0].duplex.write('abc');
-        expect(channels[1].duplex.read()).toEqual(new Buffer('abc'));
+        expect(await GetBufferOf(channels[1].duplex, 3)).toEqual(new Buffer('abc'));
+    });
+
+    it('offered channels must have names', async () => {
+        await expectThrow(mx1.offerChannelAsync(null));
+    });
+
+    it('accepted channels must have names', async () => {
+        await expectThrow(mx1.acceptChannelAsync(null));
     });
 });
+
+async function expectThrow<T>(promise: Promise<T>): Promise<T> {
+    try {
+        await promise;
+        fail("Expected error not thrown.");
+    }
+    catch {
+        return null;
+    }
+}
