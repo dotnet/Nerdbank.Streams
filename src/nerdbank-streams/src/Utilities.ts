@@ -3,24 +3,26 @@ import { Deferred } from './Deferred';
 import { IDisposableObservable } from './IDisposableObservable';
 
 export async function getBufferFrom(readable: NodeJS.ReadableStream, size: number, allowEndOfStream?: boolean, cancellationToken?: CancellationToken): Promise<Buffer> {
+    var streamEnded = new Deferred<void>();
     while (size > 0) {
         var readBuffer = <Buffer>readable.read(size);
         if (readBuffer === null) {
             var bytesAvailable = new Deferred<void>();
             readable.once('readable', bytesAvailable.resolve.bind(bytesAvailable));
-            await bytesAvailable.promise;
-            continue;
+            readable.once('end', streamEnded.resolve.bind(streamEnded));
+            await Promise.race([bytesAvailable.promise, streamEnded.promise]);
+            if (!streamEnded.isCompleted) {
+                continue;
+            }
         }
 
-        if (allowEndOfStream && readBuffer.length === 0) {
-            return readBuffer;
+        if (!allowEndOfStream) {
+            if (!readBuffer || readBuffer.length < size) {
+                throw new Error("Stream terminated before required bytes were read.");
+            }
         }
 
-        if (readBuffer.length < size) {
-            throw new Error("Stream terminated before required bytes were read.");
-        }
-
-        return readBuffer;
+        return readBuffer || new Buffer([]);
     }
 }
 

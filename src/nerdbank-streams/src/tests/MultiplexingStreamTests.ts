@@ -71,6 +71,30 @@ describe('MultiplexingStream', () => {
         expect(await getBufferFrom(channels[1].duplex, 3)).toEqual(new Buffer('abc'));
     });
 
+    it('Can exchange data over two channels', async () => {
+        var channels = await Promise.all([
+            mx1.offerChannelAsync('test'),
+            mx1.offerChannelAsync('test2'),
+            mx2.acceptChannelAsync('test'),
+            mx2.acceptChannelAsync('test2'),
+        ]);
+        channels[0].duplex.write('abc');
+        channels[3].duplex.write('def');
+        channels[3].duplex.write('ghi');
+        expect(await getBufferFrom(channels[2].duplex, 3)).toEqual(new Buffer('abc'));
+        expect(await getBufferFrom(channels[1].duplex, 6)).toEqual(new Buffer('defghi'));
+    });
+
+    it('end of channel', async () => {
+        var channels = await Promise.all([
+            mx1.offerChannelAsync('test'),
+            mx2.acceptChannelAsync('test'),
+        ]);
+        channels[0].duplex.end('finished');
+        expect(await getBufferFrom(channels[1].duplex, 8)).toEqual(new Buffer('finished'));
+        expect(await getBufferFrom(channels[1].duplex, 1, true)).toEqual(new Buffer(''));
+    });
+
     it('offered channels must have names', async () => {
         await expectThrow(mx1.offerChannelAsync(null));
     });

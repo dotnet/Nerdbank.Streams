@@ -20,9 +20,11 @@ export class ChannelClass implements Channel {
     private readonly _completion = new Deferred<void>();
 
     constructor(private multiplexingStream: MultiplexingStreamClass, id: number, private name: string, private offeredByThem: boolean, private options: ChannelOptions) {
+        var self = this;
         this.id = id;
         this._duplex = new Duplex({
             async write(chunk, encoding, callback) {
+                var error = undefined;
                 try {
                     var payload = Buffer.from(chunk);
 
@@ -31,9 +33,25 @@ export class ChannelClass implements Channel {
                     header.channelId = id;
                     header.framePayloadLength = payload.length;
                     await multiplexingStream.sendFrameAsync(header, payload);
-                    callback();
                 } catch (err) {
-                    callback(err);
+                    error = err;
+                }
+
+                if (callback) {
+                    callback(error);
+                }
+            },
+
+            async final(cb?: (err?: any) => void) {
+                var error = undefined;
+                try {
+                    await multiplexingStream.onChannelWritingCompleted(self);
+                } catch (err) {
+                    error = err;
+                }
+
+                if (cb) {
+                    cb(error);
                 }
             },
 

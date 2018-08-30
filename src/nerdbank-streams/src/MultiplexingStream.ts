@@ -260,9 +260,9 @@ export abstract class MultiplexingStream implements IDisposableObservable {
         return this.lastOfferedChannelId += 2;
     }
 
-    protected abstract sendFrameAsync(header: FrameHeader, payload?: Buffer, cancellationToken?: CancellationToken) : Promise<void>;
+    protected abstract sendFrameAsync(header: FrameHeader, payload?: Buffer, cancellationToken?: CancellationToken): Promise<void>;
 
-    protected abstract sendFrame(code: ControlCode, channelId: number) : Promise<void>;
+    protected abstract sendFrame(code: ControlCode, channelId: number): Promise<void>;
 
     protected acceptChannelOrThrow(channel: ChannelClass, options: ChannelOptions) {
         if (channel.tryAcceptOffer(options)) {
@@ -321,8 +321,14 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         await this.sendFrameAsync(header);
     }
 
-    private async readFromStream(cancellationToken: CancellationToken) {
+    async onChannelWritingCompleted(channel: ChannelClass) {
+        // Only inform the remote side if this channel has not already been terminated.
+        if (!channel.isDisposed && this.openChannels[channel.id]) {
+            await this.sendFrame(ControlCode.ContentWritingCompleted, channel.id);
+        }
+    }
 
+    private async readFromStream(cancellationToken: CancellationToken) {
         while (!this.isDisposed) {
             var headerBuffer = await getBufferFrom(this.stream, FrameHeader.HeaderLength, true, cancellationToken);
             if (headerBuffer.length === 0) {
@@ -341,6 +347,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
                     await this.onContent(header, cancellationToken);
                     break;
                 case ControlCode.ContentWritingCompleted:
+                    this.onContentWritingCompleted(header.channelId);
                     break;
                 case ControlCode.ChannelTerminated:
                     break;
@@ -411,4 +418,8 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         channel.onContent(buffer);
     }
 
+    private onContentWritingCompleted(channelId: number) {
+        var channel = <ChannelClass>this.openChannels[channelId];
+        channel.onContent(null); // signify that the remote is done writing.
+    }
 }
