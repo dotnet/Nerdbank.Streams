@@ -1,14 +1,14 @@
 import 'jasmine';
 import { MultiplexingStream } from '../MultiplexingStream';
 import { timeout } from './Timeout';
-import { DuplexPair } from './DuplexPair';
+import { FullDuplexStream } from '../FullDuplexStream';
 import { getBufferFrom } from '../Utilities';
 
 describe('MultiplexingStream', () => {
     var mx1: MultiplexingStream;
     var mx2: MultiplexingStream;
     beforeEach(async () => {
-        var underlyingPair = DuplexPair.Create();
+        var underlyingPair = FullDuplexStream.CreateStreams();
         var mxs = await Promise.all([
             MultiplexingStream.CreateAsync(underlyingPair.Item1),
             MultiplexingStream.CreateAsync(underlyingPair.Item2)

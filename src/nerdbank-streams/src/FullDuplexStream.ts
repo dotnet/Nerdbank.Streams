@@ -1,8 +1,8 @@
 import { create } from "domain";
 import { Duplex } from "stream";
 
-export class DuplexPair {
-    public static Create(): Tuple<Duplex, Duplex> {
+export class FullDuplexStream {
+    public static CreateStreams(): Tuple<Duplex, Duplex> {
         var duplex2: Duplex;
         var duplex1 = new Duplex({
             write(chunk, encoding, callback) {
@@ -32,7 +32,7 @@ export class DuplexPair {
     }
 }
 
-interface Tuple<T1, T2> {
+export interface Tuple<T1, T2> {
     Item1: T1;
     Item2: T2;
 }
