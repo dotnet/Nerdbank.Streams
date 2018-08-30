@@ -1,7 +1,8 @@
 import { CancellationToken } from 'vscode-jsonrpc';
 import { Deferred } from './Deferred';
+import { IDisposableObservable } from './IDisposableObservable';
 
-export async function GetBufferOf(readable: NodeJS.ReadableStream, size: number, allowEndOfStream?: boolean, cancellationToken?: CancellationToken): Promise<Buffer> {
+export async function getBufferFrom(readable: NodeJS.ReadableStream, size: number, allowEndOfStream?: boolean, cancellationToken?: CancellationToken): Promise<Buffer> {
     while (size > 0) {
         var readBuffer = <Buffer>readable.read(size);
         if (readBuffer === null) {
@@ -20,5 +21,11 @@ export async function GetBufferOf(readable: NodeJS.ReadableStream, size: number,
         }
 
         return readBuffer;
+    }
+}
+
+export function throwIfDisposed(value: IDisposableObservable) {
+    if (value.isDisposed) {
+        throw new Error("disposed");
     }
 }

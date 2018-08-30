@@ -5,7 +5,7 @@ import { Duplex } from 'stream';
 import { log } from 'util';
 import { DuplexPair } from './DuplexPair';
 import { Deferred } from '../Deferred';
-import { GetBufferOf } from '../Utilities';
+import { getBufferFrom } from '../Utilities';
 
 describe('MultiplexingStream', () => {
     var mx1: MultiplexingStream;
@@ -68,7 +68,7 @@ describe('MultiplexingStream', () => {
             mx2.acceptChannelAsync('test'),
         ]);
         channels[0].duplex.write('abc');
-        expect(await GetBufferOf(channels[1].duplex, 3)).toEqual(new Buffer('abc'));
+        expect(await getBufferFrom(channels[1].duplex, 3)).toEqual(new Buffer('abc'));
     });
 
     it('offered channels must have names', async () => {

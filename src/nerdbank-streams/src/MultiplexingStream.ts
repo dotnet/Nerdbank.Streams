@@ -8,7 +8,7 @@ import { IDisposableObservable } from './IDisposableObservable';
 import { randomBytes } from 'crypto';
 import { FrameHeader } from './FrameHeader';
 import { ControlCode } from './ControlCode';
-import { GetBufferOf } from './Utilities';
+import { getBufferFrom, throwIfDisposed } from './Utilities';
 
 export abstract class MultiplexingStream implements IDisposableObservable {
     /**
@@ -97,7 +97,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
         var sendBuffer = Buffer.concat([MultiplexingStream.protocolMagicNumber, randomSendBuffer]);
         stream.write(sendBuffer);
 
-        var recvBuffer = await GetBufferOf(stream, sendBuffer.length);
+        var recvBuffer = await getBufferFrom(stream, sendBuffer.length);
 
         for (let i = 0; i < MultiplexingStream.protocolMagicNumber.length; i++) {
             const expected = MultiplexingStream.protocolMagicNumber[i];
@@ -175,7 +175,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
             throw new Error("Name must be specified.");
         }
 
-        this.throwIfDisposed();
+        throwIfDisposed(this);
 
         var payload = new Buffer(name, MultiplexingStream.ControlFrameEncoding);
         if (payload.length > MultiplexingStream.framePayloadMaxLength) {
@@ -210,7 +210,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
             throw new Error("Name must be specified.");
         }
 
-        this.throwIfDisposed();
+        throwIfDisposed(this);
 
         var channel: ChannelClass = null;
         var pendingAcceptChannel: Deferred<Channel>;
@@ -278,12 +278,6 @@ export abstract class MultiplexingStream implements IDisposableObservable {
             throw new Error("Channel could not be accepted.");
         }
     }
-
-    protected throwIfDisposed() {
-        if (this.isDisposed) {
-            throw new Error("disposed");
-        }
-    }
 }
 
 export class MultiplexingStreamClass extends MultiplexingStream {
@@ -302,7 +296,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
             throw new Error("Header is required.");
         }
 
-        this.throwIfDisposed();
+        throwIfDisposed(this);
 
         var headerBuffer = new Buffer(FrameHeader.HeaderLength);
         header.serialize(headerBuffer);
@@ -330,7 +324,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
     private async readFromStream(cancellationToken: CancellationToken) {
 
         while (!this.isDisposed) {
-            var headerBuffer = await GetBufferOf(this.stream, FrameHeader.HeaderLength, true, cancellationToken);
+            var headerBuffer = await getBufferFrom(this.stream, FrameHeader.HeaderLength, true, cancellationToken);
             if (headerBuffer.length === 0) {
                 break;
             }
@@ -359,7 +353,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
     }
 
     private async onOffer(channelId: number, payloadSize: number, cancellationToken: CancellationToken) {
-        var payload = await GetBufferOf(this.stream, payloadSize, null, cancellationToken);
+        var payload = await getBufferFrom(this.stream, payloadSize, null, cancellationToken);
         var name = payload.toString(MultiplexingStream.ControlFrameEncoding);
 
         var channel = new ChannelClass(this, channelId, name, true, MultiplexingStream.defaultChannelOptions);
@@ -413,7 +407,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
     private async onContent(header: FrameHeader, cancellationToken: CancellationToken) {
         var channel = <ChannelClass>this.openChannels[header.channelId];
 
-        var buffer = await GetBufferOf(this.stream, header.framePayloadLength, false, cancellationToken);
+        var buffer = await getBufferFrom(this.stream, header.framePayloadLength, false, cancellationToken);
         channel.onContent(buffer);
     }
 
