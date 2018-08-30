@@ -1,16 +1,16 @@
-import { MultiplexingStream } from './MultiplexingStream';
-import { Channel } from './Channel';
-import { MultiplexingStreamOptions } from './MultiplexingStreamOptions';
-import { ChannelOptions } from './ChannelOptions';
-import { IDisposableObservable } from './IDisposableObservable';
-import { FullDuplexStream, Tuple } from './FullDuplexStream';
+import { Channel } from "./Channel";
+import { ChannelOptions } from "./ChannelOptions";
+import { FullDuplexStream, ITuple } from "./FullDuplexStream";
+import { IDisposableObservable } from "./IDisposableObservable";
+import { MultiplexingStream } from "./MultiplexingStream";
+import { MultiplexingStreamOptions } from "./MultiplexingStreamOptions";
 
 export {
-    Tuple,
+    ITuple,
     FullDuplexStream,
     MultiplexingStream,
     MultiplexingStreamOptions,
     Channel,
     ChannelOptions,
     IDisposableObservable,
-}
+};

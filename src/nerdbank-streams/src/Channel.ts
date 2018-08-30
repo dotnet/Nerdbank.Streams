@@ -1,34 +1,50 @@
 import { Duplex } from "stream";
-import { Deferred } from "./Deferred";
-import { IDisposableObservable } from './IDisposableObservable';
-import { MultiplexingStreamClass } from "./MultiplexingStream";
 import { ChannelOptions } from "./ChannelOptions";
-import { FrameHeader } from "./FrameHeader";
 import { ControlCode } from "./ControlCode";
+import { Deferred } from "./Deferred";
+import { FrameHeader } from "./FrameHeader";
+import { IDisposableObservable } from "./IDisposableObservable";
+import { MultiplexingStreamClass } from "./MultiplexingStream";
 
-export interface Channel extends IDisposableObservable {
-    duplex: Duplex;
-    acceptance: Promise<void>;
-    completion: Promise<void>;
+export abstract class Channel implements IDisposableObservable {
+    public duplex: Duplex;
+    public acceptance: Promise<void>;
+    public completion: Promise<void>;
+    private _isDisposed: boolean = false;
+
+    get isDisposed(): boolean {
+        return this._isDisposed;
+    }
+
+    public dispose() {
+        this._isDisposed = true;
+    }
 }
 
-export class ChannelClass implements Channel {
-    readonly id: number;
-    private _isDisposed: boolean = false;
+// tslint:disable-next-line:max-classes-per-file
+export class ChannelClass extends Channel {
+    public readonly id: number;
     private _duplex: Duplex;
     private readonly _acceptance = new Deferred<void>();
     private readonly _completion = new Deferred<void>();
 
-    constructor(private multiplexingStream: MultiplexingStreamClass, id: number, public name: string, private offeredByThem: boolean, private options: ChannelOptions) {
-        var self = this;
+    constructor(
+        private multiplexingStream: MultiplexingStreamClass,
+        id: number,
+        public name: string,
+        private offeredByThem: boolean,
+        private options: ChannelOptions) {
+
+        super();
+        const self = this;
         this.id = id;
         this._duplex = new Duplex({
             async write(chunk, encoding, callback) {
-                var error = undefined;
+                let error;
                 try {
-                    var payload = Buffer.from(chunk);
+                    const payload = Buffer.from(chunk);
 
-                    var header = new FrameHeader();
+                    const header = new FrameHeader();
                     header.code = ControlCode.Content;
                     header.channelId = id;
                     header.framePayloadLength = payload.length;
@@ -43,7 +59,7 @@ export class ChannelClass implements Channel {
             },
 
             async final(cb?: (err?: any) => void) {
-                var error = undefined;
+                let error;
                 try {
                     await multiplexingStream.onChannelWritingCompleted(self);
                 } catch (err) {
@@ -57,12 +73,8 @@ export class ChannelClass implements Channel {
 
             read(size) {
                 // Nothing to do here since data is pushed to us.
-            }
+            },
         });
-    }
-
-    get isDisposed(): boolean {
-        return this._isDisposed;
     }
 
     get duplex(): Duplex {
@@ -78,7 +90,7 @@ export class ChannelClass implements Channel {
     }
 
     get isAccepted() {
-        return this._acceptance.isCompleted
+        return this._acceptance.isCompleted;
     }
 
     get isRejectedOrCanceled() {
@@ -89,7 +101,7 @@ export class ChannelClass implements Channel {
         return this._completion.promise;
     }
 
-    tryAcceptOffer(options?: ChannelOptions): boolean {
+    public tryAcceptOffer(options?: ChannelOptions): boolean {
         if (this._acceptance.resolve()) {
             return true;
         }
@@ -97,21 +109,22 @@ export class ChannelClass implements Channel {
         return false;
     }
 
-    onAccepted() {
+    public onAccepted() {
         return this._acceptance.resolve();
     }
 
-    onContent(buffer: Buffer) {
+    public onContent(buffer: Buffer) {
         this._duplex.push(buffer);
     }
 
-    dispose() {
+    public dispose() {
         if (!this.isDisposed) {
-            this._isDisposed = true;
+            super.dispose();
 
             this._acceptance.reject("canceled");
 
-            // For the pipes, we Complete *our* ends, and leave the user's ends alone. The completion will propagate when it's ready to.
+            // For the pipes, we Complete *our* ends, and leave the user's ends alone.
+            // The completion will propagate when it's ready to.
             this.duplex.end();
             this.duplex.push(null);
 

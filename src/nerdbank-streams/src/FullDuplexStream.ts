@@ -2,9 +2,9 @@ import { create } from "domain";
 import { Duplex } from "stream";
 
 export class FullDuplexStream {
-    public static CreateStreams(): Tuple<Duplex, Duplex> {
-        var duplex2: Duplex;
-        var duplex1 = new Duplex({
+    public static CreateStreams(): ITuple<Duplex, Duplex> {
+        let duplex2: Duplex;
+        const duplex1 = new Duplex({
             write(chunk, encoding, callback) {
                 duplex2.push(chunk, encoding);
                 callback();
@@ -12,7 +12,7 @@ export class FullDuplexStream {
 
             read(size) {
                 // Nothing to do here, since our buddy pushes directly to us.
-            }
+            },
         });
         duplex2 = new Duplex({
             write(chunk, encoding, callback) {
@@ -22,7 +22,7 @@ export class FullDuplexStream {
 
             read(size) {
                 // Nothing to do here, since our buddy pushes directly to us.
-            }
+            },
         });
 
         return {
@@ -32,7 +32,7 @@ export class FullDuplexStream {
     }
 }
 
-export interface Tuple<T1, T2> {
+export interface ITuple<T1, T2> {
     Item1: T1;
     Item2: T2;
 }

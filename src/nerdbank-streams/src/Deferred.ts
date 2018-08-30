@@ -2,7 +2,7 @@
  * A TaskCompletionSource-like class that allows promises to be resolved or rejected whenever.
  */
 export class Deferred<T> {
-    readonly promise: Promise<T>;
+    public readonly promise: Promise<T>;
     private resolvePromise: (value?: T | PromiseLike<T>) => void;
     private rejectPromise: (reason?: any) => void;
     private _isResolved: boolean = false;
@@ -31,8 +31,8 @@ export class Deferred<T> {
     }
 
     /**
-   * Gets a value indicating whether this promise is rejected.
-   */
+     * Gets a value indicating whether this promise is rejected.
+     */
     get isRejected() {
         return this._isRejected;
     }
@@ -48,7 +48,7 @@ export class Deferred<T> {
      * Resolves the promise.
      * @param value The result of the promise.
      */
-    resolve(value?: T | PromiseLike<T>): boolean {
+    public resolve(value?: T | PromiseLike<T>): boolean {
         if (this.isCompleted) {
             return false;
         }
@@ -62,7 +62,7 @@ export class Deferred<T> {
      * Rejects the promise.
      * @param reason The reason for rejecting the promise.
      */
-    reject(reason?: any): boolean {
+    public reject(reason?: any): boolean {
         if (this.isCompleted) {
             return false;
         }

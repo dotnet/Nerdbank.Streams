@@ -1,14 +1,14 @@
-import 'jasmine';
-import { Deferred } from '../Deferred';
+import "jasmine";
+import { Deferred } from "../Deferred";
 
-describe('Deferred', () => {
-    var deferred: Deferred<void>;
+describe("Deferred", () => {
+    let deferred: Deferred<void>;
 
     beforeEach(() => {
         deferred = new Deferred<void>();
     });
 
-    it('indicates completion', () => {
+    it("indicates completion", () => {
         expect(deferred.isCompleted).toBe(false);
         expect(deferred.isResolved).toBe(false);
         expect(deferred.isRejected).toBe(false);
@@ -18,12 +18,12 @@ describe('Deferred', () => {
         expect(deferred.isRejected).toBe(false);
     });
 
-    it('indicates error', async () => {
+    it("indicates error", async () => {
         expect(deferred.isCompleted).toBe(false);
         expect(deferred.error).toBeUndefined();
         expect(deferred.isRejected).toBe(false);
         expect(deferred.isResolved).toBe(false);
-        var e = new Error("hi");
+        const e = new Error("hi");
         deferred.reject(e);
         expect(deferred.isCompleted).toBe(true);
         expect(deferred.error).toBe(e);
@@ -33,7 +33,8 @@ describe('Deferred', () => {
         // We must observe the rejected promise or else Jasmine will fail at the command line anyway.
         try {
             await deferred.promise;
+        } catch {
+            // This block intentionally left blank.
         }
-        catch { }
     });
 });

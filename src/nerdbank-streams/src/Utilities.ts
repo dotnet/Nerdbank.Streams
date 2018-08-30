@@ -1,15 +1,20 @@
-import { CancellationToken } from 'vscode-jsonrpc';
-import { Deferred } from './Deferred';
-import { IDisposableObservable } from './IDisposableObservable';
+import { CancellationToken } from "vscode-jsonrpc";
+import { Deferred } from "./Deferred";
+import { IDisposableObservable } from "./IDisposableObservable";
 
-export async function getBufferFrom(readable: NodeJS.ReadableStream, size: number, allowEndOfStream?: boolean, cancellationToken?: CancellationToken): Promise<Buffer> {
-    var streamEnded = new Deferred<void>();
+export async function getBufferFrom(
+    readable: NodeJS.ReadableStream,
+    size: number,
+    allowEndOfStream?: boolean,
+    cancellationToken?: CancellationToken): Promise<Buffer> {
+
+    const streamEnded = new Deferred<void>();
     while (size > 0) {
-        var readBuffer = <Buffer>readable.read(size);
+        const readBuffer = readable.read(size) as Buffer;
         if (readBuffer === null) {
-            var bytesAvailable = new Deferred<void>();
-            readable.once('readable', bytesAvailable.resolve.bind(bytesAvailable));
-            readable.once('end', streamEnded.resolve.bind(streamEnded));
+            const bytesAvailable = new Deferred<void>();
+            readable.once("readable", bytesAvailable.resolve.bind(bytesAvailable));
+            readable.once("end", streamEnded.resolve.bind(streamEnded));
             await Promise.race([bytesAvailable.promise, streamEnded.promise]);
             if (!streamEnded.isCompleted) {
                 continue;
