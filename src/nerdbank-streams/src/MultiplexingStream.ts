@@ -279,6 +279,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
     public dispose() {
         this.disposalTokenSource.cancel();
         this._completionSource.resolve();
+        this.stream.end();
     }
 
     protected abstract sendFrameAsync(

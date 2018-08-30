@@ -31,7 +31,7 @@ namespace Nerdbank.Streams
         /// <remarks>
         /// If the protocol ever changes, change this random number. It serves both as a way to recognize the other end actually supports multiplexing and ensure compatibility.
         /// </remarks>
-        private static readonly byte[] ProtocolMagicNumber = BitConverter.GetBytes(803151184);
+        private static readonly byte[] ProtocolMagicNumber = new byte[] { 0x2f, 0xdf, 0x1d, 0x50 };
 
         /// <summary>
         /// The encoding used for characters in control frames.
