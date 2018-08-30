@@ -5,12 +5,9 @@ import * as nbgv from 'nerdbank-gitversioning';
 import * as ts from 'gulp-typescript';
 
 const outDir = 'dist';
-var tsProject = ts.createProject('tsconfig.json');
 
 gulp.task('tsc', function() {
-    return tsProject.src()
-        .pipe(tsProject())
-        .pipe(gulp.dest(tsProject.options.outDir));
+    return ap.execAsync(`node ./node_modules/typescript/bin/tsc -p tsconfig.json`, { cwd: __dirname });
 });
 
 gulp.task('copyPackageContents', ['tsc'], function() {
