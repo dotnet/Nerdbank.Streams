@@ -19,7 +19,7 @@ export class ChannelClass implements Channel {
     private readonly _acceptance = new Deferred<void>();
     private readonly _completion = new Deferred<void>();
 
-    constructor(private multiplexingStream: MultiplexingStreamClass, id: number, private name: string, private offeredByThem: boolean, private options: ChannelOptions) {
+    constructor(private multiplexingStream: MultiplexingStreamClass, id: number, public name: string, private offeredByThem: boolean, private options: ChannelOptions) {
         var self = this;
         this.id = id;
         this._duplex = new Duplex({

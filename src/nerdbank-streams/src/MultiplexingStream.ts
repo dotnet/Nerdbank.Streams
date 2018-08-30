@@ -37,7 +37,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
     /**
      * A dictionary of all channels, keyed by their ID.
      */
-    protected readonly openChannels = {};
+    protected readonly openChannels: { [id: number]: ChannelClass } = {};
 
     /**
      * The last number assigned to a channel.
@@ -50,12 +50,12 @@ export abstract class MultiplexingStream implements IDisposableObservable {
     /**
      * A map of channel names to queues of channels waiting for local acceptance.
      */
-    protected readonly channelsOfferedByThemByName = {};
+    protected readonly channelsOfferedByThemByName: { [name: string]: ChannelClass[] } = {};
 
     /**
      * A map of channel names to queues of Deferred<Channel> from waiting accepters.
      */
-    protected readonly acceptingChannels = {};
+    protected readonly acceptingChannels: { [name: string]: Deferred<ChannelClass>[] } = {};
 
     protected constructor(protected stream: NodeJS.ReadWriteStream) {
     }
@@ -213,7 +213,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
         throwIfDisposed(this);
 
         var channel: ChannelClass = null;
-        var pendingAcceptChannel: Deferred<Channel>;
+        var pendingAcceptChannel: Deferred<ChannelClass>;
         var channelsOfferedByThem = <ChannelClass[]>this.channelsOfferedByThemByName[name];
         if (channelsOfferedByThem) {
             while (channel === null && channelsOfferedByThem.length > 0) {
@@ -231,7 +231,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
                 this.acceptingChannels[name] = acceptingChannels = [];
             }
 
-            pendingAcceptChannel = new Deferred<Channel>(options);
+            pendingAcceptChannel = new Deferred<ChannelClass>(options);
             acceptingChannels.push(pendingAcceptChannel);
         }
 
