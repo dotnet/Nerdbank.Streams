@@ -10,8 +10,8 @@ describe("MultiplexingStream", () => {
     beforeEach(async () => {
         const underlyingPair = FullDuplexStream.CreateStreams();
         const mxs = await Promise.all([
-            MultiplexingStream.CreateAsync(underlyingPair.Item1),
-            MultiplexingStream.CreateAsync(underlyingPair.Item2),
+            MultiplexingStream.CreateAsync(underlyingPair.first),
+            MultiplexingStream.CreateAsync(underlyingPair.second),
         ]);
         mx1 = mxs.pop();
         mx2 = mxs.pop();
