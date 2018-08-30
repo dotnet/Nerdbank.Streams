@@ -1,3 +1,13 @@
+/* TODO:
+ * Anonymous channels (create, accept, reject)
+ * Events
+ * Cancellation
+ * Tracing
+ * Fault handling (and reporting via completion promise)
+ * Auto-terminate channels when both ends have finished writing (AutoCloseOnPipesClosureAsync)
+ * Add .NET interop tests
+ */
+
 import { Deferred } from './Deferred';
 import { CancellationToken, CancellationTokenSource } from 'vscode-jsonrpc'
 import './MultiplexingStreamOptions';
@@ -137,7 +147,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      * until the remote party accepts the channel.
      */
     public createChannel(options?: ChannelOptions): Channel {
-        return null;
+        throw new Error('Not yet implemented.');
     }
 
     /**
@@ -150,7 +160,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      * for a channel that has already been made.
      */
     public acceptChannel(id: number, options?: ChannelOptions): Channel {
-        return null;
+        throw new Error('Not yet implemented.');
     }
 
     /**
@@ -158,6 +168,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      * @param id The ID of the channel whose offer should be rejected.
      */
     public rejectChannel(id: number) {
+        throw new Error('Not yet implemented.');
     }
 
     /**

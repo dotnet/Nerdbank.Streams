@@ -1,10 +1,7 @@
+import 'jasmine';
 import { MultiplexingStream } from '../MultiplexingStream';
 import { timeout } from './Timeout';
-import 'jasmine';
-import { Duplex } from 'stream';
-import { log } from 'util';
 import { DuplexPair } from './DuplexPair';
-import { Deferred } from '../Deferred';
 import { getBufferFrom } from '../Utilities';
 
 describe('MultiplexingStream', () => {
