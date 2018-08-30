@@ -106,6 +106,17 @@ export class ChannelClass implements Channel {
     }
 
     dispose() {
-        this._isDisposed = true;
+        if (!this.isDisposed) {
+            this._isDisposed = true;
+
+            this._acceptance.reject("canceled");
+
+            // For the pipes, we Complete *our* ends, and leave the user's ends alone. The completion will propagate when it's ready to.
+            this.duplex.end();
+            this.duplex.push(null);
+
+            this._completion.resolve();
+            this.multiplexingStream.onChannelDisposed(this);
+        }
     }
 }

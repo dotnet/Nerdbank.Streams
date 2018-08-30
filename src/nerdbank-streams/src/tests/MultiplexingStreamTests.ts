@@ -95,6 +95,16 @@ describe('MultiplexingStream', () => {
         expect(await getBufferFrom(channels[1].duplex, 1, true)).toEqual(new Buffer(''));
     });
 
+    it('channel terminated', async () => {
+        var channels = await Promise.all([
+            mx1.offerChannelAsync('test'),
+            mx2.acceptChannelAsync('test'),
+        ]);
+        channels[0].dispose();
+        expect(await getBufferFrom(channels[1].duplex, 1, true)).toEqual(new Buffer(''));
+        await channels[1].completion;
+    });
+
     it('offered channels must have names', async () => {
         await expectThrow(mx1.offerChannelAsync(null));
     });

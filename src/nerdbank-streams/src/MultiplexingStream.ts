@@ -328,6 +328,12 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         }
     }
 
+    async onChannelDisposed(channel: ChannelClass) {
+        if (!this._completionSource.isCompleted) {
+            await this.sendFrame(ControlCode.ChannelTerminated, channel.id);
+        }
+    }
+
     private async readFromStream(cancellationToken: CancellationToken) {
         while (!this.isDisposed) {
             var headerBuffer = await getBufferFrom(this.stream, FrameHeader.HeaderLength, true, cancellationToken);
@@ -350,6 +356,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
                     this.onContentWritingCompleted(header.channelId);
                     break;
                 case ControlCode.ChannelTerminated:
+                    this.onChannelTerminated(header.channelId);
                     break;
                 default:
                     break;
@@ -421,5 +428,26 @@ export class MultiplexingStreamClass extends MultiplexingStream {
     private onContentWritingCompleted(channelId: number) {
         var channel = <ChannelClass>this.openChannels[channelId];
         channel.onContent(null); // signify that the remote is done writing.
+    }
+
+    /**
+     * Occurs when the remote party has terminated a channel (including canceling an offer).
+     * @param channelId The ID of the terminated channel.
+     */
+    private onChannelTerminated(channelId: number) {
+        var channel = this.openChannels[channelId];
+        if (channel) {
+            delete this.openChannels[channelId];
+            if (channel.name) {
+                var queue: Channel[] = this.channelsOfferedByThemByName[channel.name];
+                if (queue) {
+                    var idx = queue.indexOf(channel);
+                    if (idx >= 0) {
+                        queue.splice(idx, 1);
+                    }
+                }
+            }
+            channel.dispose();
+        }
     }
 }
