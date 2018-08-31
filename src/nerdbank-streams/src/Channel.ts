@@ -12,7 +12,7 @@ export abstract class Channel implements IDisposableObservable {
     public completion: Promise<void>;
     private _isDisposed: boolean = false;
 
-    get isDisposed(): boolean {
+    public get isDisposed(): boolean {
         return this._isDisposed;
     }
 
@@ -77,27 +77,27 @@ export class ChannelClass extends Channel {
         });
     }
 
-    get duplex(): Duplex {
+    public get duplex(): Duplex {
         return this._duplex;
     }
 
-    get acceptance(): Promise<void> {
+    public get acceptance(): Promise<void> {
         return this._acceptance.promise;
     }
 
-    get acceptanceIsCompleted() {
+    public get acceptanceIsCompleted() {
         return this._acceptance.isCompleted;
     }
 
-    get isAccepted() {
+    public get isAccepted() {
         return this._acceptance.isCompleted;
     }
 
-    get isRejectedOrCanceled() {
+    public get isRejectedOrCanceled() {
         return this._acceptance.isRejected;
     }
 
-    get completion(): Promise<void> {
+    public get completion(): Promise<void> {
         return this._completion.promise;
     }
 

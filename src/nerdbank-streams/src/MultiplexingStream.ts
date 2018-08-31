@@ -29,14 +29,14 @@ export abstract class MultiplexingStream implements IDisposableObservable {
     /**
      * Gets a promise that is resolved or rejected based on how this stream is disposed or fails.
      */
-    get completion(): Promise<void> {
+    public get completion(): Promise<void> {
         return this._completionSource.promise;
     }
 
     /**
      * Gets a value indicating whether this instance has been disposed.
      */
-    get isDisposed(): boolean {
+    public get isDisposed(): boolean {
         return this.disposalTokenSource.token.isCancellationRequested;
     }
 

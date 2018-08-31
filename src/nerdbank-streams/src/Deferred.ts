@@ -19,28 +19,28 @@ export class Deferred<T> {
     /**
      * Gets a value indicating whether this promise has been completed.
      */
-    get isCompleted() {
+    public get isCompleted() {
         return this._isResolved || this._isRejected;
     }
 
     /**
      * Gets a value indicating whether this promise is resolved.
      */
-    get isResolved() {
+    public get isResolved() {
         return this._isResolved;
     }
 
     /**
      * Gets a value indicating whether this promise is rejected.
      */
-    get isRejected() {
+    public get isRejected() {
         return this._isRejected;
     }
 
     /**
      * Gets the reason for promise rejection, if applicable.
      */
-    get error() {
+    public get error() {
         return this._error;
     }
 
