@@ -16,7 +16,7 @@ export async function getBufferFrom(
             readable.once("readable", bytesAvailable.resolve.bind(bytesAvailable));
             readable.once("end", streamEnded.resolve.bind(streamEnded));
             await Promise.race([bytesAvailable.promise, streamEnded.promise]);
-            if (!streamEnded.isCompleted) {
+            if (bytesAvailable.isCompleted) {
                 continue;
             }
         }

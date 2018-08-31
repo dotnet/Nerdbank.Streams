@@ -8,7 +8,7 @@ describe("MultiplexingStream", () => {
     let mx1: MultiplexingStream;
     let mx2: MultiplexingStream;
     beforeEach(async () => {
-        const underlyingPair = FullDuplexStream.CreateStreams();
+        const underlyingPair = FullDuplexStream.CreatePair();
         const mxs = await Promise.all([
             MultiplexingStream.CreateAsync(underlyingPair.first),
             MultiplexingStream.CreateAsync(underlyingPair.second),

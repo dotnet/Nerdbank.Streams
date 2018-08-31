@@ -43,6 +43,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
     /**
      * Initializes a new instance of the `MultiplexingStream` class.
      * @param stream The duplex stream to read and write to.
+     * Use `FullDuplexStream.Splice` if you have distinct input/output streams.
      * @param options Options to customize the behavior of the stream.
      * @param cancellationToken A token whose cancellation aborts the handshake with the remote end.
      * @returns The multiplexing stream, once the handshake is complete.

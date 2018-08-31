@@ -179,7 +179,7 @@ namespace Nerdbank.Streams
         /// <summary>
         /// Initializes a new instance of the <see cref="MultiplexingStream"/> class.
         /// </summary>
-        /// <param name="stream">The stream to multiplex multiple channels over.</param>
+        /// <param name="stream">The stream to multiplex multiple channels over. Use <see cref="FullDuplexStream.Splice(Stream, Stream)"/> if you have distinct input/output streams.</param>
         /// <param name="cancellationToken">A cancellation token.</param>
         /// <returns>The multiplexing stream, once the handshake is complete.</returns>
         /// <exception cref="EndOfStreamException">Thrown if the remote end disconnects before the handshake is complete.</exception>
@@ -188,7 +188,7 @@ namespace Nerdbank.Streams
         /// <summary>
         /// Initializes a new instance of the <see cref="MultiplexingStream"/> class.
         /// </summary>
-        /// <param name="stream">The stream to multiplex multiple channels over.</param>
+        /// <param name="stream">The stream to multiplex multiple channels over. Use <see cref="FullDuplexStream.Splice(Stream, Stream)"/> if you have distinct input/output streams.</param>
         /// <param name="options">Options to define behavior for the multiplexing stream.</param>
         /// <param name="cancellationToken">A cancellation token.</param>
         /// <returns>The multiplexing stream, once the handshake is complete.</returns>
