@@ -247,7 +247,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
         if (channelsOfferedByThem) {
             while (channel === null && channelsOfferedByThem.length > 0) {
                 channel = channelsOfferedByThem.shift();
-                if (channel.acceptanceIsCompleted) {
+                if (channel.isAccepted || channel.isRejectedOrCanceled) {
                     channel = null;
                     continue;
                 }

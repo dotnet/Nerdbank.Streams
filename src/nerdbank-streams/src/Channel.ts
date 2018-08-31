@@ -85,12 +85,8 @@ export class ChannelClass extends Channel {
         return this._acceptance.promise;
     }
 
-    public get acceptanceIsCompleted() {
-        return this._acceptance.isCompleted;
-    }
-
     public get isAccepted() {
-        return this._acceptance.isCompleted;
+        return this._acceptance.isResolved;
     }
 
     public get isRejectedOrCanceled() {
