@@ -17,3 +17,13 @@ export function timeout<T>(promise: Promise<T>, ms: number): Promise<T> {
     });
     return deferred.promise;
 }
+
+export function delay(ms: number): Promise<void> {
+    const deferred = new Deferred<void>();
+    const t = setTimeout(
+        () => {
+            deferred.resolve();
+        },
+        ms);
+    return deferred.promise;
+}
