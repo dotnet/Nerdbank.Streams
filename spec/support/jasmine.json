@@ -4,7 +4,6 @@
     "**/*.js"
   ],
   "helpers": [
-    "src/nerdbank-streams/out/helpers/**/*.js"
   ],
   "stopSpecOnExpectationFailure": false,
   "random": true
