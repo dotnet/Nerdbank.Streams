@@ -43,9 +43,7 @@ script: |
   DOTNET_ROLL_FORWARD_ON_NO_CANDIDATE_FX=0 RuntimeFrameworkVersion=2.0.7  dotnet test -f netcoreapp2.0 src/Nerdbank.Streams.Tests
   DOTNET_ROLL_FORWARD_ON_NO_CANDIDATE_FX=0 RuntimeFrameworkVersion=2.1.0  dotnet test -f netcoreapp2.1 src/Nerdbank.Streams.Tests
 
-  pushd src/nerdbank-streams
-  yarn install
-  node_modules/.bin/tsc -p gulpfile.tsconfig.json
-  node_modules/.bin/gulp
-  npm test
-  popd
+  yarn --cwd=src/nerdbank-streams install
+  node_modules/.bin/tsc -p src/nerdbank-streams/gulpfile.tsconfig.json
+  node_modules/.bin/gulp --gulpfile src/nerdbank-streams/gulpfile.js
+  yarn --cwd=src/nerdbank-streams test

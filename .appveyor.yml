@@ -49,7 +49,7 @@ test_script:
 
     dotnet test src\Nerdbank.Streams.Tests --no-build
 
-    pushd src\nerdbank-streams && npm test && popd
+    yarn --cwd=src\nerdbank-streams test
 artifacts:
 - path: bin\**\*.nupkg
   name: NuGet Package
