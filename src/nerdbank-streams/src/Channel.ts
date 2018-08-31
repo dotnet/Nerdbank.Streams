@@ -105,7 +105,7 @@ export class ChannelClass extends Channel {
         return false;
     }
 
-    public onAccepted() {
+    public onAccepted(): boolean {
         return this._acceptance.resolve();
     }
 
