@@ -7,9 +7,9 @@ Specialized .NET Stream classes
 [![Travis (.org)](https://api.travis-ci.org/AArnott/Nerdbank.Streams.svg?branch=master)](https://travis-ci.org/AArnott/Nerdbank.Streams)
 [![codecov](https://codecov.io/gh/AArnott/Nerdbank.Streams/branch/master/graph/badge.svg)](https://codecov.io/gh/AArnott/Nerdbank.Streams)
 
-## Features
+*Enhanced streams for communication in-proc or across the Internet.*
 
-The streams in this package focus on communication (not persistence).
+## Features
 
 1. [`HalfDuplexStream`](doc/HalfDuplexStream.md) is meant to allow two parties to communicate *one direction*.
    Anything written to the stream can subsequently be read from it. You can share this `Stream`
