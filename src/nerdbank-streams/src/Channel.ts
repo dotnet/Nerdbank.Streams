@@ -7,16 +7,35 @@ import { IDisposableObservable } from "./IDisposableObservable";
 import { MultiplexingStreamClass } from "./MultiplexingStream";
 
 export abstract class Channel implements IDisposableObservable {
-    public duplex: Duplex;
+    /**
+     * A read/write stream used to communicate over this channel.
+     */
+    public stream: NodeJS.ReadWriteStream;
+
+    /**
+     * A promise that completes when this channel has been accepted/rejected by the remote party.
+     */
     public acceptance: Promise<void>;
+
+    /**
+     * A promise that completes when this channel is closed.
+     */
     public completion: Promise<void>;
+
     private _isDisposed: boolean = false;
 
+    /**
+     * Gets a value indicating whether this channel has been disposed.
+     */
     public get isDisposed(): boolean {
         return this._isDisposed;
     }
 
+    /**
+     * Closes this channel.
+     */
     public dispose() {
+        // The interesting stuff is in the derived class.
         this._isDisposed = true;
     }
 }
@@ -77,7 +96,7 @@ export class ChannelClass extends Channel {
         });
     }
 
-    public get duplex(): Duplex {
+    public get stream(): NodeJS.ReadWriteStream {
         return this._duplex;
     }
 
@@ -121,8 +140,8 @@ export class ChannelClass extends Channel {
 
             // For the pipes, we Complete *our* ends, and leave the user's ends alone.
             // The completion will propagate when it's ready to.
-            this.duplex.end();
-            this.duplex.push(null);
+            this._duplex.end();
+            this._duplex.push(null);
 
             this._completion.resolve();
             this._multiplexingStream.onChannelDisposed(this);

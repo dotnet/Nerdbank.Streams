@@ -57,8 +57,8 @@ describe("MultiplexingStream", () => {
             mx1.offerChannelAsync("test"),
             mx2.acceptChannelAsync("test"),
         ]);
-        channels[0].duplex.write("abc");
-        expect(await getBufferFrom(channels[1].duplex, 3)).toEqual(new Buffer("abc"));
+        channels[0].stream.write("abc");
+        expect(await getBufferFrom(channels[1].stream, 3)).toEqual(new Buffer("abc"));
     });
 
     it("Can exchange data over two channels", async () => {
@@ -68,11 +68,11 @@ describe("MultiplexingStream", () => {
             mx2.acceptChannelAsync("test"),
             mx2.acceptChannelAsync("test2"),
         ]);
-        channels[0].duplex.write("abc");
-        channels[3].duplex.write("def");
-        channels[3].duplex.write("ghi");
-        expect(await getBufferFrom(channels[2].duplex, 3)).toEqual(new Buffer("abc"));
-        expect(await getBufferFrom(channels[1].duplex, 6)).toEqual(new Buffer("defghi"));
+        channels[0].stream.write("abc");
+        channels[3].stream.write("def");
+        channels[3].stream.write("ghi");
+        expect(await getBufferFrom(channels[2].stream, 3)).toEqual(new Buffer("abc"));
+        expect(await getBufferFrom(channels[1].stream, 6)).toEqual(new Buffer("defghi"));
     });
 
     it("end of channel", async () => {
@@ -80,9 +80,9 @@ describe("MultiplexingStream", () => {
             mx1.offerChannelAsync("test"),
             mx2.acceptChannelAsync("test"),
         ]);
-        channels[0].duplex.end("finished");
-        expect(await getBufferFrom(channels[1].duplex, 8)).toEqual(new Buffer("finished"));
-        expect(await getBufferFrom(channels[1].duplex, 1, true)).toEqual(new Buffer(""));
+        channels[0].stream.end("finished");
+        expect(await getBufferFrom(channels[1].stream, 8)).toEqual(new Buffer("finished"));
+        expect(await getBufferFrom(channels[1].stream, 1, true)).toEqual(new Buffer(""));
     });
 
     it("channel terminated", async () => {
@@ -91,7 +91,7 @@ describe("MultiplexingStream", () => {
             mx2.acceptChannelAsync("test"),
         ]);
         channels[0].dispose();
-        expect(await getBufferFrom(channels[1].duplex, 1, true)).toEqual(new Buffer(""));
+        expect(await getBufferFrom(channels[1].stream, 1, true)).toEqual(new Buffer(""));
         await channels[1].completion;
     });
 
