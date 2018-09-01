@@ -9,12 +9,15 @@ describe("MultiplexingStream (interop)", () => {
     let mx: MultiplexingStream;
     let proc: ChildProcess;
     let procExited: Deferred<any>;
+    const dotnetEnvBlock: NodeJS.ProcessEnv = {
+        DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1", // prevent warnings in stdout that corrupt our interop stream.
+    };
     beforeAll(
         async () => {
-            proc = spawn("dotnet", [
-                "build",
-                projectPath,
-            ]);
+            proc = spawn(
+                "dotnet",
+                [ "build", projectPath ],
+                dotnetEnvBlock);
             try {
                 procExited = new Deferred<any>();
                 proc.once("error", (err) => procExited.resolve(err));
@@ -29,12 +32,10 @@ describe("MultiplexingStream (interop)", () => {
         },
         20000); // leave time for package restore and build
     beforeEach(async () => {
-        proc = spawn("dotnet", [
-            "run",
-            "--no-build",
-            "--project",
-            projectPath,
-        ]);
+        proc = spawn(
+            "dotnet",
+            [ "run", "--no-build", "--project", projectPath ],
+            dotnetEnvBlock);
         try {
             procExited = new Deferred<any>();
             proc.once("error", (err) => procExited.resolve(err));
