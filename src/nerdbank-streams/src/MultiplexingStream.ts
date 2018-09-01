@@ -70,7 +70,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
             const expected = MultiplexingStream.protocolMagicNumber[i];
             const actual = recvBuffer.readUInt8(i);
             if (expected !== actual) {
-                throw new Error("Protocol magic number mismatch.");
+                throw new Error(`Protocol magic number mismatch. Expected ${expected} but was ${actual}.`);
             }
         }
 
