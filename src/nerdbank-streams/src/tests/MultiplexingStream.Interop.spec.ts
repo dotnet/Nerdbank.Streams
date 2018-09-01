@@ -4,7 +4,7 @@ import { Deferred } from "../Deferred";
 import { FullDuplexStream } from "../FullDuplexStream";
 import { MultiplexingStream } from "../MultiplexingStream";
 
-describe("MultiplexingStream", () => {
+describe("MultiplexingStream (interop)", () => {
     const projectPath = `${__dirname}/../../../Nerdbank.Streams.Interop.Tests`;
     let mx: MultiplexingStream;
     let proc: ChildProcess;
@@ -27,8 +27,8 @@ describe("MultiplexingStream", () => {
                 proc = null;
             }
         },
-    20000); // leave time for package restore and build
-    beforeEach(async (done) => {
+        20000); // leave time for package restore and build
+    beforeEach(async () => {
         proc = spawn("dotnet", [
             "run",
             "--no-build",
@@ -45,23 +45,17 @@ describe("MultiplexingStream", () => {
             proc.kill();
             proc = null;
             throw e;
-        } finally {
-            done();
         }
     }, 10000); // leave time for dotnet to start.
 
-    afterEach(async (done) => {
-        try {
-            if (mx) {
-                mx.dispose();
-            }
+    afterEach(async () => {
+        if (mx) {
+            mx.dispose();
+        }
 
-            if (proc) {
-                const exitCode = await procExited.promise;
-                // console.log(`.NET process exited with: ${exitCode}`);
-            }
-        } finally {
-            done();
+        if (proc) {
+            const exitCode = await procExited.promise;
+            // console.log(`.NET process exited with: ${exitCode}`);
         }
     }, 10000);
 
