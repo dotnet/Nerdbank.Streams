@@ -1,4 +1,5 @@
 import { ControlCode } from "./ControlCode";
+import { requireInteger } from "./Utilities";
 
 export class FrameHeader {
     public static readonly HeaderLength = 1 /*control code*/ + 4 /*channel id*/ + 2/*payload length*/;
@@ -8,28 +9,44 @@ export class FrameHeader {
             throw new Error("buffer must have length of " + FrameHeader.HeaderLength);
         }
 
-        const header = new FrameHeader();
-        header.code = buffer[0];
-        header.channelId = buffer.readUInt32BE(1);
-        header.framePayloadLength = buffer.readUInt16BE(5);
+        const code: ControlCode = buffer[0];
+        const channelId = buffer.readUInt32BE(1);
+        const framePayloadLength = buffer.readUInt16BE(5);
+        const header = new FrameHeader(code, channelId, framePayloadLength);
         return header;
     }
 
     /**
-     * Gets or sets the kind of frame this is.
+     * Gets the kind of frame this is.
      */
-    public code: ControlCode;
+    public readonly code: ControlCode;
 
     /**
-     * Gets or sets the channel that this frame refers to or carries a payload for.
+     * Gets the channel that this frame refers to or carries a payload for.
      */
-    public channelId: number;
+    public readonly channelId: number;
 
     /**
-     * Gets or sets the length of the frame content (excluding the header).
+     * Gets the length of the frame content (excluding the header).
      * Must be no greater than 65535 (uint16 max value).
      */
-    public framePayloadLength: number;
+    public readonly framePayloadLength: number;
+
+    /**
+     * Initializes a new instance of the `FrameHeader` class.
+     * @param code the kind of frame this is.
+     * @param channelId the channel that this frame refers to or carries a payload for.
+     * @param framePayloadLength the length of the frame content (excluding the header).
+     * Must be no greater than 65535 (uint16 max value).
+     */
+    constructor(code: ControlCode, channelId: number, framePayloadLength: number = 0) {
+        requireInteger("channelId", channelId, 4, "signed");
+        requireInteger("framePayloadLength", framePayloadLength, 2, "unsigned");
+
+        this.code = code;
+        this.channelId = channelId;
+        this.framePayloadLength = framePayloadLength || 0;
+    }
 
     public serialize(buffer: Buffer) {
         if (!buffer || buffer.length !== FrameHeader.HeaderLength) {

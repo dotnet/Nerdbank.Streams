@@ -125,6 +125,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
     /**
      * The last number assigned to a channel.
      * Each use of this should increment by two.
+     * It should never exceed uint32.MaxValue
      */
     protected lastOfferedChannelId: number;
 
@@ -210,10 +211,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
             options);
         this.openChannels[channel.id] = channel;
 
-        const header = new FrameHeader();
-        header.code = ControlCode.Offer;
-        header.framePayloadLength = payload.length;
-        header.channelId = channel.id;
+        const header = new FrameHeader(ControlCode.Offer, channel.id, payload.length);
 
         // TODO: add cancellation handling
         await this.sendFrameAsync(header, payload, cancellationToken);
@@ -345,10 +343,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
             return;
         }
 
-        const header = new FrameHeader();
-        header.code = code;
-        header.channelId = channelId;
-        header.framePayloadLength = 0;
+        const header = new FrameHeader(code, channelId);
         await this.sendFrameAsync(header);
     }
 

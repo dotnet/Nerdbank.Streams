@@ -36,3 +36,25 @@ export function throwIfDisposed(value: IDisposableObservable) {
         throw new Error("disposed");
     }
 }
+
+export function requireInteger(
+    parameterName: string,
+    value: number,
+    serializedByteLength: number,
+    signed: "unsigned" | "signed" = "signed"): void {
+
+    if (!Number.isInteger(value)) {
+        throw new Error(`${parameterName} must be an integer.`);
+    }
+
+    let bits = serializedByteLength * 8;
+    if (signed === "signed") {
+        bits--;
+    }
+
+    const maxValue = Math.pow(2, bits) - 1;
+    const minValue = signed === "signed" ? -Math.pow(2, bits) : 0;
+    if (value > maxValue || value < minValue) {
+        throw new Error(`${parameterName} must be in the range ${minValue}-${maxValue}.`);
+    }
+}

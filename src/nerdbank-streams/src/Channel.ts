@@ -47,10 +47,7 @@ export class ChannelClass extends Channel {
                 try {
                     const payload = Buffer.from(chunk);
 
-                    const header = new FrameHeader();
-                    header.code = ControlCode.Content;
-                    header.channelId = id;
-                    header.framePayloadLength = payload.length;
+                    const header = new FrameHeader(ControlCode.Content, id, payload.length);
                     await multiplexingStream.sendFrameAsync(header, payload);
                 } catch (err) {
                     error = err;
