@@ -4,21 +4,69 @@
 namespace Nerdbank.Streams.Interop.Tests
 {
     using System;
+    using System.IO;
+    using System.Text;
     using System.Threading.Tasks;
+    using Microsoft;
+    using Microsoft.VisualStudio.Threading;
     using Nerdbank.Streams;
 
     /// <summary>Entrypoint of the test app.</summary>
     internal class Program
     {
+        private readonly MultiplexingStream mx;
+
+        private Program(MultiplexingStream mx)
+        {
+            Requires.NotNull(mx, nameof(mx));
+            this.mx = mx;
+        }
+
         private static async Task Main(string[] args)
         {
             ////System.Diagnostics.Debugger.Launch();
             var mx = await MultiplexingStream.CreateAsync(FullDuplexStream.Splice(Console.OpenStandardInput(), Console.OpenStandardOutput()));
+            var program = new Program(mx);
+            await program.RunAsync();
+        }
 
-            var clientOffer = mx.AcceptChannelAsync("clientOffer");
-            var serverOffer = mx.OfferChannelAsync("serverOffer");
+        private static (StreamReader, StreamWriter) CreateStreamIO(MultiplexingStream.Channel channel)
+        {
+            var encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+            var reader = new StreamReader(channel.Input.AsStream(), encoding);
+            var writer = new StreamWriter(channel.Output.AsStream(), encoding)
+            {
+                AutoFlush = true,
+                NewLine = "\n",
+            };
+            return (reader, writer);
+        }
 
-            await mx.Completion;
+        private async Task RunAsync()
+        {
+            this.ClientOfferAsync().Forget();
+            this.ServerOfferAsync().Forget();
+
+            await this.mx.Completion;
+        }
+
+        private async Task ClientOfferAsync()
+        {
+            var channel = await this.mx.AcceptChannelAsync("clientOffer");
+            var (r, w) = CreateStreamIO(channel);
+            string line = await r.ReadLineAsync();
+            await w.WriteLineAsync($"recv: {line}");
+        }
+
+        private async Task ServerOfferAsync()
+        {
+            var channel = await this.mx.OfferChannelAsync("serverOffer");
+            var (r, w) = CreateStreamIO(channel);
+            await w.WriteLineAsync("theserver");
+            w.Close();
+            string line = await r.ReadLineAsync();
+            Assumes.True(line == "recv: theserver");
+            r.Close();
         }
     }
 }

@@ -11,4 +11,8 @@
     <ProjectReference Include="..\Nerdbank.Streams\Nerdbank.Streams.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.VisualStudio.Threading" Version="15.8.145" />
+  </ItemGroup>
+
 </Project>

@@ -5,7 +5,6 @@
  * Tracing
  * Fault handling (and reporting via completion promise)
  * Auto-terminate channels when both ends have finished writing (AutoCloseOnPipesClosureAsync)
- * Add .NET interop tests
  */
 
 import { randomBytes } from "crypto";
