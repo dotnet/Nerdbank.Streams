@@ -22,6 +22,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IsolatedTestHost", "Isolate
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nerdbank.Streams.Interop.Tests", "Nerdbank.Streams.Interop.Tests\Nerdbank.Streams.Interop.Tests.csproj", "{35EC5994-B682-4FD9-8242-D6D3DEE78FDE}"
 EndProject
+Project("{9092AA53-FB77-4645-B42D-1CCCA6BD08BD}") = "nerdbank-streams", "nerdbank-streams\nerdbank-streams.njsproj", "{9C64CF35-FD7C-4D57-B10A-5BD2F112B8D2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -44,6 +46,10 @@ Global
 		{35EC5994-B682-4FD9-8242-D6D3DEE78FDE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{35EC5994-B682-4FD9-8242-D6D3DEE78FDE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{35EC5994-B682-4FD9-8242-D6D3DEE78FDE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9C64CF35-FD7C-4D57-B10A-5BD2F112B8D2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9C64CF35-FD7C-4D57-B10A-5BD2F112B8D2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9C64CF35-FD7C-4D57-B10A-5BD2F112B8D2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9C64CF35-FD7C-4D57-B10A-5BD2F112B8D2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

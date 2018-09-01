@@ -1,0 +1,120 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{9c64cf35-fd7c-4d57-b10a-5bd2f112b8d2}</ProjectGuid>
+    <ProjectHome>.</ProjectHome>
+    <ProjectView>ProjectFiles</ProjectView>
+    <StartupFile>gulpfile.ts</StartupFile>
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <ProjectTypeGuids>{3AF33F2E-1136-4D97-BBB7-1795711AC8B8};{349c5851-65df-11da-9384-00065b846f21};{9092AA53-FB77-4645-B42D-1CCCA6BD08BD}</ProjectTypeGuids>
+    <TypeScriptSourceMap>true</TypeScriptSourceMap>
+    <TypeScriptModuleKind>CommonJS</TypeScriptModuleKind>
+    <EnableTypeScript>true</EnableTypeScript>
+    <TypeScriptToolsVersion>3.0</TypeScriptToolsVersion>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">14.0</VisualStudioVersion>
+    <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
+    <LastActiveSolutionConfig>Debug|Any CPU</LastActiveSolutionConfig>
+    <StartWebBrowser>True</StartWebBrowser>
+    <SaveNodeJsSettingsInProjectFile>True</SaveNodeJsSettingsInProjectFile>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+  <ItemGroup>
+    <Content Include="gulpfile.tsconfig.json" />
+    <Content Include="package.json" />
+    <Content Include="tsconfig.json" />
+    <Content Include="tslint.json" />
+    <Content Include="README.md" />
+    <TypeScriptCompile Include="asyncprocess.ts" />
+    <TypeScriptCompile Include="gulpfile.ts" />
+    <TypeScriptCompile Include="out\Channel.d.ts" />
+    <TypeScriptCompile Include="out\ChannelOptions.d.ts" />
+    <TypeScriptCompile Include="out\ControlCode.d.ts" />
+    <TypeScriptCompile Include="out\Deferred.d.ts" />
+    <TypeScriptCompile Include="out\FrameHeader.d.ts" />
+    <TypeScriptCompile Include="out\FullDuplexStream.d.ts" />
+    <TypeScriptCompile Include="out\IDisposableObservable.d.ts" />
+    <TypeScriptCompile Include="out\index.d.ts" />
+    <TypeScriptCompile Include="out\MultiplexingStream.d.ts" />
+    <TypeScriptCompile Include="out\MultiplexingStreamOptions.d.ts" />
+    <TypeScriptCompile Include="out\Utilities.d.ts" />
+    <TypeScriptCompile Include="src\Channel.ts" />
+    <TypeScriptCompile Include="src\ChannelOptions.ts" />
+    <TypeScriptCompile Include="src\ControlCode.ts" />
+    <TypeScriptCompile Include="src\Deferred.ts" />
+    <TypeScriptCompile Include="src\FrameHeader.ts" />
+    <TypeScriptCompile Include="src\FullDuplexStream.ts" />
+    <TypeScriptCompile Include="src\IDisposableObservable.ts" />
+    <TypeScriptCompile Include="src\index.ts" />
+    <TypeScriptCompile Include="src\MultiplexingStream.ts" />
+    <TypeScriptCompile Include="src\MultiplexingStreamOptions.ts" />
+    <TypeScriptCompile Include="src\Utilities.ts" />
+    <TypeScriptCompile Include="out\tests\Deferred.spec.d.ts" />
+    <TypeScriptCompile Include="out\tests\DeferredTests.d.ts" />
+    <TypeScriptCompile Include="out\tests\FullDuplexStream.spec.d.ts" />
+    <TypeScriptCompile Include="out\tests\FullDuplexStreamTests.d.ts" />
+    <TypeScriptCompile Include="out\tests\MultiplexingStream.Interop.spec.d.ts" />
+    <TypeScriptCompile Include="out\tests\MultiplexingStream.spec.d.ts" />
+    <TypeScriptCompile Include="out\tests\MultiplexingStreamTests.d.ts" />
+    <TypeScriptCompile Include="out\tests\Timeout.d.ts" />
+    <Content Include="spec\support\jasmine.json" />
+    <TypeScriptCompile Include="src\tests\Deferred.spec.ts" />
+    <TypeScriptCompile Include="src\tests\FullDuplexStream.spec.ts" />
+    <TypeScriptCompile Include="src\tests\MultiplexingStream.Interop.spec.ts" />
+    <TypeScriptCompile Include="src\tests\MultiplexingStream.spec.ts" />
+    <TypeScriptCompile Include="src\tests\Timeout.ts" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="out" />
+    <Folder Include="out\tests" />
+    <Folder Include="spec" />
+    <Folder Include="spec\support" />
+    <Folder Include="src" />
+    <Folder Include="src\tests" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <!--Do not delete the following Import Project.  While this appears to do nothing it is a marker for setting TypeScript properties before our import that depends on them.-->
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\TypeScript\Microsoft.TypeScript.targets" Condition="False" />
+  <Import Project="$(VSToolsPath)\Node.js Tools\Microsoft.NodejsTools.targets" />
+  <ProjectExtensions>
+    <VisualStudio>
+      <FlavorProperties GUID="{349c5851-65df-11da-9384-00065b846f21}">
+        <WebProjectProperties>
+          <UseIIS>False</UseIIS>
+          <AutoAssignPort>True</AutoAssignPort>
+          <DevelopmentServerPort>0</DevelopmentServerPort>
+          <DevelopmentServerVPath>/</DevelopmentServerVPath>
+          <IISUrl>http://localhost:48022/</IISUrl>
+          <NTLMAuthentication>False</NTLMAuthentication>
+          <UseCustomServer>True</UseCustomServer>
+          <CustomServerUrl>http://localhost:1337</CustomServerUrl>
+          <SaveServerSettingsInUserFile>False</SaveServerSettingsInUserFile>
+        </WebProjectProperties>
+      </FlavorProperties>
+      <FlavorProperties GUID="{349c5851-65df-11da-9384-00065b846f21}" User="">
+        <WebProjectProperties>
+          <StartPageUrl>
+          </StartPageUrl>
+          <StartAction>CurrentPage</StartAction>
+          <AspNetDebugging>True</AspNetDebugging>
+          <SilverlightDebugging>False</SilverlightDebugging>
+          <NativeDebugging>False</NativeDebugging>
+          <SQLDebugging>False</SQLDebugging>
+          <ExternalProgram>
+          </ExternalProgram>
+          <StartExternalURL>
+          </StartExternalURL>
+          <StartCmdLineArguments>
+          </StartCmdLineArguments>
+          <StartWorkingDirectory>
+          </StartWorkingDirectory>
+          <EnableENC>False</EnableENC>
+          <AlwaysStartWebServerOnDebug>False</AlwaysStartWebServerOnDebug>
+        </WebProjectProperties>
+      </FlavorProperties>
+    </VisualStudio>
+  </ProjectExtensions>
+</Project>
