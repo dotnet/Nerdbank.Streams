@@ -207,7 +207,6 @@ export abstract class MultiplexingStream implements IDisposableObservable {
             this as any as MultiplexingStreamClass,
             this.getUnusedChannelId(),
             name,
-            false, // offeredByThem
             options);
         this.openChannels[channel.id] = channel;
 
@@ -402,7 +401,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         const payload = await getBufferFrom(this.stream, payloadSize, null, cancellationToken);
         const name = payload.toString(MultiplexingStream.ControlFrameEncoding);
 
-        const channel = new ChannelClass(this, channelId, name, true, MultiplexingStream.defaultChannelOptions);
+        const channel = new ChannelClass(this, channelId, name, MultiplexingStream.defaultChannelOptions);
         let acceptingChannelAlreadyPresent = false;
         let options: ChannelOptions = null;
 

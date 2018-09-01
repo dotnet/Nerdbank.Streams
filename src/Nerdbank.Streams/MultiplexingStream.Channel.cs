@@ -43,7 +43,7 @@ namespace Nerdbank.Streams
             /// </summary>
             private readonly Pipe transmissionPipe;
 
-            internal Channel(MultiplexingStream multiplexingStream, int id, string name, bool offeredByRemote, ChannelOptions channelOptions)
+            internal Channel(MultiplexingStream multiplexingStream, int id, string name, ChannelOptions channelOptions)
             {
                 Requires.NotNull(multiplexingStream, nameof(multiplexingStream));
                 Requires.NotNull(channelOptions, nameof(channelOptions));
@@ -52,7 +52,6 @@ namespace Nerdbank.Streams
                 this.UnderlyingMultiplexingStream = multiplexingStream;
                 this.Id = id;
                 this.Name = name;
-                this.OfferedByThem = offeredByRemote;
                 this.TraceSource = channelOptions.TraceSource ?? new TraceSource($"{nameof(MultiplexingStream)}.{nameof(Channel)} {id} ({name})", SourceLevels.Critical);
 
                 this.receivingPipe = new Pipe();
@@ -106,16 +105,6 @@ namespace Nerdbank.Streams
             internal MultiplexingStream UnderlyingMultiplexingStream { get; }
 
             internal string Name { get; set; }
-
-            /// <summary>
-            /// Gets a value indicating whether this channel was originally offered by the remote party.
-            /// </summary>
-            internal bool OfferedByThem { get; }
-
-            /// <summary>
-            /// Gets a value indicating whether this channel was originally offered by us.
-            /// </summary>
-            internal bool OfferedByUs => !this.OfferedByThem;
 
             internal bool IsAccepted => this.Acceptance.Status == TaskStatus.RanToCompletion;
 

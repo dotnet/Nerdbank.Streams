@@ -24,20 +24,23 @@ export abstract class Channel implements IDisposableObservable {
 // tslint:disable-next-line:max-classes-per-file
 export class ChannelClass extends Channel {
     public readonly id: number;
+    public readonly name: string;
     private _duplex: Duplex;
+    private readonly _multiplexingStream: MultiplexingStreamClass;
     private readonly _acceptance = new Deferred<void>();
     private readonly _completion = new Deferred<void>();
 
     constructor(
-        private multiplexingStream: MultiplexingStreamClass,
+        multiplexingStream: MultiplexingStreamClass,
         id: number,
-        public name: string,
-        private offeredByThem: boolean,
-        private options: ChannelOptions) {
+        name: string,
+        options: ChannelOptions) {
 
         super();
         const self = this;
         this.id = id;
+        this.name = name;
+        this._multiplexingStream = multiplexingStream;
         this._duplex = new Duplex({
             async write(chunk, encoding, callback) {
                 let error;
@@ -125,7 +128,7 @@ export class ChannelClass extends Channel {
             this.duplex.push(null);
 
             this._completion.resolve();
-            this.multiplexingStream.onChannelDisposed(this);
+            this._multiplexingStream.onChannelDisposed(this);
         }
     }
 }

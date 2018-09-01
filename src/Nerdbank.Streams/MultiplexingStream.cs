@@ -1,4 +1,4 @@
-﻿// Copyright (c) Andrew Arnott. All rights reserved.
+// Copyright (c) Andrew Arnott. All rights reserved.
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 
 namespace Nerdbank.Streams
@@ -277,7 +277,7 @@ namespace Nerdbank.Streams
         /// </remarks>
         public Channel CreateChannel(ChannelOptions options = default)
         {
-            Channel channel = new Channel(this, this.GetUnusedChannelId(), string.Empty, offeredByRemote: false, options ?? DefaultChannelOptions);
+            Channel channel = new Channel(this, this.GetUnusedChannelId(), string.Empty, options ?? DefaultChannelOptions);
             lock (this.syncObject)
             {
                 this.openChannels.Add(channel.Id, channel);
@@ -375,7 +375,7 @@ namespace Nerdbank.Streams
 
             Memory<byte> payload = ControlFrameEncoding.GetBytes(name);
             Requires.Argument(payload.Length <= this.framePayloadMaxLength, nameof(name), "{0} encoding of value exceeds maximum frame payload length.", ControlFrameEncoding.EncodingName);
-            Channel channel = new Channel(this, this.GetUnusedChannelId(), name, offeredByRemote: false, options ?? DefaultChannelOptions);
+            Channel channel = new Channel(this, this.GetUnusedChannelId(), name, options ?? DefaultChannelOptions);
             lock (this.syncObject)
             {
                 this.openChannels.Add(channel.Id, channel);
@@ -714,7 +714,7 @@ namespace Nerdbank.Streams
             await ReadToFillAsync(this.stream, payloadBuffer, throwOnEmpty: true, cancellationToken).ConfigureAwait(false);
             string name = DecodeString(payloadBuffer);
 
-            var channel = new Channel(this, channelId, name, offeredByRemote: true, channelOptions: DefaultChannelOptions);
+            var channel = new Channel(this, channelId, name, channelOptions: DefaultChannelOptions);
             bool acceptingChannelAlreadyPresent = false;
             ChannelOptions options = null;
             lock (this.syncObject)
