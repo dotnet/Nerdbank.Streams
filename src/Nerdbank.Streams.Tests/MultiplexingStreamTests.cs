@@ -35,7 +35,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         mx1TraceSource.Listeners.Add(new XunitTraceListener(this.Logger, nameof(this.mx1)));
         mx2TraceSource.Listeners.Add(new XunitTraceListener(this.Logger, nameof(this.mx2)));
 
-        (this.transport1, this.transport2) = FullDuplexStream.CreateStreams();
+        (this.transport1, this.transport2) = FullDuplexStream.CreatePair();
         var mx1 = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { TraceSource = mx1TraceSource }, this.TimeoutToken);
         var mx2 = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { TraceSource = mx2TraceSource }, this.TimeoutToken);
         this.mx1 = await mx1;

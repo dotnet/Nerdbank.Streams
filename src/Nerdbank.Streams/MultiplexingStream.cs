@@ -1,4 +1,4 @@
-﻿// Copyright (c) Andrew Arnott. All rights reserved.
+// Copyright (c) Andrew Arnott. All rights reserved.
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 
 namespace Nerdbank.Streams
@@ -31,7 +31,7 @@ namespace Nerdbank.Streams
         /// <remarks>
         /// If the protocol ever changes, change this random number. It serves both as a way to recognize the other end actually supports multiplexing and ensure compatibility.
         /// </remarks>
-        private static readonly byte[] ProtocolMagicNumber = BitConverter.GetBytes(803151184);
+        private static readonly byte[] ProtocolMagicNumber = new byte[] { 0x2f, 0xdf, 0x1d, 0x50 };
 
         /// <summary>
         /// The encoding used for characters in control frames.
@@ -81,7 +81,7 @@ namespace Nerdbank.Streams
         private readonly Dictionary<string, Queue<TaskCompletionSource<Channel>>> acceptingChannels = new Dictionary<string, Queue<TaskCompletionSource<Channel>>>(StringComparer.Ordinal);
 
         /// <summary>
-        /// A dictionary of all channels, keyed by their number.
+        /// A dictionary of all channels, keyed by their ID.
         /// </summary>
         private readonly Dictionary<int, Channel> openChannels = new Dictionary<int, Channel>();
 
@@ -179,7 +179,7 @@ namespace Nerdbank.Streams
         /// <summary>
         /// Initializes a new instance of the <see cref="MultiplexingStream"/> class.
         /// </summary>
-        /// <param name="stream">The stream to multiplex multiple channels over.</param>
+        /// <param name="stream">The stream to multiplex multiple channels over. Use <see cref="FullDuplexStream.Splice(Stream, Stream)"/> if you have distinct input/output streams.</param>
         /// <param name="cancellationToken">A cancellation token.</param>
         /// <returns>The multiplexing stream, once the handshake is complete.</returns>
         /// <exception cref="EndOfStreamException">Thrown if the remote end disconnects before the handshake is complete.</exception>
@@ -188,7 +188,7 @@ namespace Nerdbank.Streams
         /// <summary>
         /// Initializes a new instance of the <see cref="MultiplexingStream"/> class.
         /// </summary>
-        /// <param name="stream">The stream to multiplex multiple channels over.</param>
+        /// <param name="stream">The stream to multiplex multiple channels over. Use <see cref="FullDuplexStream.Splice(Stream, Stream)"/> if you have distinct input/output streams.</param>
         /// <param name="options">Options to define behavior for the multiplexing stream.</param>
         /// <param name="cancellationToken">A cancellation token.</param>
         /// <returns>The multiplexing stream, once the handshake is complete.</returns>
@@ -277,7 +277,7 @@ namespace Nerdbank.Streams
         /// </remarks>
         public Channel CreateChannel(ChannelOptions options = default)
         {
-            Channel channel = new Channel(this, this.GetUnusedChannelId(), string.Empty, offeredByRemote: false, options ?? DefaultChannelOptions);
+            Channel channel = new Channel(this, this.GetUnusedChannelId(), string.Empty, options ?? DefaultChannelOptions);
             lock (this.syncObject)
             {
                 this.openChannels.Add(channel.Id, channel);
@@ -371,9 +371,11 @@ namespace Nerdbank.Streams
             Requires.NotNull(name, nameof(name));
 
             cancellationToken.ThrowIfCancellationRequested();
+            Verify.NotDisposed(this);
+
             Memory<byte> payload = ControlFrameEncoding.GetBytes(name);
             Requires.Argument(payload.Length <= this.framePayloadMaxLength, nameof(name), "{0} encoding of value exceeds maximum frame payload length.", ControlFrameEncoding.EncodingName);
-            Channel channel = new Channel(this, this.GetUnusedChannelId(), name, offeredByRemote: false, options ?? DefaultChannelOptions);
+            Channel channel = new Channel(this, this.GetUnusedChannelId(), name, options ?? DefaultChannelOptions);
             lock (this.syncObject)
             {
                 this.openChannels.Add(channel.Id, channel);
@@ -712,7 +714,7 @@ namespace Nerdbank.Streams
             await ReadToFillAsync(this.stream, payloadBuffer, throwOnEmpty: true, cancellationToken).ConfigureAwait(false);
             string name = DecodeString(payloadBuffer);
 
-            var channel = new Channel(this, channelId, name, offeredByRemote: true, channelOptions: DefaultChannelOptions);
+            var channel = new Channel(this, channelId, name, channelOptions: DefaultChannelOptions);
             bool acceptingChannelAlreadyPresent = false;
             ChannelOptions options = null;
             lock (this.syncObject)

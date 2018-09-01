@@ -1,0 +1,47 @@
+{
+  "name": "nerdbank-streams",
+  "version": "0.0.0-placeholder",
+  "description": "Multiplexing of streams",
+  "readme": "README.md",
+  "keywords": [
+    "streams",
+    "multiplexing",
+    "duplex"
+  ],
+  "main": "index.js",
+  "homepage": "https://github.com/AArnott/Nerdbank.Streams",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AArnott/Nerdbank.Streams.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AArnott/Nerdbank.Streams/issues"
+  },
+  "author": {
+    "name": "Andrew Arnott",
+    "email": "andrewarnott@gmail.com",
+    "url": "http://blog.nerdbank.net/"
+  },
+  "license": "MIT",
+  "private": false,
+  "scripts": {
+    "test": "jasmine"
+  },
+  "devDependencies": {
+    "@types/jasmine": "^2.8.8",
+    "@types/node": "^10.9.2",
+    "@types/promise": "^7.1.30",
+    "gulp": "^3.9.1",
+    "gulp-typescript": "^5.0.0-alpha.3",
+    "jasmine": "^3.2.0",
+    "jshint": "^2.9.6",
+    "nerdbank-gitversioning": "^2.2.7",
+    "path": "^0.12.7",
+    "promise": "^8.0.1",
+    "tslint": "^5.11.0",
+    "typescript": "^3.0.1"
+  },
+  "dependencies": {
+    "vscode-jsonrpc": "^3.6.2"
+  }
+}

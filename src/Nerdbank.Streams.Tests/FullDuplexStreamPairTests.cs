@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using Nerdbank.Streams;
 using Xunit;
 
-public class FullDuplexStreamTests : IDisposable
+public class FullDuplexStreamPairTests : IDisposable
 {
     private static readonly byte[] Data3Bytes = new byte[] { 0x1, 0x3, 0x2 };
 
@@ -30,9 +30,9 @@ public class FullDuplexStreamTests : IDisposable
 
     private readonly CancellationTokenSource testCancellationSource;
 
-    public FullDuplexStreamTests()
+    public FullDuplexStreamPairTests()
     {
-        var tuple = FullDuplexStream.CreateStreams();
+        var tuple = FullDuplexStream.CreatePair();
         Assert.NotNull(tuple);
         Assert.NotNull(tuple.Item1);
         Assert.NotNull(tuple.Item2);

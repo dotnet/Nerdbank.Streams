@@ -1,0 +1,11 @@
+{
+    "files.exclude": {
+        //"src/nerdbank-streams/*.js": { "when": "$(basename).ts"},
+        "src/nerdbank-streams/*.js.map": true,
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/CVS": true,
+        "**/.DS_Store": true
+    }
+}

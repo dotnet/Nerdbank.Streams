@@ -1,0 +1,10 @@
+{
+  "spec_dir": "src/nerdbank-streams/out/tests",
+  "spec_files": [
+    "**/*.spec.js"
+  ],
+  "helpers": [
+  ],
+  "stopSpecOnExpectationFailure": false,
+  "random": true
+}

@@ -6,7 +6,6 @@ namespace Nerdbank.Streams
     using System;
     using System.Collections.Generic;
     using System.IO;
-    using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft;
@@ -22,19 +21,130 @@ namespace Nerdbank.Streams
         /// to allow for interaction with each other.
         /// </summary>
         /// <returns>A pair of streams.</returns>
-        public static Tuple<Stream, Stream> CreateStreams()
+        public static Tuple<Stream, Stream> CreatePair()
         {
-            var stream1 = new MyStream();
-            var stream2 = new MyStream();
+            var stream1 = new PairedStream();
+            var stream2 = new PairedStream();
             stream1.SetOtherStream(stream2);
             stream2.SetOtherStream(stream1);
             return Tuple.Create<Stream, Stream>(stream1, stream2);
         }
 
         /// <summary>
+        /// Combines a readable <see cref="Stream"/> with a writable <see cref="Stream"/> into a new full-duplex <see cref="Stream"/>
+        /// that reads and writes to the specified streams.
+        /// </summary>
+        /// <param name="readableStream">A readable stream.</param>
+        /// <param name="writableStream">A writable stream.</param>
+        /// <returns>A new full-duplex stream.</returns>
+        public static Stream Splice(Stream readableStream, Stream writableStream) => new CombinedStream(readableStream, writableStream);
+
+        private class CombinedStream : Stream, IDisposableObservable
+        {
+            private readonly Stream readableStream;
+            private readonly Stream writableStream;
+
+            internal CombinedStream(Stream readableStream, Stream writableStream)
+            {
+                Requires.NotNull(readableStream, nameof(readableStream));
+                Requires.NotNull(writableStream, nameof(writableStream));
+
+                Requires.Argument(readableStream.CanRead, nameof(readableStream), "Must be readable");
+                Requires.Argument(writableStream.CanWrite, nameof(writableStream), "Must be writable");
+
+                this.readableStream = readableStream;
+                this.writableStream = writableStream;
+            }
+
+            public override bool CanRead => !this.IsDisposed;
+
+            public override bool CanSeek => false;
+
+            public override bool CanWrite => !this.IsDisposed;
+
+            public override bool CanTimeout => this.readableStream.CanTimeout || this.writableStream.CanTimeout;
+
+            public override int ReadTimeout
+            {
+                get => this.readableStream.ReadTimeout;
+                set => this.readableStream.ReadTimeout = value;
+            }
+
+            public override int WriteTimeout
+            {
+                get => this.writableStream.WriteTimeout;
+                set => this.writableStream.WriteTimeout = value;
+            }
+
+            public override long Length => throw this.ThrowDisposedOr(new NotSupportedException());
+
+            public override long Position
+            {
+                get => throw this.ThrowDisposedOr(new NotSupportedException());
+                set => throw this.ThrowDisposedOr(new NotSupportedException());
+            }
+
+            public bool IsDisposed { get; private set; }
+
+            public override long Seek(long offset, SeekOrigin origin) => throw this.ThrowDisposedOr(new NotSupportedException());
+
+            public override void SetLength(long value) => this.ThrowDisposedOr(new NotSupportedException());
+
+            public override void Flush() => this.writableStream.Flush();
+
+            public override Task FlushAsync(CancellationToken cancellationToken) => this.writableStream.FlushAsync(cancellationToken);
+
+            public override int Read(byte[] buffer, int offset, int count) => this.readableStream.Read(buffer, offset, count);
+
+            public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) => this.readableStream.ReadAsync(buffer, offset, count, cancellationToken);
+
+            public override int ReadByte() => this.readableStream.ReadByte();
+
+            public override Task CopyToAsync(Stream destination, int bufferSize, CancellationToken cancellationToken) => this.readableStream.CopyToAsync(destination, bufferSize, cancellationToken);
+
+            public override void Write(byte[] buffer, int offset, int count) => this.writableStream.Write(buffer, offset, count);
+
+            public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) => this.writableStream.WriteAsync(buffer, offset, count, cancellationToken);
+
+            public override void WriteByte(byte value) => this.writableStream.WriteByte(value);
+
+#if NETCOREAPP2_1
+
+            public override void Write(ReadOnlySpan<byte> buffer) => this.writableStream.Write(buffer);
+
+#pragma warning disable AvoidAsyncSuffix // Avoid Async suffix
+            public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) => this.writableStream.WriteAsync(buffer, cancellationToken);
+
+            public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) => this.readableStream.ReadAsync(buffer, cancellationToken);
+#pragma warning restore AvoidAsyncSuffix // Avoid Async suffix
+
+            public override int Read(Span<byte> buffer) => this.readableStream.Read(buffer);
+
+#endif
+
+            protected override void Dispose(bool disposing)
+            {
+                this.IsDisposed = true;
+                if (disposing)
+                {
+                    this.readableStream.Dispose();
+                    this.writableStream.Dispose();
+                }
+
+                base.Dispose(disposing);
+            }
+
+            private Exception ThrowDisposedOr(Exception ex)
+            {
+                Verify.NotDisposed(this);
+                throw ex;
+            }
+        }
+
+        /// <summary>
         /// The full duplex stream.
         /// </summary>
-        private class MyStream : Stream, IDisposableObservable
+        private class PairedStream : Stream, IDisposableObservable
         {
             /// <summary>
             /// The options to use when creating the value for <see cref="enqueuedSource"/>.
@@ -58,7 +168,7 @@ namespace Nerdbank.Streams
             /// <summary>
             /// The stream to write to.
             /// </summary>
-            private MyStream other;
+            private PairedStream other;
 
             /// <inheritdoc />
             public bool IsDisposed { get; private set; }
@@ -227,7 +337,7 @@ namespace Nerdbank.Streams
             /// Sets the stream to copy written data to.
             /// </summary>
             /// <param name="other">The other stream.</param>
-            internal void SetOtherStream(MyStream other)
+            internal void SetOtherStream(PairedStream other)
             {
                 Requires.NotNull(other, nameof(other));
                 Assumes.Null(this.other);
