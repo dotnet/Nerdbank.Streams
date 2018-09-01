@@ -51,6 +51,7 @@ describe("MultiplexingStream (interop)", () => {
     afterEach(async () => {
         if (mx) {
             mx.dispose();
+            await mx.completion;
         }
 
         if (proc) {

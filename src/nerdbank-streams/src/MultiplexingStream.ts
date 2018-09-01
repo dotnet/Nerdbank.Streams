@@ -320,7 +320,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 
         // Initiate reading from the transport stream. This will not end until the stream does, or we're disposed.
         // If reading the stream fails, we'll dispose ourselves.
-        this.readFromStream(this.disposalToken);
+        this.readFromStream(this.disposalToken).catch((err) => this._completionSource.reject(err));
     }
 
     public sendFrameAsync(header: FrameHeader, payload?: Buffer, cancellationToken?: CancellationToken) {

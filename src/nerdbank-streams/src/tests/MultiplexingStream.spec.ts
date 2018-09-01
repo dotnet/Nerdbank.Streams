@@ -17,13 +17,15 @@ describe("MultiplexingStream", () => {
         mx2 = mxs.pop();
     });
 
-    afterEach(() => {
+    afterEach(async () => {
         if (mx1) {
             mx1.dispose();
+            await mx1.completion;
         }
 
         if (mx2) {
             mx2.dispose();
+            await mx2.completion;
         }
     });
 
