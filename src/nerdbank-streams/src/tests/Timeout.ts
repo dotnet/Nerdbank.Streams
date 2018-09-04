@@ -27,3 +27,9 @@ export function delay(ms: number): Promise<void> {
         ms);
     return deferred.promise;
 }
+
+export function nextTick(): Promise<void> {
+    const deferred = new Deferred<void>();
+    process.nextTick(deferred.resolve.bind(deferred));
+    return deferred.promise;
+}

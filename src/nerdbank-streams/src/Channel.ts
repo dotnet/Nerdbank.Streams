@@ -133,8 +133,9 @@ export class ChannelClass extends Channel {
     }
 
     public tryCancelOffer() {
-        this._acceptance.reject(CancellationToken.Cancelled);
-        this._completion.reject(CancellationToken.Cancelled);
+        const reason = new CancellationToken.Cancelled("rejected");
+        this._acceptance.reject(reason);
+        this._completion.reject(reason);
     }
 
     public onAccepted(): boolean {
@@ -149,7 +150,7 @@ export class ChannelClass extends Channel {
         if (!this.isDisposed) {
             super.dispose();
 
-            this._acceptance.reject(CancellationToken.Cancelled);
+            this._acceptance.reject(new CancellationToken.Cancelled("disposed"));
 
             // For the pipes, we Complete *our* ends, and leave the user's ends alone.
             // The completion will propagate when it's ready to.
