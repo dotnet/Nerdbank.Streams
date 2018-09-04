@@ -3,6 +3,7 @@ import "jasmine";
 import { Deferred } from "../Deferred";
 import { FullDuplexStream } from "../FullDuplexStream";
 import { MultiplexingStream } from "../MultiplexingStream";
+import { getBufferFrom } from "../Utilities";
 
 describe("MultiplexingStream (interop)", () => {
     const projectPath = `${__dirname}/../../../Nerdbank.Streams.Interop.Tests`;
@@ -16,7 +17,7 @@ describe("MultiplexingStream (interop)", () => {
         async () => {
             proc = spawn(
                 "dotnet",
-                [ "build", projectPath ],
+                ["build", projectPath],
                 dotnetEnvBlock);
             try {
                 procExited = new Deferred<any>();
@@ -34,7 +35,7 @@ describe("MultiplexingStream (interop)", () => {
     beforeEach(async () => {
         proc = spawn(
             "dotnet",
-            [ "run", "--no-build", "--project", projectPath ],
+            ["run", "--no-build", "--project", projectPath],
             dotnetEnvBlock);
         try {
             procExited = new Deferred<any>();
@@ -63,9 +64,39 @@ describe("MultiplexingStream (interop)", () => {
 
     it("Can offer channel", async () => {
         const channel = await mx.offerChannelAsync("clientOffer");
+        await writeAsync(channel.stream, "theclient\n");
+        const recv = await readAsync(channel.stream);
+        expect(recv).toEqual("recv: theclient\n");
     });
 
     it("Can accept channel", async () => {
         const channel = await mx.acceptChannelAsync("serverOffer");
+        const recv = await readAsync(channel.stream);
+        await writeAsync(channel.stream, `recv: ${recv}`);
     });
+
+    function writeAsync(stream: NodeJS.WritableStream, text: string): Promise<void> {
+        const deferred = new Deferred<void>();
+        stream.write(text, "utf8", deferred.resolve.bind(deferred));
+        return deferred.promise;
+    }
+
+    async function readAsync(readable: NodeJS.ReadableStream): Promise<string> {
+        let readBuffer = readable.read() as Buffer;
+
+        if (readBuffer === null) {
+            const bytesAvailable = new Deferred<void>();
+            const streamEnded = new Deferred<void>();
+            readable.once("readable", bytesAvailable.resolve.bind(bytesAvailable));
+            readable.once("end", streamEnded.resolve.bind(streamEnded));
+            await Promise.race([bytesAvailable.promise, streamEnded.promise]);
+            if (bytesAvailable.isCompleted) {
+                readBuffer = readable.read() as Buffer;
+            } else {
+                return null;
+            }
+        }
+
+        return readBuffer.toString("utf8");
+    }
 });

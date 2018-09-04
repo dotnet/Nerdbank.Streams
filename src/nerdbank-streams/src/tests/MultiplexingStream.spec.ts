@@ -2,6 +2,7 @@ import "jasmine";
 import { FullDuplexStream } from "../FullDuplexStream";
 import { MultiplexingStream } from "../MultiplexingStream";
 import { getBufferFrom } from "../Utilities";
+import { startJsonRpc } from "./jsonRpcStreams";
 import { timeout } from "./Timeout";
 
 describe("MultiplexingStream", () => {
@@ -50,6 +51,49 @@ describe("MultiplexingStream", () => {
             mx1.offerChannelAsync("test"),
             mx2.acceptChannelAsync("test"),
         ]);
+    });
+
+    it("An offered anonymous channel is accepted", async () => {
+        const rpcChannels = await Promise.all([
+            mx1.offerChannelAsync("test"),
+            mx2.acceptChannelAsync("test"),
+        ]);
+
+        const offer = mx1.createChannel();
+
+        // Send a few bytes on the anonymous channel.
+        offer.stream.write(new Buffer([1, 2, 3]));
+
+        // await until we've confirmed the ID could have propagated
+        // to the remote party.
+        rpcChannels[0].stream.write(new Buffer(1));
+        await getBufferFrom(rpcChannels[1].stream, 1);
+
+        const accept = mx2.acceptChannel(offer.id);
+
+        // Receive the few bytes on the new channel.
+        const recvOnChannel = await getBufferFrom(accept.stream, 3);
+        expect(recvOnChannel).toEqual(new Buffer([1, 2, 3]));
+
+        // Confirm the original party recognizes acceptance.
+        await offer.acceptance;
+    });
+
+    it("Can use JSON-RPC over a channel", async () => {
+        const rpcChannels = await Promise.all([
+            mx1.offerChannelAsync("test"),
+            mx2.acceptChannelAsync("test"),
+        ]);
+
+        const rpc1 = startJsonRpc(rpcChannels[0]);
+        const rpc2 = startJsonRpc(rpcChannels[1]);
+
+        rpc2.onRequest("add", (a: number, b: number) => a + b);
+        rpc2.listen();
+
+        rpc1.listen();
+        const sum = await rpc1.sendRequest("add", 1, 2);
+        expect(sum).toEqual(3);
     });
 
     it("Can exchange data over channel", async () => {

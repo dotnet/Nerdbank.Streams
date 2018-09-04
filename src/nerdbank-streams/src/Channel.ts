@@ -1,3 +1,4 @@
+import CancellationToken from "cancellationtoken";
 import { Duplex } from "stream";
 import { ChannelOptions } from "./ChannelOptions";
 import { ControlCode } from "./ControlCode";
@@ -7,6 +8,11 @@ import { IDisposableObservable } from "./IDisposableObservable";
 import { MultiplexingStreamClass } from "./MultiplexingStream";
 
 export abstract class Channel implements IDisposableObservable {
+    /**
+     * The id of the channel.
+     */
+    public readonly id: number;
+
     /**
      * A read/write stream used to communicate over this channel.
      */
@@ -23,6 +29,10 @@ export abstract class Channel implements IDisposableObservable {
     public completion: Promise<void>;
 
     private _isDisposed: boolean = false;
+
+    constructor(id: number) {
+        this.id = id;
+    }
 
     /**
      * Gets a value indicating whether this channel has been disposed.
@@ -42,7 +52,6 @@ export abstract class Channel implements IDisposableObservable {
 
 // tslint:disable-next-line:max-classes-per-file
 export class ChannelClass extends Channel {
-    public readonly id: number;
     public readonly name: string;
     private _duplex: Duplex;
     private readonly _multiplexingStream: MultiplexingStreamClass;
@@ -55,9 +64,8 @@ export class ChannelClass extends Channel {
         name: string,
         options: ChannelOptions) {
 
-        super();
+        super(id);
         const self = this;
-        this.id = id;
         this.name = name;
         this._multiplexingStream = multiplexingStream;
         this._duplex = new Duplex({
@@ -124,6 +132,11 @@ export class ChannelClass extends Channel {
         return false;
     }
 
+    public tryCancelOffer() {
+        this._acceptance.reject(CancellationToken.Cancelled);
+        this._completion.reject(CancellationToken.Cancelled);
+    }
+
     public onAccepted(): boolean {
         return this._acceptance.resolve();
     }
@@ -136,7 +149,7 @@ export class ChannelClass extends Channel {
         if (!this.isDisposed) {
             super.dispose();
 
-            this._acceptance.reject("canceled");
+            this._acceptance.reject(CancellationToken.Cancelled);
 
             // For the pipes, we Complete *our* ends, and leave the user's ends alone.
             // The completion will propagate when it's ready to.

@@ -1,15 +1,11 @@
 /* TODO:
- * Anonymous channels (create, accept, reject)
  * Events
- * Cancellation
  * Tracing
- * Fault handling (and reporting via completion promise)
  * Auto-terminate channels when both ends have finished writing (AutoCloseOnPipesClosureAsync)
- * Add .NET interop tests
  */
 
+import CancellationToken from "cancellationtoken";
 import { randomBytes } from "crypto";
-import { CancellationToken, CancellationTokenSource } from "vscode-jsonrpc";
 import { Channel, ChannelClass } from "./Channel";
 import { ChannelOptions } from "./ChannelOptions";
 import { ControlCode } from "./ControlCode";
@@ -18,7 +14,7 @@ import { FrameHeader } from "./FrameHeader";
 import { IDisposableObservable } from "./IDisposableObservable";
 import "./MultiplexingStreamOptions";
 import { MultiplexingStreamOptions } from "./MultiplexingStreamOptions";
-import { getBufferFrom, throwIfDisposed } from "./Utilities";
+import { getBufferFrom, removeFromQueue, throwIfDisposed } from "./Utilities";
 
 export abstract class MultiplexingStream implements IDisposableObservable {
 
@@ -37,7 +33,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      * Gets a value indicating whether this instance has been disposed.
      */
     public get isDisposed(): boolean {
-        return this.disposalTokenSource.token.isCancellationRequested;
+        return this.disposalTokenSource.token.isCancelled;
     }
 
     /**
@@ -51,7 +47,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
     public static async CreateAsync(
         stream: NodeJS.ReadWriteStream,
         options?: MultiplexingStreamOptions,
-        cancellationToken?: CancellationToken): Promise<MultiplexingStream> {
+        cancellationToken: CancellationToken = CancellationToken.CONTINUE): Promise<MultiplexingStream> {
 
         if (!stream) {
             throw new Error("stream must be specified.");
@@ -64,7 +60,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
         const sendBuffer = Buffer.concat([MultiplexingStream.protocolMagicNumber, randomSendBuffer]);
         stream.write(sendBuffer);
 
-        const recvBuffer = await getBufferFrom(stream, sendBuffer.length);
+        const recvBuffer = await getBufferFrom(stream, sendBuffer.length, false, cancellationToken);
 
         for (let i = 0; i < MultiplexingStream.protocolMagicNumber.length; i++) {
             const expected = MultiplexingStream.protocolMagicNumber[i];
@@ -139,7 +135,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      */
     protected readonly acceptingChannels: { [name: string]: Array<Deferred<ChannelClass>> } = {};
 
-    private disposalTokenSource = new CancellationTokenSource();
+    private disposalTokenSource = CancellationToken.create();
 
     protected constructor(protected stream: NodeJS.ReadWriteStream) {
     }
@@ -153,7 +149,15 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      * buffered locally until the remote party accepts the channel.
      */
     public createChannel(options?: ChannelOptions): Channel {
-        throw new Error("Not yet implemented.");
+        const channel = new ChannelClass(
+            this as any as MultiplexingStreamClass,
+            this.getUnusedChannelId(),
+            "",
+            options);
+        this.openChannels[channel.id] = channel;
+
+        this.rejectOnFailure(this.sendFrame(ControlCode.Offer, channel.id));
+        return channel;
     }
 
     /**
@@ -166,7 +170,15 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      * for a channel that has already been made.
      */
     public acceptChannel(id: number, options?: ChannelOptions): Channel {
-        throw new Error("Not yet implemented.");
+        const channel = this.openChannels[id];
+        if (!channel) {
+            throw new Error("No channel with ID " + id);
+        }
+
+        this.removeChannelFromOfferedQueue(channel);
+
+        this.acceptChannelOrThrow(channel, options);
+        return channel;
     }
 
     /**
@@ -184,19 +196,21 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      * It need not be unique, and may be empty but must not be null.
      * Any characters are allowed, and max length is determined by the maximum frame payload (based on UTF-8 encoding).
      * @param options A set of options that describe local treatment of this channel.
-     * @param cancellationToken A cancellation token.
+     * @param cancellationToken A cancellation token. Do NOT let this be a long-lived token
+     * or a memory leak will result since we add continuations to its promise.
      * @returns A task that completes with the `Channel` if the offer is accepted on the remote end
      * or faults with `MultiplexingProtocolException` if the remote end rejects the channel.
      */
     public async offerChannelAsync(
         name: string,
         options?: ChannelOptions,
-        cancellationToken?: CancellationToken): Promise<Channel> {
+        cancellationToken: CancellationToken = CancellationToken.CONTINUE): Promise<Channel> {
 
         if (!name) {
             throw new Error("Name must be specified.");
         }
 
+        cancellationToken.throwIfCancelled();
         throwIfDisposed(this);
 
         const payload = new Buffer(name, MultiplexingStream.ControlFrameEncoding);
@@ -213,7 +227,11 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 
         const header = new FrameHeader(ControlCode.Offer, channel.id, payload.length);
 
-        // TODO: add cancellation handling
+        // .NET lets us delete these these CancellationToken "registrations"
+        // to avoid a memory leak when the provided token is long-lived and
+        // never canceled. But JavaScript promises do not offer this.
+        // https://github.com/conradreuter/cancellationtoken/issues/1
+        cancellationToken.whenCancelled.then(() => this.offerChannelCanceled(channel));
         await this.sendFrameAsync(header, payload, cancellationToken);
         await channel.acceptance;
 
@@ -225,17 +243,20 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      * @param name The name of the channel to accept.
      * @param options A set of options that describe local treatment of this channel.
      * @param cancellationToken A token to indicate lost interest in accepting the channel.
+     * Do NOT let this be a long-lived token
+     * or a memory leak will result since we add continuations to its promise.
      * @returns The `Channel`, after its offer has been received from the remote party and accepted.
      * @description If multiple offers exist with the specified `name`, the first one received will be accepted.
      */
     public async acceptChannelAsync(
         name: string,
         options?: ChannelOptions,
-        cancellationToken?: CancellationToken): Promise<Channel> {
+        cancellationToken: CancellationToken = CancellationToken.CONTINUE): Promise<Channel> {
         if (!name) {
             throw new Error("Name must be specified.");
         }
 
+        cancellationToken.throwIfCancelled();
         throwIfDisposed(this);
 
         let channel: ChannelClass = null;
@@ -265,7 +286,11 @@ export abstract class MultiplexingStream implements IDisposableObservable {
             this.acceptChannelOrThrow(channel, options);
             return channel;
         } else {
-            // TODO: add cancellation handling
+            // .NET lets us delete these these CancellationToken "registrations"
+            // to avoid a memory leak when the provided token is long-lived and
+            // never canceled. But JavaScript promises do not offer this.
+            // https://github.com/conradreuter/cancellationtoken/issues/1
+            cancellationToken.whenCancelled.then(() => this.acceptChannelCanceled(pendingAcceptChannel, name));
             return await pendingAcceptChannel.promise;
         }
     }
@@ -281,8 +306,8 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 
     protected abstract sendFrameAsync(
         header: FrameHeader,
-        payload?: Buffer,
-        cancellationToken?: CancellationToken): Promise<void>;
+        payload: Buffer,
+        cancellationToken: CancellationToken): Promise<void>;
 
     protected abstract sendFrame(code: ControlCode, channelId: number): Promise<void>;
 
@@ -296,6 +321,43 @@ export abstract class MultiplexingStream implements IDisposableObservable {
         } else {
             throw new Error("Channel could not be accepted.");
         }
+    }
+
+    /**
+     * Disposes this instance if the specified promise is rejected.
+     * @param promise The promise to check for failures.
+     */
+    protected async rejectOnFailure<T>(promise: Promise<T>) {
+        try {
+            await promise;
+        } catch (err) {
+            this._completionSource.reject(err);
+        }
+    }
+
+    protected removeChannelFromOfferedQueue(channel: ChannelClass) {
+        if (channel.name) {
+            removeFromQueue(channel, this.channelsOfferedByThemByName[channel.name]);
+        }
+    }
+
+    /**
+     * Cancels a prior call to acceptChannelAsync
+     * @param channel The promise of a channel to be canceled.
+     * @param name The name of the channel the caller was accepting.
+     */
+    private acceptChannelCanceled(channel: Deferred<ChannelClass>, name: string) {
+        if (channel.reject(CancellationToken.Cancelled)) {
+            removeFromQueue(channel, this.acceptingChannels[name]);
+        }
+    }
+
+    /**
+     * Responds to cancellation of a prior call to offerChannelAsync.
+     * @param channel The channel previously offered.
+     */
+    private offerChannelCanceled(channel: ChannelClass) {
+        channel.tryCancelOffer();
     }
 
     /**
@@ -320,11 +382,16 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         this.readFromStream(this.disposalToken).catch((err) => this._completionSource.reject(err));
     }
 
-    public sendFrameAsync(header: FrameHeader, payload?: Buffer, cancellationToken?: CancellationToken) {
+    public sendFrameAsync(
+        header: FrameHeader,
+        payload?: Buffer,
+        cancellationToken: CancellationToken = CancellationToken.CONTINUE) {
+
         if (!header) {
             throw new Error("Header is required.");
         }
 
+        cancellationToken.throwIfCancelled();
         throwIfDisposed(this);
 
         const headerBuffer = new Buffer(FrameHeader.HeaderLength);
@@ -394,7 +461,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 
     private async onOffer(channelId: number, payloadSize: number, cancellationToken: CancellationToken) {
         const payload = await getBufferFrom(this.stream, payloadSize, null, cancellationToken);
-        const name = payload.toString(MultiplexingStream.ControlFrameEncoding);
+        const name = payload != null ? payload.toString(MultiplexingStream.ControlFrameEncoding) : "";
 
         const channel = new ChannelClass(this, channelId, name, MultiplexingStream.defaultChannelOptions);
         let acceptingChannelAlreadyPresent = false;
@@ -464,15 +531,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         const channel = this.openChannels[channelId];
         if (channel) {
             delete this.openChannels[channelId];
-            if (channel.name) {
-                const queue: Channel[] = this.channelsOfferedByThemByName[channel.name];
-                if (queue) {
-                    const idx = queue.indexOf(channel);
-                    if (idx >= 0) {
-                        queue.splice(idx, 1);
-                    }
-                }
-            }
+            this.removeChannelFromOfferedQueue(channel);
             channel.dispose();
         }
     }

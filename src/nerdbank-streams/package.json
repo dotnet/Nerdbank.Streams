@@ -39,9 +39,10 @@
     "path": "^0.12.7",
     "promise": "^8.0.1",
     "tslint": "^5.11.0",
-    "typescript": "^3.0.1"
+    "typescript": "^3.0.1",
+    "vscode-jsonrpc": "^3.6.2"
   },
   "dependencies": {
-    "vscode-jsonrpc": "^3.6.2"
+    "cancellationtoken": "^1.0.3"
   }
 }
