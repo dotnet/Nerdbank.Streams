@@ -1,4 +1,6 @@
+import CancellationToken from "cancellationtoken";
 import "jasmine";
+import { Deferred } from "../Deferred";
 import { FullDuplexStream } from "../FullDuplexStream";
 import { MultiplexingStream } from "../MultiplexingStream";
 import { getBufferFrom } from "../Utilities";
@@ -79,6 +81,81 @@ describe("MultiplexingStream", () => {
         await offer.acceptance;
     });
 
+    it("An offered anonymous channel is rejected", async () => {
+        const rpcChannels = await Promise.all([
+            mx1.offerChannelAsync("test"),
+            mx2.acceptChannelAsync("test"),
+        ]);
+
+        const offer = mx1.createChannel();
+
+        // Send a few bytes on the anonymous channel.
+        offer.stream.write(new Buffer([1, 2, 3]));
+
+        // await until we've confirmed the ID could have propagated
+        // to the remote party.
+        rpcChannels[0].stream.write(new Buffer(1));
+        await getBufferFrom(rpcChannels[1].stream, 1);
+
+        mx2.rejectChannel(offer.id);
+
+        // Confirm the original party recognizes rejection.
+        await expectThrow(offer.acceptance);
+    });
+
+    it("Channel offer is canceled by event handler", async () => {
+        const handler = new Deferred<void>();
+        mx2.on("channelOffered", (args) => {
+            try {
+                expect(args.name).toEqual("myname");
+                expect(args.isAccepted).toEqual(false);
+                mx2.rejectChannel(args.id);
+                handler.resolve();
+            } catch (error) {
+                handler.reject(error);
+            }
+        });
+
+        await expectThrow(mx1.offerChannelAsync("myname"));
+        await handler.promise; // rethrow any failures in the handler.
+    });
+
+    it("Channel offer is accepted by event handler", async () => {
+        const handler = new Deferred<void>();
+        mx2.on("channelOffered", (args) => {
+            try {
+                expect(args.name).toEqual("myname");
+                expect(args.isAccepted).toEqual(false);
+                const channel = mx2.acceptChannel(args.id);
+                handler.resolve();
+            } catch (error) {
+                handler.reject(error);
+            }
+        });
+
+        const offer = mx1.offerChannelAsync("myname");
+        const offeredChannel = await offer;
+        await handler.promise; // rethrow any failures in the handler.
+    });
+
+    it("Channel offer is observed by event handler as accepted", async () => {
+        const handler = new Deferred<void>();
+        mx2.on("channelOffered", (args) => {
+            try {
+                expect(args.name).toEqual("myname");
+                expect(args.isAccepted).toEqual(true);
+                handler.resolve();
+            } catch (error) {
+                handler.reject(error);
+            }
+        });
+
+        const accept = mx2.acceptChannelAsync("myname");
+        const offeredChannel = await mx1.offerChannelAsync("myname");
+        await accept;
+        await handler.promise; // rethrow any failures in the handler.
+    });
+
     it("Can use JSON-RPC over a channel", async () => {
         const rpcChannels = await Promise.all([
             mx1.offerChannelAsync("test"),
@@ -143,16 +220,23 @@ describe("MultiplexingStream", () => {
         await expectThrow(mx1.offerChannelAsync(null));
     });
 
+    it("offered channel name may be blank", async () => {
+        await Promise.all([
+            mx1.offerChannelAsync(""),
+            mx2.acceptChannelAsync(""),
+        ]);
+    });
+
     it("accepted channels must have names", async () => {
         await expectThrow(mx1.acceptChannelAsync(null));
     });
 });
 
-async function expectThrow<T>(promise: Promise<T>): Promise<T> {
+async function expectThrow<T>(promise: Promise<T>): Promise<any> {
     try {
         await promise;
         fail("Expected error not thrown.");
-    } catch {
-        return null;
+    } catch (error) {
+        return error;
     }
 }
