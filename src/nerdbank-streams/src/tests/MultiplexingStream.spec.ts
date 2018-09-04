@@ -143,6 +143,13 @@ describe("MultiplexingStream", () => {
         await expectThrow(mx1.offerChannelAsync(null));
     });
 
+    it("offered channel name may be blank", async () => {
+        await Promise.all([
+            mx1.offerChannelAsync(""),
+            mx2.acceptChannelAsync(""),
+        ]);
+    });
+
     it("accepted channels must have names", async () => {
         await expectThrow(mx1.acceptChannelAsync(null));
     });

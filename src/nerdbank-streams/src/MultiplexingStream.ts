@@ -206,8 +206,8 @@ export abstract class MultiplexingStream implements IDisposableObservable {
         options?: ChannelOptions,
         cancellationToken: CancellationToken = CancellationToken.CONTINUE): Promise<Channel> {
 
-        if (!name) {
-            throw new Error("Name must be specified.");
+        if (name == null) {
+            throw new Error("Name must be specified (but may be empty).");
         }
 
         cancellationToken.throwIfCancelled();
@@ -252,8 +252,8 @@ export abstract class MultiplexingStream implements IDisposableObservable {
         name: string,
         options?: ChannelOptions,
         cancellationToken: CancellationToken = CancellationToken.CONTINUE): Promise<Channel> {
-        if (!name) {
-            throw new Error("Name must be specified.");
+        if (name == null) {
+            throw new Error("Name must be specified (but may be empty).");
         }
 
         cancellationToken.throwIfCancelled();
