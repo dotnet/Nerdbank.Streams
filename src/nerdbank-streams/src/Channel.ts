@@ -1,3 +1,4 @@
+import CancellationToken from "cancellationtoken";
 import { Duplex } from "stream";
 import { ChannelOptions } from "./ChannelOptions";
 import { ControlCode } from "./ControlCode";
@@ -131,6 +132,11 @@ export class ChannelClass extends Channel {
         return false;
     }
 
+    public tryCancelOffer() {
+        this._acceptance.reject(CancellationToken.Cancelled);
+        this._completion.reject(CancellationToken.Cancelled);
+    }
+
     public onAccepted(): boolean {
         return this._acceptance.resolve();
     }
@@ -143,7 +149,7 @@ export class ChannelClass extends Channel {
         if (!this.isDisposed) {
             super.dispose();
 
-            this._acceptance.reject("canceled");
+            this._acceptance.reject(CancellationToken.Cancelled);
 
             // For the pipes, we Complete *our* ends, and leave the user's ends alone.
             // The completion will propagate when it's ready to.

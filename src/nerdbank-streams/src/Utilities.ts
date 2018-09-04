@@ -1,11 +1,11 @@
-import { CancellationToken } from "vscode-jsonrpc";
+import CancellationToken from "cancellationtoken";
 import { Deferred } from "./Deferred";
 import { IDisposableObservable } from "./IDisposableObservable";
 
 export async function getBufferFrom(
     readable: NodeJS.ReadableStream,
     size: number,
-    allowEndOfStream?: boolean,
+    allowEndOfStream: boolean = false,
     cancellationToken?: CancellationToken): Promise<Buffer> {
 
     const streamEnded = new Deferred<void>();
@@ -56,5 +56,14 @@ export function requireInteger(
     const minValue = signed === "signed" ? -Math.pow(2, bits) : 0;
     if (value > maxValue || value < minValue) {
         throw new Error(`${parameterName} must be in the range ${minValue}-${maxValue}.`);
+    }
+}
+
+export function removeFromQueue<T>(value: T, queue: T[]) {
+    if (queue) {
+        const idx = queue.indexOf(value);
+        if (idx >= 0) {
+            queue.splice(idx, 1);
+        }
     }
 }
