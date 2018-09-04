@@ -1,9 +1,7 @@
 /* TODO:
- * Anonymous channels (create, accept, reject)
  * Events
  * Cancellation
  * Tracing
- * Fault handling (and reporting via completion promise)
  * Auto-terminate channels when both ends have finished writing (AutoCloseOnPipesClosureAsync)
  */
 
@@ -152,7 +150,15 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      * buffered locally until the remote party accepts the channel.
      */
     public createChannel(options?: ChannelOptions): Channel {
-        throw new Error("Not yet implemented.");
+        const channel = new ChannelClass(
+            this as any as MultiplexingStreamClass,
+            this.getUnusedChannelId(),
+            "",
+            options);
+        this.openChannels[channel.id] = channel;
+
+        this.rejectOnFailure(this.sendFrame(ControlCode.Offer, channel.id));
+        return channel;
     }
 
     /**
@@ -165,7 +171,15 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      * for a channel that has already been made.
      */
     public acceptChannel(id: number, options?: ChannelOptions): Channel {
-        throw new Error("Not yet implemented.");
+        const channel = this.openChannels[id];
+        if (!channel) {
+            throw new Error("No channel with ID " + id);
+        }
+
+        this.removeChannelFromOfferedQueue(channel);
+
+        this.acceptChannelOrThrow(channel, options);
+        return channel;
     }
 
     /**
@@ -298,6 +312,30 @@ export abstract class MultiplexingStream implements IDisposableObservable {
     }
 
     /**
+     * Disposes this instance if the specified promise is rejected.
+     * @param promise The promise to check for failures.
+     */
+    protected async rejectOnFailure<T>(promise: Promise<T>) {
+        try {
+            await promise;
+        } catch (err) {
+            this._completionSource.reject(err);
+        }
+    }
+
+    protected removeChannelFromOfferedQueue(channel: ChannelClass) {
+        if (channel.name) {
+            const queue: Channel[] = this.channelsOfferedByThemByName[channel.name];
+            if (queue) {
+                const idx = queue.indexOf(channel);
+                if (idx >= 0) {
+                    queue.splice(idx, 1);
+                }
+            }
+        }
+    }
+
+    /**
      * Gets a unique number that can be used to represent a channel.
      * @description The channel numbers increase by two in order to maintain odd or even numbers,
      * since each party is allowed to create only one or the other.
@@ -393,7 +431,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 
     private async onOffer(channelId: number, payloadSize: number, cancellationToken: CancellationToken) {
         const payload = await getBufferFrom(this.stream, payloadSize, null, cancellationToken);
-        const name = payload.toString(MultiplexingStream.ControlFrameEncoding);
+        const name = payload != null ? payload.toString(MultiplexingStream.ControlFrameEncoding) : "";
 
         const channel = new ChannelClass(this, channelId, name, MultiplexingStream.defaultChannelOptions);
         let acceptingChannelAlreadyPresent = false;
@@ -463,15 +501,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         const channel = this.openChannels[channelId];
         if (channel) {
             delete this.openChannels[channelId];
-            if (channel.name) {
-                const queue: Channel[] = this.channelsOfferedByThemByName[channel.name];
-                if (queue) {
-                    const idx = queue.indexOf(channel);
-                    if (idx >= 0) {
-                        queue.splice(idx, 1);
-                    }
-                }
-            }
+            this.removeChannelFromOfferedQueue(channel);
             channel.dispose();
         }
     }

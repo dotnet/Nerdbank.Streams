@@ -8,6 +8,11 @@ import { MultiplexingStreamClass } from "./MultiplexingStream";
 
 export abstract class Channel implements IDisposableObservable {
     /**
+     * The id of the channel.
+     */
+    public readonly id: number;
+
+    /**
      * A read/write stream used to communicate over this channel.
      */
     public stream: NodeJS.ReadWriteStream;
@@ -23,6 +28,10 @@ export abstract class Channel implements IDisposableObservable {
     public completion: Promise<void>;
 
     private _isDisposed: boolean = false;
+
+    constructor(id: number) {
+        this.id = id;
+    }
 
     /**
      * Gets a value indicating whether this channel has been disposed.
@@ -42,7 +51,6 @@ export abstract class Channel implements IDisposableObservable {
 
 // tslint:disable-next-line:max-classes-per-file
 export class ChannelClass extends Channel {
-    public readonly id: number;
     public readonly name: string;
     private _duplex: Duplex;
     private readonly _multiplexingStream: MultiplexingStreamClass;
@@ -55,9 +63,8 @@ export class ChannelClass extends Channel {
         name: string,
         options: ChannelOptions) {
 
-        super();
+        super(id);
         const self = this;
-        this.id = id;
         this.name = name;
         this._multiplexingStream = multiplexingStream;
         this._duplex = new Duplex({
