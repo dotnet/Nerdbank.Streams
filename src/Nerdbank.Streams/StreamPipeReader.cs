@@ -39,7 +39,7 @@ namespace Nerdbank.Streams
 
         private List<(Action<Exception, object>, object)> writerCompletedCallbacks;
 
-        internal StreamPipeReader(Stream stream, int bufferSize = 4096)
+        internal StreamPipeReader(Stream stream, int bufferSize)
         {
             Requires.NotNull(stream, nameof(stream));
             Requires.Argument(stream.CanRead, nameof(stream), "Stream must be readable.");

@@ -61,7 +61,7 @@ public class PipeExtensionsTests : TestBase
     {
         var expectedBuffer = new byte[] { 4, 5, 6 };
         var webSocket = new MockWebSocket();
-        var pipeWriter = webSocket.UsePipeWriter(this.TimeoutToken);
+        var pipeWriter = webSocket.UsePipeWriter(cancellationToken: this.TimeoutToken);
         await pipeWriter.WriteAsync(expectedBuffer, this.TimeoutToken);
         pipeWriter.Complete();
         await pipeWriter.WaitForReaderCompletionAsync();
