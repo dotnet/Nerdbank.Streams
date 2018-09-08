@@ -20,7 +20,7 @@ namespace Nerdbank.Streams
         /// <summary>
         /// The default buffer size to use for pipe readers.
         /// </summary>
-        private const int DefaultReadBufferSize = 2 * 1024;
+        private const int DefaultReadBufferSize = 4 * 1024;
 
         /// <summary>
         /// Exposes a full-duplex pipe as a <see cref="Stream"/>.
@@ -47,15 +47,16 @@ namespace Nerdbank.Streams
         /// Enables efficiently reading a stream using <see cref="PipeReader"/>.
         /// </summary>
         /// <param name="stream">The stream to read from using a pipe.</param>
-        /// <param name="sizeHint">The size of the buffer to ask the stream to fill.</param>
+        /// <param name="sizeHint">A hint at the size of messages that are commonly transferred. Use 0 for a commonly reasonable default.</param>
+        /// <param name="pipeOptions">Optional pipe options to use.</param>
         /// <param name="cancellationToken">A cancellation token that aborts reading from the <paramref name="stream"/>.</param>
         /// <returns>A <see cref="PipeReader"/>.</returns>
-        public static PipeReader UsePipeReader(this Stream stream, int sizeHint = 0, CancellationToken cancellationToken = default)
+        public static PipeReader UsePipeReader(this Stream stream, int sizeHint = 0, PipeOptions pipeOptions = null, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(stream, nameof(stream));
             Requires.Argument(stream.CanRead, nameof(stream), "Stream must be readable.");
 
-            var pipe = new Pipe();
+            var pipe = new Pipe(pipeOptions ?? PipeOptions.Default);
             Task.Run(async delegate
             {
                 while (!cancellationToken.IsCancellationRequested)
@@ -94,32 +95,33 @@ namespace Nerdbank.Streams
         /// Creates a <see cref="PipeReader"/> that reads from the specified <see cref="Stream"/> exactly as told to do so.
         /// </summary>
         /// <param name="stream">The stream to read from using a pipe.</param>
-        /// <param name="readBufferSize">The size of the buffer to ask the stream to fill.</param>
+        /// <param name="sizeHint">A hint at the size of messages that are commonly transferred. Use 0 for a commonly reasonable default.</param>
         /// <returns>A <see cref="PipeReader"/>.</returns>
         /// <remarks>
-        /// This reader may not be as efficient as the <see cref="Pipe"/>-based <see cref="PipeReader"/> returned from <see cref="UsePipeReader(Stream, int, CancellationToken)"/>,
+        /// This reader may not be as efficient as the <see cref="Pipe"/>-based <see cref="PipeReader"/> returned from <see cref="UsePipeReader(Stream, int, PipeOptions, CancellationToken)"/>,
         /// but its interaction with the underlying <see cref="Stream"/> is closer to how a <see cref="Stream"/> would typically be used which can ease migration from streams to pipes.
         /// </remarks>
-        public static PipeReader UseStrictPipeReader(this Stream stream, int readBufferSize = DefaultReadBufferSize)
+        public static PipeReader UseStrictPipeReader(this Stream stream, int sizeHint = DefaultReadBufferSize)
         {
             Requires.NotNull(stream, nameof(stream));
             Requires.Argument(stream.CanRead, nameof(stream), "Stream must be readable.");
 
-            return new StreamPipeReader(stream, readBufferSize);
+            return new StreamPipeReader(stream, sizeHint);
         }
 
         /// <summary>
         /// Enables writing to a stream using <see cref="PipeWriter"/>.
         /// </summary>
         /// <param name="stream">The stream to write to using a pipe.</param>
+        /// <param name="pipeOptions">Optional pipe options to use.</param>
         /// <param name="cancellationToken">A cancellation token that aborts writing to the <paramref name="stream"/>.</param>
         /// <returns>A <see cref="PipeWriter"/>.</returns>
-        public static PipeWriter UsePipeWriter(this Stream stream, CancellationToken cancellationToken = default)
+        public static PipeWriter UsePipeWriter(this Stream stream, PipeOptions pipeOptions = null, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(stream, nameof(stream));
             Requires.Argument(stream.CanWrite, nameof(stream), "Stream must be writable.");
 
-            var pipe = new Pipe();
+            var pipe = new Pipe(pipeOptions ?? PipeOptions.Default);
             Task.Run(async delegate
             {
                 try
@@ -163,7 +165,7 @@ namespace Nerdbank.Streams
         /// <param name="stream">The stream to write to using a pipe.</param>
         /// <returns>A <see cref="PipeWriter"/>.</returns>
         /// <remarks>
-        /// This writer may not be as efficient as the <see cref="Pipe"/>-based <see cref="PipeWriter"/> returned from <see cref="UsePipeWriter(Stream, CancellationToken)"/>,
+        /// This writer may not be as efficient as the <see cref="Pipe"/>-based <see cref="PipeWriter"/> returned from <see cref="UsePipeWriter(Stream, PipeOptions, CancellationToken)"/>,
         /// but its interaction with the underlying <see cref="Stream"/> is closer to how a <see cref="Stream"/> would typically be used which can ease migration from streams to pipes.
         /// </remarks>
         public static PipeWriter UseStrictPipeWriter(this Stream stream)
@@ -178,26 +180,28 @@ namespace Nerdbank.Streams
         /// Enables reading and writing to a <see cref="Stream"/> using <see cref="PipeWriter"/> and <see cref="PipeReader"/>.
         /// </summary>
         /// <param name="stream">The stream to access using a pipe.</param>
-        /// <param name="sizeHint">A hint at the size of messages that may be transferred. Use 0 for a commonly reasonable default.</param>
+        /// <param name="sizeHint">A hint at the size of messages that are commonly transferred. Use 0 for a commonly reasonable default.</param>
+        /// <param name="pipeOptions">Optional pipe options to use.</param>
         /// <param name="cancellationToken">A token that may cancel async processes to read from and write to the <paramref name="stream"/>.</param>
         /// <returns>An <see cref="IDuplexPipe"/> instance.</returns>
-        public static IDuplexPipe UsePipe(this Stream stream, int sizeHint = 0, CancellationToken cancellationToken = default)
+        public static IDuplexPipe UsePipe(this Stream stream, int sizeHint = 0, PipeOptions pipeOptions = null, CancellationToken cancellationToken = default)
         {
-            return new DuplexPipe(stream.UsePipeReader(sizeHint, cancellationToken), stream.UsePipeWriter(cancellationToken));
+            return new DuplexPipe(stream.UsePipeReader(sizeHint, pipeOptions, cancellationToken), stream.UsePipeWriter(pipeOptions, cancellationToken));
         }
 
         /// <summary>
         /// Enables efficiently reading a <see cref="WebSocket"/> using <see cref="PipeReader"/>.
         /// </summary>
         /// <param name="webSocket">The web socket to read from using a pipe.</param>
-        /// <param name="sizeHint">The size of the buffer to ask the stream to fill.</param>
+        /// <param name="sizeHint">A hint at the size of messages that are commonly transferred. Use 0 for a commonly reasonable default.</param>
+        /// <param name="pipeOptions">Optional pipe options to use.</param>
         /// <param name="cancellationToken">A cancellation token that aborts reading from the <paramref name="webSocket"/>.</param>
         /// <returns>A <see cref="PipeReader"/>.</returns>
-        public static PipeReader UsePipeReader(this WebSocket webSocket, int sizeHint = 0, CancellationToken cancellationToken = default)
+        public static PipeReader UsePipeReader(this WebSocket webSocket, int sizeHint = 0, PipeOptions pipeOptions = null, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(webSocket, nameof(webSocket));
 
-            var pipe = new Pipe();
+            var pipe = new Pipe(pipeOptions ?? PipeOptions.Default);
             Task.Run(async delegate
             {
                 while (!cancellationToken.IsCancellationRequested)
@@ -237,13 +241,14 @@ namespace Nerdbank.Streams
         /// Enables efficiently writing to a <see cref="WebSocket"/> using a <see cref="PipeWriter"/>.
         /// </summary>
         /// <param name="webSocket">The web socket to write to using a pipe.</param>
+        /// <param name="pipeOptions">Optional pipe options to use.</param>
         /// <param name="cancellationToken">A cancellation token that aborts writing to the <paramref name="webSocket"/>.</param>
         /// <returns>A <see cref="PipeWriter"/>.</returns>
-        public static PipeWriter UsePipeWriter(this WebSocket webSocket, CancellationToken cancellationToken = default)
+        public static PipeWriter UsePipeWriter(this WebSocket webSocket, PipeOptions pipeOptions = null, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(webSocket, nameof(webSocket));
 
-            var pipe = new Pipe();
+            var pipe = new Pipe(pipeOptions ?? PipeOptions.Default);
             Task.Run(async delegate
             {
                 try
@@ -283,11 +288,12 @@ namespace Nerdbank.Streams
         /// </summary>
         /// <param name="webSocket">The <see cref="WebSocket"/> to access using a pipe.</param>
         /// <param name="sizeHint">A hint at the size of messages that may be transferred. Use 0 for a commonly reasonable default.</param>
+        /// <param name="pipeOptions">Optional pipe options to use.</param>
         /// <param name="cancellationToken">A token that may cancel async processes to read from and write to the <paramref name="webSocket"/>.</param>
         /// <returns>An <see cref="IDuplexPipe"/> instance.</returns>
-        public static IDuplexPipe UsePipe(this WebSocket webSocket, int sizeHint = 0, CancellationToken cancellationToken = default)
+        public static IDuplexPipe UsePipe(this WebSocket webSocket, int sizeHint = 0, PipeOptions pipeOptions = null, CancellationToken cancellationToken = default)
         {
-            return new DuplexPipe(webSocket.UsePipeReader(sizeHint, cancellationToken), webSocket.UsePipeWriter(cancellationToken));
+            return new DuplexPipe(webSocket.UsePipeReader(sizeHint, pipeOptions, cancellationToken), webSocket.UsePipeWriter(pipeOptions, cancellationToken));
         }
 
         private class DuplexPipe : IDuplexPipe
