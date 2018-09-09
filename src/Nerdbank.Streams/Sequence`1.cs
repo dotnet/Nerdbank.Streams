@@ -67,7 +67,7 @@ namespace Nerdbank.Streams
         public static implicit operator ReadOnlySequence<T>(Sequence<T> sequence)
         {
             return sequence.first != null
-                ? new ReadOnlySequence<T>(sequence.first, 0, sequence.last, sequence.last.Length)
+                ? new ReadOnlySequence<T>(sequence.first, sequence.first.Start, sequence.last, sequence.last.End)
                 : ReadOnlySequence<T>.Empty;
         }
 
@@ -247,32 +247,36 @@ namespace Nerdbank.Streams
             private int end;
 
             /// <summary>
-            /// Gets the index of the first element in the backing array to consider part of the sequence.
+            /// Gets the index of the first element in <see cref="AvailableMemory"/> to consider part of the sequence.
             /// </summary>
             /// <remarks>
-            /// The Start represents the offset into AvailableMemory where the range of "active" bytes begins. At the point when the block is leased
-            /// the Start is guaranteed to be equal to 0. The value of Start may be assigned anywhere between 0 and
-            /// AvailableMemory.Length, and must be equal to or less than End.
+            /// The <see cref="Start"/> represents the offset into <see cref="AvailableMemory"/> where the range of "active" bytes begins. At the point when the block is leased
+            /// the <see cref="Start"/> is guaranteed to be equal to 0. The value of <see cref="Start"/> may be assigned anywhere between 0 and
+            /// <see cref="AvailableMemory"/>.Length, and must be equal to or less than <see cref="End"/>.
             /// </remarks>
             internal int Start { get; private set; }
 
             /// <summary>
-            /// Gets or sets the index of the element just beyond the end in the backing array to consider part of the sequence.
+            /// Gets or sets the index of the element just beyond the end in <see cref="AvailableMemory"/> to consider part of the sequence.
             /// </summary>
             /// <remarks>
-            /// The End represents the offset into AvailableMemory where the range of "active" bytes ends. At the point when the block is leased
-            /// the End is guaranteed to be equal to Start. The value of Start may be assigned anywhere between 0 and
-            /// Buffer.Length, and must be equal to or less than End.
+            /// The <see cref="End"/> represents the offset into <see cref="AvailableMemory"/> where the range of "active" bytes ends. At the point when the block is leased
+            /// the <see cref="End"/> is guaranteed to be equal to <see cref="Start"/>. The value of <see cref="Start"/> may be assigned anywhere between 0 and
+            /// <see cref="AvailableMemory"/>.Length, and must be equal to or less than <see cref="End"/>.
             /// </remarks>
             internal int End
             {
                 get => this.end;
                 set
                 {
-                    Requires.Range(value - this.Start <= this.AvailableMemory.Length, nameof(value));
+                    Requires.Range(value <= this.AvailableMemory.Length, nameof(value));
 
                     this.end = value;
-                    this.UpdateMemory();
+
+                    // If we ever support creating these instances on existing arrays, such that
+                    // this.Start isn't 0 at the beginning, we'll have to "pin" this.Start and remove
+                    // Advance, forcing Sequence<T> itself to track it, the way Pipe does it internally.
+                    this.Memory = this.AvailableMemory.Slice(0, value);
                 }
             }
 
@@ -342,34 +346,13 @@ namespace Nerdbank.Streams
                 Requires.NotNull(segment, nameof(segment));
 
                 this.Next = segment;
-
-                segment = this;
-
-                while (segment.Next != null)
-                {
-                    segment.Next.RunningIndex = segment.RunningIndex + segment.Length;
-                    segment = segment.Next;
-                }
+                segment.RunningIndex = this.RunningIndex + this.Length;
             }
 
             internal void AdvanceTo(int offset)
             {
-                Requires.Range(this.Start + offset <= this.End, nameof(offset));
-                this.Start += offset;
-                this.UpdateMemory();
-
-                var segment = this;
-
-                while (segment.Next != null)
-                {
-                    segment.Next.RunningIndex = segment.RunningIndex + segment.Length;
-                    segment = segment.Next;
-                }
-            }
-
-            private void UpdateMemory()
-            {
-                this.Memory = this.AvailableMemory.Slice(this.Start, this.end - this.Start);
+                Requires.Range(offset <= this.End, nameof(offset));
+                this.Start = offset;
             }
         }
     }

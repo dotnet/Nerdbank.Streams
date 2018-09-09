@@ -240,6 +240,51 @@ public class SequenceTests : TestBase
     }
 
     [Fact]
+    public void AdvanceTo_LaterPositionInCurrentBlock()
+    {
+        ReadOnlySpan<char> original = "abcdefg".ToCharArray();
+        var seq = new Sequence<char>();
+        seq.Write(original);
+        var ros = seq.AsReadOnlySequence;
+
+        seq.AdvanceTo(ros.GetPosition(5, ros.Start));
+        ros = seq.AsReadOnlySequence;
+        Assert.Equal<char>(original.Slice(5).ToArray(), ros.First.ToArray());
+
+        seq.AdvanceTo(ros.GetPosition(2, ros.Start));
+        Assert.Equal(0, seq.AsReadOnlySequence.Length);
+    }
+
+    [Fact]
+    public void AdvanceTo_InterweavedWith_Advance()
+    {
+        ReadOnlySpan<char> original = "abcdefg".ToCharArray();
+        ReadOnlySpan<char> later = "hijkl".ToCharArray();
+        var seq = new Sequence<char>();
+        var mem = seq.GetMemory(30); // Specify a size with enough space to store both buffers
+        original.CopyTo(mem.Span);
+        seq.Advance(original.Length);
+
+        var originalRos = seq.AsReadOnlySequence;
+        var origLastCharPosition = originalRos.GetPosition(originalRos.Length - 1);
+        char origLastChar = originalRos.Slice(origLastCharPosition, 1).First.Span[0];
+
+        // "Consume" a few characters, but leave the origEnd an unconsumed position so it should be valid.
+        seq.AdvanceTo(originalRos.GetPosition(3, originalRos.Start));
+
+        // Verify that the SequencePosition we saved before still represents the same character.
+        Assert.Equal(origLastChar, seq.AsReadOnlySequence.Slice(origLastCharPosition, 1).First.Span[0]);
+
+        // Append several characters
+        mem = seq.GetMemory(later.Length);
+        later.CopyTo(mem.Span);
+        seq.Advance(later.Length);
+
+        // Verify that the SequencePosition we saved before still represents the same character.
+        Assert.Equal(origLastChar, seq.AsReadOnlySequence.Slice(origLastCharPosition, 1).First.Span[0]);
+    }
+
+    [Fact]
     public void Dispose_ReturnsArraysToPool()
     {
         MockPool<char> mockPool = new MockPool<char>();
