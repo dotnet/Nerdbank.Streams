@@ -285,6 +285,26 @@ public class SequenceTests : TestBase
     }
 
     [Fact]
+    public void AdvanceTo_InterweavedWith_Advance2()
+    {
+        // use the mock pool so that we can predict the actual array size will not exceed what we ask for.
+        var seq = new Sequence<int>(new MockPool<int>());
+
+        seq.GetSpan(10);
+        seq.Advance(10);
+
+        seq.AdvanceTo(seq.AsReadOnlySequence.GetPosition(3));
+
+        seq.GetSpan(10);
+        seq.Advance(10);
+
+        seq.GetSpan(10);
+        seq.Advance(10);
+
+        Assert.Equal(10 - 3 + 10 + 10, seq.AsReadOnlySequence.Length);
+    }
+
+    [Fact]
     public void Dispose_ReturnsArraysToPool()
     {
         MockPool<char> mockPool = new MockPool<char>();

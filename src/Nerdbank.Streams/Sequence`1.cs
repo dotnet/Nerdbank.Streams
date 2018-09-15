@@ -346,7 +346,7 @@ namespace Nerdbank.Streams
                 Requires.NotNull(segment, nameof(segment));
 
                 this.Next = segment;
-                segment.RunningIndex = this.RunningIndex + this.Length;
+                segment.RunningIndex = this.RunningIndex + this.End;
             }
 
             internal void AdvanceTo(int offset)
