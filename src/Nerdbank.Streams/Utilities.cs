@@ -119,7 +119,7 @@ namespace Nerdbank.Streams
         }
 
         /// <summary>
-        /// Reads an <see cref="int"/> value to a buffer using big endian.
+        /// Reads an <see cref="int"/> value from a buffer using big endian.
         /// </summary>
         /// <param name="buffer">The buffer to read from. Must be at least 4 bytes long.</param>
         /// <returns>The read value.</returns>

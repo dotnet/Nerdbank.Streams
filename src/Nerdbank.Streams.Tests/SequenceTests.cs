@@ -213,6 +213,7 @@ public class SequenceTests : TestBase
         Assert.Throws<ArgumentException>(() => seq.AdvanceTo(pos1));
         ros = seq;
         Assert.Equal(2, ros.Length);
+        Assert.Equal(ros.Length, seq.Length);
     }
 
     [Fact]

@@ -56,6 +56,11 @@ namespace Nerdbank.Streams
         public ReadOnlySequence<T> AsReadOnlySequence => this;
 
         /// <summary>
+        /// Gets the length of the sequence.
+        /// </summary>
+        public long Length => this.AsReadOnlySequence.Length;
+
+        /// <summary>
         /// Gets the value to display in a debugger datatip.
         /// </summary>
         private string DebuggerDisplay => $"Length: {AsReadOnlySequence.Length}";
