@@ -1,3 +1,4 @@
+const fs = require("fs");
 import * as gulp from "gulp";
 import * as nbgv from "nerdbank-gitversioning";
 import * as path from "path";
@@ -25,8 +26,12 @@ gulp.task("setPackageVersion", ["copyPackageContents"], () => {
     return nbgv.setPackageVersion(outDir, ".");
 });
 
-gulp.task("package", ["setPackageVersion"], () => {
-    return ap.execAsync(`npm pack "${path.join(__dirname, outDir)}"`, { cwd: path.join(__dirname, "../../bin") });
+gulp.task("package", ["setPackageVersion"], (done) => {
+    const binDir = path.join(__dirname, "../../bin");
+    fs.mkdir(binDir, async () => {
+        await ap.execAsync(`npm pack "${path.join(__dirname, outDir)}"`, { cwd: binDir });
+        done();
+    });
 });
 
 gulp.task("default", ["package"], () => {
