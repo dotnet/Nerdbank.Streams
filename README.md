@@ -2,9 +2,7 @@ Specialized .NET Stream classes
 =========================
 
 [![NuGet package](https://img.shields.io/nuget/v/Nerdbank.Streams.svg)](https://nuget.org/packages/Nerdbank.Streams)
-
-[![Build status](https://ci.appveyor.com/api/projects/status/849r1unf4tnjbpy8?svg=true)](https://ci.appveyor.com/project/AArnott/nerdbank-fullduplexstream)
-[![Travis (.org)](https://api.travis-ci.org/AArnott/Nerdbank.Streams.svg?branch=master)](https://travis-ci.org/AArnott/Nerdbank.Streams)
+[![Build Status](https://andrewarnott.visualstudio.com/OSS/_apis/build/status/Nerdbank.Streams)](https://andrewarnott.visualstudio.com/OSS/_build/latest?definitionId=14)
 [![codecov](https://codecov.io/gh/AArnott/Nerdbank.Streams/branch/master/graph/badge.svg)](https://codecov.io/gh/AArnott/Nerdbank.Streams)
 
 *Enhanced streams for communication in-proc or across the Internet.*
