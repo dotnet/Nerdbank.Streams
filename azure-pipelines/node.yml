@@ -26,10 +26,3 @@ steps:
   inputs:
     ProjectDirectory: ${{ parameters.projectdirectory }}
     Arguments: test
-
-- task: CopyFiles@1
-  inputs:
-    Contents: |
-      bin/*-*.tgz
-    TargetFolder: $(Build.ArtifactStagingDirectory)/deployables
-  displayName: Collecting NPM package artifacts

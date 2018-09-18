@@ -61,6 +61,14 @@ jobs:
   - task: CopyFiles@1
     inputs:
       Contents: |
+        bin/*-*.tgz
+      TargetFolder: $(Build.ArtifactStagingDirectory)/deployables
+      flattenFolders: true
+    displayName: Collecting NPM package artifacts
+
+  - task: CopyFiles@1
+    inputs:
+      Contents: |
         obj/**/project.assets.json
       TargetFolder: $(Build.ArtifactStagingDirectory)/projectAssetsJson
     displayName: Collecting project.assets.json artifacts
