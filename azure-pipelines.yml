@@ -135,60 +135,19 @@ jobs:
   container: xenial
   variables:
     GitLinkEnabled: false
-  strategy:
-    maxParallel: 4
-    matrix:
-      netcoreapp1_0:
-        runtime: 1.0.11
-        targetfx: netcoreapp1.0
-      netcoreapp1_1:
-        runtime: 1.1.8
-        targetfx: netcoreapp1.0
-      netcoreapp2_0:
-        runtime: 2.0.7
-        targetfx: netcoreapp2.0
-      netcoreapp2_1:
-        runtime: 2.1.0
-        targetfx: netcoreapp2.1
   steps:
   - template: azure-pipelines/testfx.yml
+  - template: azure-pipelines/node.yml
+    parameters:
+      projectdirectory: src/nerdbank-streams
 
 - job: macOS
   pool:
     vmImage: macOS 10.13
   variables:
     GitLinkEnabled: false
-  strategy:
-    maxParallel: 4
-    matrix:
-      netcoreapp1_0:
-        runtime: 1.0.11
-        targetfx: netcoreapp1.0
-      netcoreapp1_1:
-        runtime: 1.1.8
-        targetfx: netcoreapp1.0
-      netcoreapp2_0:
-        runtime: 2.0.7
-        targetfx: netcoreapp2.0
-      netcoreapp2_1:
-        runtime: 2.1.0
-        targetfx: netcoreapp2.1
   steps:
   - template: azure-pipelines/testfx.yml
-
-- job: Linux_node
-  pool:
-    vmImage: Ubuntu 16.04
-  container: xenial
-  steps:
-  - template: azure-pipelines/node.yml
-    parameters:
-      projectdirectory: src/nerdbank-streams
-
-- job: macOS_node
-  pool:
-    vmImage: macOS 10.13
-  steps:
   - template: azure-pipelines/node.yml
     parameters:
       projectdirectory: src/nerdbank-streams
