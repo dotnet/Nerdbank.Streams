@@ -145,6 +145,8 @@ jobs:
     GitLinkEnabled: false
   steps:
   - template: azure-pipelines/testfx.yml
+    parameters:
+      projectdirectory: src/Nerdbank.Streams.Tests
   - template: azure-pipelines/node.yml
     parameters:
       projectdirectory: src/nerdbank-streams
@@ -156,6 +158,8 @@ jobs:
     GitLinkEnabled: false
   steps:
   - template: azure-pipelines/testfx.yml
+    parameters:
+      projectdirectory: src/Nerdbank.Streams.Tests
   - template: azure-pipelines/node.yml
     parameters:
       projectdirectory: src/nerdbank-streams
