@@ -90,6 +90,19 @@ public class StreamUseStrictPipeWriterTests : StreamPipeWriterTestBase
         Assert.True(flushResult.IsCanceled);
     }
 
+    [Fact]
+    public async Task Write_MultipleBlocks()
+    {
+        var ms = new MemoryStream();
+        var w = ms.UseStrictPipeWriter();
+        w.GetMemory(4);
+        w.Advance(4);
+        w.GetMemory(1024);
+        w.Advance(1024);
+        await w.FlushAsync(this.TimeoutToken);
+        Assert.Equal(1028, ms.Length);
+    }
+
     [Fact] // Not applied to base test class because of https://github.com/dotnet/corefx/issues/31837
     public async Task CancelPendingFlush_BeforeFlushDoesNotCancelFutureFlush()
     {

@@ -101,16 +101,15 @@ namespace Nerdbank.Streams
                 {
                     try
                     {
-                        var buffer = this.buffer.AsReadOnlySequence;
-                        int bytesWritten = 0;
-                        foreach (ReadOnlyMemory<byte> segment in buffer)
+                        while (this.buffer.Length > 0)
                         {
                             // Allow cancellation in between each write, but not during one.
                             // That way we don't corrupt the outbound stream.
                             cts.Token.ThrowIfCancellationRequested();
+                            var readOnlySeq = this.buffer.AsReadOnlySequence;
+                            var segment = readOnlySeq.First;
                             await this.stream.WriteAsync(segment).ConfigureAwait(false);
-                            bytesWritten += segment.Length;
-                            this.buffer.AdvanceTo(buffer.GetPosition(bytesWritten));
+                            this.buffer.AdvanceTo(readOnlySeq.GetPosition(segment.Length));
                         }
 
                         // Presumably, cancelling during a flush doesn't leave the stream in a corrupted state.
