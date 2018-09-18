@@ -25,6 +25,7 @@
   "license": "MIT",
   "private": false,
   "scripts": {
+    "build": "tsc -p gulpfile.tsconfig.json && gulp",
     "test": "jasmine"
   },
   "devDependencies": {
