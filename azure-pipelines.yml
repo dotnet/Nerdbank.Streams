@@ -1,0 +1,161 @@
+trigger:
+  branches:
+    include: ["master"]
+  paths:
+    exclude: ["doc", "*.md", ".appveyor.yml", ".travis.yml"]
+
+variables:
+  TreatWarningsAsErrors: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  BuildConfiguration: Release
+  BuildPlatform: Any CPU
+  codecov_token: b8be69b5-6dc3-40f8-a4c7-4e13a42654a3
+
+resources:
+  containers:
+  - container: xenial
+    image: andrewarnott/linux-buildagent
+
+jobs:
+- job: Windows
+  pool: Hosted VS2017
+  steps:
+  - script: |
+      dotnet tool install --tool-path . nbgv
+      .\nbgv cloud -p src
+    displayName: Set build number
+    condition: ne(variables['system.pullrequest.isfork'], true)
+
+  - script: dotnet --info
+    displayName: Show dotnet SDK info
+
+  - task: DotNetCoreCLI@2
+    displayName: Restore NuGet packages
+    inputs:
+      command: restore
+      verbosityRestore: normal # detailed, normal, minimal
+      projects: src/**/*.sln
+      feedsToUse: config
+      nugetConfigPath: src/nuget.config
+
+  # Use VSBuild on Windows so GitLink will work (it fails on dotnet build)
+  - task: VSBuild@1
+    inputs:
+      vsVersion: 15.0
+      msbuildArgs: /t:build /m /v:m /bl:"$(Build.ArtifactStagingDirectory)/build_logs/msbuild.binlog"
+      platform: $(BuildPlatform)
+      configuration: $(BuildConfiguration)
+    displayName: Build Visual Studio solution
+
+  - task: DotNetCoreCLI@2
+    displayName: Run tests
+    inputs:
+      command: test
+      projects: src/Nerdbank.Streams.Tests/Nerdbank.Streams.Tests.csproj
+      arguments: --configuration $(BuildConfiguration) --no-build --filter "TestCategory!=FailsInCloudTest" -v n
+
+  - template: azure-pipelines/node.yml
+    parameters:
+      projectdirectory: src/nerdbank-streams
+
+  - task: CopyFiles@1
+    inputs:
+      Contents: |
+        bin/*-*.tgz
+      TargetFolder: $(Build.ArtifactStagingDirectory)/deployables
+      flattenFolders: true
+    displayName: Collecting NPM package artifacts
+
+  - task: CopyFiles@1
+    inputs:
+      Contents: |
+        obj/**/project.assets.json
+      TargetFolder: $(Build.ArtifactStagingDirectory)/projectAssetsJson
+    displayName: Collecting project.assets.json artifacts
+    condition: succeededOrFailed()
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: $(Build.ArtifactStagingDirectory)/projectAssetsJson
+      ArtifactName: projectAssetsJson
+      ArtifactType: Container
+    displayName: Publish projectAssetsJson artifacts
+    condition: and(succeededOrFailed(), ne(variables['system.pullrequest.isfork'], true))
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: $(Build.ArtifactStagingDirectory)/build_logs
+      ArtifactName: build_logs
+      ArtifactType: Container
+    displayName: Publish build_logs artifacts
+    condition: and(succeededOrFailed(), ne(variables['system.pullrequest.isfork'], true))
+
+  ## The rest of these steps are for deployment and skipped for PR builds
+
+  #- task: PublishBuildArtifacts@1
+  #  inputs:
+  #    PathtoPublish: $(build.sourcesdirectory)/bin
+  #    ArtifactName: bin
+  #    ArtifactType: Container
+  #  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'), ne(variables['system.pullrequest.isfork'], true))
+
+  - task: DotNetCoreCLI@2
+    displayName: Pack
+    inputs:
+      command: pack
+      projects: src/**/*.sln
+      nobuild: true
+      verbosityPack: normal
+      packDirectory: $(Build.ArtifactStagingDirectory)/deployables
+
+  - powershell: >-
+      $testdir="bin\Nerdbank.Streams.Tests\$(BuildConfiguration)\net461"
+
+      & "$HOME\.nuget\packages\OpenCover\4.6.519\tools\OpenCover.Console.exe"
+      -register:user
+      -target:"$HOME\.nuget\packages\xunit.runner.console\2.3.1\tools\net452\xunit.console.x86.exe"
+      -targetargs:"$testdir\Nerdbank.Streams.Tests.dll -noshadow -parallel all -notrait \"SkipInCodeCoverage=true\" -html $testdir\testresults.html -xml $testdir\testresults.xml -appveyor -nologo"
+      -returntargetcode
+      -excludebyattribute:*.ExcludeFromCodeCoverage*
+      -excludebyfile:*\*Designer.cs
+      -filter:"+[Nerdbank.Streams]*"
+      -hideskipped:All
+      -output:$testdir\code_coverage.xml
+
+      $env:PATH = "C:\Python34;C:\Python34\Scripts;$env:PATH"
+
+      pip install codecov
+
+      codecov -f "$testdir\code_coverage.xml"
+    displayName: Run tests on .NET Framework (with code coverage)
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: $(Build.ArtifactStagingDirectory)/deployables
+      ArtifactName: deployables
+      ArtifactType: Container
+    displayName: Publish deployables artifacts
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'), ne(variables['system.pullrequest.isfork'], true))
+
+- job: Linux
+  pool:
+    vmImage: Ubuntu 16.04
+  container: xenial
+  variables:
+    GitLinkEnabled: false
+  steps:
+  - template: azure-pipelines/testfx.yml
+  - template: azure-pipelines/node.yml
+    parameters:
+      projectdirectory: src/nerdbank-streams
+
+- job: macOS
+  pool:
+    vmImage: macOS 10.13
+  variables:
+    GitLinkEnabled: false
+  steps:
+  - template: azure-pipelines/testfx.yml
+  - template: azure-pipelines/node.yml
+    parameters:
+      projectdirectory: src/nerdbank-streams

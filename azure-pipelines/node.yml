@@ -1,0 +1,28 @@
+parameters:
+  projectdirectory: ''
+
+steps:
+- task: NodeTool@0
+  displayName: Use Node 8.x
+  inputs:
+    versionSpec: 8.x
+
+- task: geeklearningio.gl-vsts-tasks-yarn.yarn-installer-task.YarnInstaller@2
+  displayName: Use Yarn 1.x
+
+- task: geeklearningio.gl-vsts-tasks-yarn.yarn-task.Yarn@2
+  displayName: Yarn install
+  inputs:
+    ProjectDirectory: ${{ parameters.projectdirectory }}
+
+- task: geeklearningio.gl-vsts-tasks-yarn.yarn-task.Yarn@2
+  displayName: Yarn build
+  inputs:
+    ProjectDirectory: ${{ parameters.projectdirectory }}
+    Arguments: build
+
+- task: geeklearningio.gl-vsts-tasks-yarn.yarn-task.Yarn@2
+  displayName: Yarn test
+  inputs:
+    ProjectDirectory: ${{ parameters.projectdirectory }}
+    Arguments: test
