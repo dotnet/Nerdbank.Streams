@@ -294,12 +294,6 @@ namespace Nerdbank.Streams
             internal int Length => this.End - this.Start;
 
             /// <summary>
-            /// Gets a value indicating whether data should not be written into the backing block after the End offset.
-            /// Data between start and end should never be modified since this would break cloning.
-            /// </summary>
-            internal bool ReadOnly { get; private set; }
-
-            /// <summary>
             /// Gets the amount of writable bytes in this segment.
             /// It is the amount of bytes between <see cref="Length"/> and <see cref="End"/>.
             /// </summary>
@@ -320,13 +314,12 @@ namespace Nerdbank.Streams
                 this.SetMemory(memoryOwner, 0, memoryOwner.Memory.Length);
             }
 
-            internal void SetMemory(IMemoryOwner<T> memoryOwner, int start, int end, bool readOnly = false)
+            internal void SetMemory(IMemoryOwner<T> memoryOwner, int start, int end)
             {
                 this.MemoryOwner = memoryOwner;
 
                 this.AvailableMemory = this.MemoryOwner.Memory;
 
-                this.ReadOnly = readOnly;
                 this.RunningIndex = 0;
                 this.Start = start;
                 this.End = end;
@@ -343,7 +336,6 @@ namespace Nerdbank.Streams
                 this.Next = null;
                 this.Start = 0;
                 this.end = 0;
-                this.ReadOnly = false;
             }
 
             internal void SetNext(SequenceSegment segment)
