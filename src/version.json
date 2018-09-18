@@ -4,10 +4,5 @@
   "publicReleaseRefSpec": [
     "^refs/heads/master$",
     "^refs/heads/fullduplexstream$"
-  ],
-  "cloudBuild": {
-    "buildNumber": {
-      "enabled": true
-    }
-  }
+  ]
 }
