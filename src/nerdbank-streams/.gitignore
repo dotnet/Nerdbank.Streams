@@ -2,4 +2,3 @@ dist/
 *.js
 *.d.ts
 *.js.map
-yarn.lock

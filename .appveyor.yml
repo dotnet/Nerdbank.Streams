@@ -23,9 +23,8 @@ environment:
 build_script: |
   dotnet build src
   dotnet pack src --no-build
-  yarn install --cwd src/nerdbank-streams
-  .\src\nerdbank-streams\node_modules\.bin\tsc -p src\nerdbank-streams\gulpfile.tsconfig.json
-  .\src\nerdbank-streams\node_modules\.bin\gulp --gulpfile src\nerdbank-streams\gulpfile.js
+  yarn --cwd src/nerdbank-streams install
+  yarn --cwd src/nerdbank-streams build
 test_script:
 - cmd: >-
     SET testdir=bin\Nerdbank.Streams.Tests\%configuration%\net461\
