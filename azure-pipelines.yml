@@ -114,7 +114,7 @@ jobs:
       & "$HOME\.nuget\packages\OpenCover\4.6.519\tools\OpenCover.Console.exe"
       -register:user
       -target:"$HOME\.nuget\packages\xunit.runner.console\2.3.1\tools\net452\xunit.console.x86.exe"
-      -targetargs:"$testdir\Nerdbank.Streams.Tests.dll -noshadow -parallel all -notrait \"SkipInCodeCoverage=true\" -html $testdir\testresults.html -xml $testdir\testresults.xml -appveyor -nologo"
+      -targetargs:"$testdir\Nerdbank.Streams.Tests.dll -noshadow -parallel all -notrait SkipInCodeCoverage=true -html $testdir\testresults.html -xml $testdir\testresults.xml -appveyor -nologo"
       -returntargetcode
       -excludebyattribute:*.ExcludeFromCodeCoverage*
       -excludebyfile:*\*Designer.cs
