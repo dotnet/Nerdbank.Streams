@@ -588,39 +588,46 @@ namespace Nerdbank.Streams
             Memory<byte> buffer = new byte[FrameHeader.HeaderLength + this.framePayloadMaxLength];
             Memory<byte> headerBuffer = buffer.Slice(0, FrameHeader.HeaderLength);
             Memory<byte> payloadBuffer = buffer.Slice(FrameHeader.HeaderLength);
-            while (!this.Completion.IsCompleted)
+            try
             {
-                if (!await ReadToFillAsync(this.stream, headerBuffer, throwOnEmpty: false, this.DisposalToken).ConfigureAwait(false))
+                while (!this.Completion.IsCompleted)
                 {
-                    break;
-                }
+                    if (!await ReadToFillAsync(this.stream, headerBuffer, throwOnEmpty: false, this.DisposalToken).ConfigureAwait(false))
+                    {
+                        break;
+                    }
 
-                var header = FrameHeader.Deserialize(headerBuffer.Span);
-                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
-                {
-                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.FrameReceived, "Received {0} frame for channel {1} with {2} bytes of content.", header.Code, header.ChannelId, header.FramePayloadLength);
-                }
+                    var header = FrameHeader.Deserialize(headerBuffer.Span);
+                    if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                    {
+                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.FrameReceived, "Received {0} frame for channel {1} with {2} bytes of content.", header.Code, header.ChannelId, header.FramePayloadLength);
+                    }
 
-                switch (header.Code)
-                {
-                    case ControlCode.Offer:
-                        await this.OnOffer(header.ChannelId, payloadBuffer.Slice(0, header.FramePayloadLength), this.DisposalToken).ConfigureAwait(false);
-                        break;
-                    case ControlCode.OfferAccepted:
-                        this.OnOfferAccepted(header.ChannelId);
-                        break;
-                    case ControlCode.Content:
-                        await this.OnContent(header, this.DisposalToken).ConfigureAwait(false);
-                        break;
-                    case ControlCode.ContentWritingCompleted:
-                        this.OnContentWritingCompleted(header.ChannelId);
-                        break;
-                    case ControlCode.ChannelTerminated:
-                        this.OnChannelTerminated(header.ChannelId);
-                        break;
-                    default:
-                        break;
+                    switch (header.Code)
+                    {
+                        case ControlCode.Offer:
+                            await this.OnOffer(header.ChannelId, payloadBuffer.Slice(0, header.FramePayloadLength), this.DisposalToken).ConfigureAwait(false);
+                            break;
+                        case ControlCode.OfferAccepted:
+                            this.OnOfferAccepted(header.ChannelId);
+                            break;
+                        case ControlCode.Content:
+                            await this.OnContent(header, this.DisposalToken).ConfigureAwait(false);
+                            break;
+                        case ControlCode.ContentWritingCompleted:
+                            this.OnContentWritingCompleted(header.ChannelId);
+                            break;
+                        case ControlCode.ChannelTerminated:
+                            this.OnChannelTerminated(header.ChannelId);
+                            break;
+                        default:
+                            break;
+                    }
                 }
+            }
+            catch (EndOfStreamException)
+            {
+                // When we unexpectedly hit an end of stream, just close up shop.
             }
 
             this.Dispose();
