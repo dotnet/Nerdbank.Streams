@@ -162,6 +162,19 @@ namespace Nerdbank.Streams
         }
 
         /// <inheritdoc />
+        public override int Read(Span<byte> buffer)
+        {
+            Verify.NotDisposed(this);
+            if (this.reader == null)
+            {
+                throw new NotSupportedException();
+            }
+
+            ReadResult readResult = this.reader.ReadAsync().GetAwaiter().GetResult();
+            return this.ReadHelper(buffer, readResult);
+        }
+
+        /// <inheritdoc />
         public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -174,6 +187,19 @@ namespace Nerdbank.Streams
             this.writer.Write(buffer.Span);
             return default;
         }
+
+        /// <inheritdoc />
+        public override void Write(ReadOnlySpan<byte> buffer)
+        {
+            Verify.NotDisposed(this);
+            if (this.writer == null)
+            {
+                throw new NotSupportedException();
+            }
+
+            this.writer.Write(buffer);
+        }
+
 #endif
 
 #pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
