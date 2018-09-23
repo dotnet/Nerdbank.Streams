@@ -10,14 +10,12 @@ using Xunit.Abstractions;
 internal class XunitTraceListener : TraceListener
 {
     private readonly ITestOutputHelper logger;
-    private readonly string name;
     private readonly StringBuilder lineInProgress = new StringBuilder();
     private bool disposed;
 
-    internal XunitTraceListener(ITestOutputHelper logger, string name)
+    internal XunitTraceListener(ITestOutputHelper logger)
     {
         this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        this.name = name;
     }
 
     public override bool IsThreadSafe => false;

@@ -2,59 +2,33 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
+using Xunit.Abstractions;
 
-public class FullDuplexStreamPairTests : IDisposable
+public class FullDuplexStreamPairTests : TestBase
 {
     private static readonly byte[] Data3Bytes = new byte[] { 0x1, 0x3, 0x2 };
 
     private static readonly byte[] Data5Bytes = new byte[] { 0x1, 0x3, 0x2, 0x5, 0x4 };
 
-    /// <summary>
-    /// The time to wait for an async operation to occur within a reasonable time,
-    /// when we expect a passing test to wait the entire time.
-    /// </summary>
-    private static readonly TimeSpan ExpectedAsyncTimeout = TimeSpan.FromMilliseconds(250);
-
-    private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(5);
-
     private readonly Stream stream1;
 
     private readonly Stream stream2;
 
-    private readonly CancellationTokenSource testCancellationSource;
-
-    public FullDuplexStreamPairTests()
+    public FullDuplexStreamPairTests(ITestOutputHelper logger)
+        : base(logger)
     {
         var tuple = FullDuplexStream.CreatePair();
-        Assert.NotNull(tuple);
         Assert.NotNull(tuple.Item1);
         Assert.NotNull(tuple.Item2);
 
         this.stream1 = tuple.Item1;
         this.stream2 = tuple.Item2;
-
-        TimeSpan timeout = Debugger.IsAttached ? Timeout.InfiniteTimeSpan : TestTimeout;
-        this.testCancellationSource = new CancellationTokenSource(timeout);
-    }
-
-    protected CancellationToken TestCanceled => this.testCancellationSource.Token;
-
-    /// <summary>
-    /// Gets a new <see cref="CancellationToken"/> that will automatically cancel
-    /// after <see cref="ExpectedAsyncTimeout"/> has elapsed.
-    /// </summary>
-    protected CancellationToken ExpectedAsyncTimeoutToken => new CancellationTokenSource(ExpectedAsyncTimeout).Token;
-
-    public void Dispose()
-    {
-        this.testCancellationSource.Dispose();
     }
 
     [Fact]
@@ -74,6 +48,7 @@ public class FullDuplexStreamPairTests : IDisposable
         byte[] sentBuffer = Data3Bytes;
 
         this.stream1.Write(sentBuffer, 0, sentBuffer.Length);
+        this.stream1.Flush();
         byte[] buffer = new byte[sentBuffer.Length];
         int bytesRead = this.stream2.Read(buffer, 0, buffer.Length);
         Assert.Equal(sentBuffer.Length, bytesRead);
@@ -86,6 +61,7 @@ public class FullDuplexStreamPairTests : IDisposable
         byte[] sentBuffer = Data5Bytes;
 
         this.stream1.Write(sentBuffer, 0, sentBuffer.Length);
+        this.stream1.Flush();
         byte[] buffer = new byte[2];
         int bytesRead = this.stream2.Read(buffer, 0, buffer.Length);
         Assert.Equal(buffer.Length, bytesRead);
@@ -104,11 +80,12 @@ public class FullDuplexStreamPairTests : IDisposable
     public async Task Read_BeforeWrite()
     {
         byte[] buffer = new byte[5];
-        var readTask = this.stream2.ReadAsync(buffer, 0, buffer.Length, this.TestCanceled);
+        var readTask = this.stream2.ReadAsync(buffer, 0, buffer.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken);
         Assert.False(readTask.IsCompleted);
 
-        await this.stream1.WriteAsync(Data3Bytes, 0, Data3Bytes.Length);
-        int bytesRead = await readTask;
+        await this.stream1.WriteAsync(Data3Bytes, 0, Data3Bytes.Length).WithCancellation(this.TimeoutToken);
+        await this.stream1.FlushAsync(this.TimeoutToken);
+        int bytesRead = await readTask.WithCancellation(this.TimeoutToken);
         Assert.Equal(Data3Bytes.Length, bytesRead);
         Assert.Equal(Data3Bytes, buffer.Take(bytesRead));
     }
@@ -119,28 +96,28 @@ public class FullDuplexStreamPairTests : IDisposable
         // Verify that closing the transmitting stream after reading has been requested
         // appropriately ends the read attempt.
         byte[] buffer = new byte[5];
-        var readTask = this.stream2.ReadAsync(buffer, 0, buffer.Length, this.TestCanceled);
+        var readTask = this.stream2.ReadAsync(buffer, 0, buffer.Length, this.TimeoutToken);
         Assert.False(readTask.IsCompleted);
 #if NETCOREAPP1_0
         this.stream1.Dispose();
 #else
         this.stream1.Close();
 #endif
-        int bytesRead = await readTask;
+        int bytesRead = await readTask.WithCancellation(this.TimeoutToken);
         Assert.Equal(0, bytesRead);
 
         // Verify that reading from a closed stream returns 0 bytes.
-        bytesRead = await this.stream2.ReadAsync(buffer, 0, buffer.Length, this.TestCanceled);
+        bytesRead = await this.stream2.ReadAsync(buffer, 0, buffer.Length, this.TimeoutToken);
         Assert.Equal(0, bytesRead);
     }
 
     [Fact]
     public async Task Write_EmptyBufferDoesNotTerminateOtherStream()
     {
-        await this.stream1.WriteAsync(Data3Bytes, 0, 0);
+        await this.stream1.WriteAsync(Data3Bytes, 0, 0).WithCancellation(this.TimeoutToken);
         var buffer = new byte[10];
         await Assert.ThrowsAsync<OperationCanceledException>(
-            () => this.stream2.ReadAsync(buffer, 0, buffer.Length, this.ExpectedAsyncTimeoutToken));
+            () => this.stream2.ReadAsync(buffer, 0, buffer.Length, ExpectedTimeoutToken)).WithCancellation(this.TimeoutToken);
     }
 
     [Fact]
@@ -148,6 +125,7 @@ public class FullDuplexStreamPairTests : IDisposable
     {
         this.stream1.Write(Data3Bytes, 0, Data3Bytes.Length);
         this.stream1.Write(Data5Bytes, 0, Data5Bytes.Length);
+        this.stream1.Flush();
         byte[] receiveBuffer = new byte[Data3Bytes.Length + Data5Bytes.Length];
         int bytesRead = 0;
         do
@@ -190,8 +168,9 @@ public class FullDuplexStreamPairTests : IDisposable
             (cb, state) => this.stream1.BeginRead(readBuffer, 0, readBuffer.Length, cb, state),
             ar => this.stream1.EndRead(ar),
             null);
-        await this.stream2.WriteAsync(Data3Bytes, 0, Data3Bytes.Length);
-        int bytesRead = await readTask;
+        await this.stream2.WriteAsync(Data3Bytes, 0, Data3Bytes.Length).WithCancellation(this.TimeoutToken);
+        await this.stream2.FlushAsync(this.TimeoutToken);
+        int bytesRead = await readTask.WithCancellation(this.TimeoutToken);
         Assert.Equal(Data3Bytes.Length, bytesRead);
         Assert.Equal(Data3Bytes, readBuffer.Take(bytesRead));
     }
@@ -202,9 +181,10 @@ public class FullDuplexStreamPairTests : IDisposable
         await Task.Factory.FromAsync(
             (cb, state) => this.stream1.BeginWrite(Data3Bytes, 0, Data3Bytes.Length, cb, state),
             ar => this.stream1.EndWrite(ar),
-            null);
+            null).WithCancellation(this.TimeoutToken);
+        await this.stream1.FlushAsync(this.TimeoutToken);
         byte[] readBuffer = new byte[10];
-        int bytesRead = await this.stream2.ReadAsync(readBuffer, 0, readBuffer.Length);
+        int bytesRead = await this.stream2.ReadAsync(readBuffer, 0, readBuffer.Length).WithCancellation(this.TimeoutToken);
         Assert.Equal(Data3Bytes.Length, bytesRead);
         Assert.Equal(Data3Bytes, readBuffer.Take(bytesRead));
     }
@@ -296,7 +276,7 @@ public class FullDuplexStreamPairTests : IDisposable
     {
         this.stream1.Dispose();
         var buffer = new byte[1];
-        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream1.ReadAsync(buffer, 0, buffer.Length));
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream1.ReadAsync(buffer, 0, buffer.Length).WithCancellation(this.TimeoutToken));
     }
 
     [Fact]
@@ -312,7 +292,7 @@ public class FullDuplexStreamPairTests : IDisposable
     {
         this.stream1.Dispose();
         var buffer = new byte[1];
-        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream1.WriteAsync(buffer, 0, buffer.Length));
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream1.WriteAsync(buffer, 0, buffer.Length).WithCancellation(this.TimeoutToken));
     }
 
     [Fact]
