@@ -187,7 +187,9 @@ namespace Nerdbank.Streams
         protected override void Dispose(bool disposing)
         {
             this.IsDisposed = true;
+            this.reader?.CancelPendingRead();
             this.reader?.Complete();
+            this.writer?.CancelPendingFlush();
             this.writer?.Complete();
             base.Dispose(disposing);
         }
@@ -206,6 +208,11 @@ namespace Nerdbank.Streams
 
         private int ReadHelper(Span<byte> buffer, ReadResult readResult)
         {
+            if (readResult.IsCanceled && this.IsDisposed)
+            {
+                return 0;
+            }
+
             long bytesToCopyCount = Math.Min(buffer.Length, readResult.Buffer.Length);
             ReadOnlySequence<byte> slice = readResult.Buffer.Slice(0, bytesToCopyCount);
             slice.CopyTo(buffer);

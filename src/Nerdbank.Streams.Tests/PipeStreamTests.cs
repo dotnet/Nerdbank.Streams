@@ -195,6 +195,15 @@ public class PipeStreamTests : TestBase
     }
 
     [Fact]
+    public async Task Read_DisposedWhileWaiting()
+    {
+        Task<int> readTask = this.stream.ReadAsync(new byte[1], 0, 1, this.TimeoutToken);
+        this.stream.Dispose();
+        int readBytes = await readTask;
+        Assert.Equal(0, readBytes);
+    }
+
+    [Fact]
     public async Task Read_ThrowsNotSupportedException()
     {
         this.stream = this.pipe.Writer.AsStream();
