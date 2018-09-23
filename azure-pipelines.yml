@@ -97,7 +97,7 @@ jobs:
   #    PathtoPublish: $(build.sourcesdirectory)/bin
   #    ArtifactName: bin
   #    ArtifactType: Container
-  #  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'), ne(variables['system.pullrequest.isfork'], true))
+  #  condition: and(succeeded(), ne(variables['system.pullrequest.isfork'], true))
 
   - task: DotNetCoreCLI@2
     displayName: Pack
@@ -135,7 +135,7 @@ jobs:
       ArtifactName: deployables
       ArtifactType: Container
     displayName: Publish deployables artifacts
-    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'), ne(variables['system.pullrequest.isfork'], true))
+    condition: and(succeeded(), ne(variables['system.pullrequest.isfork'], true))
 
 - job: Linux
   pool:
