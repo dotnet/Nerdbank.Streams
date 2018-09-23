@@ -146,9 +146,15 @@ namespace Nerdbank.Streams
         {
             cancellationToken.ThrowIfCancellationRequested();
             Verify.NotDisposed(this);
+
             if (this.reader == null)
             {
                 throw new NotSupportedException();
+            }
+
+            if (this.readingCompleted)
+            {
+                return 0;
             }
 
             ReadResult readResult = await this.reader.ReadAsync(cancellationToken).ConfigureAwait(false);

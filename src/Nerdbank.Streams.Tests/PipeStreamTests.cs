@@ -195,13 +195,42 @@ public class PipeStreamTests : TestBase
     }
 
     [Fact]
-    public async Task Read_DisposedWhileWaiting()
+    public async Task ReadAsync_Array_DisposedWhileWaiting()
     {
         Task<int> readTask = this.stream.ReadAsync(new byte[1], 0, 1, this.TimeoutToken);
         this.stream.Dispose();
         int readBytes = await readTask;
         Assert.Equal(0, readBytes);
     }
+
+    [Fact]
+    public async Task ReadAsync_Array_CompleteThenReadAgain()
+    {
+        this.pipe.Writer.Complete();
+        Assert.Equal(0, await this.stream.ReadAsync(new byte[1], 0, 1, this.TimeoutToken));
+        Assert.Equal(0, await this.stream.ReadAsync(new byte[1], 0, 1, this.TimeoutToken));
+    }
+
+#if SPAN_BUILTIN
+
+    [Fact]
+    public async Task ReadAsync_Memory_DisposedWhileWaiting()
+    {
+        ValueTask<int> readTask = this.stream.ReadAsync(new byte[1], this.TimeoutToken);
+        this.stream.Dispose();
+        int readBytes = await readTask;
+        Assert.Equal(0, readBytes);
+    }
+
+    [Fact]
+    public async Task ReadAsync_Memory_CompleteThenReadAgain()
+    {
+        this.pipe.Writer.Complete();
+        Assert.Equal(0, await this.stream.ReadAsync(new byte[1], this.TimeoutToken));
+        Assert.Equal(0, await this.stream.ReadAsync(new byte[1], this.TimeoutToken));
+    }
+
+#endif
 
     [Fact]
     public async Task Read_ThrowsNotSupportedException()
