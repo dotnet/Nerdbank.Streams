@@ -1,4 +1,4 @@
-const fs = require("fs");
+import * as fs from "fs";
 import * as gulp from "gulp";
 import * as nbgv from "nerdbank-gitversioning";
 import * as path from "path";
