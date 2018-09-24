@@ -140,7 +140,7 @@ jobs:
 - job: Linux
   pool:
     vmImage: Ubuntu 16.04
-  container: xenial
+#  container: xenial
   variables:
     GitLinkEnabled: false
   steps:

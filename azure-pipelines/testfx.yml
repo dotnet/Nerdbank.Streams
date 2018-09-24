@@ -1,4 +1,6 @@
 steps:
+- script: dotnet --info
+  displayName: Show dotnet SDK info
 - script: dotnet restore
   displayName: Restore packages
   workingDirectory: ${{ parameters.projectdirectory }}
