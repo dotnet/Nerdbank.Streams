@@ -232,9 +232,9 @@ camel-case@^3.0.0:
     no-case "^2.2.0"
     upper-case "^1.1.1"
 
-cancellationtoken@^1.0.3:
-  version "1.0.3"
-  resolved "https://registry.yarnpkg.com/cancellationtoken/-/cancellationtoken-1.0.3.tgz#e7d9c51b762b92db1f62a963115ad404a8d86252"
+cancellationtoken@^2.0.1:
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/cancellationtoken/-/cancellationtoken-2.0.1.tgz#be6f1833aca4f5a67c9c7334853a08f16ced6156"
 
 caseless@~0.12.0:
   version "0.12.0"
