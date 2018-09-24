@@ -44,7 +44,7 @@
     "vscode-jsonrpc": "^3.6.2"
   },
   "dependencies": {
-    "cancellationtoken": "^1.0.3",
+    "cancellationtoken": "^2.0.1",
     "caught": "^0.1.2"
   }
 }

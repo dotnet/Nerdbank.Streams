@@ -242,20 +242,19 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 
         const header = new FrameHeader(ControlCode.Offer, channel.id, payload.length);
 
-        // .NET lets us delete these these CancellationToken "registrations"
-        // to avoid a memory leak when the provided token is long-lived and
-        // never canceled. But JavaScript promises do not offer this.
-        // https://github.com/conradreuter/cancellationtoken/issues/1
-        cancellationToken.whenCancelled.then(() => this.offerChannelCanceled(channel));
+        const unsubscribeFromCT = cancellationToken.onCancelled((reason) => this.offerChannelCanceled(channel, reason));
+        try {
+            // We *will* recognize rejection of this promise. But just in case sendFrameAsync completes synchronously,
+            // we want to signify that we *will* catch it first to avoid node.js emitting warnings or crashing.
+            caught(channel.acceptance);
 
-        // We *will* recognize rejection of this promise. But just in case sendFrameAsync completes synchronously,
-        // we want to signify that we *will* catch it first to avoid node.js emitting warnings or crashing.
-        caught(channel.acceptance);
+            await this.sendFrameAsync(header, payload, cancellationToken);
+            await channel.acceptance;
 
-        await this.sendFrameAsync(header, payload, cancellationToken);
-        await channel.acceptance;
-
-        return channel;
+            return channel;
+        } finally {
+            unsubscribeFromCT();
+        }
     }
 
     /**
@@ -306,13 +305,13 @@ export abstract class MultiplexingStream implements IDisposableObservable {
             this.acceptChannelOrThrow(channel, options);
             return channel;
         } else {
-            // .NET lets us delete these these CancellationToken "registrations"
-            // to avoid a memory leak when the provided token is long-lived and
-            // never canceled. But JavaScript promises do not offer this.
-            // https://github.com/conradreuter/cancellationtoken/issues/1
-            cancellationToken.whenCancelled.then(
+            const unsubscribeFromCT = cancellationToken.onCancelled(
                 (reason) => this.acceptChannelCanceled(pendingAcceptChannel, name, reason));
-            return await pendingAcceptChannel.promise;
+            try {
+                return await pendingAcceptChannel.promise;
+            } finally {
+                unsubscribeFromCT();
+            }
         }
     }
 
@@ -394,7 +393,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      * @param reason The reason for cancellation.
      */
     private acceptChannelCanceled(channel: Deferred<ChannelClass>, name: string, reason: any) {
-        if (channel.reject(new CancellationToken.Cancelled(reason))) {
+        if (channel.reject(new CancellationToken.CancellationError(reason))) {
             removeFromQueue(channel, this.acceptingChannels[name]);
         }
     }
@@ -403,8 +402,8 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      * Responds to cancellation of a prior call to offerChannelAsync.
      * @param channel The channel previously offered.
      */
-    private offerChannelCanceled(channel: ChannelClass) {
-        channel.tryCancelOffer();
+    private offerChannelCanceled(channel: ChannelClass, reason: any) {
+        channel.tryCancelOffer(reason);
     }
 
     /**
