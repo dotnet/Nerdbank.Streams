@@ -45,7 +45,7 @@ The following demonstrates wrapping a `PipeWriter` in a `Stream` and writing to 
 PipeWriter writer; // obtained some other way
 Stream writerStream = writer.AsStream();
 byte[] buffer = { 0x1, 0x2, 0x3 };
-await writerStream.WriterAsync(buffer, 0, buffer.Length);
+await writerStream.WriteAsync(buffer, 0, buffer.Length);
 ```
 
 Given an `IDuplexPipe` (which allows two-way communication over a `PipeReader`/`PipeWriter` pair),
@@ -57,7 +57,7 @@ Stream duplexStream = pipe.AsStream();
 
 // Write something
 byte[] writeBuffer = { 0x1, 0x2, 0x3 };
-await writerStream.WriterAsync(writeBuffer, 0, writeBuffer.Length);
+await writerStream.WriteAsync(writeBuffer, 0, writeBuffer.Length);
 
 // Read something
 byte[] readBuffer = new byte[10];
