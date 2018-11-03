@@ -293,6 +293,7 @@ namespace Nerdbank.Streams
         /// <param name="id">The <see cref="Channel.Id"/> of the channel to accept.</param>
         /// <param name="options">A set of options that describe local treatment of this channel.</param>
         /// <returns>The accepted <see cref="Channel"/>.</returns>
+        /// <exception cref="InvalidOperationException">Thrown if the channel is already accepted or is no longer offered by the remote party.</exception>
         /// <remarks>
         /// This method can be used to accept anonymous channels created with <see cref="CreateChannel"/>.
         /// Unlike <see cref="AcceptChannelAsync(string, ChannelOptions, CancellationToken)"/> which will await
@@ -418,6 +419,7 @@ namespace Nerdbank.Streams
         /// <remarks>
         /// If multiple offers exist with the specified <paramref name="name"/>, the first one received will be accepted.
         /// </remarks>
+        /// <exception cref="InvalidOperationException">Thrown if the channel is already accepted or is no longer offered by the remote party.</exception>
         /// <exception cref="OperationCanceledException">Thrown if <paramref name="cancellationToken"/> is canceled before a request to create the channel has been received.</exception>
         public async Task<Channel> AcceptChannelAsync(string name, ChannelOptions options = default, CancellationToken cancellationToken = default)
         {
