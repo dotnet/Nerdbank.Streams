@@ -4,6 +4,7 @@
 namespace Nerdbank.Streams
 {
     using System;
+    using System.Buffers;
     using System.Collections.Generic;
     using System.IO;
     using System.IO.Pipelines;
@@ -17,7 +18,7 @@ namespace Nerdbank.Streams
     /// A <see cref="Stream"/> that acts as a queue for bytes, in that what gets written to it
     /// can then be read from it, in order.
     /// </summary>
-    public class HalfDuplexStream : Stream, IDisposableObservable
+    public class HalfDuplexStream : Stream, IBufferWriter<byte>, IDisposableObservable
     {
         /// <summary>
         /// The pipe that does all the hard work.
@@ -107,16 +108,21 @@ namespace Nerdbank.Streams
         }
 
         /// <inheritdoc />
-        public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
-            Requires.NotNull(buffer, nameof(buffer));
-            Requires.Range(offset + count <= buffer.Length, nameof(count));
-            Requires.Range(offset >= 0, nameof(offset));
-            Requires.Range(count >= 0, nameof(count));
-            Verify.NotDisposed(this);
-
-            await this.pipe.Writer.WriteAsync(new ReadOnlyMemory<byte>(buffer, offset, count)).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            this.Write(buffer, offset, count);
+            return Task.CompletedTask;
         }
+
+        /// <inheritdoc />
+        void IBufferWriter<byte>.Advance(int count) => this.pipe.Writer.Advance(count);
+
+        /// <inheritdoc />
+        Memory<byte> IBufferWriter<byte>.GetMemory(int sizeHint) => this.pipe.Writer.GetMemory(sizeHint);
+
+        /// <inheritdoc />
+        Span<byte> IBufferWriter<byte>.GetSpan(int sizeHint) => this.pipe.Writer.GetSpan(sizeHint);
 
 #pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
 
@@ -124,7 +130,18 @@ namespace Nerdbank.Streams
         public override int Read(byte[] buffer, int offset, int count) => this.ReadAsync(buffer, offset, count).GetAwaiter().GetResult();
 
         /// <inheritdoc />
-        public override void Write(byte[] buffer, int offset, int count) => this.WriteAsync(buffer, offset, count).GetAwaiter().GetResult();
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            Requires.NotNull(buffer, nameof(buffer));
+            Requires.Range(offset + count <= buffer.Length, nameof(count));
+            Requires.Range(offset >= 0, nameof(offset));
+            Requires.Range(count >= 0, nameof(count));
+            Verify.NotDisposed(this);
+
+            var memory = this.pipe.Writer.GetMemory(count);
+            buffer.AsMemory(offset, count).CopyTo(memory);
+            this.pipe.Writer.Advance(count);
+        }
 
         /// <inheritdoc />
         public override void Flush() => this.FlushAsync().GetAwaiter().GetResult();
