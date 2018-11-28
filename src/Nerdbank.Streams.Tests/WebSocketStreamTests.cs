@@ -245,6 +245,7 @@ public partial class WebSocketStreamTests : TestBase
         const int writeCount = 10;
         var buffer = new byte[5];
         await Task.WhenAll(Enumerable.Range(0, writeCount).Select(i => this.stream.WriteAsync(buffer, 0, buffer.Length, this.TimeoutToken)));
+        await this.stream.FlushAsync(this.TimeoutToken);
 
         var recvBuffer = new byte[buffer.Length * writeCount];
         int bytesRead = 0;

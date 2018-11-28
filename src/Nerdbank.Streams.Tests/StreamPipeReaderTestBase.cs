@@ -92,6 +92,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
         byte[] expectedBuffer = this.GetRandomBuffer(2048);
         var stream = new HalfDuplexStream();
         stream.Write(expectedBuffer, 0, 50);
+        await stream.FlushAsync(this.TimeoutToken);
         var reader = this.CreatePipeReader(stream, sizeHint: 50);
         byte[] actualBuffer = new byte[expectedBuffer.Length];
 
@@ -109,12 +110,14 @@ public abstract class StreamPipeReaderTestBase : TestBase
         ValueTask<ReadResult> resultTask2 = reader.ReadAsync(this.TimeoutToken);
         Assert.False(resultTask2.IsCompleted);
         stream.Write(expectedBuffer, 50, 50);
+        await stream.FlushAsync(this.TimeoutToken);
         var result2 = await resultTask2;
         Assert.True(result2.Buffer.Length > result.Buffer.Length);
 
         // Now consume everything and get even more.
         reader.AdvanceTo(result2.Buffer.End);
         stream.Write(expectedBuffer, 100, expectedBuffer.Length - 100);
+        await stream.FlushAsync(this.TimeoutToken);
         ReadResult result3 = await reader.ReadAsync(this.TimeoutToken);
         Assert.True(result3.Buffer.Length > 0);
     }

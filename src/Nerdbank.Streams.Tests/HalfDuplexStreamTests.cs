@@ -108,6 +108,7 @@ public class HalfDuplexStreamTests : TestBase
     {
         byte[] sendBuffer = this.GetRandomBuffer(20);
         await this.WriteAsync(sendBuffer, 0, sendBuffer.Length, useAsync);
+        await this.stream.FlushAsync(this.TimeoutToken);
         byte[] recvBuffer = new byte[sendBuffer.Length];
         await this.ReadAsync(this.stream, recvBuffer, isAsync: useAsync);
         Assert.Equal(sendBuffer, recvBuffer);
@@ -150,6 +151,7 @@ public class HalfDuplexStreamTests : TestBase
 
         // Write the balance of the bytes
         await this.WriteAsync(sendBuffer, bytesWritten, bytes - bytesWritten, useAsync);
+        await this.stream.FlushAsync(this.TimeoutToken);
 
         byte[] recvBuffer = new byte[sendBuffer.Length];
         await this.ReadAsync(this.stream, recvBuffer, isAsync: useAsync);
@@ -199,6 +201,7 @@ public class HalfDuplexStreamTests : TestBase
     {
         byte[] sendBuffer = new byte[] { 0x1, 0x2 };
         await this.WriteAsync(sendBuffer, 0, sendBuffer.Length, useAsync);
+        await this.stream.FlushAsync(this.TimeoutToken);
         int bytesRead;
         byte[] recvBuffer = new byte[5];
         if (useAsync)
@@ -221,6 +224,7 @@ public class HalfDuplexStreamTests : TestBase
         byte[] recvBuffer = new byte[sendBuffer.Length];
         Task readTask = this.ReadAsync(this.stream, recvBuffer);
         await this.stream.WriteAsync(sendBuffer, 0, sendBuffer.Length).WithCancellation(this.TimeoutToken);
+        await this.stream.FlushAsync(this.TimeoutToken);
         await readTask.WithCancellation(this.TimeoutToken);
         Assert.Equal(sendBuffer, recvBuffer);
     }
