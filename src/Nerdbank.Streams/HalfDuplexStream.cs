@@ -4,6 +4,7 @@
 namespace Nerdbank.Streams
 {
     using System;
+    using System.Buffers;
     using System.Collections.Generic;
     using System.IO;
     using System.IO.Pipelines;
@@ -17,7 +18,7 @@ namespace Nerdbank.Streams
     /// A <see cref="Stream"/> that acts as a queue for bytes, in that what gets written to it
     /// can then be read from it, in order.
     /// </summary>
-    public class HalfDuplexStream : Stream, IDisposableObservable
+    public class HalfDuplexStream : Stream, IBufferWriter<byte>, IDisposableObservable
     {
         /// <summary>
         /// The pipe that does all the hard work.
@@ -113,6 +114,15 @@ namespace Nerdbank.Streams
             this.Write(buffer, offset, count);
             return Task.CompletedTask;
         }
+
+        /// <inheritdoc />
+        void IBufferWriter<byte>.Advance(int count) => this.pipe.Writer.Advance(count);
+
+        /// <inheritdoc />
+        Memory<byte> IBufferWriter<byte>.GetMemory(int sizeHint) => this.pipe.Writer.GetMemory(sizeHint);
+
+        /// <inheritdoc />
+        Span<byte> IBufferWriter<byte>.GetSpan(int sizeHint) => this.pipe.Writer.GetSpan(sizeHint);
 
 #pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
 

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -239,6 +240,19 @@ public class HalfDuplexStreamTests : TestBase
         await this.ReadAsync(this.stream, recvbuffer, count: 3, isAsync: useAsync);
         Assert.Equal(0, await this.stream.ReadAsync(recvbuffer, 3, 2, this.TimeoutToken).WithCancellation(this.TimeoutToken));
         Assert.Equal(0, this.stream.Read(recvbuffer, 3, 2));
+    }
+
+    [Fact]
+    public async Task StreamAsBufferWriter()
+    {
+        IBufferWriter<byte> writer = this.stream;
+        writer.Write(new byte[] { 1, 2, 3 });
+        writer.Write(new byte[] { 4, 5, 6, 7, 8, 9 });
+        await this.stream.FlushAsync(this.TimeoutToken);
+        var readBuffer = new byte[10];
+        int bytesRead = await this.stream.ReadAsync(readBuffer, 0, 10, this.TimeoutToken);
+        Assert.Equal(9, bytesRead);
+        Assert.Equal(Enumerable.Range(1, 9).Select(i => (byte)i), readBuffer.Take(bytesRead));
     }
 
     protected override void Dispose(bool disposing)
