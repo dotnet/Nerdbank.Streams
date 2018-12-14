@@ -127,7 +127,7 @@ namespace Nerdbank.Streams
             {
                 try
                 {
-                    int bytesRead = await this.stream.ReadAsync(memory, cts.Token);
+                    int bytesRead = await this.stream.ReadAsync(memory, cts.Token).ConfigureAwait(false);
                     if (bytesRead == 0)
                     {
                         this.CompleteWriting();

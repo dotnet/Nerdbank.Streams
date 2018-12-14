@@ -170,7 +170,9 @@ namespace Nerdbank.Streams
                 throw new NotSupportedException();
             }
 
+#pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
             ReadResult readResult = this.reader.ReadAsync().GetAwaiter().GetResult();
+#pragma warning restore VSTHRD002 // Avoid problematic synchronous waits
             return this.ReadHelper(buffer, readResult);
         }
 

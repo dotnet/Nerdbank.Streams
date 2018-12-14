@@ -64,7 +64,7 @@ namespace Nerdbank.Streams
                     Memory<byte> memory = pipe.Writer.GetMemory(sizeHint);
                     try
                     {
-                        int bytesRead = await stream.ReadAsync(memory, cancellationToken);
+                        int bytesRead = await stream.ReadAsync(memory, cancellationToken).ConfigureAwait(false);
                         if (bytesRead == 0)
                         {
                             break;
@@ -78,7 +78,7 @@ namespace Nerdbank.Streams
                         throw;
                     }
 
-                    FlushResult result = await pipe.Writer.FlushAsync();
+                    FlushResult result = await pipe.Writer.FlushAsync().ConfigureAwait(false);
                     if (result.IsCompleted)
                     {
                         break;
@@ -128,12 +128,12 @@ namespace Nerdbank.Streams
                 {
                     while (!cancellationToken.IsCancellationRequested)
                     {
-                        ReadResult readResult = await pipe.Reader.ReadAsync(cancellationToken);
+                        ReadResult readResult = await pipe.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
                         if (readResult.Buffer.Length > 0)
                         {
                             foreach (ReadOnlyMemory<byte> segment in readResult.Buffer)
                             {
-                                await stream.WriteAsync(segment, cancellationToken);
+                                await stream.WriteAsync(segment, cancellationToken).ConfigureAwait(false);
                             }
 
                             await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
@@ -209,7 +209,7 @@ namespace Nerdbank.Streams
                     Memory<byte> memory = pipe.Writer.GetMemory(sizeHint);
                     try
                     {
-                        var readResult = await webSocket.ReceiveAsync(memory, cancellationToken);
+                        var readResult = await webSocket.ReceiveAsync(memory, cancellationToken).ConfigureAwait(false);
                         if (readResult.Count == 0)
                         {
                             break;
@@ -223,7 +223,7 @@ namespace Nerdbank.Streams
                         throw;
                     }
 
-                    FlushResult result = await pipe.Writer.FlushAsync();
+                    FlushResult result = await pipe.Writer.FlushAsync().ConfigureAwait(false);
                     if (result.IsCompleted)
                     {
                         break;
@@ -255,12 +255,12 @@ namespace Nerdbank.Streams
                 {
                     while (!cancellationToken.IsCancellationRequested)
                     {
-                        ReadResult readResult = await pipe.Reader.ReadAsync(cancellationToken);
+                        ReadResult readResult = await pipe.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
                         if (readResult.Buffer.Length > 0)
                         {
                             foreach (ReadOnlyMemory<byte> segment in readResult.Buffer)
                             {
-                                await webSocket.SendAsync(segment, WebSocketMessageType.Binary, endOfMessage: true, cancellationToken);
+                                await webSocket.SendAsync(segment, WebSocketMessageType.Binary, endOfMessage: true, cancellationToken).ConfigureAwait(false);
                             }
                         }
 

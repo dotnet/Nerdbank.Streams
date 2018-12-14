@@ -45,9 +45,9 @@ internal class ProcessJobTracker : IDisposable
         string jobName = nameof(ProcessJobTracker) + Process.GetCurrentProcess().Id;
         this.jobHandle = CreateJobObject(IntPtr.Zero, jobName);
 
-        var extendedInfo = new JOB_OBJECT_EXTENDED_LIMIT_INFORMATION
+        var extendedInfo = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION
         {
-            BasicLimitInformation = new JOB_OBJECT_BASIC_LIMIT_INFORMATION
+            BasicLimitInformation = new JOBOBJECT_BASIC_LIMIT_INFORMATION
             {
                 LimitFlags = JOB_OBJECT_LIMIT_FLAGS.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
             },
@@ -62,14 +62,14 @@ internal class ProcessJobTracker : IDisposable
             Marshal.StructureToPtr(extendedInfo, pExtendedInfo, fDeleteOld: false);
             try
             {
-                if (!SetInformationJobObject(this.jobHandle, JOBOBJECT_INFO_CLASS.JobObjectExtendedLimitInformation, pExtendedInfo, (uint)length))
+                if (!SetInformationJobObject(this.jobHandle, JOBOBJECTINFOCLASS.JobObjectExtendedLimitInformation, pExtendedInfo, (uint)length))
                 {
                     throw new Win32Exception();
                 }
             }
             finally
             {
-                Marshal.DestroyStructure<JOB_OBJECT_EXTENDED_LIMIT_INFORMATION>(pExtendedInfo);
+                Marshal.DestroyStructure<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>(pExtendedInfo);
             }
         }
         finally

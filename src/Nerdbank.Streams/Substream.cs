@@ -166,7 +166,7 @@ namespace Nerdbank.Streams
             else
             {
                 int totalCount = this.count + count;
-                await this.WriteLengthHeaderAsync(totalCount, cancellationToken);
+                await this.WriteLengthHeaderAsync(totalCount, cancellationToken).ConfigureAwait(false);
                 await this.underlyingStream.WriteAsync(this.buffer, 0, this.count).ConfigureAwait(false);
                 await this.underlyingStream.WriteAsync(buffer, offset, count).ConfigureAwait(false);
                 this.count = 0;
