@@ -148,6 +148,22 @@ public class BufferWriterStreamTests : TestBase
         Assert.Equal(5, this.sequence.AsReadOnlySequence.Length);
     }
 
+#if NETCOREAPP2_1
+
+    [Fact]
+    public void Write_Span()
+    {
+        this.stream.Write(new byte[] { 1, 2, 3, 4, 5 }.AsSpan(1, 3));
+        Assert.Equal(new byte[] { 2, 3, 4 }, this.sequence.AsReadOnlySequence.ToArray());
+        this.stream.Write(new byte[] { 5, 6 }.AsSpan(0, 2));
+        Assert.Equal(new byte[] { 2, 3, 4, 5, 6 }, this.sequence.AsReadOnlySequence.ToArray());
+
+        this.stream.Write(new byte[0].AsSpan(0, 0));
+        Assert.Equal(5, this.sequence.AsReadOnlySequence.Length);
+    }
+
+#endif
+
     [Fact]
     public void WriteAsync_ReturnsSynchronously()
     {
@@ -165,6 +181,22 @@ public class BufferWriterStreamTests : TestBase
         await this.stream.WriteAsync(new byte[0], 0, 0);
         Assert.Equal(5, this.sequence.AsReadOnlySequence.Length);
     }
+
+#if NETCOREAPP2_1
+
+    [Fact]
+    public async Task WriteAsync_Memory()
+    {
+        await this.stream.WriteAsync(new byte[] { 1, 2, 3, 4, 5 }.AsMemory(1, 3));
+        Assert.Equal(new byte[] { 2, 3, 4 }, this.sequence.AsReadOnlySequence.ToArray());
+        await this.stream.WriteAsync(new byte[] { 5, 6 }.AsMemory(0, 2));
+        Assert.Equal(new byte[] { 2, 3, 4, 5, 6 }, this.sequence.AsReadOnlySequence.ToArray());
+
+        await this.stream.WriteAsync(new byte[0].AsMemory(0, 0));
+        Assert.Equal(5, this.sequence.AsReadOnlySequence.Length);
+    }
+
+#endif
 
     [Fact]
     public void WriteByte()
@@ -195,15 +227,27 @@ public class BufferWriterStreamTests : TestBase
     public void Read_IsNotSupported()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.Read(new byte[1], 0, 1));
+#if NETCOREAPP2_1
+        Assert.Throws<NotSupportedException>(() => this.stream.Read(new byte[1].AsSpan(0, 1)));
+#endif
         this.stream.Dispose();
         Assert.Throws<ObjectDisposedException>(() => this.stream.Read(new byte[1], 0, 1));
+#if NETCOREAPP2_1
+        Assert.Throws<ObjectDisposedException>(() => this.stream.Read(new byte[1].AsSpan(0, 1)));
+#endif
     }
 
     [Fact]
     public async Task ReadAsync_IsNotSupported()
     {
         await Assert.ThrowsAsync<NotSupportedException>(() => this.stream.ReadAsync(new byte[1], 0, 1));
+#if NETCOREAPP2_1
+        await Assert.ThrowsAsync<NotSupportedException>(() => this.stream.ReadAsync(new byte[1].AsMemory(0, 1)).AsTask());
+#endif
         this.stream.Dispose();
         await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream.ReadAsync(new byte[1], 0, 1));
+#if NETCOREAPP2_1
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream.ReadAsync(new byte[1].AsMemory(0, 1)).AsTask());
+#endif
     }
 }

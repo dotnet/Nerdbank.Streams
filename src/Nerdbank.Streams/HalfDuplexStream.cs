@@ -75,7 +75,7 @@ namespace Nerdbank.Streams
         public void CompleteWriting() => this.pipe.Writer.Complete();
 
         /// <inheritdoc />
-        public override async Task FlushAsync(CancellationToken cancellationToken) => await this.pipe.Writer.FlushAsync(cancellationToken);
+        public override async Task FlushAsync(CancellationToken cancellationToken) => await this.pipe.Writer.FlushAsync(cancellationToken).ConfigureAwait(false);
 
         /// <inheritdoc />
         public override long Seek(long offset, SeekOrigin origin) => throw this.ThrowDisposedOr(new NotSupportedException());
@@ -91,7 +91,7 @@ namespace Nerdbank.Streams
             Requires.Range(offset >= 0, nameof(offset));
             Requires.Range(count > 0, nameof(count));
 
-            ReadResult readResult = await this.pipe.Reader.ReadAsync(cancellationToken);
+            ReadResult readResult = await this.pipe.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
             int bytesRead = 0;
             System.Buffers.ReadOnlySequence<byte> slice = readResult.Buffer.Slice(0, Math.Min(count, readResult.Buffer.Length));
             foreach (ReadOnlyMemory<byte> span in slice)
