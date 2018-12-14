@@ -38,7 +38,6 @@ jobs:
       feedsToUse: config
       nugetConfigPath: src/nuget.config
 
-  # Use VSBuild on Windows so GitLink will work (it fails on dotnet build)
   - task: VSBuild@1
     inputs:
       vsVersion: 15.0
@@ -141,8 +140,6 @@ jobs:
   pool:
     vmImage: Ubuntu 16.04
   container: xenial
-  variables:
-    GitLinkEnabled: false
   steps:
   - template: azure-pipelines/testfx.yml
     parameters:
@@ -154,8 +151,6 @@ jobs:
 - job: macOS
   pool:
     vmImage: macOS 10.13
-  variables:
-    GitLinkEnabled: false
   steps:
   - template: azure-pipelines/testfx.yml
     parameters:
