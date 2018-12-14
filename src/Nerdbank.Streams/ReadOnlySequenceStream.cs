@@ -171,6 +171,33 @@ namespace Nerdbank.Streams
             }
         }
 
+#if NETCOREAPP2_1
+
+        /// <inheritdoc/>
+        public override int Read(Span<byte> buffer)
+        {
+            ReadOnlySequence<byte> remaining = this.readOnlySequence.Slice(this.position);
+            ReadOnlySequence<byte> toCopy = remaining.Slice(0, Math.Min(buffer.Length, remaining.Length));
+            this.position = toCopy.End;
+            toCopy.CopyTo(buffer);
+            return (int)toCopy.Length;
+        }
+
+        /// <inheritdoc/>
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new ValueTask<int>(this.Read(buffer.Span));
+        }
+
+        /// <inheritdoc/>
+        public override void Write(ReadOnlySpan<byte> buffer) => throw this.ThrowDisposedOr(new NotSupportedException());
+
+        /// <inheritdoc/>
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) => throw this.ThrowDisposedOr(new NotSupportedException());
+
+#endif
+
         /// <inheritdoc/>
         protected override void Dispose(bool disposing)
         {

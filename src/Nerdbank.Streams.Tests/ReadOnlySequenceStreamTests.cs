@@ -150,16 +150,28 @@ public class ReadOnlySequenceStreamTests : TestBase
     public void Write()
     {
         Assert.Throws<NotSupportedException>(() => this.defaultStream.Write(new byte[1], 0, 1));
+#if NETCOREAPP2_1
+        Assert.Throws<NotSupportedException>(() => this.defaultStream.Write(new byte[1].AsSpan(0, 1)));
+#endif
         this.defaultStream.Dispose();
         Assert.Throws<ObjectDisposedException>(() => this.defaultStream.Write(new byte[1], 0, 1));
+#if NETCOREAPP2_1
+        Assert.Throws<ObjectDisposedException>(() => this.defaultStream.Write(new byte[1].AsSpan(0, 1)));
+#endif
     }
 
     [Fact]
     public async Task WriteAsync()
     {
         await Assert.ThrowsAsync<NotSupportedException>(() => this.defaultStream.WriteAsync(new byte[1], 0, 1));
+#if NETCOREAPP2_1
+        await Assert.ThrowsAsync<NotSupportedException>(() => this.defaultStream.WriteAsync(new byte[1].AsMemory(0, 1)).AsTask());
+#endif
         this.defaultStream.Dispose();
         await Assert.ThrowsAsync<ObjectDisposedException>(() => this.defaultStream.WriteAsync(new byte[1], 0, 1));
+#if NETCOREAPP2_1
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.defaultStream.WriteAsync(new byte[1].AsMemory(0, 1)).AsTask());
+#endif
     }
 
     [Fact]
@@ -260,6 +272,31 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.Equal(9, stream.Position);
     }
 
+#if NETCOREAPP2_1
+
+    [Fact]
+    public void Read_Span()
+    {
+        var stream = MultiBlockSequence.AsStream();
+        var buffer = new byte[MultiBlockSequence.Length + 2];
+        Assert.Equal(2, stream.Read(buffer.AsSpan(0, 2)));
+        Assert.Equal(new byte[] { 1, 2, 0 }, buffer.Take(3));
+        Assert.Equal(2, stream.Position);
+
+        Assert.Equal(2, stream.Read(buffer.AsSpan(3, 2)));
+        Assert.Equal(new byte[] { 1, 2, 0, 3, 4, 0 }, buffer.Take(6));
+
+        Assert.Equal(5, stream.Read(buffer.AsSpan(5, buffer.Length - 5)));
+        Assert.Equal(new byte[] { 1, 2, 0, 3, 4, 5, 6, 7, 8, 9, 0 }, buffer);
+        Assert.Equal(9, stream.Position);
+
+        Assert.Equal(0, stream.Read(buffer.AsSpan(0, buffer.Length)));
+        Assert.Equal(0, stream.Read(buffer.AsSpan(0, buffer.Length)));
+        Assert.Equal(9, stream.Position);
+    }
+
+#endif
+
     [Fact]
     public void ReadAsync_ReturnsSynchronously()
     {
@@ -302,6 +339,31 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.Equal(0, await stream.ReadAsync(buffer, 0, buffer.Length));
         Assert.Equal(9, stream.Position);
     }
+
+#if NETCOREAPP2_1
+
+    [Fact]
+    public async Task ReadAsync_Memory_Works()
+    {
+        var stream = MultiBlockSequence.AsStream();
+        var buffer = new byte[MultiBlockSequence.Length + 2];
+        Assert.Equal(2, await stream.ReadAsync(buffer.AsMemory(0, 2)));
+        Assert.Equal(new byte[] { 1, 2, 0 }, buffer.Take(3));
+        Assert.Equal(2, stream.Position);
+
+        Assert.Equal(2, await stream.ReadAsync(buffer.AsMemory(3, 2)));
+        Assert.Equal(new byte[] { 1, 2, 0, 3, 4, 0 }, buffer.Take(6));
+
+        Assert.Equal(5, await stream.ReadAsync(buffer.AsMemory(5, buffer.Length - 5)));
+        Assert.Equal(new byte[] { 1, 2, 0, 3, 4, 5, 6, 7, 8, 9, 0 }, buffer);
+        Assert.Equal(9, stream.Position);
+
+        Assert.Equal(0, await stream.ReadAsync(buffer.AsMemory(0, buffer.Length)));
+        Assert.Equal(0, await stream.ReadAsync(buffer.AsMemory(0, buffer.Length)));
+        Assert.Equal(9, stream.Position);
+    }
+
+#endif
 
     [Fact]
     public async Task CopyToAsync()
