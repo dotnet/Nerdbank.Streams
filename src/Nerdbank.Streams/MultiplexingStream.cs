@@ -426,55 +426,62 @@ namespace Nerdbank.Streams
             Requires.NotNull(name, nameof(name));
             Verify.NotDisposed(this);
 
-            Channel channel = null;
-            TaskCompletionSource<Channel> pendingAcceptChannel = null;
-            lock (this.syncObject)
+            while (true)
             {
-                if (this.channelsOfferedByThemByName.TryGetValue(name, out var channelsOfferedByThem))
+                Channel channel = null;
+                TaskCompletionSource<Channel> pendingAcceptChannel = null;
+                lock (this.syncObject)
                 {
-                    while (channel == null && channelsOfferedByThem.Count > 0)
+                    if (this.channelsOfferedByThemByName.TryGetValue(name, out var channelsOfferedByThem))
                     {
-                        channel = channelsOfferedByThem.Dequeue();
-                        if (channel.Acceptance.IsCompleted)
+                        while (channel == null && channelsOfferedByThem.Count > 0)
                         {
-                            channel = null;
-                            continue;
-                        }
+                            channel = channelsOfferedByThem.Dequeue();
+                            if (channel.Acceptance.IsCompleted)
+                            {
+                                channel = null;
+                                continue;
+                            }
 
+                            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                            {
+                                this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.AcceptChannelAlreadyOffered, "Accepting channel {1} \"{0}\" which is already offered by the other side.", name, channel.Id);
+                            }
+                        }
+                    }
+
+                    if (channel == null)
+                    {
                         if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
                         {
-                            this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.AcceptChannelAlreadyOffered, "Accepting channel {1} \"{0}\" which is already offered by the other side.", name, channel.Id);
+                            this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.AcceptChannelWaiting, "Waiting to accept channel \"{0}\", when offered by the other side.", name);
                         }
+
+                        if (!this.acceptingChannels.TryGetValue(name, out var acceptingChannels))
+                        {
+                            this.acceptingChannels.Add(name, acceptingChannels = new Queue<TaskCompletionSource<Channel>>());
+                        }
+
+                        pendingAcceptChannel = new TaskCompletionSource<Channel>(options);
+                        acceptingChannels.Enqueue(pendingAcceptChannel);
                     }
                 }
 
-                if (channel == null)
+                if (channel != null)
                 {
-                    if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                    // In a race condition with the channel offer being canceled, we may fail to accept the channel.
+                    // In that case, we'll just loop back around and wait for another one.
+                    if (this.TryAcceptChannel(channel, options))
                     {
-                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.AcceptChannelWaiting, "Waiting to accept channel \"{0}\", when offered by the other side.", name);
+                        return channel;
                     }
-
-                    if (!this.acceptingChannels.TryGetValue(name, out var acceptingChannels))
-                    {
-                        this.acceptingChannels.Add(name, acceptingChannels = new Queue<TaskCompletionSource<Channel>>());
-                    }
-
-                    pendingAcceptChannel = new TaskCompletionSource<Channel>(options);
-                    acceptingChannels.Enqueue(pendingAcceptChannel);
                 }
-            }
-
-            if (channel != null)
-            {
-                this.AcceptChannelOrThrow(channel, options);
-                return channel;
-            }
-            else
-            {
-                using (cancellationToken.Register(this.AcceptChannelCanceled, Tuple.Create(pendingAcceptChannel, name), false))
+                else
                 {
-                    return await pendingAcceptChannel.Task.ConfigureAwait(false);
+                    using (cancellationToken.Register(this.AcceptChannelCanceled, Tuple.Create(pendingAcceptChannel, name), false))
+                    {
+                        return await pendingAcceptChannel.Task.ConfigureAwait(false);
+                    }
                 }
             }
         }
@@ -784,25 +791,35 @@ namespace Nerdbank.Streams
             this.OnChannelOffered(args);
         }
 
-        private void AcceptChannelOrThrow(Channel channel, ChannelOptions options)
+        private bool TryAcceptChannel(Channel channel, ChannelOptions options)
         {
             Requires.NotNull(channel, nameof(channel));
 
             if (channel.TryAcceptOffer(options))
             {
                 this.SendFrame(ControlCode.OfferAccepted, channel.Id);
+                return true;
             }
-            else if (channel.IsAccepted)
+
+            return false;
+        }
+
+        private void AcceptChannelOrThrow(Channel channel, ChannelOptions options)
+        {
+            if (!this.TryAcceptChannel(channel, options))
             {
-                throw new InvalidOperationException("Channel is already accepted.");
-            }
-            else if (channel.IsRejectedOrCanceled)
-            {
-                throw new InvalidOperationException("Channel is no longer available for acceptance.");
-            }
-            else
-            {
-                throw new InvalidOperationException("Channel could not be accepted.");
+                if (channel.IsAccepted)
+                {
+                    throw new InvalidOperationException("Channel is already accepted.");
+                }
+                else if (channel.IsRejectedOrCanceled)
+                {
+                    throw new InvalidOperationException("Channel is no longer available for acceptance.");
+                }
+                else
+                {
+                    throw new InvalidOperationException("Channel could not be accepted.");
+                }
             }
         }
 
