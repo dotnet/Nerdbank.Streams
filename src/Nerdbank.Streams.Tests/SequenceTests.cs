@@ -125,6 +125,14 @@ public class SequenceTests : TestBase
     }
 
     [Fact]
+    public void Advance_TooFar()
+    {
+        var seq = new Sequence<char>();
+        var mem1 = seq.GetMemory(3);
+        Assert.Throws<ArgumentOutOfRangeException>(() => seq.Advance(mem1.Length + 1));
+    }
+
+    [Fact]
     public void AdvanceTo_ReturnsArraysToPool()
     {
         MockPool<char> mockPool = new MockPool<char>();
