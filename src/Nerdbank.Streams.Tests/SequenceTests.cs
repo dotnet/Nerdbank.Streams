@@ -70,6 +70,28 @@ public class SequenceTests : TestBase
         mockPool.AssertContents(mem1);
     }
 
+    /// <summary>
+    /// Verifies that folks can "reserve" space for a header, write content, then circle back and write
+    /// the header later.
+    /// </summary>
+    /// <seealso href="https://github.com/dotnet/corefx/issues/34259"/>
+    [Fact]
+    public void GetSpan_ReservesHeaderSpaceForWritingLater()
+    {
+        var seq = new Sequence<char>();
+
+        var headerSpan = seq.GetSpan(4);
+        seq.Advance(4);
+
+        var contentSpan = seq.GetSpan(10);
+        "0123456789".AsSpan().CopyTo(contentSpan);
+        seq.Advance(10);
+
+        "abcd".AsSpan().CopyTo(headerSpan);
+
+        Assert.Equal("abcd0123456789", new string(seq.AsReadOnlySequence.ToArray()));
+    }
+
     [Fact]
     public void Advance_OneBlock()
     {
