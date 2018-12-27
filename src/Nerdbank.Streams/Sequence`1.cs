@@ -32,7 +32,8 @@ namespace Nerdbank.Streams
         private SequenceSegment last;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="Sequence{T}"/> class.
+        /// Initializes a new instance of the <see cref="Sequence{T}"/> class
+        /// that uses the <see cref="MemoryPool{T}.Shared"/> memory pool for recycling arrays.
         /// </summary>
         public Sequence()
             : this(MemoryPool<T>.Shared)
@@ -175,12 +176,14 @@ namespace Nerdbank.Streams
         /// <summary>
         /// Clears the entire sequence, recycles associated memory into pools,
         /// and resets this instance for reuse.
+        /// This invalidates any <see cref="ReadOnlySequence{T}"/> previously produced by this instance.
         /// </summary>
         [EditorBrowsable(EditorBrowsableState.Never)]
         public void Dispose() => this.Reset();
 
         /// <summary>
         /// Clears the entire sequence and recycles associated memory into pools.
+        /// This invalidates any <see cref="ReadOnlySequence{T}"/> previously produced by this instance.
         /// </summary>
         public void Reset()
         {
