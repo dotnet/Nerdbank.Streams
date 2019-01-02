@@ -18,7 +18,7 @@ namespace Nerdbank.Streams
     /// <remarks>
     /// Instance members are not thread-safe.
     /// </remarks>
-    [DebuggerDisplay("{" + nameof(DebuggerDisplay) + "}")]
+    [DebuggerDisplay("{" + nameof(DebuggerDisplay) + ",nq}")]
     public class Sequence<T> : IBufferWriter<T>, IDisposable
     {
         private const int DefaultBufferSize = 4 * 1024;
