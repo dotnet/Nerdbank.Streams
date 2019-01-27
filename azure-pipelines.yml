@@ -26,6 +26,12 @@ jobs:
     displayName: Set build number
     condition: ne(variables['system.pullrequest.isfork'], true)
 
+  - task: DotNetCoreInstaller@0
+    displayName: Install .NET Core SDK 2.1.503
+    inputs:
+      packageType: sdk
+      version: 2.1.503
+
   - script: dotnet --info
     displayName: Show dotnet SDK info
 
