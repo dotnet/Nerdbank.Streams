@@ -160,6 +160,7 @@ namespace Nerdbank.Streams
                     return true;
                 }
 
+                result = default;
                 return false;
             }
         }
