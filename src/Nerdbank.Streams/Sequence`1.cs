@@ -312,12 +312,24 @@ namespace Nerdbank.Streams
                 }
             }
 
+            /// <summary>
+            /// Gets the memory that has been allocated but not yet committed.
+            /// </summary>
             internal Memory<T> TrailingSlack => this.AvailableMemory.Slice(this.End);
 
+            /// <summary>
+            /// Gets the tracker for the underlying array for this segment, which can be used to recycle the array when we're disposed of.
+            /// </summary>
             internal IMemoryOwner<T> MemoryOwner { get; private set; }
 
-            internal Memory<T> AvailableMemory { get; private set; }
+            /// <summary>
+            /// Gets the full memory owned by the <see cref="MemoryOwner"/>.
+            /// </summary>
+            internal Memory<T> AvailableMemory => this.MemoryOwner?.Memory ?? default;
 
+            /// <summary>
+            /// Gets the number of elements that are committed in this segment.
+            /// </summary>
             internal int Length => this.End - this.Start;
 
             /// <summary>
@@ -330,22 +342,18 @@ namespace Nerdbank.Streams
                 get => this.AvailableMemory.Length - this.End;
             }
 
+            /// <summary>
+            /// Gets or sets the next segment in the singly linked list of segments.
+            /// </summary>
             internal new SequenceSegment Next
             {
                 get => (SequenceSegment)base.Next;
                 set => base.Next = value;
             }
 
-            internal void SetMemory(IMemoryOwner<T> memoryOwner)
-            {
-                this.SetMemory(memoryOwner, 0, memoryOwner.Memory.Length);
-            }
-
             internal void SetMemory(IMemoryOwner<T> memoryOwner, int start, int end)
             {
                 this.MemoryOwner = memoryOwner;
-
-                this.AvailableMemory = this.MemoryOwner.Memory;
 
                 this.RunningIndex = 0;
                 this.Start = start;
@@ -357,7 +365,6 @@ namespace Nerdbank.Streams
             {
                 this.MemoryOwner.Dispose();
                 this.MemoryOwner = null;
-                this.AvailableMemory = default;
 
                 this.Memory = default;
                 this.Next = null;
