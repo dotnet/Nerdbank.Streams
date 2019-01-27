@@ -251,13 +251,14 @@ public class FullDuplexStreamCombineTests : TestBase
     [Fact(Skip = "Moq lacks support for testing ReadOnlySpan<T> overloads")]
     public void Write_ReadOnlySpan()
     {
-        var writableMock = new Mock<Stream>(MockBehavior.Strict);
-        writableMock.SetupGet(s => s.CanWrite).Returns(true);
-        var buffer = new byte[3];
-        writableMock.Setup(s => s.Write(new ReadOnlySpan<byte>(buffer)));
-        var duplex = FullDuplexStream.Splice(Stream.Null, writableMock.Object);
-        duplex.Write(buffer);
-        writableMock.VerifyAll();
+        throw new NotImplementedException();
+        ////var writableMock = new Mock<Stream>(MockBehavior.Strict);
+        ////writableMock.SetupGet(s => s.CanWrite).Returns(true);
+        ////var buffer = new byte[3];
+        ////writableMock.Setup(s => s.Write(new ReadOnlySpan<byte>(buffer)));
+        ////var duplex = FullDuplexStream.Splice(Stream.Null, writableMock.Object);
+        ////duplex.Write(buffer);
+        ////writableMock.VerifyAll();
     }
 #endif
 
