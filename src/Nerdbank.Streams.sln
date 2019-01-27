@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.26823.1
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.28523.61
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nerdbank.Streams", "Nerdbank.Streams\Nerdbank.Streams.csproj", "{588B37F9-4102-4A6B-BA9E-769EDA0E89D5}"
 EndProject
@@ -10,6 +10,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		..\.appveyor.yml = ..\.appveyor.yml
 		..\.gitignore = ..\.gitignore
 		Directory.Build.props = Directory.Build.props
+		global.json = global.json
 		..\LICENSE.txt = ..\LICENSE.txt
 		nuget.config = nuget.config
 		..\README.md = ..\README.md
