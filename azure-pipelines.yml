@@ -43,6 +43,7 @@ jobs:
       projects: src/**/*.sln
       feedsToUse: config
       nugetConfigPath: src/nuget.config
+      workingDirectory: src
 
   - task: VSBuild@1
     inputs:
@@ -58,6 +59,7 @@ jobs:
       command: test
       projects: src/Nerdbank.Streams.Tests/Nerdbank.Streams.Tests.csproj
       arguments: --configuration $(BuildConfiguration) --no-build --filter "TestCategory!=FailsInCloudTest" -v n
+      workingDirectory: src
 
   - template: azure-pipelines/node.yml
     parameters:
