@@ -33,3 +33,5 @@ Specialized .NET Stream classes
    an unknown length as part of a larger stream, and later deserialize it such in reading the
    substream, you cannot read more bytes than were written to it.
 1. [`Sequence<T>`](doc/Sequence.md) is a builder for `ReadOnlySequence<T>`.
+1. [`PrefixingBufferWriter<T>`](doc/PrefixingBufferWriter.md) wraps another `IBufferWriter<T>`
+   to allow for prefixing some header to the next written buffer, which may be arbitrarily long.
