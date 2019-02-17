@@ -7,8 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nerdbank.Streams", "Nerdban
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{2B416DBB-F2EF-4815-A851-E14D5579055C}"
 	ProjectSection(SolutionItems) = preProject
-		..\.appveyor.yml = ..\.appveyor.yml
 		..\.gitignore = ..\.gitignore
+		..\azure-pipelines.yml = ..\azure-pipelines.yml
 		Directory.Build.props = Directory.Build.props
 		global.json = global.json
 		..\LICENSE.txt = ..\LICENSE.txt
