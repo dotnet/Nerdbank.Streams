@@ -51,6 +51,27 @@ namespace Nerdbank.Streams
         }
 
         /// <summary>
+        /// Gets or sets the minimum length for an allocated to store more data.
+        /// </summary>
+        /// <value>The default value is 32, but this may change in future versions to tune for more general applicability.</value>
+        /// <remarks>
+        /// <para>
+        /// Each time <see cref="GetSpan(int)"/> or <see cref="GetMemory(int)"/> is called,
+        /// previously allocated memory is used if it is large enough to satisfy the length demand.
+        /// If new memory must be allocated, the argument to one of these methods typically dictate
+        /// the length of array to allocate. When the caller uses very small values (just enough for its immediate need)
+        /// but the high level scenario can predict that a large amount of memory will be ultimately required,
+        /// it can be advisable to set this property to a value such that just a few larger arrays are allocated
+        /// instead of many small ones.
+        /// </para>
+        /// <para>
+        /// The <see cref="MemoryPool{T}"/> in use may itself have a minimum array length as well,
+        /// in which case the higher of the two minimums dictate the minimum array size that will be allocated.
+        /// </para>
+        /// </remarks>
+        public int MinimumSpanLength { get; set; } = 32;
+
+        /// <summary>
         /// Gets this sequence expressed as a <see cref="ReadOnlySequence{T}"/>.
         /// </summary>
         /// <returns>A read only sequence representing the data in this object.</returns>
@@ -160,7 +181,7 @@ namespace Nerdbank.Streams
 
             if (this.last == null || this.last.WritableBytes < sizeHint)
             {
-                this.Append(this.memoryPool.Rent(sizeHint));
+                this.Append(this.memoryPool.Rent(Math.Max(this.MinimumSpanLength, sizeHint)));
             }
 
             return this.last.TrailingSlack;

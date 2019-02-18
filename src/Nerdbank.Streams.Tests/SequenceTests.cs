@@ -30,7 +30,8 @@ public class SequenceTests : TestBase
     [Fact]
     public void GetMemory_Sizes()
     {
-        var seq = new Sequence<char>();
+        var seq = new Sequence<char>(new MockPool<char>());
+        seq.MinimumSpanLength = 1;
 
         var mem1 = seq.GetMemory(16);
         Assert.Equal(16, mem1.Length);
@@ -52,6 +53,7 @@ public class SequenceTests : TestBase
     {
         MockPool<char> mockPool = new MockPool<char>();
         var seq = new Sequence<char>(mockPool);
+        seq.MinimumSpanLength = 1;
 
         for (int i = 0; i < leadingBlocks; i++)
         {
@@ -203,11 +205,11 @@ public class SequenceTests : TestBase
         MockPool<char> mockPool = new MockPool<char>();
         var seq = new Sequence<char>(mockPool);
 
-        var mem1 = seq.GetMemory(3);
+        var mem1 = seq.GetMemory(3).Slice(0, 3);
         mem1.Span.Fill('a');
         seq.Advance(mem1.Length);
 
-        var mem2 = seq.GetMemory(3);
+        var mem2 = seq.GetMemory(3).Slice(0, 3);
         mem2.Span.Fill('b');
         seq.Advance(mem2.Length);
 
@@ -227,11 +229,11 @@ public class SequenceTests : TestBase
         MockPool<char> mockPool = new MockPool<char>();
         var seq = new Sequence<char>(mockPool);
 
-        var mem1 = seq.GetMemory(3);
+        var mem1 = seq.GetMemory(3).Slice(0, 3);
         mem1.Span.Fill('a');
         seq.Advance(mem1.Length);
 
-        var mem2 = seq.GetMemory(3);
+        var mem2 = seq.GetMemory(3).Slice(0, 3);
         mem2.Span.Fill('b');
         seq.Advance(mem2.Length);
 
@@ -253,11 +255,11 @@ public class SequenceTests : TestBase
         var seqA = new Sequence<char>(mockPool);
         var seqB = new Sequence<char>(mockPool);
 
-        var mem1 = seqA.GetMemory(3);
+        var mem1 = seqA.GetMemory(3).Slice(0, 3);
         mem1.Span.Fill('a');
         seqA.Advance(mem1.Length);
 
-        var mem2 = seqB.GetMemory(3);
+        var mem2 = seqB.GetMemory(3).Slice(0, 3);
         mem2.Span.Fill('b');
         seqB.Advance(mem2.Length);
 
@@ -333,6 +335,25 @@ public class SequenceTests : TestBase
         seq.Advance(10);
 
         Assert.Equal(10 - 3 + 10 + 10, seq.AsReadOnlySequence.Length);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(5)]
+    [InlineData(64)]
+    [InlineData(2048)]
+    [InlineData(4096)]
+    public void MinimumSpanLength(int minLength)
+    {
+        var seq = new Sequence<int>();
+        Assert.True(seq.MinimumSpanLength > 0);
+        seq.MinimumSpanLength = minLength;
+        Assert.Equal(minLength, seq.MinimumSpanLength);
+        var span = seq.GetSpan(1);
+        Assert.True(span.Length >= seq.MinimumSpanLength);
+
+        seq.Reset();
+        Assert.Equal(minLength, seq.MinimumSpanLength);
     }
 
     [Fact]
