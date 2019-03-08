@@ -51,7 +51,7 @@ namespace Nerdbank.Streams
         }
 
         /// <summary>
-        /// Gets or sets the minimum length for an allocated to store more data.
+        /// Gets or sets the minimum length for any array allocated as a segment in the sequence.
         /// </summary>
         /// <value>The default value is 32, but this may change in future versions to tune for more general applicability.</value>
         /// <remarks>
