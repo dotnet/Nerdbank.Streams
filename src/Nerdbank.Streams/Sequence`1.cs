@@ -21,8 +21,6 @@ namespace Nerdbank.Streams
     [DebuggerDisplay("{" + nameof(DebuggerDisplay) + ",nq}")]
     public class Sequence<T> : IBufferWriter<T>, IDisposable
     {
-        private const int DefaultBufferSize = 4 * 1024;
-
         private readonly Stack<SequenceSegment> segmentPool = new Stack<SequenceSegment>();
 
         private readonly MemoryPool<T> memoryPool;
@@ -52,8 +50,9 @@ namespace Nerdbank.Streams
 
         /// <summary>
         /// Gets or sets the minimum length for any array allocated as a segment in the sequence.
+        /// Any non-positive value allows the pool to determine the length of the array.
         /// </summary>
-        /// <value>The default value is 32, but this may change in future versions to tune for more general applicability.</value>
+        /// <value>The default value is 0.</value>
         /// <remarks>
         /// <para>
         /// Each time <see cref="GetSpan(int)"/> or <see cref="GetMemory(int)"/> is called,
@@ -69,7 +68,7 @@ namespace Nerdbank.Streams
         /// in which case the higher of the two minimums dictate the minimum array size that will be allocated.
         /// </para>
         /// </remarks>
-        public int MinimumSpanLength { get; set; } = 32;
+        public int MinimumSpanLength { get; set; } = 0;
 
         /// <summary>
         /// Gets this sequence expressed as a <see cref="ReadOnlySequence{T}"/>.
@@ -171,17 +170,21 @@ namespace Nerdbank.Streams
             {
                 if (this.last?.WritableBytes > 0)
                 {
-                    sizeHint = this.last.WritableBytes;
+                    return this.last.TrailingSlack;
                 }
                 else
                 {
-                    sizeHint = DefaultBufferSize;
+                    sizeHint = -1; // MemoryPool<T>.Rent value for "give us the default size"
                 }
+            }
+            else
+            {
+                sizeHint = Math.Max(this.MinimumSpanLength, sizeHint);
             }
 
             if (this.last == null || this.last.WritableBytes < sizeHint)
             {
-                this.Append(this.memoryPool.Rent(Math.Max(this.MinimumSpanLength, sizeHint)));
+                this.Append(this.memoryPool.Rent(sizeHint));
             }
 
             return this.last.TrailingSlack;

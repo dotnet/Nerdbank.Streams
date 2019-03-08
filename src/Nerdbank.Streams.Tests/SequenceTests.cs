@@ -338,6 +338,7 @@ public class SequenceTests : TestBase
     }
 
     [Theory]
+    [InlineData(-1)]
     [InlineData(1)]
     [InlineData(5)]
     [InlineData(64)]
@@ -346,7 +347,7 @@ public class SequenceTests : TestBase
     public void MinimumSpanLength(int minLength)
     {
         var seq = new Sequence<int>();
-        Assert.True(seq.MinimumSpanLength > 0);
+        Assert.Equal(0, seq.MinimumSpanLength);
         seq.MinimumSpanLength = minLength;
         Assert.Equal(minLength, seq.MinimumSpanLength);
         var span = seq.GetSpan(1);
@@ -354,6 +355,15 @@ public class SequenceTests : TestBase
 
         seq.Reset();
         Assert.Equal(minLength, seq.MinimumSpanLength);
+    }
+
+    [Fact]
+    public void MinimumSpanLength_ZeroGetsPoolRecommendation()
+    {
+        var seq = new Sequence<int>(new MockPool<int>());
+        seq.MinimumSpanLength = 0;
+        var span = seq.GetSpan(0);
+        Assert.Equal(MockPool<int>.DefaultLength, span.Length);
     }
 
     [Fact]

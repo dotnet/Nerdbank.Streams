@@ -9,6 +9,8 @@ using Xunit;
 
 internal class MockPool<T> : MemoryPool<T>
 {
+    internal const int DefaultLength = 16;
+
     public override int MaxBufferSize => throw new NotImplementedException();
 
     public List<Memory<T>> Contents { get; } = new List<Memory<T>>();
@@ -34,7 +36,7 @@ internal class MockPool<T> : MemoryPool<T>
 
         if (result.Length == 0)
         {
-            result = minBufferSize == 0 ? default : new T[minBufferSize];
+            result = minBufferSize == 0 ? default : new T[minBufferSize == -1 ? DefaultLength : minBufferSize];
         }
         else
         {
