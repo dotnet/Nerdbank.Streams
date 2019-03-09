@@ -219,7 +219,7 @@ public class FullDuplexStreamCombineTests : TestBase
         writableMock.VerifyAll();
     }
 
-#if NETCOREAPP2_1
+#if SPAN_BUILTIN
     [Fact]
     public void ReadAsync_Memory()
     {

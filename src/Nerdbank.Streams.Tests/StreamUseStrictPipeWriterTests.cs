@@ -29,7 +29,7 @@ public class StreamUseStrictPipeWriterTests : StreamPipeWriterTestBase
         unreadableStream.SetupGet(s => s.CanWrite).Returns(true);
 
         // Set up for either WriteAsync method to be called. We expect it will be Memory<T> on .NET Core 2.1 and byte[] on all the others.
-#if NETCOREAPP2_1
+#if SPAN_BUILTIN
         unreadableStream.Setup(s => s.WriteAsync(It.IsAny<ReadOnlyMemory<byte>>(), It.IsAny<CancellationToken>())).Throws(expectedException);
 #else
         unreadableStream.Setup(s => s.WriteAsync(It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ThrowsAsync(expectedException);
@@ -48,7 +48,7 @@ public class StreamUseStrictPipeWriterTests : StreamPipeWriterTestBase
         var writeCompletedSource = new TaskCompletionSource<object>();
 
         // Set up for either WriteAsync method to be called. We expect it will be Memory<T> on .NET Core 2.1 and byte[] on all the others.
-#if NETCOREAPP2_1
+#if SPAN_BUILTIN
         streamMock.Setup(s => s.WriteAsync(It.IsAny<ReadOnlyMemory<byte>>(), It.IsAny<CancellationToken>())).Returns(new ValueTask(writeCompletedSource.Task));
 #else
         streamMock.Setup(s => s.WriteAsync(It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).Returns(writeCompletedSource.Task);
@@ -73,7 +73,7 @@ public class StreamUseStrictPipeWriterTests : StreamPipeWriterTestBase
         var writeCompletedSource = new TaskCompletionSource<object>();
 
         // Set up for either WriteAsync method to be called. We expect it will be Memory<T> on .NET Core 2.1 and byte[] on all the others.
-#if NETCOREAPP2_1
+#if SPAN_BUILTIN
         streamMock.Setup(s => s.WriteAsync(It.IsAny<ReadOnlyMemory<byte>>(), It.IsAny<CancellationToken>())).Returns(new ValueTask(writeCompletedSource.Task));
 #else
         streamMock.Setup(s => s.WriteAsync(It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).Returns(writeCompletedSource.Task);

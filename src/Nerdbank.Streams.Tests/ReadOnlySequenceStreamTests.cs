@@ -150,12 +150,12 @@ public class ReadOnlySequenceStreamTests : TestBase
     public void Write()
     {
         Assert.Throws<NotSupportedException>(() => this.defaultStream.Write(new byte[1], 0, 1));
-#if NETCOREAPP2_1
+#if SPAN_BUILTIN
         Assert.Throws<NotSupportedException>(() => this.defaultStream.Write(new byte[1].AsSpan(0, 1)));
 #endif
         this.defaultStream.Dispose();
         Assert.Throws<ObjectDisposedException>(() => this.defaultStream.Write(new byte[1], 0, 1));
-#if NETCOREAPP2_1
+#if SPAN_BUILTIN
         Assert.Throws<ObjectDisposedException>(() => this.defaultStream.Write(new byte[1].AsSpan(0, 1)));
 #endif
     }
@@ -164,12 +164,12 @@ public class ReadOnlySequenceStreamTests : TestBase
     public async Task WriteAsync()
     {
         await Assert.ThrowsAsync<NotSupportedException>(() => this.defaultStream.WriteAsync(new byte[1], 0, 1));
-#if NETCOREAPP2_1
+#if SPAN_BUILTIN
         await Assert.ThrowsAsync<NotSupportedException>(() => this.defaultStream.WriteAsync(new byte[1].AsMemory(0, 1)).AsTask());
 #endif
         this.defaultStream.Dispose();
         await Assert.ThrowsAsync<ObjectDisposedException>(() => this.defaultStream.WriteAsync(new byte[1], 0, 1));
-#if NETCOREAPP2_1
+#if SPAN_BUILTIN
         await Assert.ThrowsAsync<ObjectDisposedException>(() => this.defaultStream.WriteAsync(new byte[1].AsMemory(0, 1)).AsTask());
 #endif
     }
@@ -272,7 +272,7 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.Equal(9, stream.Position);
     }
 
-#if NETCOREAPP2_1
+#if SPAN_BUILTIN
 
     [Fact]
     public void Read_Span()
@@ -340,7 +340,7 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.Equal(9, stream.Position);
     }
 
-#if NETCOREAPP2_1
+#if SPAN_BUILTIN
 
     [Fact]
     public async Task ReadAsync_Memory_Works()

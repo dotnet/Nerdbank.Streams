@@ -97,7 +97,7 @@ namespace Nerdbank.Streams
             this.writer.Advance(1);
         }
 
-#if NETCOREAPP2_1
+#if SPAN_BUILTIN
 
         /// <inheritdoc/>
         public override int Read(Span<byte> buffer) => throw this.ThrowDisposedOr(new NotSupportedException());
