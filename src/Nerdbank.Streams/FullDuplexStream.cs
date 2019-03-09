@@ -113,7 +113,7 @@ namespace Nerdbank.Streams
 
             public override void WriteByte(byte value) => this.writableStream.WriteByte(value);
 
-#if NETCOREAPP2_1
+#if SPAN_BUILTIN
 
             public override void Write(ReadOnlySpan<byte> buffer) => this.writableStream.Write(buffer);
 
