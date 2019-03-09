@@ -20,17 +20,18 @@ jobs:
 - job: Windows
   pool: Hosted VS2017
   steps:
-  - script: |
-      dotnet tool install --tool-path . nbgv
-      .\nbgv cloud -p src
-    displayName: Set build number
-    condition: ne(variables['system.pullrequest.isfork'], true)
-
   - task: DotNetCoreInstaller@0
-    displayName: Install .NET Core SDK 2.1.503
+    displayName: Install .NET Core SDK 2.2.104
     inputs:
       packageType: sdk
-      version: 2.1.503
+      version: 2.2.104
+
+  - script: |
+      dotnet tool install --tool-path .. nbgv
+      ..\nbgv cloud
+    workingDirectory: src
+    displayName: Set build number
+    condition: ne(variables['system.pullrequest.isfork'], true)
 
   - script: dotnet --info
     displayName: Show dotnet SDK info
