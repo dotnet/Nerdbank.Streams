@@ -5,7 +5,6 @@ namespace Nerdbank.Streams
 {
     using System;
     using System.Buffers;
-    using System.Collections.Generic;
 
     /// <summary>
     /// An <see cref="IBufferWriter{T}"/> that reserves some fixed size for a header.
@@ -18,42 +17,63 @@ namespace Nerdbank.Streams
     public class PrefixingBufferWriter<T> : IBufferWriter<T>
     {
         /// <summary>
+        /// The value to use in place of <see cref="payloadSizeHint"/> when it is 0.
+        /// </summary>
+        /// <remarks>
+        /// We choose ~4K, since 4K is the default size for buffers in a lot of corefx libraries.
+        /// We choose 4K - 4 specifically because length prefixing is so often for an <see cref="int"/> value,
+        /// and if we ask for 1 byte more than 4K, memory pools tend to give us 8K.
+        /// </remarks>
+        private const int PayloadSizeGuess = 4092;
+
+        /// <summary>
         /// The underlying buffer writer.
         /// </summary>
         private readonly IBufferWriter<T> innerWriter;
 
         /// <summary>
-        /// The length of the header.
+        /// The length of the prefix to reserve space for.
         /// </summary>
         private readonly int expectedPrefixSize;
 
         /// <summary>
-        /// A hint from our owner at the size of the payload that follows the header.
+        /// The minimum space to reserve for the payload when first asked for a buffer.
         /// </summary>
+        /// <remarks>
+        /// This, added to <see cref="expectedPrefixSize"/>, makes up the minimum size to request from <see cref="innerWriter"/>
+        /// to minimize the chance that we'll need to copy buffers from <see cref="excessSequence"/> to <see cref="innerWriter"/>.
+        /// </remarks>
         private readonly int payloadSizeHint;
 
         /// <summary>
-        /// The memory reserved for the header from the <see cref="innerWriter"/>.
-        /// This memory is not reserved until the first call from this writer to acquire memory.
+        /// The pool to use when initializing <see cref="excessSequence"/>.
+        /// </summary>
+        private readonly MemoryPool<T> memoryPool;
+
+        /// <summary>
+        /// The buffer writer to use for all buffers after the original one obtained from <see cref="innerWriter"/>.
+        /// </summary>
+        private Sequence<T> excessSequence;
+
+        /// <summary>
+        /// The buffer from <see cref="innerWriter"/> reserved for the fixed-length prefix.
         /// </summary>
         private Memory<T> prefixMemory;
 
         /// <summary>
-        /// The memory acquired from <see cref="innerWriter"/>.
-        /// This memory is not reserved until the first call from this writer to acquire memory.
+        /// The memory being actively written to, which may have come from <see cref="innerWriter"/> or <see cref="excessSequence"/>.
         /// </summary>
         private Memory<T> realMemory;
 
         /// <summary>
-        /// The number of elements written to a buffer belonging to <see cref="innerWriter"/>.
+        /// The number of elements written to the original buffer obtained from <see cref="innerWriter"/>.
         /// </summary>
         private int advanced;
 
         /// <summary>
-        /// The fallback writer to use when the caller writes more than we allowed for given the <see cref="payloadSizeHint"/>
-        /// in anything but the initial call to <see cref="GetSpan(int)"/>.
+        /// A value indicating whether we're using <see cref="excessSequence"/> in the current state.
         /// </summary>
-        private Sequence<T> privateWriter;
+        private bool usingExcessMemory;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PrefixingBufferWriter{T}"/> class.
@@ -61,7 +81,8 @@ namespace Nerdbank.Streams
         /// <param name="innerWriter">The underlying writer that should ultimately receive the prefix and payload.</param>
         /// <param name="prefixSize">The length of the header to reserve space for. Must be a positive number.</param>
         /// <param name="payloadSizeHint">A hint at the expected max size of the payload. The real size may be more or less than this, but additional copying is avoided if it does not exceed this amount. If 0, a reasonable guess is made.</param>
-        public PrefixingBufferWriter(IBufferWriter<T> innerWriter, int prefixSize, int payloadSizeHint)
+        /// <param name="memoryPool">The memory pool to use for allocating additional memory when the payload exceeds <paramref name="payloadSizeHint"/>.</param>
+        public PrefixingBufferWriter(IBufferWriter<T> innerWriter, int prefixSize, int payloadSizeHint = 0, MemoryPool<T> memoryPool = null)
         {
             if (prefixSize <= 0)
             {
@@ -71,17 +92,26 @@ namespace Nerdbank.Streams
             this.innerWriter = innerWriter ?? throw new ArgumentNullException(nameof(innerWriter));
             this.expectedPrefixSize = prefixSize;
             this.payloadSizeHint = payloadSizeHint;
+            this.memoryPool = memoryPool ?? MemoryPool<T>.Shared;
         }
+
+        /// <summary>
+        /// Gets the sum of all values passed to <see cref="Advance(int)"/> since
+        /// the last call to <see cref="Complete(ReadOnlySpan{T})"/>.
+        /// </summary>
+        public long Length => (this.excessSequence?.Length ?? 0) + this.advanced;
 
         /// <inheritdoc />
         public void Advance(int count)
         {
-            if (this.privateWriter != null)
+            if (this.usingExcessMemory)
             {
-                this.privateWriter.Advance(count);
+                this.excessSequence.Advance(count);
+                this.realMemory = default;
             }
             else
             {
+                this.realMemory = this.realMemory.Slice(count);
                 this.advanced += count;
             }
         }
@@ -90,51 +120,29 @@ namespace Nerdbank.Streams
         public Memory<T> GetMemory(int sizeHint = 0)
         {
             this.EnsureInitialized(sizeHint);
-
-            if (this.privateWriter != null || sizeHint > this.realMemory.Length - this.advanced)
-            {
-                if (this.privateWriter == null)
-                {
-                    this.privateWriter = new Sequence<T>();
-                }
-
-                return this.privateWriter.GetMemory(sizeHint);
-            }
-            else
-            {
-                return this.realMemory.Slice(this.advanced);
-            }
+            return this.realMemory;
         }
 
         /// <inheritdoc />
         public Span<T> GetSpan(int sizeHint = 0)
         {
             this.EnsureInitialized(sizeHint);
-
-            if (this.privateWriter != null || sizeHint > this.realMemory.Length - this.advanced)
-            {
-                if (this.privateWriter == null)
-                {
-                    this.privateWriter = new Sequence<T>();
-                }
-
-                return this.privateWriter.GetSpan(sizeHint);
-            }
-            else
-            {
-                return this.realMemory.Span.Slice(this.advanced);
-            }
+            return this.realMemory.Span;
         }
 
         /// <summary>
-        /// Inserts the prefix and commits the payload to the underlying <see cref="IBufferWriter{T}"/>.
+        /// Commits all the elements written to the underlying writer, fills in the prefix,
+        /// and advances the underlying writer past the prefix and payload.
         /// </summary>
         /// <param name="prefix">The prefix to write in. The length must match the one given in the constructor.</param>
+        /// <remarks>
+        /// This instance is safe to reuse after this call.
+        /// </remarks>
         public void Complete(ReadOnlySpan<T> prefix)
         {
             if (prefix.Length != this.expectedPrefixSize)
             {
-                throw new ArgumentOutOfRangeException(nameof(prefix), "Prefix was not expected length.");
+                throw new ArgumentException("Prefix was not expected length.", nameof(prefix));
             }
 
             if (this.prefixMemory.Length == 0)
@@ -144,33 +152,50 @@ namespace Nerdbank.Streams
             }
             else
             {
-                // Payload has been written, so write in the prefix then commit the payload.
+                // Payload has been written. Write in the prefix and commit the first buffer.
                 prefix.CopyTo(this.prefixMemory.Span);
-                this.innerWriter.Advance(prefix.Length + this.advanced);
-                if (this.privateWriter != null)
+                this.innerWriter.Advance(this.prefixMemory.Length + this.advanced);
+
+                // Now copy any excess buffer.
+                if (this.usingExcessMemory)
                 {
-                    // Try to minimize segments in the target writer by hinting at the total size.
-                    this.innerWriter.GetSpan((int)this.privateWriter.Length);
-                    foreach (var segment in this.privateWriter.AsReadOnlySequence)
+                    var span = this.innerWriter.GetSpan((int)this.excessSequence.Length);
+                    foreach (var segment in this.excessSequence.AsReadOnlySequence)
                     {
-                        this.innerWriter.Write(segment.Span);
+                        segment.Span.CopyTo(span);
+                        span = span.Slice(segment.Length);
                     }
+
+                    this.innerWriter.Advance((int)this.excessSequence.Length);
+                    this.excessSequence.Reset(); // return backing arrays to memory pools
                 }
             }
+
+            // Reset for the next write.
+            this.usingExcessMemory = false;
+            this.prefixMemory = default;
+            this.realMemory = default;
+            this.advanced = 0;
         }
 
-        /// <summary>
-        /// Makes the initial call to acquire memory from the underlying writer if it has not been done already.
-        /// </summary>
-        /// <param name="sizeHint">The size requested by the caller to either <see cref="GetMemory(int)"/> or <see cref="GetSpan(int)"/>.</param>
         private void EnsureInitialized(int sizeHint)
         {
             if (this.prefixMemory.Length == 0)
             {
-                int sizeToRequest = this.expectedPrefixSize + Math.Max(sizeHint, this.payloadSizeHint);
+                int sizeToRequest = this.expectedPrefixSize + Math.Max(sizeHint, this.payloadSizeHint == 0 ? PayloadSizeGuess : this.payloadSizeHint);
                 var memory = this.innerWriter.GetMemory(sizeToRequest);
                 this.prefixMemory = memory.Slice(0, this.expectedPrefixSize);
                 this.realMemory = memory.Slice(this.expectedPrefixSize);
+            }
+            else if (this.realMemory.Length == 0 || this.realMemory.Length - this.advanced < sizeHint)
+            {
+                if (this.excessSequence == null)
+                {
+                    this.excessSequence = new Sequence<T>(this.memoryPool);
+                }
+
+                this.usingExcessMemory = true;
+                this.realMemory = this.excessSequence.GetMemory(sizeHint);
             }
         }
     }

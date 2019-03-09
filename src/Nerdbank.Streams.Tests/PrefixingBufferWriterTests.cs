@@ -47,6 +47,7 @@ public class PrefixingBufferWriterTests
 
         var prefixWriter = new PrefixingBufferWriter<byte>(this.sequence, Prefix.Length, sizeHint);
         int stepSize = Payload.Length / stepCount;
+        int expectedLength = 0;
         for (int i = 0; i < stepCount - 1; i++)
         {
             var spanToWrite = Payload.Span.Slice(stepSize * i, stepSize);
@@ -60,6 +61,9 @@ public class PrefixingBufferWriterTests
             {
                 prefixWriter.Write(spanToWrite);
             }
+
+            expectedLength += spanToWrite.Length;
+            Assert.Equal(expectedLength, prefixWriter.Length);
         }
 
         // The last step fills in the remainder as well.
@@ -68,13 +72,83 @@ public class PrefixingBufferWriterTests
         this.PayloadCompleteHelper(prefixWriter);
     }
 
+    [Fact]
+    public void GetSpan_WriteWithHint0()
+    {
+        var prefixWriter = new PrefixingBufferWriter<byte>(this.sequence, Prefix.Length, 0);
+        var span = prefixWriter.GetSpan(0);
+        Assert.NotEqual(0, span.Length);
+    }
+
+    [Fact]
+    public void GetSpan_WriteFillThenRequest0()
+    {
+        var prefixWriter = new PrefixingBufferWriter<byte>(this.sequence, Prefix.Length, 0);
+        var span = prefixWriter.GetSpan(5);
+        prefixWriter.Advance(span.Length);
+        span = prefixWriter.GetSpan(0);
+        Assert.NotEqual(0, span.Length);
+    }
+
+    [Fact]
+    public void GetMemory()
+    {
+        var prefixWriter = new PrefixingBufferWriter<byte>(this.sequence, Prefix.Length, 0);
+        var mem = prefixWriter.GetMemory(Payload.Length);
+        Assert.NotEqual(0, mem.Length);
+        Payload.CopyTo(mem);
+        prefixWriter.Advance(Payload.Length);
+        this.PayloadCompleteHelper(prefixWriter);
+    }
+
+    [Fact]
+    public void ReuseAfterComplete()
+    {
+        var prefixWriter = new PrefixingBufferWriter<byte>(this.sequence, Prefix.Length, 0);
+        prefixWriter.Write(Payload.Span);
+        Assert.Equal(Payload.Length, prefixWriter.Length);
+        this.PayloadCompleteHelper(prefixWriter);
+        this.sequence.Reset();
+
+        Assert.Equal(0, prefixWriter.Length);
+        prefixWriter.Write(Payload.Span);
+        Assert.Equal(Payload.Length, prefixWriter.Length);
+        this.PayloadCompleteHelper(prefixWriter);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Ctor_NonPositivePrefixHintSizes(int size)
+    {
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => new PrefixingBufferWriter<byte>(this.sequence, size));
+        Assert.Equal("prefixSize", ex.ParamName);
+    }
+
+    [Fact]
+    public void Ctor_NullUnderwriter()
+    {
+        Assert.Throws<ArgumentNullException>(() => new PrefixingBufferWriter<byte>(null, 5));
+    }
+
+    [Fact]
+    public void Complete_PrefixLengthMismatch()
+    {
+        var prefixing = new PrefixingBufferWriter<byte>(this.sequence, 5);
+        var ex = Assert.Throws<ArgumentException>(() => prefixing.Complete(new byte[3]));
+        Assert.Equal("prefix", ex.ParamName);
+    }
+
     private void PayloadCompleteHelper(PrefixingBufferWriter<byte> prefixWriter)
     {
         // There mustn't be any calls to Advance on the underlying buffer yet, or else we've lost the opportunity to write the prefix.
         Assert.Equal(0, this.sequence.Length);
+        var length = prefixWriter.Length;
 
         // Go ahead and commit everything, with our prefix.
         prefixWriter.Complete(Prefix.Span);
+
+        Assert.Equal(length + Prefix.Length, this.sequence.Length);
 
         // Verify that the prefix immediately precedes the payload.
         Assert.Equal(Prefix.ToArray().Concat(Payload.ToArray()), this.sequence.AsReadOnlySequence.ToArray());
