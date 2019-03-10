@@ -30,7 +30,8 @@ public class PrefixingBufferWriterTests
     {
         var prefixWriter = new PrefixingBufferWriter<byte>(this.sequence, Prefix.Length, 50);
         Assert.Equal(0, this.sequence.Length);
-        prefixWriter.Complete(Prefix.Span);
+        Prefix.CopyTo(prefixWriter.Prefix);
+        prefixWriter.Commit();
         Assert.Equal(Prefix.Length, this.sequence.Length);
         Assert.Equal(Prefix.ToArray(), this.sequence.AsReadOnlySequence.ToArray());
     }
@@ -131,14 +132,6 @@ public class PrefixingBufferWriterTests
         Assert.Throws<ArgumentNullException>(() => new PrefixingBufferWriter<byte>(null, 5));
     }
 
-    [Fact]
-    public void Complete_PrefixLengthMismatch()
-    {
-        var prefixing = new PrefixingBufferWriter<byte>(this.sequence, 5);
-        var ex = Assert.Throws<ArgumentException>(() => prefixing.Complete(new byte[3]));
-        Assert.Equal("prefix", ex.ParamName);
-    }
-
     private void PayloadCompleteHelper(PrefixingBufferWriter<byte> prefixWriter)
     {
         // There mustn't be any calls to Advance on the underlying buffer yet, or else we've lost the opportunity to write the prefix.
@@ -146,7 +139,8 @@ public class PrefixingBufferWriterTests
         var length = prefixWriter.Length;
 
         // Go ahead and commit everything, with our prefix.
-        prefixWriter.Complete(Prefix.Span);
+        Prefix.CopyTo(prefixWriter.Prefix);
+        prefixWriter.Commit();
 
         Assert.Equal(length + Prefix.Length, this.sequence.Length);
 

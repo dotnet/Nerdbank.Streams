@@ -97,9 +97,21 @@ namespace Nerdbank.Streams
 
         /// <summary>
         /// Gets the sum of all values passed to <see cref="Advance(int)"/> since
-        /// the last call to <see cref="Complete(ReadOnlySpan{T})"/>.
+        /// the last call to <see cref="Commit"/>.
         /// </summary>
         public long Length => (this.excessSequence?.Length ?? 0) + this.advanced;
+
+        /// <summary>
+        /// Gets the memory reserved for the prefix.
+        /// </summary>
+        public Memory<T> Prefix
+        {
+            get
+            {
+                this.EnsureInitialized(0);
+                return this.prefixMemory;
+            }
+        }
 
         /// <inheritdoc />
         public void Advance(int count)
@@ -131,29 +143,22 @@ namespace Nerdbank.Streams
         }
 
         /// <summary>
-        /// Commits all the elements written to the underlying writer, fills in the prefix,
+        /// Commits all the elements written and the prefix to the underlying writer
         /// and advances the underlying writer past the prefix and payload.
         /// </summary>
-        /// <param name="prefix">The prefix to write in. The length must match the one given in the constructor.</param>
         /// <remarks>
         /// This instance is safe to reuse after this call.
         /// </remarks>
-        public void Complete(ReadOnlySpan<T> prefix)
+        public void Commit()
         {
-            if (prefix.Length != this.expectedPrefixSize)
-            {
-                throw new ArgumentException("Prefix was not expected length.", nameof(prefix));
-            }
-
             if (this.prefixMemory.Length == 0)
             {
                 // No payload was actually written, and we never requested memory, so just write it out.
-                this.innerWriter.Write(prefix);
+                this.innerWriter.Write(this.Prefix.Span);
             }
             else
             {
                 // Payload has been written. Write in the prefix and commit the first buffer.
-                prefix.CopyTo(this.prefixMemory.Span);
                 this.innerWriter.Advance(this.prefixMemory.Length + this.advanced);
 
                 // Now copy any excess buffer.
