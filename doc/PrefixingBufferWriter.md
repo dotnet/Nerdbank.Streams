@@ -23,7 +23,11 @@ void WriteList<T>(IBufferWriter<byte> writer, IEnumerable<T> items)
         count++;
     }
 
-    prefixingWriter.Complete(BitConverter.GetBytes(count));
+    // Write out the header.
+    BitConverter.GetBytes(count).AsSpan().CopyTo(prefixingWriter.Prefix);
+
+    // Commit the whole result to the underlying writer.
+    prefixingWriter.Commit();
 }
 ```
 
@@ -41,4 +45,4 @@ writer's buffers and Advance is called.
 ## Reuse
 
 The same `PrefixingBufferWriter<T>` instance can be used to write any number of
-length-prefixed buffers. After calling `Complete` simply use it again.
+length-prefixed buffers. After calling `Commit` simply use it again.
