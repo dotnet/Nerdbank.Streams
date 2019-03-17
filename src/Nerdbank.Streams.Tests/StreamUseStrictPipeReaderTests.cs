@@ -30,7 +30,7 @@ public class StreamUseStrictPipeReaderTests : StreamPipeReaderTestBase
         unreadableStream.SetupGet(s => s.CanRead).Returns(true);
 
         // Set up for either ReadAsync method to be called. We expect it will be Memory<T> on .NET Core 2.1 and byte[] on all the others.
-#if NETCOREAPP2_1
+#if SPAN_BUILTIN
         unreadableStream.Setup(s => s.ReadAsync(It.IsAny<Memory<byte>>(), It.IsAny<CancellationToken>())).ThrowsAsync(expectedException);
 #else
         unreadableStream.Setup(s => s.ReadAsync(It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ThrowsAsync(expectedException);

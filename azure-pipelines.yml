@@ -20,17 +20,17 @@ jobs:
 - job: Windows
   pool: Hosted VS2017
   steps:
-  - script: |
-      dotnet tool install --tool-path . nbgv
-      .\nbgv cloud -p src
-    displayName: Set build number
-    condition: ne(variables['system.pullrequest.isfork'], true)
-
   - task: DotNetCoreInstaller@0
-    displayName: Install .NET Core SDK 2.1.503
+    displayName: Install .NET Core SDK 2.2.104
     inputs:
       packageType: sdk
-      version: 2.1.503
+      version: 2.2.104
+
+  - script: |
+      dotnet tool install --tool-path .. nbgv
+      ..\nbgv cloud
+    workingDirectory: src
+    displayName: Set build number
 
   - script: dotnet --info
     displayName: Show dotnet SDK info
@@ -87,7 +87,7 @@ jobs:
       ArtifactName: projectAssetsJson
       ArtifactType: Container
     displayName: Publish projectAssetsJson artifacts
-    condition: and(succeededOrFailed(), ne(variables['system.pullrequest.isfork'], true))
+    condition: succeededOrFailed()
 
   - task: PublishBuildArtifacts@1
     inputs:
@@ -95,16 +95,7 @@ jobs:
       ArtifactName: build_logs
       ArtifactType: Container
     displayName: Publish build_logs artifacts
-    condition: and(succeededOrFailed(), ne(variables['system.pullrequest.isfork'], true))
-
-  ## The rest of these steps are for deployment and skipped for PR builds
-
-  #- task: PublishBuildArtifacts@1
-  #  inputs:
-  #    PathtoPublish: $(build.sourcesdirectory)/bin
-  #    ArtifactName: bin
-  #    ArtifactType: Container
-  #  condition: and(succeeded(), ne(variables['system.pullrequest.isfork'], true))
+    condition: succeededOrFailed()
 
   - task: DotNetCoreCLI@2
     displayName: Pack
@@ -142,7 +133,6 @@ jobs:
       ArtifactName: deployables
       ArtifactType: Container
     displayName: Publish deployables artifacts
-    condition: and(succeeded(), ne(variables['system.pullrequest.isfork'], true))
 
 - job: Linux
   pool:

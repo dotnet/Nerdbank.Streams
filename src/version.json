@@ -3,6 +3,7 @@
   "version": "2.1-alpha",
   "publicReleaseRefSpec": [
     "^refs/heads/master$",
+    "^refs/heads/v\\d+(?:.\\d+)?$",
     "^refs/heads/fullduplexstream$"
   ]
 }

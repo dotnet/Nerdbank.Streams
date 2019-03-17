@@ -198,7 +198,7 @@ namespace Nerdbank.Streams
         {
             Span<byte> intBytes = stackalloc byte[4];
             Utilities.Write(intBytes, length);
-#if NETCOREAPP2_1
+#if SPAN_BUILTIN
             this.underlyingStream.Write(intBytes);
 #else
             this.underlyingStream.Write(intBytes.ToArray(), 0, intBytes.Length);
@@ -213,7 +213,7 @@ namespace Nerdbank.Streams
             Utilities.Write(intBytes, length);
             try
             {
-#if NETCOREAPP2_1
+#if SPAN_BUILTIN
                 await this.underlyingStream.WriteAsync(intBytes.AsMemory(0, 4), cancellationToken).ConfigureAwait(false);
 #else
                 await this.underlyingStream.WriteAsync(intBytes, 0, sizeof(int), cancellationToken).ConfigureAwait(false);

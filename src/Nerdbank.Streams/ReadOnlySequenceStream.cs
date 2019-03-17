@@ -171,7 +171,7 @@ namespace Nerdbank.Streams
             }
         }
 
-#if NETCOREAPP2_1
+#if SPAN_BUILTIN
 
         /// <inheritdoc/>
         public override int Read(Span<byte> buffer)
