@@ -3,7 +3,6 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFrameworks>netcoreapp2.0;netcoreapp2.1;net45</TargetFrameworks>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <IsPackable>false</IsPackable>
     <CodeAnalysisRuleSet>IsolatedTestHost.ruleset</CodeAnalysisRuleSet>
