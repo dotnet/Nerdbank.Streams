@@ -6,6 +6,8 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using Microsoft;
 using Nerdbank.Streams;
 using Xunit;
 using Xunit.Abstractions;
@@ -28,7 +30,7 @@ public class SequenceTests : TestBase
     [Fact]
     public void GetMemory_Sizes()
     {
-        var seq = new Sequence<char>(new MockPool<char>());
+        var seq = new Sequence<char>(new MockMemoryPool<char>());
         seq.MinimumSpanLength = 1;
 
         var mem1 = seq.GetMemory(16);
@@ -49,7 +51,7 @@ public class SequenceTests : TestBase
     [InlineData(2)]
     public void GetMemory_TwiceInARowRecyclesOldArray(int leadingBlocks)
     {
-        MockPool<char> mockPool = new MockPool<char>();
+        MockMemoryPool<char> mockPool = new MockMemoryPool<char>();
         var seq = new Sequence<char>(mockPool);
         seq.MinimumSpanLength = 1;
 
@@ -157,7 +159,7 @@ public class SequenceTests : TestBase
     [Fact]
     public void AdvanceTo_ReturnsArraysToPool()
     {
-        MockPool<char> mockPool = new MockPool<char>();
+        MockMemoryPool<char> mockPool = new MockMemoryPool<char>();
         var seq = new Sequence<char>(mockPool);
 
         var mem1 = seq.GetMemory(3);
@@ -200,7 +202,7 @@ public class SequenceTests : TestBase
     [Fact]
     public void AdvanceTo_PriorPositionWithinBlock()
     {
-        MockPool<char> mockPool = new MockPool<char>();
+        MockMemoryPool<char> mockPool = new MockMemoryPool<char>();
         var seq = new Sequence<char>(mockPool);
 
         var mem1 = seq.GetMemory(3).Slice(0, 3);
@@ -224,7 +226,7 @@ public class SequenceTests : TestBase
     [Fact]
     public void AdvanceTo_PriorPositionInPriorBlock()
     {
-        MockPool<char> mockPool = new MockPool<char>();
+        MockMemoryPool<char> mockPool = new MockMemoryPool<char>();
         var seq = new Sequence<char>(mockPool);
 
         var mem1 = seq.GetMemory(3).Slice(0, 3);
@@ -249,7 +251,7 @@ public class SequenceTests : TestBase
     [Fact]
     public void AdvanceTo_PositionFromUnrelatedSequence()
     {
-        MockPool<char> mockPool = new MockPool<char>();
+        MockMemoryPool<char> mockPool = new MockMemoryPool<char>();
         var seqA = new Sequence<char>(mockPool);
         var seqB = new Sequence<char>(mockPool);
 
@@ -319,7 +321,7 @@ public class SequenceTests : TestBase
     public void AdvanceTo_InterweavedWith_Advance2()
     {
         // use the mock pool so that we can predict the actual array size will not exceed what we ask for.
-        var seq = new Sequence<int>(new MockPool<int>());
+        var seq = new Sequence<int>(new MockMemoryPool<int>());
 
         var span = seq.GetSpan(10);
         Enumerable.Range(1, 10).ToArray().CopyTo(span);
@@ -345,7 +347,7 @@ public class SequenceTests : TestBase
     {
         var seq = new Sequence<object>();
 
-        WeakReference tracker = AdvanceTo_ReleasesReferencesHelper(seq);
+        WeakReference tracker = StoreReferenceInSequence(seq);
 
         GC.Collect();
         Assert.True(tracker.IsAlive);
@@ -377,22 +379,41 @@ public class SequenceTests : TestBase
     [Fact]
     public void MinimumSpanLength_ZeroGetsPoolRecommendation()
     {
-        var seq = new Sequence<int>(new MockPool<int>());
+        var seq = new Sequence<int>(new MockMemoryPool<int>());
         seq.MinimumSpanLength = 0;
         var span = seq.GetSpan(0);
-        Assert.Equal(MockPool<int>.DefaultLength, span.Length);
+        Assert.Equal(MockMemoryPool<int>.DefaultLength, span.Length);
     }
 
     [Fact]
-    public void Dispose_ReturnsArraysToPool()
+    public void Dispose_ReturnsArraysToPool_MemoryPool()
     {
-        MockPool<char> mockPool = new MockPool<char>();
+        MockMemoryPool<char> mockPool = new MockMemoryPool<char>();
         var seq = new Sequence<char>(mockPool);
         var expected = new List<Memory<char>>();
         for (int i = 0; i < 3; i++)
         {
             var mem = seq.GetMemory(3);
             expected.Add(mem);
+            seq.Advance(mem.Length);
+        }
+
+        seq.Dispose();
+        Assert.True(seq.AsReadOnlySequence.IsEmpty);
+        mockPool.AssertContents(expected);
+    }
+
+    [Fact]
+    public void Dispose_ReturnsArraysToPool_ArrayPool()
+    {
+        MockArrayPool<char> mockPool = new MockArrayPool<char>();
+        var seq = new Sequence<char>(mockPool);
+        var expected = new List<char[]>();
+        for (int i = 0; i < 3; i++)
+        {
+            var mem = seq.GetMemory(3);
+            Assumes.True(MemoryMarshal.TryGetArray<char>(mem, out var segment));
+            expected.Add(segment.Array);
             seq.Advance(mem.Length);
         }
 
@@ -422,12 +443,16 @@ public class SequenceTests : TestBase
     }
 
     /// <summary>
-    /// Don't inline this because we need to guarantee the local disappears.
+    /// Adds a reference to an object in the sequence and returns a weak reference to it.
     /// </summary>
+    /// <remarks>
+    /// Don't inline this because we need to guarantee the local disappears.
+    /// </remarks>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static WeakReference AdvanceTo_ReleasesReferencesHelper(Sequence<object> seq)
+    private static WeakReference StoreReferenceInSequence<T>(Sequence<T> seq)
+        where T : class, new()
     {
-        var o = new object();
+        var o = new T();
         var tracker = new WeakReference(o);
         var span = seq.GetSpan(5);
         span[0] = o;
