@@ -323,17 +323,22 @@ public class SequenceTests : TestBase
         // use the mock pool so that we can predict the actual array size will not exceed what we ask for.
         var seq = new Sequence<int>(new MockPool<int>());
 
-        seq.GetSpan(10);
+        var span = seq.GetSpan(10);
+        Enumerable.Range(1, 10).ToArray().CopyTo(span);
         seq.Advance(10);
 
         seq.AdvanceTo(seq.AsReadOnlySequence.GetPosition(3));
 
-        seq.GetSpan(10);
+        span = seq.GetSpan(10);
+        Enumerable.Range(11, 10).ToArray().CopyTo(span);
         seq.Advance(10);
 
-        seq.GetSpan(10);
+        span = seq.GetSpan(10);
+        Enumerable.Range(21, 10).ToArray().CopyTo(span);
         seq.Advance(10);
 
+        this.Logger.WriteLine(string.Join(", ", seq.AsReadOnlySequence.ToArray()));
+        Assert.Equal(Enumerable.Range(4, 27), seq.AsReadOnlySequence.ToArray());
         Assert.Equal(10 - 3 + 10 + 10, seq.AsReadOnlySequence.Length);
     }
 
