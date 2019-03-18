@@ -5,9 +5,7 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Moq;
+using System.Runtime.CompilerServices;
 using Nerdbank.Streams;
 using Xunit;
 using Xunit.Abstractions;
@@ -323,18 +321,37 @@ public class SequenceTests : TestBase
         // use the mock pool so that we can predict the actual array size will not exceed what we ask for.
         var seq = new Sequence<int>(new MockPool<int>());
 
-        seq.GetSpan(10);
+        var span = seq.GetSpan(10);
+        Enumerable.Range(1, 10).ToArray().CopyTo(span);
         seq.Advance(10);
 
         seq.AdvanceTo(seq.AsReadOnlySequence.GetPosition(3));
 
-        seq.GetSpan(10);
+        span = seq.GetSpan(10);
+        Enumerable.Range(11, 10).ToArray().CopyTo(span);
         seq.Advance(10);
 
-        seq.GetSpan(10);
+        span = seq.GetSpan(10);
+        Enumerable.Range(21, 10).ToArray().CopyTo(span);
         seq.Advance(10);
 
+        this.Logger.WriteLine(string.Join(", ", seq.AsReadOnlySequence.ToArray()));
+        Assert.Equal(Enumerable.Range(4, 27), seq.AsReadOnlySequence.ToArray());
         Assert.Equal(10 - 3 + 10 + 10, seq.AsReadOnlySequence.Length);
+    }
+
+    [Fact]
+    public void AdvanceTo_ReleasesReferences()
+    {
+        var seq = new Sequence<object>();
+
+        WeakReference tracker = AdvanceTo_ReleasesReferencesHelper(seq);
+
+        GC.Collect();
+        Assert.True(tracker.IsAlive);
+        seq.AdvanceTo(seq.AsReadOnlySequence.GetPosition(1));
+        GC.Collect();
+        Assert.False(tracker.IsAlive);
     }
 
     [Theory]
@@ -402,5 +419,19 @@ public class SequenceTests : TestBase
         Assert.True(seq.AsReadOnlySequence.IsEmpty);
         seq.Write(new char[3]);
         Assert.Equal(3, seq.AsReadOnlySequence.Length);
+    }
+
+    /// <summary>
+    /// Don't inline this because we need to guarantee the local disappears.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference AdvanceTo_ReleasesReferencesHelper(Sequence<object> seq)
+    {
+        var o = new object();
+        var tracker = new WeakReference(o);
+        var span = seq.GetSpan(5);
+        span[0] = o;
+        seq.Advance(1);
+        return tracker;
     }
 }

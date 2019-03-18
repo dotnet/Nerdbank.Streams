@@ -8,6 +8,7 @@ namespace Nerdbank.Streams
     using System.Collections.Generic;
     using System.ComponentModel;
     using System.Diagnostics;
+    using System.Reflection;
     using System.Runtime.CompilerServices;
     using Microsoft;
 
@@ -126,9 +127,7 @@ namespace Nerdbank.Streams
             current = this.first;
             while (current != firstSegment)
             {
-                var next = current.Next;
-                current.ResetMemory();
-                current = next;
+                current = this.RecycleAndGetNext(current);
             }
 
             firstSegment.AdvanceTo(firstIndex);
@@ -151,51 +150,21 @@ namespace Nerdbank.Streams
         /// returned by a prior call to <see cref="GetMemory(int)"/>.
         /// </summary>
         /// <param name="count">The number of elements written into memory.</param>
-        public void Advance(int count)
-        {
-            Requires.Range(count >= 0, nameof(count));
-            this.last.End += count;
-        }
+        public void Advance(int count) => this.last.Advance(count);
 
         /// <summary>
         /// Gets writable memory that can be initialized and added to the sequence via a subsequent call to <see cref="Advance(int)"/>.
         /// </summary>
         /// <param name="sizeHint">The size of the memory required, or 0 to just get a convenient (non-empty) buffer.</param>
         /// <returns>The requested memory.</returns>
-        public Memory<T> GetMemory(int sizeHint)
-        {
-            Requires.Range(sizeHint >= 0, nameof(sizeHint));
-
-            if (sizeHint == 0)
-            {
-                if (this.last?.WritableBytes > 0)
-                {
-                    return this.last.TrailingSlack;
-                }
-                else
-                {
-                    sizeHint = -1; // MemoryPool<T>.Rent value for "give us the default size"
-                }
-            }
-            else
-            {
-                sizeHint = Math.Max(this.MinimumSpanLength, sizeHint);
-            }
-
-            if (this.last == null || this.last.WritableBytes < sizeHint)
-            {
-                this.Append(this.memoryPool.Rent(sizeHint));
-            }
-
-            return this.last.TrailingSlack;
-        }
+        public Memory<T> GetMemory(int sizeHint) => this.GetSegment(sizeHint).RemainingMemory;
 
         /// <summary>
         /// Gets writable memory that can be initialized and added to the sequence via a subsequent call to <see cref="Advance(int)"/>.
         /// </summary>
         /// <param name="sizeHint">The size of the memory required, or 0 to just get a convenient (non-empty) buffer.</param>
         /// <returns>The requested memory.</returns>
-        public Span<T> GetSpan(int sizeHint) => this.GetMemory(sizeHint).Span;
+        public Span<T> GetSpan(int sizeHint) => this.GetSegment(sizeHint).RemainingSpan;
 
         /// <summary>
         /// Clears the entire sequence, recycles associated memory into pools,
@@ -220,12 +189,35 @@ namespace Nerdbank.Streams
             this.first = this.last = null;
         }
 
-        private void Append(IMemoryOwner<T> array)
+        private SequenceSegment GetSegment(int sizeHint)
         {
-            Requires.NotNull(array, nameof(array));
+            Requires.Range(sizeHint >= 0, nameof(sizeHint));
+            if (sizeHint == 0)
+            {
+                if (this.last == null || this.last.WritableBytes == 0)
+                {
+                    // We're going to need more memory. Take whatever size the pool wants to give us.
+                    this.Append(this.memoryPool.Rent());
+                }
+            }
+            else
+            {
+                sizeHint = Math.Max(this.MinimumSpanLength, sizeHint);
+                if (this.last == null || this.last.WritableBytes < sizeHint)
+                {
+                    this.Append(this.memoryPool.Rent(sizeHint));
+                }
+            }
+
+            return this.last;
+        }
+
+        private void Append(IMemoryOwner<T> memoryOwner)
+        {
+            Requires.NotNull(memoryOwner, nameof(memoryOwner));
 
             var segment = this.segmentPool.Count > 0 ? this.segmentPool.Pop() : new SequenceSegment();
-            segment.SetMemory(array, 0, 0);
+            segment.Assign(memoryOwner);
 
             if (this.last == null)
             {
@@ -274,108 +266,118 @@ namespace Nerdbank.Streams
         private class SequenceSegment : ReadOnlySequenceSegment<T>
         {
             /// <summary>
-            /// Backing field for the <see cref="End"/> property.
+            /// Gets the position within <see cref="ReadOnlySequenceSegment{T}.Memory"/> where the data starts.
             /// </summary>
-            private int end;
-
-            /// <summary>
-            /// Gets the index of the first element in <see cref="AvailableMemory"/> to consider part of the sequence.
-            /// </summary>
-            /// <remarks>
-            /// The <see cref="Start"/> represents the offset into <see cref="AvailableMemory"/> where the range of "active" bytes begins. At the point when the block is leased
-            /// the <see cref="Start"/> is guaranteed to be equal to 0. The value of <see cref="Start"/> may be assigned anywhere between 0 and
-            /// <see cref="AvailableMemory"/>.Length, and must be equal to or less than <see cref="End"/>.
-            /// </remarks>
+            /// <remarks>This may be nonzero as a result of calling <see cref="Sequence{T}.AdvanceTo(SequencePosition)"/>.</remarks>
             internal int Start { get; private set; }
 
             /// <summary>
-            /// Gets or sets the index of the element just beyond the end in <see cref="AvailableMemory"/> to consider part of the sequence.
+            /// Gets the position within <see cref="ReadOnlySequenceSegment{T}.Memory"/> where the data ends.
             /// </summary>
-            /// <remarks>
-            /// The <see cref="End"/> represents the offset into <see cref="AvailableMemory"/> where the range of "active" bytes ends. At the point when the block is leased
-            /// the <see cref="End"/> is guaranteed to be equal to <see cref="Start"/>. The value of <see cref="Start"/> may be assigned anywhere between 0 and
-            /// <see cref="AvailableMemory"/>.Length, and must be equal to or less than <see cref="End"/>.
-            /// </remarks>
-            internal int End
-            {
-                get => this.end;
-                set
-                {
-                    Requires.Range(value <= this.AvailableMemory.Length, nameof(value));
+            internal int End { get; private set; }
 
-                    this.end = value;
+            /// <summary>
+            /// Gets the tail of memory that has not yet been committed.
+            /// </summary>
+            internal Memory<T> RemainingMemory => this.MemoryOwner.Memory.Slice(this.End);
 
-                    // If we ever support creating these instances on existing arrays, such that
-                    // this.Start isn't 0 at the beginning, we'll have to "pin" this.Start and remove
-                    // Advance, forcing Sequence<T> itself to track it, the way Pipe does it internally.
-                    this.Memory = this.AvailableMemory.Slice(0, value);
-                }
-            }
+            /// <summary>
+            /// Gets the tail of memory that has not yet been committed.
+            /// </summary>
+            internal Span<T> RemainingSpan => this.MemoryOwner.Memory.Span.Slice(this.End);
 
-            internal Memory<T> TrailingSlack => this.AvailableMemory.Slice(this.End);
-
+            /// <summary>
+            /// Gets the tracker for the underlying array for this segment, which can be used to recycle the array when we're disposed of.
+            /// </summary>
             internal IMemoryOwner<T> MemoryOwner { get; private set; }
 
-            internal Memory<T> AvailableMemory { get; private set; }
+            /// <summary>
+            /// Gets the full memory owned by the <see cref="MemoryOwner"/>.
+            /// </summary>
+            internal Memory<T> AvailableMemory => this.MemoryOwner?.Memory ?? default;
 
+            /// <summary>
+            /// Gets the number of elements that are committed in this segment.
+            /// </summary>
             internal int Length => this.End - this.Start;
 
             /// <summary>
             /// Gets the amount of writable bytes in this segment.
             /// It is the amount of bytes between <see cref="Length"/> and <see cref="End"/>.
             /// </summary>
-            internal int WritableBytes
-            {
-                [MethodImpl(MethodImplOptions.AggressiveInlining)]
-                get => this.AvailableMemory.Length - this.End;
-            }
+            internal int WritableBytes => this.AvailableMemory.Length - this.End;
 
+            /// <summary>
+            /// Gets or sets the next segment in the singly linked list of segments.
+            /// </summary>
             internal new SequenceSegment Next
             {
                 get => (SequenceSegment)base.Next;
                 set => base.Next = value;
             }
 
-            internal void SetMemory(IMemoryOwner<T> memoryOwner)
-            {
-                this.SetMemory(memoryOwner, 0, memoryOwner.Memory.Length);
-            }
-
-            internal void SetMemory(IMemoryOwner<T> memoryOwner, int start, int end)
+            /// <summary>
+            /// Assigns this (recyclable) segment a new area in memory.
+            /// </summary>
+            /// <param name="memoryOwner">The memory and a means to recycle it.</param>
+            internal void Assign(IMemoryOwner<T> memoryOwner)
             {
                 this.MemoryOwner = memoryOwner;
-
-                this.AvailableMemory = this.MemoryOwner.Memory;
-
-                this.RunningIndex = 0;
-                this.Start = start;
-                this.End = end;
-                this.Next = null;
+                this.Memory = memoryOwner.Memory;
             }
 
+            /// <summary>
+            /// Clears all fields in preparation to recycle this instance.
+            /// </summary>
             internal void ResetMemory()
             {
-                this.MemoryOwner.Dispose();
-                this.MemoryOwner = null;
-                this.AvailableMemory = default;
-
                 this.Memory = default;
                 this.Next = null;
+                this.RunningIndex = 0;
                 this.Start = 0;
-                this.end = 0;
+                this.End = 0;
+                this.MemoryOwner.Dispose();
+                this.MemoryOwner = null;
             }
 
+            /// <summary>
+            /// Adds a new segment after this one.
+            /// </summary>
+            /// <param name="segment">The next segment in the linked list.</param>
             internal void SetNext(SequenceSegment segment)
             {
-                Requires.NotNull(segment, nameof(segment));
-
+                Debug.Assert(segment != null, "Null not allowed.");
                 this.Next = segment;
-                segment.RunningIndex = this.RunningIndex + this.End;
+                segment.RunningIndex = this.RunningIndex + this.Start + this.Length;
+
+                // When setting Memory, we start with index 0 instead of this.Start because
+                // the first segment has an explicit index set anyway,
+                // and we don't want to double-count it here.
+                this.Memory = this.AvailableMemory.Slice(0, this.Start + this.Length);
             }
 
+            /// <summary>
+            /// Commits more elements as written in this segment.
+            /// </summary>
+            /// <param name="count">The number of elements written.</param>
+            internal void Advance(int count)
+            {
+                Requires.Range(count >= 0 && this.End + count <= this.Memory.Length, nameof(count));
+                this.End += count;
+            }
+
+            /// <summary>
+            /// Removes some elements from the start of this segment.
+            /// </summary>
+            /// <param name="offset">The number of elements to remove.</param>
             internal void AdvanceTo(int offset)
             {
-                Requires.Range(offset <= this.End, nameof(offset));
+                // If we store references, clear them to allow the objects to be GC'd.
+                if (!typeof(T).GetTypeInfo().IsValueType)
+                {
+                    this.AvailableMemory.Span.Slice(this.Start, offset).Fill(default);
+                }
+
                 this.Start = offset;
             }
         }
