@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Xunit;
 
-internal class MockPool<T> : MemoryPool<T>
+internal class MockMemoryPool<T> : MemoryPool<T>
 {
     internal const int DefaultLength = 16;
 
@@ -76,9 +76,9 @@ internal class MockPool<T> : MemoryPool<T>
 
     private class Rental : IMemoryOwner<T>
     {
-        private readonly MockPool<T> owner;
+        private readonly MockMemoryPool<T> owner;
 
-        internal Rental(MockPool<T> owner, Memory<T> memory)
+        internal Rental(MockMemoryPool<T> owner, Memory<T> memory)
         {
             this.owner = owner ?? throw new ArgumentNullException(nameof(owner));
             this.Memory = memory;

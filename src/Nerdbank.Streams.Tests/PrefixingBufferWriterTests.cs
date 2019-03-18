@@ -16,7 +16,7 @@ public class PrefixingBufferWriterTests
 
     private static readonly ReadOnlyMemory<byte> Payload = Enumerable.Range(3, PayloadSize).Select(v => (byte)v).ToArray();
 
-    private readonly MockPool<byte> mockPool = new MockPool<byte>();
+    private readonly MockMemoryPool<byte> mockPool = new MockMemoryPool<byte>();
 
     private readonly Sequence<byte> sequence;
 

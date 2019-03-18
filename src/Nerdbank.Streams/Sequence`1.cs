@@ -10,6 +10,7 @@ namespace Nerdbank.Streams
     using System.Diagnostics;
     using System.Reflection;
     using System.Runtime.CompilerServices;
+    using System.Runtime.InteropServices;
     using Microsoft;
 
     /// <summary>
@@ -22,9 +23,13 @@ namespace Nerdbank.Streams
     [DebuggerDisplay("{" + nameof(DebuggerDisplay) + ",nq}")]
     public class Sequence<T> : IBufferWriter<T>, IDisposable
     {
+        private static readonly int DefaultLengthFromArrayPool = 1 + (4095 / Marshal.SizeOf<T>());
+
         private readonly Stack<SequenceSegment> segmentPool = new Stack<SequenceSegment>();
 
         private readonly MemoryPool<T> memoryPool;
+
+        private readonly ArrayPool<T> arrayPool;
 
         private SequenceSegment first;
 
@@ -35,7 +40,7 @@ namespace Nerdbank.Streams
         /// that uses the <see cref="MemoryPool{T}.Shared"/> memory pool for recycling arrays.
         /// </summary>
         public Sequence()
-            : this(MemoryPool<T>.Shared)
+            : this(ArrayPool<T>.Shared)
         {
         }
 
@@ -47,6 +52,16 @@ namespace Nerdbank.Streams
         {
             Requires.NotNull(memoryPool, nameof(memoryPool));
             this.memoryPool = memoryPool;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Sequence{T}"/> class.
+        /// </summary>
+        /// <param name="arrayPool">The pool to use for recycling backing arrays.</param>
+        public Sequence(ArrayPool<T> arrayPool)
+        {
+            Requires.NotNull(arrayPool, nameof(arrayPool));
+            this.arrayPool = arrayPool;
         }
 
         /// <summary>
@@ -192,12 +207,13 @@ namespace Nerdbank.Streams
         private SequenceSegment GetSegment(int sizeHint)
         {
             Requires.Range(sizeHint >= 0, nameof(sizeHint));
+            int? minBufferSize = null;
             if (sizeHint == 0)
             {
                 if (this.last == null || this.last.WritableBytes == 0)
                 {
                     // We're going to need more memory. Take whatever size the pool wants to give us.
-                    this.Append(this.memoryPool.Rent());
+                    minBufferSize = -1;
                 }
             }
             else
@@ -205,20 +221,30 @@ namespace Nerdbank.Streams
                 sizeHint = Math.Max(this.MinimumSpanLength, sizeHint);
                 if (this.last == null || this.last.WritableBytes < sizeHint)
                 {
-                    this.Append(this.memoryPool.Rent(sizeHint));
+                    minBufferSize = sizeHint;
                 }
+            }
+
+            if (minBufferSize.HasValue)
+            {
+                var segment = this.segmentPool.Count > 0 ? this.segmentPool.Pop() : new SequenceSegment();
+                if (this.arrayPool != null)
+                {
+                    segment.Assign(this.arrayPool.Rent(minBufferSize.Value == -1 ? DefaultLengthFromArrayPool : minBufferSize.Value));
+                }
+                else
+                {
+                    segment.Assign(this.memoryPool.Rent(minBufferSize.Value));
+                }
+
+                this.Append(segment);
             }
 
             return this.last;
         }
 
-        private void Append(IMemoryOwner<T> memoryOwner)
+        private void Append(SequenceSegment segment)
         {
-            Requires.NotNull(memoryOwner, nameof(memoryOwner));
-
-            var segment = this.segmentPool.Count > 0 ? this.segmentPool.Pop() : new SequenceSegment();
-            segment.Assign(memoryOwner);
-
             if (this.last == null)
             {
                 this.first = this.last = segment;
@@ -258,13 +284,18 @@ namespace Nerdbank.Streams
         {
             var recycledSegment = segment;
             segment = segment.Next;
-            recycledSegment.ResetMemory();
+            recycledSegment.ResetMemory(this.arrayPool);
             this.segmentPool.Push(recycledSegment);
             return segment;
         }
 
         private class SequenceSegment : ReadOnlySequenceSegment<T>
         {
+            /// <summary>
+            /// Gets the backing array, when using an <see cref="ArrayPool{T}"/> instead of a <see cref="MemoryPool{T}"/>.
+            /// </summary>
+            private T[] array;
+
             /// <summary>
             /// Gets the position within <see cref="ReadOnlySequenceSegment{T}.Memory"/> where the data starts.
             /// </summary>
@@ -279,22 +310,23 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Gets the tail of memory that has not yet been committed.
             /// </summary>
-            internal Memory<T> RemainingMemory => this.MemoryOwner.Memory.Slice(this.End);
+            internal Memory<T> RemainingMemory => this.AvailableMemory.Slice(this.End);
 
             /// <summary>
             /// Gets the tail of memory that has not yet been committed.
             /// </summary>
-            internal Span<T> RemainingSpan => this.MemoryOwner.Memory.Span.Slice(this.End);
+            internal Span<T> RemainingSpan => this.AvailableMemory.Span.Slice(this.End);
 
             /// <summary>
             /// Gets the tracker for the underlying array for this segment, which can be used to recycle the array when we're disposed of.
+            /// Will be <c>null</c> if using an array pool, in which case the memory is held by <see cref="array"/>.
             /// </summary>
             internal IMemoryOwner<T> MemoryOwner { get; private set; }
 
             /// <summary>
             /// Gets the full memory owned by the <see cref="MemoryOwner"/>.
             /// </summary>
-            internal Memory<T> AvailableMemory => this.MemoryOwner?.Memory ?? default;
+            internal Memory<T> AvailableMemory => this.array ?? this.MemoryOwner?.Memory ?? default;
 
             /// <summary>
             /// Gets the number of elements that are committed in this segment.
@@ -327,17 +359,35 @@ namespace Nerdbank.Streams
             }
 
             /// <summary>
+            /// Assigns this (recyclable) segment a new area in memory.
+            /// </summary>
+            /// <param name="array">An array drawn from an <see cref="ArrayPool{T}"/>.</param>
+            internal void Assign(T[] array)
+            {
+                this.array = array;
+                this.Memory = array;
+            }
+
+            /// <summary>
             /// Clears all fields in preparation to recycle this instance.
             /// </summary>
-            internal void ResetMemory()
+            internal void ResetMemory(ArrayPool<T> arrayPool)
             {
                 this.Memory = default;
                 this.Next = null;
                 this.RunningIndex = 0;
                 this.Start = 0;
                 this.End = 0;
-                this.MemoryOwner.Dispose();
-                this.MemoryOwner = null;
+                if (this.array != null)
+                {
+                    arrayPool.Return(this.array);
+                    this.array = null;
+                }
+                else
+                {
+                    this.MemoryOwner?.Dispose();
+                    this.MemoryOwner = null;
+                }
             }
 
             /// <summary>
