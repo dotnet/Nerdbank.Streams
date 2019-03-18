@@ -45,6 +45,26 @@ public class SequenceTests : TestBase
         Assert.Throws<ArgumentOutOfRangeException>(() => seq.GetMemory(-1));
     }
 
+    [Fact]
+    public void MemoryPool_ReleasesReferenceOnRecycle()
+    {
+        var seq = new Sequence<object>(new MockMemoryPool<object>());
+        var weakReference = StoreReferenceInSequence(seq);
+        seq.Reset();
+        GC.Collect();
+        Assert.False(weakReference.IsAlive);
+    }
+
+    [Fact]
+    public void ArrayPool_ReleasesReferenceOnRecycle()
+    {
+        var seq = new Sequence<object>(new MockArrayPool<object>());
+        var weakReference = StoreReferenceInSequence(seq);
+        seq.Reset();
+        GC.Collect();
+        Assert.False(weakReference.IsAlive);
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(1)]

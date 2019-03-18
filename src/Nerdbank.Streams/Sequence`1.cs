@@ -373,6 +373,7 @@ namespace Nerdbank.Streams
             /// </summary>
             internal void ResetMemory(ArrayPool<T> arrayPool)
             {
+                this.ClearReferences(this.Start, this.End);
                 this.Memory = default;
                 this.Next = null;
                 this.RunningIndex = 0;
@@ -419,16 +420,21 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Removes some elements from the start of this segment.
             /// </summary>
-            /// <param name="offset">The number of elements to remove.</param>
+            /// <param name="offset">The number of elements to ignore from the start of the underlying array.</param>
             internal void AdvanceTo(int offset)
+            {
+                Debug.Assert(offset >= this.Start, "Trying to rewind.");
+                this.ClearReferences(this.Start, offset - this.Start);
+                this.Start = offset;
+            }
+
+            private void ClearReferences(int startIndex, int length)
             {
                 // If we store references, clear them to allow the objects to be GC'd.
                 if (!typeof(T).GetTypeInfo().IsValueType)
                 {
-                    this.AvailableMemory.Span.Slice(this.Start, offset).Fill(default);
+                    this.AvailableMemory.Span.Slice(startIndex, length).Fill(default);
                 }
-
-                this.Start = offset;
             }
         }
     }
