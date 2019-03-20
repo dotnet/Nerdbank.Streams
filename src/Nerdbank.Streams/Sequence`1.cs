@@ -292,6 +292,11 @@ namespace Nerdbank.Streams
         private class SequenceSegment : ReadOnlySequenceSegment<T>
         {
             /// <summary>
+            /// A value indicating whether the element is a value type.
+            /// </summary>
+            private static readonly bool IsValueTypeElement = typeof(T).GetTypeInfo().IsValueType;
+
+            /// <summary>
             /// Gets the backing array, when using an <see cref="ArrayPool{T}"/> instead of a <see cref="MemoryPool{T}"/>.
             /// </summary>
             private T[] array;
@@ -431,7 +436,7 @@ namespace Nerdbank.Streams
             private void ClearReferences(int startIndex, int length)
             {
                 // If we store references, clear them to allow the objects to be GC'd.
-                if (!typeof(T).GetTypeInfo().IsValueType)
+                if (!IsValueTypeElement)
                 {
                     this.AvailableMemory.Span.Slice(startIndex, length).Fill(default);
                 }
