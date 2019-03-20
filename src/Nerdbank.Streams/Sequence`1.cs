@@ -37,10 +37,10 @@ namespace Nerdbank.Streams
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Sequence{T}"/> class
-        /// that uses the <see cref="MemoryPool{T}.Shared"/> memory pool for recycling arrays.
+        /// that uses a private <see cref="ArrayPool{T}"/> for recycling arrays.
         /// </summary>
         public Sequence()
-            : this(ArrayPool<T>.Shared)
+            : this(ArrayPool<T>.Create())
         {
         }
 
