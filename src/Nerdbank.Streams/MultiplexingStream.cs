@@ -206,14 +206,13 @@ namespace Nerdbank.Streams
             var sendBuffer = new byte[ProtocolMagicNumber.Length + randomSendBuffer.Length];
             Array.Copy(ProtocolMagicNumber, sendBuffer, ProtocolMagicNumber.Length);
             Array.Copy(randomSendBuffer, 0, sendBuffer, ProtocolMagicNumber.Length, randomSendBuffer.Length);
-            Task writeTask = stream.WriteAsync(sendBuffer, 0, sendBuffer.Length);
-            Task flushTask = stream.FlushAsync(cancellationToken);
+            Task writeTask = WriteAndFlushAsync(stream, new ArraySegment<byte>(sendBuffer), cancellationToken);
 
             var recvBuffer = new byte[sendBuffer.Length];
             await ReadToFillAsync(stream, recvBuffer, throwOnEmpty: true, cancellationToken).ConfigureAwait(false);
 
             // Realize any exceptions from writing to the stream.
-            await Task.WhenAll(writeTask, flushTask).ConfigureAwait(false);
+            await writeTask.ConfigureAwait(false);
 
             for (int i = 0; i < ProtocolMagicNumber.Length; i++)
             {
@@ -590,6 +589,14 @@ namespace Nerdbank.Streams
             {
                 return ControlFrameEncoding.GetString((byte*)pinnedBuffer.Pointer, buffer.Length);
             }
+        }
+
+        private static async Task WriteAndFlushAsync(Stream stream, ArraySegment<byte> buffer, CancellationToken cancellationToken)
+        {
+            Requires.NotNull(stream, nameof(stream));
+
+            await stream.WriteAsync(buffer.Array, buffer.Offset, buffer.Count);
+            await stream.FlushAsync(cancellationToken);
         }
 
         private async Task ReadStreamAsync()
