@@ -165,7 +165,12 @@ namespace Nerdbank.Streams
         /// returned by a prior call to <see cref="GetMemory(int)"/>.
         /// </summary>
         /// <param name="count">The number of elements written into memory.</param>
-        public void Advance(int count) => this.last.Advance(count);
+        public void Advance(int count)
+        {
+            SequenceSegment last = this.last;
+            Verify.Operation(last != null, "Cannot advance before acquiring memory.");
+            last.Advance(count);
+        }
 
         /// <summary>
         /// Gets writable memory that can be initialized and added to the sequence via a subsequent call to <see cref="Advance(int)"/>.
