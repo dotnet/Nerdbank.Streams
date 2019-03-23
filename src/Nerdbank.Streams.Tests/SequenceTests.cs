@@ -115,6 +115,13 @@ public class SequenceTests : TestBase
     }
 
     [Fact]
+    public void Advance_BeforeGetMemory()
+    {
+        var seq = new Sequence<char>();
+        Assert.Throws<InvalidOperationException>(() => seq.Advance(1));
+    }
+
+    [Fact]
     public void Advance_OneBlock()
     {
         var seq = new Sequence<char>();
