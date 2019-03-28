@@ -72,6 +72,10 @@ namespace Nerdbank.Streams
 
                         pipe.Writer.Advance(bytesRead);
                     }
+                    catch (ObjectDisposedException)
+                    {
+                        break;
+                    }
                     catch (Exception ex)
                     {
                         pipe.Writer.Complete(ex);
