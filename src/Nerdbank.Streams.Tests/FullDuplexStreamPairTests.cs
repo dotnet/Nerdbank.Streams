@@ -319,6 +319,28 @@ public class FullDuplexStreamPairTests : TestBase
         Assert.Equal(0, this.stream2.Read(buffer, 0, 1));
     }
 
+    [Fact]
+    public async Task PipePair()
+    {
+        var (party1, party2) = FullDuplexStream.CreatePipePair();
+
+        // First party indicates they're done sending messages (but might still be reading).
+        party1.Output.Complete();
+
+        // Second party recognizes that the other's writing is done, and acknowledges that they're done reading.
+        await party2.Input.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
+        party2.Input.Complete();
+        await party1.Output.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken); // just to show propagation.
+
+        // Second party indicates that they're done writing messages.
+        party2.Output.Complete();
+
+        // First party recognizes that the other's writing is done, and acknowledges that they're done reading.
+        await party1.Input.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
+        party1.Input.Complete();
+        await party2.Output.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken); // just to show propagation.
+    }
+
     private static MemoryStream GetDisposedMemoryStream()
     {
         var ms = new MemoryStream();
