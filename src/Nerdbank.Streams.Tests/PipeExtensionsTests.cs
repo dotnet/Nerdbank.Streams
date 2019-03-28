@@ -45,6 +45,45 @@ public class PipeExtensionsTests : TestBase
     }
 
     [Fact]
+    public async Task UsePipe_Stream_Disposal()
+    {
+        var ms = new HalfDuplexStream();
+        IDuplexPipe pipe = ms.UsePipe(cancellationToken: this.TimeoutToken);
+        pipe.Output.Complete();
+        pipe.Input.Complete();
+        while (!ms.IsDisposed && !this.TimeoutToken.IsCancellationRequested)
+        {
+            await Task.Yield();
+        }
+
+        Assert.True(ms.IsDisposed);
+    }
+
+    [Theory]
+    [PairwiseData]
+    public async Task UsePipe_Stream_OneDirectionDoesNotDispose(bool completeOutput)
+    {
+        var ms = new HalfDuplexStream();
+        IDuplexPipe pipe = ms.UsePipe(cancellationToken: this.TimeoutToken);
+        if (completeOutput)
+        {
+            pipe.Output.Complete();
+        }
+        else
+        {
+            pipe.Input.Complete();
+        }
+
+        var timeout = ExpectedTimeoutToken;
+        while (!ms.IsDisposed && !timeout.IsCancellationRequested)
+        {
+            await Task.Yield();
+        }
+
+        Assert.False(ms.IsDisposed);
+    }
+
+    [Fact]
     public async Task UsePipeReader_WebSocket()
     {
         var expectedBuffer = new byte[] { 4, 5, 6 };

@@ -183,5 +183,21 @@ public abstract class StreamPipeReaderTestBase : TestBase
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => readTask.AsTask());
     }
 
+    [Fact]
+    public async Task Complete_DoesNotCauseStreamDisposal()
+    {
+        var stream = new HalfDuplexStream();
+        var reader = this.CreatePipeReader(stream);
+        reader.Complete();
+
+        var timeout = ExpectedTimeoutToken;
+        while (!stream.IsDisposed && !timeout.IsCancellationRequested)
+        {
+            await Task.Yield();
+        }
+
+        Assert.False(stream.IsDisposed);
+    }
+
     protected abstract PipeReader CreatePipeReader(Stream stream, int sizeHint = 0);
 }

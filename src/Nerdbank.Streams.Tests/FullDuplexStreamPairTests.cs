@@ -5,6 +5,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft;
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
@@ -317,6 +318,32 @@ public class FullDuplexStreamPairTests : TestBase
         this.stream1.Dispose();
         byte[] buffer = new byte[1];
         Assert.Equal(0, this.stream2.Read(buffer, 0, 1));
+    }
+
+    [Fact]
+    public async Task StreamPairWithUsePipe()
+    {
+        var pipe1 = this.stream1.UsePipe();
+        var pipe2 = this.stream2.UsePipe();
+
+        // Complete the pipe's reader and writer. Assert that this disposes their stream.
+        pipe2.Output.Complete();
+        pipe2.Input.Complete();
+
+        // Verify that this disposes the stream.
+        while (!((IDisposableObservable)this.stream2).IsDisposed && !this.TimeoutToken.IsCancellationRequested)
+        {
+            await Task.Yield();
+        }
+
+        Assert.True(((IDisposableObservable)this.stream2).IsDisposed);
+
+        // Verify that the other end notices.
+        await pipe1.Input.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
+
+        // The other end then decides it is done writing.
+        pipe1.Output.Complete();
+        await pipe1.Output.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken);
     }
 
     [Fact]
