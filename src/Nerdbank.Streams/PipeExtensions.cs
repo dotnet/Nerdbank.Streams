@@ -51,26 +51,43 @@ namespace Nerdbank.Streams
         /// <param name="pipeOptions">Optional pipe options to use.</param>
         /// <param name="cancellationToken">A cancellation token that aborts reading from the <paramref name="stream"/>.</param>
         /// <returns>A <see cref="PipeReader"/>.</returns>
+        /// <remarks>
+        /// When the caller invokes <see cref="PipeReader.Complete(Exception)"/> on the result value,
+        /// this leads to the associated <see cref="PipeWriter.Complete(Exception)"/> to be automatically called as well.
+        /// </remarks>
         public static PipeReader UsePipeReader(this Stream stream, int sizeHint = 0, PipeOptions pipeOptions = null, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(stream, nameof(stream));
             Requires.Argument(stream.CanRead, nameof(stream), "Stream must be readable.");
 
             var pipe = new Pipe(pipeOptions ?? PipeOptions.Default);
+
+            // Notice when the pipe reader isn't listening any more, and terminate our loop that reads from the stream.
+            var combinedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            pipe.Writer.OnReaderCompleted((ex, state) => ((CancellationTokenSource)state).Cancel(), combinedTokenSource);
+
             Task.Run(async delegate
             {
-                while (!cancellationToken.IsCancellationRequested)
+                while (!combinedTokenSource.Token.IsCancellationRequested)
                 {
                     Memory<byte> memory = pipe.Writer.GetMemory(sizeHint);
                     try
                     {
-                        int bytesRead = await stream.ReadAsync(memory, cancellationToken).ConfigureAwait(false);
+                        int bytesRead = await stream.ReadAsync(memory, combinedTokenSource.Token).ConfigureAwait(false);
                         if (bytesRead == 0)
                         {
                             break;
                         }
 
                         pipe.Writer.Advance(bytesRead);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        break;
                     }
                     catch (Exception ex)
                     {
@@ -186,7 +203,14 @@ namespace Nerdbank.Streams
         /// <returns>An <see cref="IDuplexPipe"/> instance.</returns>
         public static IDuplexPipe UsePipe(this Stream stream, int sizeHint = 0, PipeOptions pipeOptions = null, CancellationToken cancellationToken = default)
         {
-            return new DuplexPipe(stream.UsePipeReader(sizeHint, pipeOptions, cancellationToken), stream.UsePipeWriter(pipeOptions, cancellationToken));
+            PipeReader input = stream.UsePipeReader(sizeHint, pipeOptions, cancellationToken);
+            PipeWriter output = stream.UsePipeWriter(pipeOptions, cancellationToken);
+
+            // Arrange for closing the stream when *both* input/output are completed.
+            Task ioCompleted = Task.WhenAll(input.WaitForWriterCompletionAsync(), output.WaitForReaderCompletionAsync());
+            ioCompleted.ContinueWith((_, state) => ((Stream)state).Dispose(), stream, cancellationToken, TaskContinuationOptions.None, TaskScheduler.Default).Forget();
+
+            return new DuplexPipe(input, output);
         }
 
         /// <summary>

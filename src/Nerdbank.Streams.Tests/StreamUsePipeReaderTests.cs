@@ -41,5 +41,15 @@ public class StreamUsePipeReaderTests : StreamPipeReaderTestBase
         Assert.Same(expectedException, actualException);
     }
 
+    [Fact]
+    public async Task Complete_CausesWriterCompletion()
+    {
+        var stream = new HalfDuplexStream();
+        var reader = this.CreatePipeReader(stream);
+        Task writerCompletion = reader.WaitForWriterCompletionAsync();
+        reader.Complete();
+        await writerCompletion.WithCancellation(this.TimeoutToken);
+    }
+
     protected override PipeReader CreatePipeReader(Stream stream, int hintSize = 0) => stream.UsePipeReader(hintSize);
 }

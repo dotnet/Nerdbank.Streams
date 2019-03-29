@@ -26,13 +26,25 @@ namespace Nerdbank.Streams
         /// <returns>A pair of streams.</returns>
         public static (Stream, Stream) CreatePair(PipeOptions pipeOptions = null)
         {
+            var (pipe1, pipe2) = CreatePipePair(pipeOptions);
+            return (pipe1.AsStream(), pipe2.AsStream());
+        }
+
+        /// <summary>
+        /// Creates a pair of duplex pipes that can be passed to two parties
+        /// to allow for interaction with each other.
+        /// </summary>
+        /// <param name="pipeOptions">Pipe options to initialize the internal pipes with.</param>
+        /// <returns>A pair of <see cref="IDuplexPipe"/> objects.</returns>
+        public static (IDuplexPipe, IDuplexPipe) CreatePipePair(PipeOptions pipeOptions = null)
+        {
             var pipe1 = new Pipe(pipeOptions ?? PipeOptions.Default);
             var pipe2 = new Pipe(pipeOptions ?? PipeOptions.Default);
 
             var party1 = new PipeExtensions.DuplexPipe(pipe1.Reader, pipe2.Writer);
             var party2 = new PipeExtensions.DuplexPipe(pipe2.Reader, pipe1.Writer);
 
-            return (party1.AsStream(), party2.AsStream());
+            return (party1, party2);
         }
 
         /// <summary>
