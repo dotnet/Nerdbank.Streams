@@ -197,6 +197,15 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
+    public void ChannelExposesMultiplexingStream()
+    {
+        var channel = this.mx1.CreateChannel();
+        Assert.Same(this.mx1, channel.MultiplexingStream);
+        channel.Dispose();
+        Assert.Same(this.mx1, channel.MultiplexingStream);
+    }
+
+    [Fact]
     public async Task CommunicateOverOneChannel()
     {
         var (a, b) = await this.EstablishChannelStreamsAsync("a");
