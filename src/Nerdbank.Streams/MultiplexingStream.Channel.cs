@@ -18,7 +18,7 @@ namespace Nerdbank.Streams
     public partial class MultiplexingStream
     {
         /// <summary>
-        /// An individual channel within a <see cref="MultiplexingStream"/>.
+        /// An individual channel within a <see cref="Streams.MultiplexingStream"/>.
         /// </summary>
         [DebuggerDisplay("{" + nameof(DebuggerDisplay) + "}")]
         public class Channel : IDisposableObservable, IDuplexPipe
@@ -49,10 +49,10 @@ namespace Nerdbank.Streams
                 Requires.NotNull(channelOptions, nameof(channelOptions));
                 Requires.NotNull(name, nameof(name));
 
-                this.UnderlyingMultiplexingStream = multiplexingStream;
+                this.MultiplexingStream = multiplexingStream;
                 this.Id = id;
                 this.Name = name;
-                this.TraceSource = channelOptions.TraceSource ?? new TraceSource($"{nameof(MultiplexingStream)}.{nameof(Channel)} {id} ({name})", SourceLevels.Critical);
+                this.TraceSource = channelOptions.TraceSource ?? new TraceSource($"{nameof(Streams.MultiplexingStream)}.{nameof(Channel)} {id} ({name})", SourceLevels.Critical);
 
                 this.receivingPipe = new Pipe();
                 this.transmissionPipe = new Pipe();
@@ -102,7 +102,10 @@ namespace Nerdbank.Streams
             /// </summary>
             public Task Completion => this.completionSource.Task;
 
-            internal MultiplexingStream UnderlyingMultiplexingStream { get; }
+            /// <summary>
+            /// Gets the underlying <see cref="Streams.MultiplexingStream"/> instance.
+            /// </summary>
+            public MultiplexingStream MultiplexingStream { get; }
 
             internal string Name { get; set; }
 
@@ -131,7 +134,7 @@ namespace Nerdbank.Streams
                     this.transmissionPipe.Reader.Complete();
 
                     this.completionSource.TrySetResult(null);
-                    this.UnderlyingMultiplexingStream.OnChannelDisposed(this);
+                    this.MultiplexingStream.OnChannelDisposed(this);
                 }
             }
 
@@ -160,7 +163,7 @@ namespace Nerdbank.Streams
 
             internal void OnStreamDisposed()
             {
-                this.UnderlyingMultiplexingStream.OnChannelDisposed(this);
+                this.MultiplexingStream.OnChannelDisposed(this);
                 this.Dispose();
             }
 
@@ -181,7 +184,7 @@ namespace Nerdbank.Streams
 
                     // We'll send whatever we've got, up to the maximum size of the frame.
                     // Anything in excess of that we'll pick up next time the loop runs.
-                    var bufferToRelay = result.Buffer.Slice(0, Math.Min(result.Buffer.Length, this.UnderlyingMultiplexingStream.framePayloadMaxLength));
+                    var bufferToRelay = result.Buffer.Slice(0, Math.Min(result.Buffer.Length, this.MultiplexingStream.framePayloadMaxLength));
 
                     if (bufferToRelay.Length > 0)
                     {
@@ -192,7 +195,7 @@ namespace Nerdbank.Streams
                             FramePayloadLength = (int)bufferToRelay.Length,
                         };
 
-                        await this.UnderlyingMultiplexingStream.SendFrameAsync(header, bufferToRelay, CancellationToken.None).ConfigureAwait(false);
+                        await this.MultiplexingStream.SendFrameAsync(header, bufferToRelay, CancellationToken.None).ConfigureAwait(false);
 
                         // Let the pipe know exactly how much we read, which might be less than we were given.
                         this.transmissionPipe.Reader.AdvanceTo(bufferToRelay.End);
@@ -200,7 +203,7 @@ namespace Nerdbank.Streams
 
                     if (result.IsCompleted)
                     {
-                        this.UnderlyingMultiplexingStream.OnChannelWritingCompleted(this);
+                        this.MultiplexingStream.OnChannelWritingCompleted(this);
                         break;
                     }
                 }
