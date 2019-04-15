@@ -41,8 +41,8 @@ namespace Nerdbank.Streams
             var pipe1 = new Pipe(pipeOptions ?? PipeOptions.Default);
             var pipe2 = new Pipe(pipeOptions ?? PipeOptions.Default);
 
-            var party1 = new PipeExtensions.DuplexPipe(pipe1.Reader, pipe2.Writer);
-            var party2 = new PipeExtensions.DuplexPipe(pipe2.Reader, pipe1.Writer);
+            var party1 = new DuplexPipe(pipe1.Reader, pipe2.Writer);
+            var party2 = new DuplexPipe(pipe2.Reader, pipe1.Writer);
 
             return (party1, party2);
         }

@@ -319,18 +319,5 @@ namespace Nerdbank.Streams
         {
             return new DuplexPipe(webSocket.UsePipeReader(sizeHint, pipeOptions, cancellationToken), webSocket.UsePipeWriter(pipeOptions, cancellationToken));
         }
-
-        internal class DuplexPipe : IDuplexPipe
-        {
-            internal DuplexPipe(PipeReader input, PipeWriter output)
-            {
-                this.Input = input ?? throw new ArgumentNullException(nameof(input));
-                this.Output = output ?? throw new ArgumentNullException(nameof(output));
-            }
-
-            public PipeReader Input { get; }
-
-            public PipeWriter Output { get; }
-        }
     }
 }
