@@ -23,6 +23,24 @@ namespace Nerdbank.Streams
         internal static readonly Task CompletedTask = Task.FromResult(0);
 
         /// <summary>
+        /// Validates that a buffer is not null and that its index and count refer to valid positions within the buffer.
+        /// </summary>
+        /// <typeparam name="T">The type of element stored in the array.</typeparam>
+        /// <param name="buffer">The array to check.</param>
+        /// <param name="index">The starting position within the buffer.</param>
+        /// <param name="count">The number of elements to process in the buffer.</param>
+        internal static void ValidateBufferIndexAndCount<T>(T[] buffer, int index, int count)
+        {
+            Requires.NotNull(buffer, nameof(buffer));
+            Requires.Range(index >= 0, nameof(index));
+            Requires.Range(count >= 0, nameof(count));
+            if (index + count > buffer.Length)
+            {
+                throw new ArgumentException();
+            }
+        }
+
+        /// <summary>
         /// Removes an element from the middle of a queue without disrupting the other elements.
         /// </summary>
         /// <typeparam name="T">The element to remove.</typeparam>

@@ -35,3 +35,9 @@ Specialized .NET Stream classes
 1. [`Sequence<T>`](doc/Sequence.md) is a builder for `ReadOnlySequence<T>`.
 1. [`PrefixingBufferWriter<T>`](doc/PrefixingBufferWriter.md) wraps another `IBufferWriter<T>`
    to allow for prefixing some header to the next written buffer, which may be arbitrarily long.
+1. [`BufferTextWriter`](doc/BufferTextWriter.md) is a `TextWriter`-derived type that can
+   write directly to any `IBufferWriter<byte>`, making it more reusable than `StreamWriter`
+   and thus allows for alloc-free writing across many writers.
+1. [`SequenceTextReader`](doc/SequenceTextReader.md) is a `TextReader`-derived type that can
+   read directly from any `ReadOnlySequence<byte>`, making it more reusable than `StreamReader`
+   and thus allows for alloc-free reading across many sequences.
