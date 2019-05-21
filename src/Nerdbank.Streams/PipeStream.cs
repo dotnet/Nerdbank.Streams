@@ -31,6 +31,11 @@ namespace Nerdbank.Streams
         private readonly PipeReader reader;
 
         /// <summary>
+        /// A value indicating whether the <see cref="writer"/> and <see cref="reader"/> should be completed when this instance is disposed.
+        /// </summary>
+        private readonly bool ownsPipe;
+
+        /// <summary>
         /// Indicates whether reading was completed.
         /// </summary>
         private bool readingCompleted;
@@ -39,32 +44,38 @@ namespace Nerdbank.Streams
         /// Initializes a new instance of the <see cref="PipeStream"/> class.
         /// </summary>
         /// <param name="writer">The <see cref="PipeWriter"/> to use when writing to this stream. May be null.</param>
-        internal PipeStream(PipeWriter writer)
+        /// <param name="ownsPipe"><c>true</c> to complete the underlying reader and writer when the <see cref="Stream"/> is disposed; <c>false</c> to keep them open.</param>
+        internal PipeStream(PipeWriter writer, bool ownsPipe)
         {
             Requires.NotNull(writer, nameof(writer));
             this.writer = writer;
+            this.ownsPipe = ownsPipe;
         }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PipeStream"/> class.
         /// </summary>
         /// <param name="reader">The <see cref="PipeReader"/> to use when reading from this stream. May be null.</param>
-        internal PipeStream(PipeReader reader)
+        /// <param name="ownsPipe"><c>true</c> to complete the underlying reader and writer when the <see cref="Stream"/> is disposed; <c>false</c> to keep them open.</param>
+        internal PipeStream(PipeReader reader, bool ownsPipe)
         {
             Requires.NotNull(reader, nameof(reader));
             this.reader = reader;
+            this.ownsPipe = ownsPipe;
         }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PipeStream"/> class.
         /// </summary>
         /// <param name="pipe">A full duplex pipe that will serve as the transport for this stream.</param>
-        internal PipeStream(IDuplexPipe pipe)
+        /// <param name="ownsPipe"><c>true</c> to complete the underlying reader and writer when the <see cref="Stream"/> is disposed; <c>false</c> to keep them open.</param>
+        internal PipeStream(IDuplexPipe pipe, bool ownsPipe)
         {
             Requires.NotNull(pipe, nameof(pipe));
 
             this.writer = pipe.Output;
             this.reader = pipe.Input;
+            this.ownsPipe = ownsPipe;
         }
 
         /// <inheritdoc />
@@ -222,9 +233,13 @@ namespace Nerdbank.Streams
         {
             this.IsDisposed = true;
             this.reader?.CancelPendingRead();
-            this.reader?.Complete();
             this.writer?.CancelPendingFlush();
-            this.writer?.Complete();
+            if (this.ownsPipe)
+            {
+                this.reader?.Complete();
+                this.writer?.Complete();
+            }
+
             base.Dispose(disposing);
         }
 

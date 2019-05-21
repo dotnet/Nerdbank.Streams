@@ -24,24 +24,39 @@ namespace Nerdbank.Streams
 
         /// <summary>
         /// Exposes a full-duplex pipe as a <see cref="Stream"/>.
+        /// The pipe will be completed when the <see cref="Stream"/> is disposed.
         /// </summary>
         /// <param name="pipe">The pipe to wrap as a stream.</param>
         /// <returns>The wrapping stream.</returns>
-        public static Stream AsStream(this IDuplexPipe pipe) => new PipeStream(pipe);
+        public static Stream AsStream(this IDuplexPipe pipe) => new PipeStream(pipe, ownsPipe: true);
+
+        /// <summary>
+        /// Exposes a full-duplex pipe as a <see cref="Stream"/>.
+        /// </summary>
+        /// <param name="pipe">The pipe to wrap as a stream.</param>
+        /// <param name="ownsPipe"><c>true</c> to complete the underlying reader and writer when the <see cref="Stream"/> is disposed; <c>false</c> to keep them open.</param>
+        /// <returns>The wrapping stream.</returns>
+        public static Stream AsStream(this IDuplexPipe pipe, bool ownsPipe) => new PipeStream(pipe, ownsPipe);
 
         /// <summary>
         /// Exposes a pipe reader as a <see cref="Stream"/>.
         /// </summary>
         /// <param name="pipeReader">The pipe to read from when <see cref="Stream.ReadAsync(byte[], int, int, CancellationToken)"/> is invoked.</param>
         /// <returns>The wrapping stream.</returns>
-        public static Stream AsStream(this PipeReader pipeReader) => new PipeStream(pipeReader);
+        /// <remarks>
+        /// The reader will be completed when the <see cref="Stream"/> is disposed.
+        /// </remarks>
+        public static Stream AsStream(this PipeReader pipeReader) => new PipeStream(pipeReader, ownsPipe: true);
 
         /// <summary>
         /// Exposes a pipe writer as a <see cref="Stream"/>.
         /// </summary>
         /// <param name="pipeWriter">The pipe to write to when <see cref="Stream.WriteAsync(byte[], int, int, CancellationToken)"/> is invoked.</param>
         /// <returns>The wrapping stream.</returns>
-        public static Stream AsStream(this PipeWriter pipeWriter) => new PipeStream(pipeWriter);
+        /// <remarks>
+        /// The writer will be completed when the <see cref="Stream"/> is disposed.
+        /// </remarks>
+        public static Stream AsStream(this PipeWriter pipeWriter) => new PipeStream(pipeWriter, ownsPipe: true);
 
         /// <summary>
         /// Enables efficiently reading a stream using <see cref="PipeReader"/>.

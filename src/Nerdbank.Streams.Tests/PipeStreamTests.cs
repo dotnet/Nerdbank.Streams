@@ -65,21 +65,34 @@ public class PipeStreamTests : TestBase
     public async Task Dispose_CompletesWriter()
     {
         TaskCompletionSource<object> completion = new TaskCompletionSource<object>();
-        this.pipe.Reader.OnWriterCompleted(
-            (ex, s) =>
-            {
-                if (ex != null)
-                {
-                    completion.SetException(ex);
-                }
-                else
-                {
-                    completion.SetResult(null);
-                }
-            },
-            null);
         this.stream.Dispose();
-        await completion.Task.WithCancellation(this.TimeoutToken);
+        await this.pipe.Reader.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
+    }
+
+    [Fact]
+    public async Task Dispose_CompletesReader()
+    {
+        TaskCompletionSource<object> completion = new TaskCompletionSource<object>();
+        this.stream.Dispose();
+        await this.pipe.Writer.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken);
+    }
+
+    [Fact]
+    public async Task Dispose_DoesNotCompleteWriter_WhenNotOwned()
+    {
+        this.stream = new LoopbackPipe(this.pipe).AsStream(ownsPipe: false);
+        TaskCompletionSource<object> completion = new TaskCompletionSource<object>();
+        this.stream.Dispose();
+        await Assert.ThrowsAsync<TimeoutException>(() => this.pipe.Reader.WaitForWriterCompletionAsync().WithTimeout(ExpectedTimeout));
+    }
+
+    [Fact]
+    public async Task Dispose_DoesNotCompleteReader_WhenNotOwned()
+    {
+        this.stream = new LoopbackPipe(this.pipe).AsStream(ownsPipe: false);
+        TaskCompletionSource<object> completion = new TaskCompletionSource<object>();
+        this.stream.Dispose();
+        await Assert.ThrowsAsync<TimeoutException>(() => this.pipe.Writer.WaitForReaderCompletionAsync().WithTimeout(ExpectedTimeout));
     }
 
     [Fact]
@@ -102,6 +115,14 @@ public class PipeStreamTests : TestBase
     {
         // Verify that we don't throw when disposing a stream without a writer.
         var stream = this.pipe.Reader.AsStream();
+        stream.Dispose();
+    }
+
+    [Fact]
+    public void Dispose_NoReader()
+    {
+        // Verify that we don't throw when disposing a stream without a reader.
+        var stream = this.pipe.Writer.AsStream();
         stream.Dispose();
     }
 
