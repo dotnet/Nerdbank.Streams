@@ -41,3 +41,4 @@ Specialized .NET Stream classes
 1. [`SequenceTextReader`](doc/SequenceTextReader.md) is a `TextReader`-derived type that can
    read directly from any `ReadOnlySequence<byte>`, making it more reusable than `StreamReader`
    and thus allows for alloc-free reading across many sequences.
+1. [`DuplexPipe`](doc/DuplexPipe.md) is a trivial implementation of `IDuplexPipe`.
