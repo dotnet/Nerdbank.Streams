@@ -106,8 +106,9 @@ namespace Nerdbank.Streams
                     }
                     catch (Exception ex)
                     {
+                        // Propagate the exception to the reader.
                         pipe.Writer.Complete(ex);
-                        throw;
+                        return;
                     }
 
                     FlushResult result = await pipe.Writer.FlushAsync().ConfigureAwait(false);
@@ -183,8 +184,9 @@ namespace Nerdbank.Streams
                 }
                 catch (Exception ex)
                 {
+                    // Propagate the exception to the writer.
                     pipe.Reader.Complete(ex);
-                    throw;
+                    return;
                 }
             }).Forget();
             return pipe.Writer;
@@ -258,8 +260,9 @@ namespace Nerdbank.Streams
                     }
                     catch (Exception ex)
                     {
+                        // Propagate the exception to the reader.
                         pipe.Writer.Complete(ex);
-                        throw;
+                        return;
                     }
 
                     FlushResult result = await pipe.Writer.FlushAsync().ConfigureAwait(false);
@@ -315,8 +318,9 @@ namespace Nerdbank.Streams
                 }
                 catch (Exception ex)
                 {
+                    // Propagate the exception to the writer.
                     pipe.Reader.Complete(ex);
-                    throw;
+                    return;
                 }
             }).Forget();
             return pipe.Writer;
