@@ -84,6 +84,29 @@ public class PipeExtensionsTests : TestBase
     }
 
     [Fact]
+    public async Task UsePipe_Stream_PropagatesException()
+    {
+        var stream = new MockInterruptedFullDuplexStream();
+        IDuplexPipe pipe = stream.UsePipe(cancellationToken: this.TimeoutToken);
+
+        await Assert.ThrowsAsync<IOException>(async () =>
+        {
+            while (!this.TimeoutToken.IsCancellationRequested)
+            {
+                var readResult = await pipe.Input.ReadAsync(this.TimeoutToken);
+                pipe.Input.AdvanceTo(readResult.Buffer.End);
+            }
+        });
+        await Assert.ThrowsAsync<IOException>(async () =>
+        {
+            while (!this.TimeoutToken.IsCancellationRequested)
+            {
+                await pipe.Output.WriteAsync(new byte[1], this.TimeoutToken);
+            }
+        });
+    }
+
+    [Fact]
     public async Task UsePipeReader_WebSocket()
     {
         var expectedBuffer = new byte[] { 4, 5, 6 };
@@ -125,5 +148,28 @@ public class PipeExtensionsTests : TestBase
         await pipe.Output.WaitForReaderCompletionAsync();
         var message = webSocket.WrittenQueue.Dequeue();
         Assert.Equal(expectedBuffer, message.Buffer.ToArray());
+    }
+
+    [Fact]
+    public async Task UsePipe_WebSocket_PropagatesException()
+    {
+        var webSocket = new MockInterruptedWebSocket();
+        IDuplexPipe pipe = webSocket.UsePipe(cancellationToken: this.TimeoutToken);
+
+        await Assert.ThrowsAsync<WebSocketException>(async () =>
+        {
+            while (!this.TimeoutToken.IsCancellationRequested)
+            {
+                var readResult = await pipe.Input.ReadAsync(this.TimeoutToken);
+                pipe.Input.AdvanceTo(readResult.Buffer.End);
+            }
+        });
+        await Assert.ThrowsAsync<WebSocketException>(async () =>
+        {
+            while (!this.TimeoutToken.IsCancellationRequested)
+            {
+                await pipe.Output.WriteAsync(new byte[1], this.TimeoutToken);
+            }
+        });
     }
 }
