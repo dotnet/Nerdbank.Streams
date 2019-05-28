@@ -100,7 +100,7 @@ namespace Nerdbank.Streams
         /// <summary>
         /// Gets the value to display in a debugger datatip.
         /// </summary>
-        private string DebuggerDisplay => $"Length: {AsReadOnlySequence.Length}";
+        private string DebuggerDisplay => $"Length: {this.AsReadOnlySequence.Length}";
 
         /// <summary>
         /// Expresses this sequence as a <see cref="ReadOnlySequence{T}"/>.
