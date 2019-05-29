@@ -109,7 +109,7 @@ jobs:
   - powershell: >-
       $testdir="src\Nerdbank.Streams.Tests"
 
-      & dotnet test -c Release --no-build $testdir -f netcoreapp2.2 /p:CollectCoverage=true
+      & dotnet test -c Release --no-build $testdir -f netcoreapp2.2 --filter "TestCategory!=FailsInCloudTest" /p:CollectCoverage=true
 
       $env:PATH = "C:\Python34;C:\Python34\Scripts;$env:PATH"
 
