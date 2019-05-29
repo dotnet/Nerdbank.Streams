@@ -106,17 +106,12 @@ jobs:
       verbosityPack: normal
       packDirectory: $(Build.ArtifactStagingDirectory)/deployables
 
-  - powershell: >-
-      $testdir="src\Nerdbank.Streams.Tests"
-
-      & dotnet test -c Release --no-build $testdir -f netcoreapp2.2 --filter "TestCategory!=FailsInCloudTest" /p:CollectCoverage=true
-
+  - powershell: |
+      dotnet test -c Release --no-build src\Nerdbank.Streams.Tests -f netcoreapp2.2 --filter "TestCategory!=FailsInCloudTest" /p:CollectCoverage=true
       $env:PATH = "C:\Python34;C:\Python34\Scripts;$env:PATH"
-
       pip install codecov
-
-      codecov -f "$testdir\coverage.opencover.xml"
-    displayName: Run tests on netcoreapp2 (with code coverage)
+      codecov -f "src\Nerdbank.Streams.Tests\coverage.opencover.xml"
+    displayName: Run tests on netcoreapp2.2 (with code coverage)
 
   - task: PublishBuildArtifacts@1
     inputs:
