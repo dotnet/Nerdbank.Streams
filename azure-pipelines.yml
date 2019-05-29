@@ -107,25 +107,16 @@ jobs:
       packDirectory: $(Build.ArtifactStagingDirectory)/deployables
 
   - powershell: >-
-      $testdir="bin\Nerdbank.Streams.Tests\$(BuildConfiguration)\net461"
+      $testdir="src\Nerdbank.Streams.Tests"
 
-      & "$HOME\.nuget\packages\OpenCover\4.6.519\tools\OpenCover.Console.exe"
-      -register:user
-      -target:"$HOME\.nuget\packages\xunit.runner.console\2.3.1\tools\net452\xunit.console.x86.exe"
-      -targetargs:"$testdir\Nerdbank.Streams.Tests.dll -noshadow -parallel all -notrait SkipInCodeCoverage=true -html $testdir\testresults.html -xml $testdir\testresults.xml -appveyor -nologo"
-      -returntargetcode
-      -excludebyattribute:*.ExcludeFromCodeCoverage*
-      -excludebyfile:*\*Designer.cs
-      -filter:"+[Nerdbank.Streams]*"
-      -hideskipped:All
-      -output:$testdir\code_coverage.xml
+      & dotnet test -c Release --no-build $testdir -f netcoreapp2.2 /p:CollectCoverage=true
 
       $env:PATH = "C:\Python34;C:\Python34\Scripts;$env:PATH"
 
       pip install codecov
 
-      codecov -f "$testdir\code_coverage.xml"
-    displayName: Run tests on .NET Framework (with code coverage)
+      codecov -f "$testdir\coverage.opencover.xml"
+    displayName: Run tests on netcoreapp2 (with code coverage)
 
   - task: PublishBuildArtifacts@1
     inputs:
