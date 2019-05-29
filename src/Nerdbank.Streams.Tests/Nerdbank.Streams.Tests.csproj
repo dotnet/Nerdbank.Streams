@@ -10,6 +10,13 @@
 
     <AspNetCoreHost Condition=" '$(TargetFramework)' != 'netcoreapp1.0' ">true</AspNetCoreHost>
     <DefineConstants Condition=" '$(AspNetCoreHost)' == 'true' ">$(DefineConstants);ASPNETCORE</DefineConstants>
+
+    <!-- https://github.com/tonerdo/coverlet -->
+    <!-- Do not collect by default -->
+    <CollectCoverage>false</CollectCoverage>
+    <CoverletOutputFormat>opencover</CoverletOutputFormat>
+    <!--<CoverletOutput>$(OutDir)code_coverage.xml</CoverletOutput>-->
+    <Exclude>[xunit.*]*,[IsolatedTestHost]*</Exclude>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\Nerdbank.Streams\Utilities.cs" Link="Utilities.cs" />
@@ -31,8 +38,10 @@
     </PackageReference>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.9.0" />
     <PackageReference Include="Moq" Version="4.10.1" />
-    <PackageReference Include="OpenCover" Version="4.6.519" />
     <PackageReference Include="System.IO.Pipes" Version="4.3.0" />
+    <PackageReference Include="coverlet.msbuild" Version="2.6.1">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
   </ItemGroup>
   <ItemGroup Condition=" '$(AspNetCoreHost)' == 'true' ">
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="2.0.2" />
