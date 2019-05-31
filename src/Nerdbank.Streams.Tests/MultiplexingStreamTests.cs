@@ -426,7 +426,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
                 Assert.True(eph.Acceptance.IsCompleted);
                 readResult = await ReadAtLeastAsync(eph.AsStream(), new ArraySegment<byte>(buffer), ephemeralMessage.Length, this.TimeoutToken);
                 Assert.Equal(ephemeralMessage, buffer);
-            }));
+            })).WithCancellation(this.TimeoutToken);
     }
 
     [Fact]
@@ -448,7 +448,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
                 int channelId = BitConverter.ToInt32(buffer, 0);
                 var eph = this.mx2.AcceptChannel(channelId);
                 Assert.Throws<InvalidOperationException>(() => this.mx2.AcceptChannel(channelId));
-            }));
+            })).WithCancellation(this.TimeoutToken);
     }
 
     [Fact]
@@ -472,7 +472,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
                 // At this point, it's too late to accept
                 Assert.Throws<InvalidOperationException>(() => this.mx2.AcceptChannel(channelId));
-            }));
+            })).WithCancellation(this.TimeoutToken);
     }
 
     [Fact]
