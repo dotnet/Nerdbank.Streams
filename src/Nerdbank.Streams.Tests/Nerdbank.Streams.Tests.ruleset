@@ -73,6 +73,7 @@
     <Rule Id="SA1601" Action="Hidden" />
     <Rule Id="SA1602" Action="Hidden" />
     <Rule Id="SA1130" Action="Hidden" />
+    <Rule Id="SA1615" Action="Hidden" />
   </Rules>
   <Rules AnalyzerId="AsyncUsageAnalyzers" RuleNamespace="AsyncUsageAnalyzers">
     <Rule Id="UseConfigureAwait" Action="Error" />
