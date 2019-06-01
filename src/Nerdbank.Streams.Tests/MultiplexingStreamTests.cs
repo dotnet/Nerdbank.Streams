@@ -37,9 +37,19 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         mx1TraceSource.Listeners.Add(new XunitTraceListener(this.Logger));
         mx2TraceSource.Listeners.Add(new XunitTraceListener(this.Logger));
 
+        Func<string, int, string, TraceSource> traceSourceFactory = (string mxInstanceName, int id, string name) =>
+        {
+            var traceSource = new TraceSource(mxInstanceName + " channel " + id, SourceLevels.All);
+            traceSource.Listeners.Add(new XunitTraceListener(this.Logger));
+            return traceSource;
+        };
+
+        Func<int, string, TraceSource> mx1TraceSourceFactory = (int id, string name) => traceSourceFactory(nameof(this.mx1), id, name);
+        Func<int, string, TraceSource> mx2TraceSourceFactory = (int id, string name) => traceSourceFactory(nameof(this.mx2), id, name);
+
         (this.transport1, this.transport2) = FullDuplexStream.CreatePair(new System.IO.Pipelines.PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024));
-        var mx1 = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { TraceSource = mx1TraceSource }, this.TimeoutToken);
-        var mx2 = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { TraceSource = mx2TraceSource }, this.TimeoutToken);
+        var mx1 = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { TraceSource = mx1TraceSource, DefaultChannelTraceSourceFactory = mx1TraceSourceFactory }, this.TimeoutToken);
+        var mx2 = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { TraceSource = mx2TraceSource, DefaultChannelTraceSourceFactory = mx2TraceSourceFactory }, this.TimeoutToken);
         this.mx1 = await mx1;
         this.mx2 = await mx2;
     }

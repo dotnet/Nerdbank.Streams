@@ -126,6 +126,7 @@ namespace Nerdbank.Streams
             this.isOdd = isOdd;
             this.lastOfferedChannelId = isOdd ? -1 : 0; // the first channel created should be 1 or 2
             this.TraceSource = options.TraceSource;
+            this.DefaultChannelTraceSourceFactory = options.DefaultChannelTraceSourceFactory;
 
             // Initiate reading from the transport stream. This will not end until the stream does, or we're disposed.
             // If reading the stream fails, we'll dispose ourselves.
@@ -175,6 +176,12 @@ namespace Nerdbank.Streams
         /// Gets a token that is canceled when this instance is disposed.
         /// </summary>
         internal CancellationToken DisposalToken => this.disposalTokenSource.Token;
+
+        /// <summary>
+        /// Gets a factory for <see cref="TraceSource"/> instances to attach to a newly opened <see cref="Channel"/>
+        /// when its <see cref="ChannelOptions.TraceSource"/> is <c>null</c>.
+        /// </summary>
+        private Func<int, string, TraceSource> DefaultChannelTraceSourceFactory { get; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MultiplexingStream"/> class.

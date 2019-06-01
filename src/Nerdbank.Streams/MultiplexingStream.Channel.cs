@@ -275,7 +275,9 @@ namespace Nerdbank.Streams
 
                 try
                 {
-                    this.TraceSource = channelOptions.TraceSource ?? new TraceSource($"{nameof(Streams.MultiplexingStream)}.{nameof(Channel)} {this.Id} ({this.Name})", SourceLevels.Critical);
+                    this.TraceSource = channelOptions.TraceSource
+                        ?? this.MultiplexingStream.DefaultChannelTraceSourceFactory?.Invoke(this.Id, this.Name)
+                        ?? new TraceSource($"{nameof(Streams.MultiplexingStream)}.{nameof(Channel)} {this.Id} ({this.Name})", SourceLevels.Critical);
 
                     if (channelOptions.ExistingPipe != null)
                     {
