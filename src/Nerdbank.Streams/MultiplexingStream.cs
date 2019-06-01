@@ -492,7 +492,7 @@ namespace Nerdbank.Streams
                         channel = await pendingAcceptChannel.Task.ConfigureAwait(false);
 
                         // Don't expose the Channel until the thread that is accepting it has applied options.
-                        await channel.OptionsApplied;
+                        await channel.OptionsApplied.ConfigureAwait(false);
                         return channel;
                     }
                 }
@@ -609,8 +609,8 @@ namespace Nerdbank.Streams
         {
             Requires.NotNull(stream, nameof(stream));
 
-            await stream.WriteAsync(buffer.Array, buffer.Offset, buffer.Count);
-            await stream.FlushAsync(cancellationToken);
+            await stream.WriteAsync(buffer.Array, buffer.Offset, buffer.Count).ConfigureAwait(false);
+            await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
 
         private async Task ReadStreamAsync()
@@ -636,16 +636,16 @@ namespace Nerdbank.Streams
                     switch (header.Code)
                     {
                         case ControlCode.Offer:
-                            await this.OnOffer(header.ChannelId, payloadBuffer.Slice(0, header.FramePayloadLength), this.DisposalToken).ConfigureAwait(false);
+                            await this.OnOfferAsync(header.ChannelId, payloadBuffer.Slice(0, header.FramePayloadLength), this.DisposalToken).ConfigureAwait(false);
                             break;
                         case ControlCode.OfferAccepted:
                             this.OnOfferAccepted(header.ChannelId);
                             break;
                         case ControlCode.Content:
-                            await this.OnContent(header, this.DisposalToken).ConfigureAwait(false);
+                            await this.OnContentAsync(header, this.DisposalToken).ConfigureAwait(false);
                             break;
                         case ControlCode.ContentWritingCompleted:
-                            await this.OnContentWritingCompleted(header.ChannelId);
+                            await this.OnContentWritingCompletedAsync(header.ChannelId).ConfigureAwait(false);
                             break;
                         case ControlCode.ChannelTerminated:
                             this.OnChannelTerminated(header.ChannelId);
@@ -688,7 +688,7 @@ namespace Nerdbank.Streams
             channel?.Dispose();
         }
 
-        private async Task OnContentWritingCompleted(int channelId)
+        private async Task OnContentWritingCompletedAsync(int channelId)
         {
             Channel channel;
             lock (this.syncObject)
@@ -701,11 +701,11 @@ namespace Nerdbank.Streams
                 throw new MultiplexingProtocolException($"Remote party indicated they're done writing to channel {channel.Id} before accepting it.");
             }
 
-            var writer = await channel.GetReceivedMessagePipeWriterAsync();
+            var writer = await channel.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
             writer.Complete();
         }
 
-        private async ValueTask<FlushResult> OnContent(FrameHeader header, CancellationToken cancellationToken)
+        private async ValueTask<FlushResult> OnContentAsync(FrameHeader header, CancellationToken cancellationToken)
         {
             Channel channel;
             lock (this.syncObject)
@@ -719,7 +719,7 @@ namespace Nerdbank.Streams
             }
 
             // Read directly from the transport stream to memory that the targeted channel's reader will read from for 0 extra buffer copies.
-            PipeWriter writer = await channel.GetReceivedMessagePipeWriterAsync();
+            PipeWriter writer = await channel.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
             Memory<byte> memory = writer.GetMemory(header.FramePayloadLength);
             var payload = memory.Slice(0, header.FramePayloadLength);
             await ReadToFillAsync(this.stream, payload, throwOnEmpty: true, cancellationToken).ConfigureAwait(false);
@@ -757,7 +757,7 @@ namespace Nerdbank.Streams
             }
         }
 
-        private async ValueTask OnOffer(int channelId, Memory<byte> payloadBuffer, CancellationToken cancellationToken)
+        private async ValueTask OnOfferAsync(int channelId, Memory<byte> payloadBuffer, CancellationToken cancellationToken)
         {
             await ReadToFillAsync(this.stream, payloadBuffer, throwOnEmpty: true, cancellationToken).ConfigureAwait(false);
             string name = DecodeString(payloadBuffer);

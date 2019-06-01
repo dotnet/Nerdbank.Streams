@@ -221,7 +221,7 @@ namespace Nerdbank.Streams
 
                 // Now wait for whatever they may have written previously to propagate to the ChannelOptions.ExistingPipe.Output writer,
                 // and then redirect all writing to that writer.
-                PipeWriter newWriter = await this.switchingToExistingPipe;
+                PipeWriter newWriter = await this.switchingToExistingPipe.ConfigureAwait(false);
                 lock (this.SyncObject)
                 {
                     this.mxStreamIOWriter = newWriter;
@@ -308,7 +308,7 @@ namespace Nerdbank.Streams
                                 this.switchingToExistingPipe = Task.Run(async delegate
                                 {
                                     // Await propagation of all bytes. Don't complete the ExistingPipe.Output when we're done because we still want to use it.
-                                    await mxStreamIncomingBytesReader.LinkToAsync(existingPipe.Output, propagateSuccessfulCompletion: false);
+                                    await mxStreamIncomingBytesReader.LinkToAsync(existingPipe.Output, propagateSuccessfulCompletion: false).ConfigureAwait(false);
                                     return existingPipe.Output;
                                 });
                             }
@@ -418,7 +418,7 @@ namespace Nerdbank.Streams
 
                 if (switchingToExistingPipe != null)
                 {
-                    currentWriter = await switchingToExistingPipe;
+                    currentWriter = await switchingToExistingPipe.ConfigureAwait(false);
                 }
 
                 if (currentWriter != initialWriter)
