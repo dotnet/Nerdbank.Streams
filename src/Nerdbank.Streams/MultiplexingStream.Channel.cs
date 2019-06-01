@@ -161,12 +161,6 @@ namespace Nerdbank.Streams
                 return false;
             }
 
-            internal void OnStreamDisposed()
-            {
-                this.MultiplexingStream.OnChannelDisposed(this);
-                this.Dispose();
-            }
-
             /// <summary>
             /// Occurs when the remote party has accepted our offer of this channel.
             /// </summary>
