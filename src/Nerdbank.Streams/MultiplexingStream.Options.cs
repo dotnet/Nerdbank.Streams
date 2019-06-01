@@ -3,6 +3,7 @@
 
 namespace Nerdbank.Streams
 {
+    using System;
     using System.Diagnostics;
     using Microsoft;
 
@@ -41,6 +42,15 @@ namespace Nerdbank.Streams
                     this.traceSource = value;
                 }
             }
+
+            /// <summary>
+            /// Gets or sets a factory for <see cref="TraceSource"/> instances to attach to a newly opened <see cref="Channel"/>
+            /// when its <see cref="ChannelOptions.TraceSource"/> is <c>null</c>.
+            /// </summary>
+            /// <remarks>
+            /// The delegate receives a channel ID and name, and may return a <see cref="TraceSource"/> or <c>null</c>.
+            /// </remarks>
+            public Func<int, string, TraceSource> DefaultChannelTraceSourceFactory { get; set; }
         }
     }
 }

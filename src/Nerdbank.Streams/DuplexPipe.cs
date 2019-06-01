@@ -9,7 +9,7 @@ namespace Nerdbank.Streams
     /// <summary>
     /// A basic implementation of <see cref="IDuplexPipe"/>.
     /// </summary>
-    public class DuplexPipe : IDuplexPipe
+    public sealed class DuplexPipe : IDuplexPipe
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="DuplexPipe"/> class.

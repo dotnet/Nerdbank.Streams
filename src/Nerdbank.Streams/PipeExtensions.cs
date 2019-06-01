@@ -4,6 +4,7 @@
 namespace Nerdbank.Streams
 {
     using System;
+    using System.Buffers;
     using System.IO;
     using System.IO.Pipelines;
     using System.Net.WebSockets;
@@ -337,6 +338,71 @@ namespace Nerdbank.Streams
         public static IDuplexPipe UsePipe(this WebSocket webSocket, int sizeHint = 0, PipeOptions pipeOptions = null, CancellationToken cancellationToken = default)
         {
             return new DuplexPipe(webSocket.UsePipeReader(sizeHint, pipeOptions, cancellationToken), webSocket.UsePipeWriter(pipeOptions, cancellationToken));
+        }
+
+        /// <summary>
+        /// Forwards all bytes coming from a <see cref="PipeReader"/> to the specified <see cref="PipeWriter"/>.
+        /// </summary>
+        /// <param name="reader">The reader to get bytes from.</param>
+        /// <param name="writer">The writer to copy bytes to.</param>
+        /// <param name="propagateSuccessfulCompletion"><c>true</c> to complete the <paramref name="writer"/> when <paramref name="reader"/> completes.</param>
+        /// <param name="cancellationToken">A cancellation token.</param>
+        /// <returns>
+        /// A <see cref="Task"/> that completes when the <paramref name="reader"/> has finished producing bytes, or an error occurs.
+        /// This <see cref="Task"/> never faults, since any exceptions are used to complete the <paramref name="writer"/>.
+        /// </returns>
+        /// <remarks>
+        /// If an error occurs during reading or writing, the <paramref name="writer"/> is completed with the exception.
+        /// </remarks>
+        internal static Task LinkToAsync(this PipeReader reader, PipeWriter writer, bool propagateSuccessfulCompletion, CancellationToken cancellationToken = default)
+        {
+            Requires.NotNull(reader, nameof(reader));
+            Requires.NotNull(writer, nameof(writer));
+
+            return Task.Run(async delegate
+            {
+                try
+                {
+                    while (!cancellationToken.IsCancellationRequested)
+                    {
+                        var result = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                        writer.Write(result.Buffer);
+                        reader.AdvanceTo(result.Buffer.End);
+                        await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+                        if (result.IsCompleted)
+                        {
+                            if (propagateSuccessfulCompletion)
+                            {
+                                writer.Complete();
+                            }
+
+                            break;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    writer.Complete(ex);
+                }
+            });
+        }
+
+        /// <summary>
+        /// Copies a sequence of bytes to a <see cref="PipeWriter"/>.
+        /// </summary>
+        /// <param name="writer">The writer to use.</param>
+        /// <param name="sequence">The sequence to read.</param>
+        private static void Write(this PipeWriter writer, ReadOnlySequence<byte> sequence)
+        {
+            Requires.NotNull(writer, nameof(writer));
+
+            foreach (ReadOnlyMemory<byte> sourceMemory in sequence)
+            {
+                var sourceSpan = sourceMemory.Span;
+                var targetSpan = writer.GetSpan(sourceSpan.Length);
+                sourceSpan.CopyTo(targetSpan);
+                writer.Advance(sourceSpan.Length);
+            }
         }
     }
 }
