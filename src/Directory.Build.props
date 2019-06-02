@@ -7,6 +7,7 @@
     <DefineConstants Condition=" '$(TargetFramework)' == 'netcoreapp2.1' or '$(TargetFramework)' == 'netcoreapp2.2' ">$(DefineConstants);SPAN_BUILTIN</DefineConstants>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
