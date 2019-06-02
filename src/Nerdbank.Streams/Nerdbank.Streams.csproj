@@ -39,12 +39,4 @@
       <LastGenOutput>Strings.Designer.cs</LastGenOutput>
     </EmbeddedResource>
   </ItemGroup>
-
-  <Target Name="SetNuSpecProperties" BeforeTargets="GenerateNuspec" DependsOnTargets="GetBuildVersion">
-    <PropertyGroup>
-      <!-- https://github.com/NuGet/Home/issues/4649 -->
-      <!--<NuSpecProperties>$(NuSpecProperties);GitCommitIdShort=$(GitCommitIdShort)</NuSpecProperties>-->
-      <PackageLicenseUrl>https://raw.githubusercontent.com/AArnott/Nerdbank.Streams/$(GitCommitIdShort)/LICENSE.txt</PackageLicenseUrl>
-    </PropertyGroup>
-  </Target>
 </Project>
