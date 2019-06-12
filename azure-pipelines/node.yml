@@ -13,16 +13,16 @@ steps:
 - task: geeklearningio.gl-vsts-tasks-yarn.yarn-task.Yarn@2
   displayName: Yarn install
   inputs:
-    ProjectDirectory: ${{ parameters.projectdirectory }}
+    ProjectDirectory: src/nerdbank-streams
 
 - task: geeklearningio.gl-vsts-tasks-yarn.yarn-task.Yarn@2
   displayName: Yarn build
   inputs:
-    ProjectDirectory: ${{ parameters.projectdirectory }}
+    ProjectDirectory: src/nerdbank-streams
     Arguments: build
 
 - task: geeklearningio.gl-vsts-tasks-yarn.yarn-task.Yarn@2
   displayName: Yarn test
   inputs:
-    ProjectDirectory: ${{ parameters.projectdirectory }}
+    ProjectDirectory: src/nerdbank-streams
     Arguments: test
