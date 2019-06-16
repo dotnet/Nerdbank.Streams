@@ -1,32 +1,41 @@
 steps:
-- script: dotnet restore src  /v:m /bl:"$(Build.ArtifactStagingDirectory)/build_logs/restore.binlog"
+- script: dotnet restore  /v:m /bl:"$(Build.ArtifactStagingDirectory)/build_logs/restore.binlog"
   displayName: dotnet restore
+  workingDirectory: src
 
-- script: dotnet build src --no-restore -c $(BuildConfiguration) /v:m /bl:"$(Build.ArtifactStagingDirectory)/build_logs/build.binlog"
+- script: dotnet build --no-restore -c $(BuildConfiguration) /v:m /bl:"$(Build.ArtifactStagingDirectory)/build_logs/build.binlog"
   displayName: dotnet build
+  workingDirectory: src
 
-- script: dotnet pack src --no-build -c $(BuildConfiguration) /v:m /bl:"$(Build.ArtifactStagingDirectory)/build_logs/pack.binlog"
+- script: dotnet pack --no-build -c $(BuildConfiguration) /v:m /bl:"$(Build.ArtifactStagingDirectory)/build_logs/pack.binlog"
   displayName: dotnet pack
+  workingDirectory: src
 
-- script: dotnet test src --no-build -c $(BuildConfiguration) -f net461 --filter "TestCategory!=FailsInCloudTest" -v n -l trx /p:CollectCoverage=true
+- script: dotnet test --no-build -c $(BuildConfiguration) -f net461 --filter "TestCategory!=FailsInCloudTest" -v n -l trx /p:CollectCoverage=true
   displayName: dotnet test -f net461
+  workingDirectory: src
   continueOnError: true
   condition: eq(variables['Agent.OS'], 'Windows_NT')
-- script: dotnet test src --no-build -c $(BuildConfiguration) -f net472 --filter "TestCategory!=FailsInCloudTest" -v n -l trx /p:CollectCoverage=true
+- script: dotnet test --no-build -c $(BuildConfiguration) -f net472 --filter "TestCategory!=FailsInCloudTest" -v n -l trx /p:CollectCoverage=true
   displayName: dotnet test -f net472
+  workingDirectory: src
   continueOnError: true
   condition: eq(variables['Agent.OS'], 'Windows_NT')
-- script: dotnet test src --no-build -c $(BuildConfiguration) -f netcoreapp1.0 --filter "TestCategory!=FailsInCloudTest" -v n -l trx # Avoid code coverage on netcoreapp1.0 (see https://github.com/tonerdo/coverlet/issues/466)
+- script: dotnet test --no-build -c $(BuildConfiguration) -f netcoreapp1.0 --filter "TestCategory!=FailsInCloudTest" -v n -l trx # Avoid code coverage on netcoreapp1.0 (see https://github.com/tonerdo/coverlet/issues/466)
   displayName: dotnet test -f netcoreapp1.0
+  workingDirectory: src
   continueOnError: true
-- script: dotnet test src --no-build -c $(BuildConfiguration) -f netcoreapp2.0 --filter "TestCategory!=FailsInCloudTest" -v n -l trx /p:CollectCoverage=true
+- script: dotnet test --no-build -c $(BuildConfiguration) -f netcoreapp2.0 --filter "TestCategory!=FailsInCloudTest" -v n -l trx /p:CollectCoverage=true
   displayName: dotnet test -f netcoreapp2.0
+  workingDirectory: src
   continueOnError: true
-- script: dotnet test src --no-build -c $(BuildConfiguration) -f netcoreapp2.1 --filter "TestCategory!=FailsInCloudTest" -v n -l trx /p:CollectCoverage=true
+- script: dotnet test --no-build -c $(BuildConfiguration) -f netcoreapp2.1 --filter "TestCategory!=FailsInCloudTest" -v n -l trx /p:CollectCoverage=true
   displayName: dotnet test -f netcoreapp2.1
+  workingDirectory: src
   continueOnError: true
-- script: dotnet test src --no-build -c $(BuildConfiguration) -f netcoreapp2.2 --filter "TestCategory!=FailsInCloudTest" -v n -l trx /p:CollectCoverage=true
+- script: dotnet test --no-build -c $(BuildConfiguration) -f netcoreapp2.2 --filter "TestCategory!=FailsInCloudTest" -v n -l trx /p:CollectCoverage=true
   displayName: dotnet test -f netcoreapp2.2
+  workingDirectory: src
   continueOnError: true
 
 - task: PublishTestResults@2
