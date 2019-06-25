@@ -307,6 +307,34 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
+    public async Task TransmitAndCloseChannel2()
+    {
+        async Task BobAsync()
+        {
+            var defaultChannel = await this.mx1.AcceptChannelAsync(string.Empty, this.TimeoutToken);
+
+            var readResult = await defaultChannel.Input.ReadAsync(this.TimeoutToken);
+            Assert.Equal(1, readResult.Buffer.Length);
+
+            // Wait for Alice to hang up on the polite channel
+            await defaultChannel.Completion;
+        }
+
+        async Task AliceAsync()
+        {
+            var defaultChannel = await this.mx2.OfferChannelAsync(string.Empty, this.TimeoutToken);
+
+            await defaultChannel.Output.WriteAsync(new byte[1], this.TimeoutToken);
+            await defaultChannel.Output.FlushAsync(this.TimeoutToken);
+
+            // hang up on the polite channel
+            defaultChannel.Dispose();
+        }
+
+        await Task.WhenAll(BobAsync(), AliceAsync());
+    }
+
+    [Fact]
     public async Task WriteLargeBuffer()
     {
         var sendBuffer = new byte[1024 * 1024];
