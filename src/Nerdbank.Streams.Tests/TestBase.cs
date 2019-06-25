@@ -2,8 +2,10 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 
 using System;
+using System.Buffers;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Pipelines;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -11,6 +13,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft;
 using Microsoft.VisualStudio.Threading;
+using Nerdbank.Streams;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -74,6 +77,28 @@ public abstract class TestBase : IDisposable
 
             bytesRead += bytesJustRead;
         }
+    }
+
+    public async ValueTask<ReadOnlySequence<byte>> ReadAtLeastAsync(PipeReader reader, int minLength)
+    {
+        Requires.NotNull(reader, nameof(reader));
+        Requires.Range(minLength > 0, nameof(minLength));
+
+        var bytesReceived = new Sequence<byte>();
+        while (bytesReceived.Length < minLength)
+        {
+            var readResult = await reader.ReadAsync(this.TimeoutToken);
+            foreach (var segment in readResult.Buffer)
+            {
+                var memory = bytesReceived.GetMemory(segment.Length);
+                segment.CopyTo(memory);
+                bytesReceived.Advance(segment.Length);
+            }
+
+            reader.AdvanceTo(readResult.Buffer.End);
+        }
+
+        return bytesReceived.AsReadOnlySequence;
     }
 
     /// <summary>

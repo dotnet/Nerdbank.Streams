@@ -283,11 +283,13 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         Assert.Equal(5, b.ReadByte());
     }
 
-    [Fact]
+    [Theory]
+    [InlineData(1024 * 1024)]
+    [InlineData(5)]
     [Trait("SkipInCodeCoverage", "true")]
-    public async Task TransmitAndCloseChannel()
+    public async Task TransmitOverStreamAndCloseChannel(int length)
     {
-        var buffer = new byte[1024 * 1024];
+        var buffer = new byte[length];
         for (int i = 0; i < buffer.Length; i++)
         {
             buffer[i] = 0xcc;
@@ -298,12 +300,36 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         await a.FlushAsync(this.TimeoutToken);
         a.Dispose();
 
-        var receivingBuffer = new byte[(1024 * 1024) + 1];
+        var receivingBuffer = new byte[length + 1];
         int readBytes = await ReadAtLeastAsync(b, new ArraySegment<byte>(receivingBuffer), buffer.Length, this.TimeoutToken);
         Assert.Equal(buffer.Length, readBytes);
         Assert.Equal(buffer, receivingBuffer.Take(buffer.Length));
 
         Assert.Equal(0, await b.ReadAsync(receivingBuffer, 0, 1, this.TimeoutToken).WithCancellation(this.TimeoutToken));
+    }
+
+    [Theory]
+    [InlineData(1024 * 1024)]
+    [InlineData(5)]
+    [Trait("SkipInCodeCoverage", "true")]
+    public async Task TransmitOverPipeAndCloseChannel(int length)
+    {
+        var buffer = new byte[length];
+        for (int i = 0; i < buffer.Length; i++)
+        {
+            buffer[i] = 0xcc;
+        }
+
+        var (a, b) = await this.EstablishChannelsAsync("a");
+        await a.Output.WriteAsync(buffer, this.TimeoutToken);
+        await a.Output.FlushAsync(this.TimeoutToken);
+        a.Dispose(); // TODO: replace this with Output.Complete()?
+
+        var readBytes = await this.ReadAtLeastAsync(b.Input, length);
+        Assert.Equal(buffer.Length, readBytes.Length);
+        Assert.Equal(buffer, readBytes.ToArray());
+
+        await b.Input.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
     }
 
     [Fact]
