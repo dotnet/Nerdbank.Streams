@@ -31,6 +31,15 @@ internal class XunitTraceListener : TraceListener
 #if !NETCOREAPP1_0
         if (data is ReadOnlySequence<byte> sequence)
         {
+            // Trim the traced output in case it's ridiculously huge.
+            const int maxLength = 100;
+            bool truncated = false;
+            if (sequence.Length > maxLength)
+            {
+                sequence = sequence.Slice(0, maxLength);
+                truncated = true;
+            }
+
             var sb = new StringBuilder(2 + ((int)sequence.Length * 2));
             var decoder = this.DataEncoding?.GetDecoder();
             sb.Append(decoder != null ? "\"" : "0x");
@@ -85,6 +94,11 @@ internal class XunitTraceListener : TraceListener
                 }
 
                 sb.Append('"');
+            }
+
+            if (truncated)
+            {
+                sb.Append("...");
             }
 
             this.logger.WriteLine(sb.ToString());
