@@ -100,6 +100,11 @@ public abstract class TestBase : IDisposable
             }
 
             reader.AdvanceTo(readResult.Buffer.End);
+
+            if (readResult.IsCompleted && bytesReceived.Length < minLength)
+            {
+                throw new EndOfStreamException($"PipeReader completed after reading {bytesReceived.Length} of the expected {minLength} bytes.");
+            }
         }
 
         return bytesReceived.AsReadOnlySequence;
