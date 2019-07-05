@@ -86,6 +86,12 @@ namespace Nerdbank.Streams
         private readonly Dictionary<int, Channel> openChannels = new Dictionary<int, Channel>();
 
         /// <summary>
+        /// Contains the set of channels for which we have transmitted a <see cref="ControlCode.ChannelTerminated"/> frame
+        /// but for which we have not received the same frame.
+        /// </summary>
+        private readonly HashSet<int> channelsPendingTermination = new HashSet<int>();
+
+        /// <summary>
         /// A semaphore that must be entered to write to the underlying transport <see cref="stream"/>.
         /// </summary>
         private readonly SemaphoreSlim sendingSemaphore = new SemaphoreSlim(1);
@@ -110,6 +116,16 @@ namespace Nerdbank.Streams
         /// Each use of this should increment by two.
         /// </summary>
         private int lastOfferedChannelId;
+
+        /// <summary>
+        /// The writer that is currently flushing, blocking our own <see cref="ReadStreamAsync"/> method.
+        /// </summary>
+        private PipeWriter onContentFlushingWriter;
+
+        /// <summary>
+        /// The channel that is currently flushing, blocking our own <see cref="ReadStreamAsync"/> method.
+        /// </summary>
+        private Channel onContentFlushingChannel;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MultiplexingStream"/> class.
@@ -140,7 +156,7 @@ namespace Nerdbank.Streams
 
         private enum TraceEventId
         {
-            HandshakeSuccessful,
+            HandshakeSuccessful = 1,
             HandshakeFailed,
             FatalError,
             UnexpectedChannelAccept,
@@ -156,6 +172,16 @@ namespace Nerdbank.Streams
             FrameReceived,
             FrameSentPayload,
             FrameReceivedPayload,
+
+            /// <summary>
+            /// Raised when content arrives for a channel that has been disposed locally, resulting in discarding the content.
+            /// </summary>
+            ContentDiscardedOnDisposedChannel,
+
+            /// <summary>
+            /// Raised when we are about to read (or wait for) the next frame.
+            /// </summary>
+            WaitingForNextFrame,
         }
 
         /// <summary>
@@ -584,6 +610,38 @@ namespace Nerdbank.Streams
             return bytesRead == buffer.Length;
         }
 
+        /// <summary>
+        /// Reads the specified number of bytes from a stream and discards everything read.
+        /// </summary>
+        /// <param name="stream">The stream to read from.</param>
+        /// <param name="length">The number of bytes to read.</param>
+        /// <param name="cancellationToken">A cancellation token.</param>
+        /// <returns>The result of the operation.</returns>
+        /// <exception cref="EndOfStreamException">Thrown if the end of the stream was reached before <paramref name="length"/> bytes were read.</exception>
+        private static async Task ReadAndDiscardAsync(Stream stream, int length, CancellationToken cancellationToken)
+        {
+            byte[] rented = ArrayPool<byte>.Shared.Rent(Math.Min(4096, length));
+            try
+            {
+                int bytesRead = 0;
+                while (bytesRead < length)
+                {
+                    var memory = rented.AsMemory(0, Math.Min(rented.Length, length - bytesRead));
+                    int bytesJustRead = await stream.ReadAsync(memory, cancellationToken).ConfigureAwait(false);
+                    if (bytesJustRead == 0)
+                    {
+                        throw new EndOfStreamException();
+                    }
+
+                    bytesRead += bytesJustRead;
+                }
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(rented);
+            }
+        }
+
         private static ReadOnlyMemory<T> AsMemory<T>(ReadOnlySequence<T> sequence, Memory<T> backupBuffer)
         {
             if (sequence.IsSingleSegment)
@@ -622,6 +680,11 @@ namespace Nerdbank.Streams
             {
                 while (!this.Completion.IsCompleted)
                 {
+                    if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
+                    {
+                        this.TraceSource.TraceEvent(TraceEventType.Verbose, (int)TraceEventId.WaitingForNextFrame, "Waiting for next frame");
+                    }
+
                     if (!await ReadToFillAsync(this.stream, headerBuffer, throwOnEmpty: false, this.DisposalToken).ConfigureAwait(false))
                     {
                         break;
@@ -648,7 +711,7 @@ namespace Nerdbank.Streams
                             await this.OnContentWritingCompletedAsync(header.ChannelId).ConfigureAwait(false);
                             break;
                         case ControlCode.ChannelTerminated:
-                            this.OnChannelTerminated(header.ChannelId);
+                            await this.OnChannelTerminatedAsync(header.ChannelId).ConfigureAwait(false);
                             break;
                         default:
                             break;
@@ -667,7 +730,7 @@ namespace Nerdbank.Streams
         /// Occurs when the remote party has terminated a channel (including canceling an offer).
         /// </summary>
         /// <param name="channelId">The ID of the terminated channel.</param>
-        private void OnChannelTerminated(int channelId)
+        private async Task OnChannelTerminatedAsync(int channelId)
         {
             Channel channel;
             lock (this.syncObject)
@@ -675,6 +738,7 @@ namespace Nerdbank.Streams
                 if (this.openChannels.TryGetValue(channelId, out channel))
                 {
                     this.openChannels.Remove(channelId);
+                    this.channelsPendingTermination.Remove(channelId);
                     if (channel.Name != null)
                     {
                         if (this.channelsOfferedByThemByName.TryGetValue(channel.Name, out var queue))
@@ -682,6 +746,21 @@ namespace Nerdbank.Streams
                             queue.RemoveMidQueue(channel);
                         }
                     }
+                }
+            }
+
+            // We Complete the writer because only the writing (logical) thread should complete it
+            // to avoid race conditions, and Channel.Dispose can be called from any thread.
+            if (!channel.IsDisposed)
+            {
+                try
+                {
+                    var writer = await channel.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
+                    writer.Complete();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // We fell victim to a race condition. It's OK to just swallow it because the writer was never created, so it needn't be completed.
                 }
             }
 
@@ -705,7 +784,7 @@ namespace Nerdbank.Streams
             writer.Complete();
         }
 
-        private async ValueTask<FlushResult> OnContentAsync(FrameHeader header, CancellationToken cancellationToken)
+        private async ValueTask OnContentAsync(FrameHeader header, CancellationToken cancellationToken)
         {
             Channel channel;
             lock (this.syncObject)
@@ -716,6 +795,19 @@ namespace Nerdbank.Streams
             if (channel.OfferedLocally && !channel.IsAccepted)
             {
                 throw new MultiplexingProtocolException($"Remote party sent content for channel {channel.Id} before accepting it.");
+            }
+
+            // Discard all data received for a disposed channel.
+            if (channel.IsDisposed)
+            {
+                // We have to "read" the data from the stream to effectively "skip" the entire frame.
+                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Warning))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Warning, (int)TraceEventId.ContentDiscardedOnDisposedChannel, "Discarding {0} bytes received on channel {1} because the channel is locally disposed.", header.FramePayloadLength, header.ChannelId);
+                }
+
+                await ReadAndDiscardAsync(this.stream, header.FramePayloadLength, cancellationToken).ConfigureAwait(false);
+                return;
             }
 
             // Read directly from the transport stream to memory that the targeted channel's reader will read from for 0 extra buffer copies.
@@ -730,7 +822,28 @@ namespace Nerdbank.Streams
             }
 
             writer.Advance(header.FramePayloadLength);
-            return await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+
+            lock (this.syncObject)
+            {
+                this.onContentFlushingWriter = writer;
+                this.onContentFlushingChannel = channel;
+            }
+
+            var flushResult = await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+            if (flushResult.IsCanceled)
+            {
+                // This happens when the channel is disposed (while or before flushing).
+                Assumes.True(channel.IsDisposed);
+                writer.Complete();
+            }
+
+            lock (this.syncObject)
+            {
+                this.onContentFlushingWriter = null;
+                this.onContentFlushingChannel = null;
+            }
+
+            return;
         }
 
         private void OnOfferAccepted(int channelId)
@@ -859,6 +972,10 @@ namespace Nerdbank.Streams
             }
         }
 
+        /// <summary>
+        /// Raised when <see cref="Channel.Dispose"/> is called and any local transmission is completed.
+        /// </summary>
+        /// <param name="channel">The channel that is closing down.</param>
         private void OnChannelDisposed(Channel channel)
         {
             Requires.NotNull(channel, nameof(channel));
@@ -871,16 +988,32 @@ namespace Nerdbank.Streams
                 }
 
                 this.SendFrame(ControlCode.ChannelTerminated, channel.Id);
+
+                // In case the channel being disposed is holding up our stream reader,
+                // be sure to cancel the flush to it since we will be discarding data in the future
+                // and there may not be any reader for the data we're waiting to flush now.
+                lock (this.syncObject)
+                {
+                    if (this.onContentFlushingChannel == channel)
+                    {
+                        this.onContentFlushingWriter.CancelPendingFlush();
+                    }
+                }
             }
         }
 
+        /// <summary>
+        /// Indicates that the local end will not be writing any more data to this channel,
+        /// leading to the transmission of a <see cref="ControlCode.ContentWritingCompleted"/> frame being sent for this channel.
+        /// </summary>
+        /// <param name="channel">The channel whose writing has finished.</param>
         private void OnChannelWritingCompleted(Channel channel)
         {
             Requires.NotNull(channel, nameof(channel));
             lock (this.syncObject)
             {
                 // Only inform the remote side if this channel has not already been terminated.
-                if (!channel.IsDisposed && this.openChannels.ContainsKey(channel.Id))
+                if (!this.channelsPendingTermination.Contains(channel.Id) && this.openChannels.ContainsKey(channel.Id))
                 {
                     this.SendFrame(ControlCode.ContentWritingCompleted, channel.Id);
                 }
@@ -927,6 +1060,23 @@ namespace Nerdbank.Streams
             await this.sendingSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
+                lock (this.syncObject)
+                {
+                    if (header.Code == ControlCode.ChannelTerminated)
+                    {
+                        if (this.openChannels.ContainsKey(header.ChannelId))
+                        {
+                            // We're sending the first termination message. Record this so we can be sure to NOT
+                            // send any more frames regarding this channel.
+                            Assumes.True(this.channelsPendingTermination.Add(header.ChannelId), "Sending ChannelTerminated more than once for the same channel.");
+                        }
+                    }
+                    else
+                    {
+                        Assumes.False(this.channelsPendingTermination.Contains(header.ChannelId), "Sending a frame for a channel we've already sent termination for.");
+                    }
+                }
+
                 if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
                 {
                     this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.FrameSent, "Sending {0} frame for channel {1}, carrying {2} bytes of content.", header.Code, header.ChannelId, (int)payload.Length);
