@@ -11,6 +11,7 @@ internal class XunitTraceListener : TraceListener
 {
     private readonly ITestOutputHelper logger;
     private readonly StringBuilder lineInProgress = new StringBuilder();
+    private readonly Stopwatch testRuntime = Stopwatch.StartNew();
     private bool disposed;
 
     internal XunitTraceListener(ITestOutputHelper logger)
@@ -112,7 +113,7 @@ internal class XunitTraceListener : TraceListener
     {
         if (!this.disposed)
         {
-            this.logger.WriteLine(this.lineInProgress.ToString() + message);
+            this.logger.WriteLine($"{this.testRuntime.Elapsed} {this.lineInProgress}{message}");
             this.lineInProgress.Clear();
         }
     }
