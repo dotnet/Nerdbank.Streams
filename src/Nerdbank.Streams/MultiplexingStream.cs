@@ -923,7 +923,6 @@ namespace Nerdbank.Streams
             Assumes.True(payload.Length <= this.framePayloadMaxLength, nameof(payload), "Frame content exceeds max limit.");
             Verify.NotDisposed(this);
 
-            Task flushTask;
             await this.sendingSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
@@ -959,14 +958,12 @@ namespace Nerdbank.Streams
                 }
 
                 await writeHeaderTask.ConfigureAwait(false); // rethrow any exception
-                flushTask = this.stream.FlushIfNecessaryAsync(CancellationToken.None);
+                await this.stream.FlushIfNecessaryAsync(CancellationToken.None).ConfigureAwait(false);
             }
             finally
             {
                 this.sendingSemaphore.Release();
             }
-
-            await flushTask.ConfigureAwait(false);
         }
 
         /// <summary>
