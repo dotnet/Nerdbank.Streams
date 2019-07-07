@@ -2,8 +2,10 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 
 using System;
+using System.Buffers;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Pipelines;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -11,6 +13,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft;
 using Microsoft.VisualStudio.Threading;
+using Nerdbank.Streams;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -28,10 +31,13 @@ public abstract class TestBase : IDisposable
 
     private readonly Random random = new Random();
 
+    private CancellationTokenRegistration timeoutLoggerRegistration;
+
     protected TestBase(ITestOutputHelper logger)
     {
         this.Logger = logger;
         this.timeoutTokenSource = new CancellationTokenSource(TestTimeout);
+        this.timeoutLoggerRegistration = this.timeoutTokenSource.Token.Register(() => logger.WriteLine("**Timeout token signaled**"));
     }
 
     public static CancellationToken ExpectedTimeoutToken => new CancellationTokenSource(ExpectedTimeout).Token;
@@ -44,6 +50,7 @@ public abstract class TestBase : IDisposable
 
     public void Dispose()
     {
+        this.timeoutLoggerRegistration.Dispose();
 #if NETFRAMEWORK
         this.processJobTracker.Dispose();
 #endif
@@ -74,6 +81,57 @@ public abstract class TestBase : IDisposable
 
             bytesRead += bytesJustRead;
         }
+    }
+
+    public async ValueTask<ReadOnlySequence<byte>> ReadAtLeastAsync(PipeReader reader, int minLength)
+    {
+        Requires.NotNull(reader, nameof(reader));
+        Requires.Range(minLength > 0, nameof(minLength));
+
+        var bytesReceived = new Sequence<byte>();
+        while (bytesReceived.Length < minLength)
+        {
+            var readResult = await reader.ReadAsync(this.TimeoutToken);
+            foreach (var segment in readResult.Buffer)
+            {
+                var memory = bytesReceived.GetMemory(segment.Length);
+                segment.CopyTo(memory);
+                bytesReceived.Advance(segment.Length);
+            }
+
+            reader.AdvanceTo(readResult.Buffer.End);
+
+            if (readResult.IsCompleted && bytesReceived.Length < minLength)
+            {
+                throw new EndOfStreamException($"PipeReader completed after reading {bytesReceived.Length} of the expected {minLength} bytes.");
+            }
+        }
+
+        return bytesReceived.AsReadOnlySequence;
+    }
+
+    public async Task DrainReaderTillCompletedAsync(PipeReader reader)
+    {
+        while (true)
+        {
+            var readResult = await reader.ReadAsync(this.TimeoutToken);
+            reader.AdvanceTo(readResult.Buffer.End);
+            if (readResult.IsCompleted)
+            {
+                break;
+            }
+        }
+    }
+
+    internal byte[] GetBuffer(int length)
+    {
+        var buffer = new byte[length];
+        for (int i = 0; i < buffer.Length; i++)
+        {
+            buffer[i] = 0xcc;
+        }
+
+        return buffer;
     }
 
     /// <summary>

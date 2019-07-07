@@ -11,6 +11,7 @@ internal class XunitTraceListener : TraceListener
 {
     private readonly ITestOutputHelper logger;
     private readonly StringBuilder lineInProgress = new StringBuilder();
+    private readonly Stopwatch testRuntime = Stopwatch.StartNew();
     private bool disposed;
 
     internal XunitTraceListener(ITestOutputHelper logger)
@@ -31,6 +32,15 @@ internal class XunitTraceListener : TraceListener
 #if !NETCOREAPP1_0
         if (data is ReadOnlySequence<byte> sequence)
         {
+            // Trim the traced output in case it's ridiculously huge.
+            const int maxLength = 100;
+            bool truncated = false;
+            if (sequence.Length > maxLength)
+            {
+                sequence = sequence.Slice(0, maxLength);
+                truncated = true;
+            }
+
             var sb = new StringBuilder(2 + ((int)sequence.Length * 2));
             var decoder = this.DataEncoding?.GetDecoder();
             sb.Append(decoder != null ? "\"" : "0x");
@@ -87,6 +97,11 @@ internal class XunitTraceListener : TraceListener
                 sb.Append('"');
             }
 
+            if (truncated)
+            {
+                sb.Append("...");
+            }
+
             this.logger.WriteLine(sb.ToString());
         }
 #endif
@@ -98,7 +113,7 @@ internal class XunitTraceListener : TraceListener
     {
         if (!this.disposed)
         {
-            this.logger.WriteLine(this.lineInProgress.ToString() + message);
+            this.logger.WriteLine($"{this.testRuntime.Elapsed} {this.lineInProgress}{message}");
             this.lineInProgress.Clear();
         }
     }

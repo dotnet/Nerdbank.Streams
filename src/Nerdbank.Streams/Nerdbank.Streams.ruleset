@@ -72,4 +72,7 @@
     <Rule Id="SA1130" Action="None" />
     <Rule Id="SA1600" Action="Hidden" />
   </Rules>
+  <Rules AnalyzerId="Microsoft.VisualStudio.Threading.Analyzers" RuleNamespace="Microsoft.VisualStudio.Threading.Analyzers">
+    <Rule Id="VSTHRD111" Action="Warning" />
+  </Rules>
 </RuleSet>

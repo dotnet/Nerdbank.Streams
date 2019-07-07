@@ -283,27 +283,101 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         Assert.Equal(5, b.ReadByte());
     }
 
-    [Fact]
+    [Theory]
+    [InlineData(1024 * 1024)]
+    [InlineData(5)]
     [Trait("SkipInCodeCoverage", "true")]
-    public async Task TransmitAndCloseChannel()
+    public async Task TransmitOverStreamAndDisposeStream(int length)
     {
-        var buffer = new byte[1024 * 1024];
-        for (int i = 0; i < buffer.Length; i++)
-        {
-            buffer[i] = 0xcc;
-        }
-
+        var buffer = this.GetBuffer(length);
         var (a, b) = await this.EstablishChannelStreamsAsync("a");
         await a.WriteAsync(buffer, 0, buffer.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken);
         await a.FlushAsync(this.TimeoutToken);
         a.Dispose();
 
-        var receivingBuffer = new byte[(1024 * 1024) + 1];
+        var receivingBuffer = new byte[length + 1];
         int readBytes = await ReadAtLeastAsync(b, new ArraySegment<byte>(receivingBuffer), buffer.Length, this.TimeoutToken);
         Assert.Equal(buffer.Length, readBytes);
         Assert.Equal(buffer, receivingBuffer.Take(buffer.Length));
 
         Assert.Equal(0, await b.ReadAsync(receivingBuffer, 0, 1, this.TimeoutToken).WithCancellation(this.TimeoutToken));
+    }
+
+    /// <summary>
+    /// Verifies that writing to a <see cref="MultiplexingStream.Channel"/> (without an <see cref="MultiplexingStream.ChannelOptions.ExistingPipe"/>)
+    /// and then immediately disposing the channel still writes everything that was pending.
+    /// </summary>
+    [Theory]
+    [InlineData(1024 * 1024)]
+    [InlineData(5)]
+    [Trait("SkipInCodeCoverage", "true")]
+    public async Task TransmitOverPipeAndDisposeChannel(int length)
+    {
+        var buffer = this.GetBuffer(length);
+        var (a, b) = await this.EstablishChannelsAsync("a");
+        await a.Output.WriteAsync(buffer, this.TimeoutToken);
+        a.Dispose();
+
+        var readBytes = await this.ReadAtLeastAsync(b.Input, length);
+        Assert.Equal(buffer.Length, readBytes.Length);
+        Assert.Equal(buffer, readBytes.ToArray());
+
+        await b.Input.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
+    }
+
+    /// <summary>
+    /// Verifies that writing to a <see cref="MultiplexingStream.Channel"/> (with an <see cref="MultiplexingStream.ChannelOptions.ExistingPipe"/>)
+    /// and then immediately disposing the channel still writes everything that was pending.
+    /// </summary>
+    [Theory]
+    [InlineData(1024 * 1024)]
+    [InlineData(5)]
+    [Trait("SkipInCodeCoverage", "true")]
+    public async Task TransmitOverPreexistingPipeAndDisposeChannel(int length)
+    {
+        var buffer = this.GetBuffer(length);
+        var pipePair = FullDuplexStream.CreatePipePair();
+
+        const string channelName = "a";
+        var mx1ChannelTask = this.mx1.OfferChannelAsync(channelName, new MultiplexingStream.ChannelOptions { ExistingPipe = pipePair.Item1 }, this.TimeoutToken);
+        var mx2ChannelTask = this.mx2.AcceptChannelAsync(channelName, this.TimeoutToken);
+        var (a, b) = await Task.WhenAll(mx1ChannelTask, mx2ChannelTask).WithCancellation(this.TimeoutToken);
+
+        await pipePair.Item2.Output.WriteAsync(buffer, this.TimeoutToken);
+        a.Dispose();
+
+        // In this scenario, there is actually no guarantee that bytes written previously were transmitted before the Channel was disposed.
+        // In practice, folks with ExistingPipe set should complete their writer instead of disposing so the channel can dispose when writing (on both sides) is done.
+        // In order for the b stream to recognize the closure, it does need to have read all the bytes that *were* transmitted though,
+        // so drain the pipe insofar as it has bytes. Just don't assert how many were read.
+        await this.DrainReaderTillCompletedAsync(b.Input);
+
+        await b.Input.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
+    }
+
+    /// <summary>
+    /// Verifies that disposing a <see cref="MultiplexingStream.Channel"/> that is still receiving data from the remote party
+    /// causes such received data to be silently dropped.
+    /// </summary>
+    [Theory]
+    [InlineData(1024 * 1024)]
+    [InlineData(5)]
+    [Trait("SkipInCodeCoverage", "true")]
+    public async Task DisposeChannel_WhileRemoteEndIsTransmitting(int length)
+    {
+        var buffer = this.GetBuffer(length);
+        var (a, b) = await this.EstablishChannelsAsync("a");
+
+        // Although we "await" this write operation, the actual transmission can complete after the await resumes.
+        await a.Output.WriteAsync(buffer, this.TimeoutToken);
+
+        // While the prior transmission is going, dispose the channel on the receiving end.
+        b.Dispose();
+
+        // Prove that communication between the two streams is still possible.
+        // This is interesting particularly when the amount of data transmitted is high and would back up the pipes
+        // such that the reader would stop if the disposed channel's content were not being actively discarded.
+        await this.EstablishChannelsAsync("b");
     }
 
     [Fact]
@@ -727,6 +801,18 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         }
     }
 
+    private static Task<T[]> WhenAllSucceedOrAnyFail<T>(params Task<T>[] tasks)
+    {
+        var tcs = new TaskCompletionSource<T[]>();
+        Task.WhenAll(tasks).ApplyResultTo(tcs);
+        foreach (var task in tasks)
+        {
+            task.ContinueWith(t => tcs.TrySetException(t.Exception), CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default).Forget();
+        }
+
+        return tcs.Task;
+    }
+
     private async Task WaitForEphemeralChannelOfferToPropagate()
     {
         // Propagation of ephemeral channel offers must occur before the remote end can accept it.
@@ -770,7 +856,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     {
         var mx1ChannelTask = this.mx1.OfferChannelAsync(identifier, this.TimeoutToken);
         var mx2ChannelTask = this.mx2.AcceptChannelAsync(identifier, this.TimeoutToken);
-        var channels = await Task.WhenAll(mx1ChannelTask, mx2ChannelTask).WithCancellation(this.TimeoutToken);
+        var channels = await WhenAllSucceedOrAnyFail(mx1ChannelTask, mx2ChannelTask).WithCancellation(this.TimeoutToken);
         Assert.NotNull(channels[0]);
         Assert.NotNull(channels[1]);
         return (channels[0], channels[1]);
@@ -788,6 +874,8 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
         private readonly TaskCompletionSource<object> completionSource = new TaskCompletionSource<object>();
 
+        private CancellationTokenSource nextFlushToken = new CancellationTokenSource();
+
         internal AsyncManualResetEvent UnblockGetMemory { get; } = new AsyncManualResetEvent();
 
         internal ReadOnlySequence<byte> WrittenBytes => this.writtenBytes.AsReadOnlySequence;
@@ -800,7 +888,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
             this.writtenBytes.Advance(bytes);
         }
 
-        public override void CancelPendingFlush() => throw new NotImplementedException();
+        public override void CancelPendingFlush() => this.nextFlushToken.Cancel();
 
         public override void Complete(Exception exception = null)
         {
@@ -816,8 +904,18 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
         public override async ValueTask<FlushResult> FlushAsync(CancellationToken cancellationToken = default)
         {
-            await this.UnblockGetMemory.WaitAsync().WithCancellation(cancellationToken);
-            return default;
+            try
+            {
+                await this.UnblockGetMemory.WaitAsync().WithCancellation(cancellationToken);
+                return default;
+            }
+            finally
+            {
+                if (this.nextFlushToken.IsCancellationRequested)
+                {
+                    this.nextFlushToken = new CancellationTokenSource();
+                }
+            }
         }
 
         public override Memory<byte> GetMemory(int sizeHint = 0)
