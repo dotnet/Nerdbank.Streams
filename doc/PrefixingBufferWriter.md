@@ -16,18 +16,21 @@ content for the header.
 void WriteList<T>(IBufferWriter<byte> writer, IEnumerable<T> items)
 {
     var prefixingWriter = new PrefixingBufferWriter<byte>(writer, sizeof(int));
-    int count = 0;
-    foreach (T item in items)
-    {
-        Serialize(prefixingWriter, item);
-        count++;
-    }
+    Serialize(prefixingWriter, items);
 
-    // Write out the header.
-    BitConverter.GetBytes(count).AsSpan().CopyTo(prefixingWriter.Prefix);
+    // Write out the header indicating the length of the serialized data just written.
+    // We're writing *bytes* here, so Length returns the length of the data in bytes.
+    // (in a networking app, think about big vs. little endian too).
+    BitConverter.GetBytes(prefixingWriter.Length).AsSpan().CopyTo(prefixingWriter.Prefix);
 
     // Commit the whole result to the underlying writer.
     prefixingWriter.Commit();
+}
+
+void Serialize<T>(IBufferWriter<byte> writer, T item)
+{
+    // How to serialize an item is out of scope of this doc.
+    // You're probably using a serialization library for this part.
 }
 ```
 
