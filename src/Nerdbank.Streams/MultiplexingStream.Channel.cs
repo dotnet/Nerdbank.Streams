@@ -303,8 +303,23 @@ namespace Nerdbank.Streams
             {
                 this.DisposeSelfOnFailure(Task.Run(async delegate
                 {
-                    var writer = await this.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
-                    writer.Complete();
+                    if (!this.IsDisposed)
+                    {
+                        try
+                        {
+                            var writer = await this.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
+                            writer.Complete();
+                        }
+                        catch (ObjectDisposedException)
+                        {
+                            this.mxStreamIOWriter?.Complete();
+                        }
+                    }
+                    else
+                    {
+                        this.mxStreamIOWriter?.Complete();
+                    }
+
                     this.mxStreamIOWriterCompleted.Set();
                 }));
             }

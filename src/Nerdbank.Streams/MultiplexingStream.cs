@@ -707,58 +707,23 @@ namespace Nerdbank.Streams
                             break;
                     }
                 }
-
-                await this.CompleteWritingOnAllChannelsAsync().ConfigureAwait(false);
             }
             catch (EndOfStreamException)
             {
                 // When we unexpectedly hit an end of stream, just close up shop.
-                await this.CompleteWritingOnAllChannelsAsync().ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                // We don't need to propagate a cancellation exception either.
-                await this.CompleteWritingOnAllChannelsAsync().ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                await this.CompleteWritingOnAllChannelsAsync(ex).ConfigureAwait(false);
-                throw;
-            }
-
-            this.Dispose();
-        }
-
-        private async Task CompleteWritingOnAllChannelsAsync(Exception ex = null)
-        {
-            ValueTask<PipeWriter>[] pipeWriters = null;
-            try
-            {
-                int writersCount;
-                lock (this.syncObject)
-                {
-                    writersCount = this.openChannels.Count;
-                    pipeWriters = ArrayPool<ValueTask<PipeWriter>>.Shared.Rent(writersCount);
-                    int i = 0;
-                    foreach (var entry in this.openChannels)
-                    {
-                        pipeWriters[i++] = entry.Value.GetReceivedMessagePipeWriterAsync();
-                    }
-                }
-
-                for (int i = 0; i < writersCount; i++)
-                {
-                    var writer = await pipeWriters[i].ConfigureAwait(false);
-                    writer.Complete(ex);
-                }
             }
             finally
             {
-                if (pipeWriters != null)
+                lock (this.syncObject)
                 {
-                    ArrayPool<ValueTask<PipeWriter>>.Shared.Return(pipeWriters);
+                    foreach (var entry in this.openChannels)
+                    {
+                        entry.Value.OnContentWritingCompleted();
+                    }
                 }
             }
+
+            this.Dispose();
         }
 
         /// <summary>
