@@ -8,9 +8,7 @@ namespace Nerdbank.Streams
     /// <summary>
     /// An exception that is thrown when an error occurs on the remote side of a multiplexed connection.
     /// </summary>
-#if !NETSTANDARD1_6
     [System.Serializable]
-#endif
     public class MultiplexingProtocolException : Exception
     {
         /// <summary>
@@ -39,7 +37,6 @@ namespace Nerdbank.Streams
         {
         }
 
-#if !NETSTANDARD1_6
         /// <summary>
         /// Initializes a new instance of the <see cref="MultiplexingProtocolException"/> class
         /// for use in deserialization.
@@ -50,6 +47,5 @@ namespace Nerdbank.Streams
             : base(info, context)
         {
         }
-#endif
     }
 }

@@ -29,7 +29,6 @@ internal class XunitTraceListener : TraceListener
 
     public override unsafe void TraceData(TraceEventCache eventCache, string source, TraceEventType eventType, int id, object data)
     {
-#if !NETCOREAPP1_0
         if (data is ReadOnlySequence<byte> sequence)
         {
             // Trim the traced output in case it's ridiculously huge.
@@ -104,7 +103,6 @@ internal class XunitTraceListener : TraceListener
 
             this.logger.WriteLine(sb.ToString());
         }
-#endif
     }
 
     public override void Write(string message) => this.lineInProgress.Append(message);

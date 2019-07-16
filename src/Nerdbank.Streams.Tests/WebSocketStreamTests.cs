@@ -10,14 +10,12 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft;
-#if ASPNETCORE
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-#endif
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
@@ -192,7 +190,6 @@ public partial class WebSocketStreamTests : TestBase
         Assert.Equal(0, bytesRead);
     }
 
-#if ASPNETCORE
     [Fact]
     public async Task ReadAsync_ReturnsEmptyBufferWhenSocketIsClosed_ASPNETCore()
     {
@@ -257,9 +254,7 @@ public partial class WebSocketStreamTests : TestBase
             this.Logger.WriteLine("Just received {0} bytes. Received {1} bytes in total of {2} expected bytes.", bytesJustRead, bytesRead, recvBuffer.Length);
         }
     }
-#endif
 
-#if ASPNETCORE
     private async Task<(Stream, WebSocket)> EstablishWebSocket()
     {
         IWebHostBuilder webHostBuilder = WebHost.CreateDefaultBuilder(Array.Empty<string>())
@@ -271,9 +266,7 @@ public partial class WebSocketStreamTests : TestBase
         Stream webSocketStream = webSocket.AsStream();
         return (webSocketStream, webSocket);
     }
-#endif
 
-#if ASPNETCORE
     private class AspNetStartup
     {
         public AspNetStartup(IConfiguration configuration)
@@ -319,6 +312,4 @@ public partial class WebSocketStreamTests : TestBase
             });
         }
     }
-#endif
-
 }

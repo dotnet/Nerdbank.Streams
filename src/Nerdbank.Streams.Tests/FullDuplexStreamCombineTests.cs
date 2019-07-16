@@ -323,7 +323,6 @@ public class FullDuplexStreamCombineTests : TestBase
         readableMock.VerifyAll();
     }
 
-#if !NETCOREAPP1_0
     [Fact]
     public void Close()
     {
@@ -340,7 +339,6 @@ public class FullDuplexStreamCombineTests : TestBase
         readableMock.VerifyAll();
         writableMock.VerifyAll();
     }
-#endif
 
     [Fact]
     public void Dispose_PassesThrough()
