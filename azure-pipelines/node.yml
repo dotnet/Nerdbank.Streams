@@ -3,7 +3,7 @@ parameters:
 
 steps:
 - task: NodeTool@0
-  displayName: Use Node 8.x
+  displayName: Use Node 10.x
   inputs:
     versionSpec: 10.x
 
