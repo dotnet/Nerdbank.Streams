@@ -79,8 +79,12 @@ namespace Nerdbank.Streams
             var pipe = new Pipe(pipeOptions ?? PipeOptions.Default);
 
             // Notice when the pipe reader isn't listening any more, and terminate our loop that reads from the stream.
+            // OBSOLETE API USAGE NOTICE: If at some point we need to stop relying on PipeWriter.OnReaderCompleted (since it is deprecated and may be removed later),
+            //                            we can return a decorated PipeReader that calls us from its Complete method directly.
             var combinedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+#pragma warning disable RS0030 // Do not used banned APIs
             pipe.Writer.OnReaderCompleted((ex, state) => ((CancellationTokenSource)state).Cancel(), combinedTokenSource);
+#pragma warning restore RS0030 // Do not used banned APIs
 
             Task.Run(async delegate
             {
@@ -225,7 +229,11 @@ namespace Nerdbank.Streams
             PipeWriter output = stream.UsePipeWriter(pipeOptions, cancellationToken);
 
             // Arrange for closing the stream when *both* input/output are completed.
+            // OBSOLETE API USAGE NOTICE: If at some point we need to stop relying on these obsolete callbacks,
+            //                            we can return a decorated PipeReader/PipeWriter that calls us from its Complete method directly.
+#pragma warning disable CS0618 // Type or member is obsolete
             Task ioCompleted = Task.WhenAll(input.WaitForWriterCompletionAsync(), output.WaitForReaderCompletionAsync());
+#pragma warning restore CS0618 // Type or member is obsolete
             ioCompleted.ContinueWith((_, state) => ((Stream)state).Dispose(), stream, cancellationToken, TaskContinuationOptions.None, TaskScheduler.Default).Forget();
 
             return new DuplexPipe(input, output);
