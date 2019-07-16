@@ -5,6 +5,7 @@ namespace Nerdbank.Streams
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics.CodeAnalysis;
     using System.IO;
     using System.IO.Pipelines;
     using System.Threading;
@@ -76,6 +77,8 @@ namespace Nerdbank.Streams
             return found;
         }
 
+        [Obsolete("Relies on the obsolete OnReaderCompleted API.")]
+        [SuppressMessage("ApiDesign", "RS0030:Do not used banned APIs", Justification = "This API is itself obsolete.")]
         internal static Task WaitForReaderCompletionAsync(this PipeWriter writer)
         {
             Requires.NotNull(writer, nameof(writer));
@@ -98,6 +101,8 @@ namespace Nerdbank.Streams
             return readerDone.Task;
         }
 
+        [Obsolete("Relies on the obsolete OnWriterCompleted API.")]
+        [SuppressMessage("ApiDesign", "RS0030:Do not used banned APIs", Justification = "This API is itself obsolete.")]
         internal static Task WaitForWriterCompletionAsync(this PipeReader reader)
         {
             Requires.NotNull(reader, nameof(reader));

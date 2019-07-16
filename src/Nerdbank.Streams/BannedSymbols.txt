@@ -1,0 +1,2 @@
+﻿M:System.IO.Pipelines.PipeWriter.OnReaderCompleted(System.Action{System.Exception,System.Object},System.Object);Obsolete in future version of System.IO.Pipelines.
+M:System.IO.Pipelines.PipeReader.OnWriterCompleted(System.Action{System.Exception,System.Object},System.Object);Obsolete in future version of System.IO.Pipelines.
