@@ -118,16 +118,6 @@ namespace Nerdbank.Streams
         private int lastOfferedChannelId;
 
         /// <summary>
-        /// The writer that is currently flushing, blocking our own <see cref="ReadStreamAsync"/> method.
-        /// </summary>
-        private PipeWriter onContentFlushingWriter;
-
-        /// <summary>
-        /// The channel that is currently flushing, blocking our own <see cref="ReadStreamAsync"/> method.
-        /// </summary>
-        private Channel onContentFlushingChannel;
-
-        /// <summary>
         /// Initializes a new instance of the <see cref="MultiplexingStream"/> class.
         /// </summary>
         /// <param name="stream">The stream to multiplex multiple channels over.</param>
@@ -708,7 +698,7 @@ namespace Nerdbank.Streams
                             await this.OnContentAsync(header, this.DisposalToken).ConfigureAwait(false);
                             break;
                         case ControlCode.ContentWritingCompleted:
-                            await this.OnContentWritingCompletedAsync(header.ChannelId).ConfigureAwait(false);
+                            this.OnContentWritingCompleted(header.ChannelId);
                             break;
                         case ControlCode.ChannelTerminated:
                             await this.OnChannelTerminatedAsync(header.ChannelId).ConfigureAwait(false);
@@ -721,6 +711,16 @@ namespace Nerdbank.Streams
             catch (EndOfStreamException)
             {
                 // When we unexpectedly hit an end of stream, just close up shop.
+            }
+            finally
+            {
+                lock (this.syncObject)
+                {
+                    foreach (var entry in this.openChannels)
+                    {
+                        entry.Value.OnContentWritingCompleted();
+                    }
+                }
             }
 
             this.Dispose();
@@ -767,7 +767,7 @@ namespace Nerdbank.Streams
             channel?.Dispose();
         }
 
-        private async Task OnContentWritingCompletedAsync(int channelId)
+        private void OnContentWritingCompleted(int channelId)
         {
             Channel channel;
             lock (this.syncObject)
@@ -780,8 +780,7 @@ namespace Nerdbank.Streams
                 throw new MultiplexingProtocolException($"Remote party indicated they're done writing to channel {channel.Id} before accepting it.");
             }
 
-            var writer = await channel.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
-            writer.Complete();
+            channel.OnContentWritingCompleted();
         }
 
         private async ValueTask OnContentAsync(FrameHeader header, CancellationToken cancellationToken)
@@ -800,19 +799,24 @@ namespace Nerdbank.Streams
             // Discard all data received for a disposed channel.
             if (channel.IsDisposed)
             {
-                // We have to "read" the data from the stream to effectively "skip" the entire frame.
-                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Warning))
-                {
-                    this.TraceSource.TraceEvent(TraceEventType.Warning, (int)TraceEventId.ContentDiscardedOnDisposedChannel, "Discarding {0} bytes received on channel {1} because the channel is locally disposed.", header.FramePayloadLength, header.ChannelId);
-                }
-
-                await ReadAndDiscardAsync(this.stream, header.FramePayloadLength, cancellationToken).ConfigureAwait(false);
+                await this.DiscardDataAsync(header, cancellationToken).ConfigureAwait(false);
                 return;
             }
 
             // Read directly from the transport stream to memory that the targeted channel's reader will read from for 0 extra buffer copies.
             PipeWriter writer = await channel.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
-            Memory<byte> memory = writer.GetMemory(header.FramePayloadLength);
+            Memory<byte> memory;
+            try
+            {
+                memory = writer.GetMemory(header.FramePayloadLength);
+            }
+            catch (InvalidOperationException)
+            {
+                // Someone completed the writer.
+                await this.DiscardDataAsync(header, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
             var payload = memory.Slice(0, header.FramePayloadLength);
             await ReadToFillAsync(this.stream, payload, throwOnEmpty: true, cancellationToken).ConfigureAwait(false);
 
@@ -821,13 +825,8 @@ namespace Nerdbank.Streams
                 this.TraceSource.TraceData(TraceEventType.Verbose, (int)TraceEventId.FrameReceivedPayload, payload);
             }
 
+            // This API won't throw at us even if the PipeWriter has been completed (per current corefx implementation anyway).
             writer.Advance(header.FramePayloadLength);
-
-            lock (this.syncObject)
-            {
-                this.onContentFlushingWriter = writer;
-                this.onContentFlushingChannel = channel;
-            }
 
             var flushResult = await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
             if (flushResult.IsCanceled)
@@ -836,14 +835,17 @@ namespace Nerdbank.Streams
                 Assumes.True(channel.IsDisposed);
                 writer.Complete();
             }
+        }
 
-            lock (this.syncObject)
+        private async Task DiscardDataAsync(FrameHeader header, CancellationToken cancellationToken)
+        {
+            // We have to "read" the data from the stream to effectively "skip" the entire frame.
+            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Warning))
             {
-                this.onContentFlushingWriter = null;
-                this.onContentFlushingChannel = null;
+                this.TraceSource.TraceEvent(TraceEventType.Warning, (int)TraceEventId.ContentDiscardedOnDisposedChannel, "Discarding {0} bytes received on channel {1} because the channel is locally disposed.", header.FramePayloadLength, header.ChannelId);
             }
 
-            return;
+            await ReadAndDiscardAsync(this.stream, header.FramePayloadLength, cancellationToken).ConfigureAwait(false);
         }
 
         private void OnOfferAccepted(int channelId)
@@ -988,17 +990,6 @@ namespace Nerdbank.Streams
                 }
 
                 this.SendFrame(ControlCode.ChannelTerminated, channel.Id);
-
-                // In case the channel being disposed is holding up our stream reader,
-                // be sure to cancel the flush to it since we will be discarding data in the future
-                // and there may not be any reader for the data we're waiting to flush now.
-                lock (this.syncObject)
-                {
-                    if (this.onContentFlushingChannel == channel)
-                    {
-                        this.onContentFlushingWriter.CancelPendingFlush();
-                    }
-                }
             }
         }
 

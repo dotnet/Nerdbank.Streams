@@ -43,6 +43,11 @@ namespace Nerdbank.Streams
             private readonly bool offeredLocally;
 
             /// <summary>
+            /// Tracks the end of any copying from the mxstream to this channel.
+            /// </summary>
+            private readonly AsyncManualResetEvent mxStreamIOWriterCompleted = new AsyncManualResetEvent();
+
+            /// <summary>
             /// Indicates whether the <see cref="Dispose"/> method has been called.
             /// </summary>
             private bool isDisposed;
@@ -53,7 +58,8 @@ namespace Nerdbank.Streams
             private PipeReader mxStreamIOReader;
 
             /// <summary>
-            /// A task that represents the completion of the <see cref="mxStreamIOReader"/>.
+            /// A task that represents the completion of the <see cref="mxStreamIOReader"/>,
+            /// signifying the point where we will stop relaying data from the channel to the <see cref="MultiplexingStream"/> for transmission to the remote party.
             /// </summary>
             private Task mxStreamIOReaderCompleted;
 
@@ -206,40 +212,44 @@ namespace Nerdbank.Streams
                     this.acceptanceSource.TrySetCanceled();
                     this.optionsAppliedTaskSource?.TrySetCanceled();
 
+                    PipeWriter mxStreamIOWriter;
                     lock (this.SyncObject)
                     {
                         this.isDisposed = true;
+                        mxStreamIOWriter = this.mxStreamIOWriter;
+                    }
 
-                        // We do NOT complete *our* writer (which reads data coming in from the remote) here because
-                        // another thread could be writing to it right now and we don't want to cause them to throw.
-                        // Instead, we'll just Cancel a pending flush to it as a signal to unblock if the mxstream is flushing now.
-                        // The mxstream itself will Complete writing.
-                        this.mxStreamIOWriter?.CancelPendingFlush();
+                    // Complete writing so that the mxstream cannot write to this channel any more.
+                    // We must also cancel a pending flush since no one is guaranteed to be reading this any more
+                    // and we don't want to deadlock on a full buffer in a disposed channel's pipe.
+                    mxStreamIOWriter?.Complete();
+                    mxStreamIOWriter?.CancelPendingFlush();
+                    this.mxStreamIOWriterCompleted.Set();
 
-                        // If we're using our own Pipe to relay user messages, we can shutdown writing and allow for our reader to propagate what was already written
+                    if (this.channelIO != null)
+                    {
+                        // We're using our own Pipe to relay user messages, so we can shutdown writing and allow for our reader to propagate what was already written
                         // before actually shutting down.
-                        if (this.channelIO != null)
-                        {
-                            this.channelIO.Output.Complete();
-                            this.channelIO.Output.OnReaderCompleted(finalDisposalAction, this);
-                        }
-                        else
-                        {
-                            // We don't own the user's PipeWriter to complete it (so they can't write anything more to this channel).
-                            // We can't know whether there is or will be more bytes written to the user's PipeWriter,
-                            // but we need to terminate our reader for their writer as part of reclaiming resources.
-                            // We want to Cancel any concurrent or subsequent read and let the reader respond and complete itself to avoid race conditions.
-                            this.mxStreamIOReader?.CancelPendingRead();
+                        this.channelIO.Output.Complete();
+                    }
+                    else
+                    {
+                        // We don't own the user's PipeWriter to complete it (so they can't write anything more to this channel).
+                        // We can't know whether there is or will be more bytes written to the user's PipeWriter,
+                        // but we need to terminate our reader for their writer as part of reclaiming resources.
+                        // We want to complete reading immediately and cancel any pending read.
+                        this.mxStreamIOReader?.Complete();
+                        this.mxStreamIOReader?.CancelPendingRead();
+                    }
 
-                            if (this.mxStreamIOReaderCompleted?.IsCompleted ?? true)
-                            {
-                                finalDisposalAction(null, this);
-                            }
-                            else
-                            {
-                                this.mxStreamIOReaderCompleted.ContinueWith(finalDisposalAction, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Forget();
-                            }
-                        }
+                    // As a minor perf optimization, avoid allocating a continuation task if the antecedent is already completed.
+                    if (this.mxStreamIOReaderCompleted?.IsCompleted ?? true)
+                    {
+                        finalDisposalAction(null, this);
+                    }
+                    else
+                    {
+                        this.mxStreamIOReaderCompleted.ContinueWith(finalDisposalAction, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Forget();
                     }
                 }
             }
@@ -252,6 +262,7 @@ namespace Nerdbank.Streams
             {
                 lock (this.SyncObject)
                 {
+                    Verify.NotDisposed(this);
                     if (this.switchingToExistingPipe == null)
                     {
                         PipeWriter result = this.mxStreamIOWriter;
@@ -275,6 +286,7 @@ namespace Nerdbank.Streams
                 PipeWriter newWriter = await this.switchingToExistingPipe.ConfigureAwait(false);
                 lock (this.SyncObject)
                 {
+                    Verify.NotDisposed(this);
                     this.mxStreamIOWriter = newWriter;
 
                     // Skip all this next time.
@@ -282,6 +294,34 @@ namespace Nerdbank.Streams
                 }
 
                 return this.mxStreamIOWriter;
+            }
+
+            /// <summary>
+            /// Called by the <see cref="MultiplexingStream"/> when when it will not be writing any more data to the channel.
+            /// </summary>
+            internal void OnContentWritingCompleted()
+            {
+                this.DisposeSelfOnFailure(Task.Run(async delegate
+                {
+                    if (!this.IsDisposed)
+                    {
+                        try
+                        {
+                            var writer = await this.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
+                            writer.Complete();
+                        }
+                        catch (ObjectDisposedException)
+                        {
+                            this.mxStreamIOWriter?.Complete();
+                        }
+                    }
+                    else
+                    {
+                        this.mxStreamIOWriter?.Complete();
+                    }
+
+                    this.mxStreamIOWriterCompleted.Set();
+                }));
             }
 
             /// <summary>
@@ -379,7 +419,7 @@ namespace Nerdbank.Streams
 
                     this.mxStreamIOReaderCompleted = this.ProcessOutboundTransmissionsAsync();
                     this.DisposeSelfOnFailure(this.mxStreamIOReaderCompleted);
-                    this.DisposeSelfOnFailure(this.AutoCloseOnPipesClosureAsync(this.mxStreamIOReaderCompleted));
+                    this.DisposeSelfOnFailure(this.AutoCloseOnPipesClosureAsync());
                 }
                 catch (Exception ex)
                 {
@@ -420,7 +460,22 @@ namespace Nerdbank.Streams
                 {
                     while (!this.Completion.IsCompleted)
                     {
-                        var result = await this.mxStreamIOReader.ReadAsync().ConfigureAwait(false);
+                        ReadResult result;
+                        try
+                        {
+                            result = await this.mxStreamIOReader.ReadAsync().ConfigureAwait(false);
+                        }
+                        catch (InvalidOperationException ex)
+                        {
+                            // Someone completed the reader. The channel was probably disposed.
+                            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
+                            {
+                                this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Transmission terminated because the reader threw: {0}", ex);
+                            }
+
+                            break;
+                        }
+
                         if (result.IsCanceled)
                         {
                             // We've been asked to cancel. Presumably the channel has been disposed.
@@ -451,8 +506,21 @@ namespace Nerdbank.Streams
 
                             await this.MultiplexingStream.SendFrameAsync(header, bufferToRelay, CancellationToken.None).ConfigureAwait(false);
 
-                            // Let the pipe know exactly how much we read, which might be less than we were given.
-                            this.mxStreamIOReader.AdvanceTo(bufferToRelay.End);
+                            try
+                            {
+                                // Let the pipe know exactly how much we read, which might be less than we were given.
+                                this.mxStreamIOReader.AdvanceTo(bufferToRelay.End);
+                            }
+                            catch (InvalidOperationException ex)
+                            {
+                                // Someone completed the reader. The channel was probably disposed.
+                                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
+                                {
+                                    this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Transmission terminated because the reader threw: {0}", ex);
+                                }
+
+                                break;
+                            }
                         }
 
                         if (result.IsCompleted)
@@ -466,7 +534,6 @@ namespace Nerdbank.Streams
                         }
                     }
 
-                    this.MultiplexingStream.OnChannelWritingCompleted(this);
                     this.mxStreamIOReader.Complete();
                 }
                 catch (Exception ex)
@@ -474,35 +541,16 @@ namespace Nerdbank.Streams
                     this.mxStreamIOReader.Complete(ex);
                     throw;
                 }
+                finally
+                {
+                    this.MultiplexingStream.OnChannelWritingCompleted(this);
+                }
             }
 
-            private async Task AutoCloseOnPipesClosureAsync(Task transmissionCompletion)
+            private async Task AutoCloseOnPipesClosureAsync()
             {
-                Requires.NotNull(transmissionCompletion, nameof(transmissionCompletion));
-
                 PipeWriter initialWriter = this.mxStreamIOWriter;
-                Task receivingCompletion = initialWriter.WaitForReaderCompletionAsync();
-                await Task.WhenAll(receivingCompletion, transmissionCompletion).ConfigureAwait(false);
-
-                // Consider that this.mxStreamIOWriter can be reassigned.
-                // Carefully await the new one to complete as well, if applicable.
-                Task<PipeWriter> switchingToExistingPipe;
-                PipeWriter currentWriter;
-                lock (this.SyncObject)
-                {
-                    switchingToExistingPipe = this.switchingToExistingPipe;
-                    currentWriter = this.mxStreamIOWriter;
-                }
-
-                if (switchingToExistingPipe != null)
-                {
-                    currentWriter = await switchingToExistingPipe.ConfigureAwait(false);
-                }
-
-                if (currentWriter != initialWriter)
-                {
-                    await currentWriter.WaitForReaderCompletionAsync().ConfigureAwait(false);
-                }
+                await Task.WhenAll(this.mxStreamIOWriterCompleted.WaitAsync(), this.mxStreamIOReaderCompleted).ConfigureAwait(false);
 
                 if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
                 {

@@ -91,6 +91,9 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         var (channel1, channel2) = await this.EstablishChannelsAsync("A");
         this.mx1.Dispose();
         Assert.True(channel1.IsDisposed);
+        await channel1.Completion.WithCancellation(this.TimeoutToken);
+        await channel1.Input.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
+        await channel1.Output.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken);
     }
 
     [Fact]
