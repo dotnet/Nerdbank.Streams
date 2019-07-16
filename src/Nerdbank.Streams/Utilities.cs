@@ -124,7 +124,6 @@ namespace Nerdbank.Streams
         {
             Requires.NotNull(stream, nameof(stream));
 
-#if !NETSTANDARD1_6
             // PipeStream.Flush does nothing, and its FlushAsync method isn't overridden
             // so calling FlushAsync simply allocates memory to schedule a no-op sync method.
             // So skip the call in that case.
@@ -132,7 +131,6 @@ namespace Nerdbank.Streams
             {
                 return Task.CompletedTask;
             }
-#endif
 
             return stream.FlushAsync();
         }

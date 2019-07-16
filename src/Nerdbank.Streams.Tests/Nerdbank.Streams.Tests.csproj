@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net461;net472;netcoreapp1.0;netcoreapp2.0;netcoreapp2.1;netcoreapp2.2</TargetFrameworks>
+    <TargetFrameworks>net472;netcoreapp2.1;netcoreapp2.2</TargetFrameworks>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
@@ -8,9 +8,6 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <CodeAnalysisRuleSet>Nerdbank.Streams.Tests.ruleset</CodeAnalysisRuleSet>
     <RootNamespace />
-
-    <AspNetCoreHost Condition=" '$(TargetFramework)' != 'netcoreapp1.0' ">true</AspNetCoreHost>
-    <DefineConstants Condition=" '$(AspNetCoreHost)' == 'true' ">$(DefineConstants);ASPNETCORE</DefineConstants>
 
     <!-- https://github.com/tonerdo/coverlet -->
     <!-- Do not collect by default -->
@@ -43,8 +40,6 @@
     <PackageReference Include="coverlet.msbuild" Version="2.6.1">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-  </ItemGroup>
-  <ItemGroup Condition=" '$(AspNetCoreHost)' == 'true' ">
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="2.0.2" />
     <PackageReference Include="Microsoft.AspNetCore" Version="2.0.2" />
   </ItemGroup>
