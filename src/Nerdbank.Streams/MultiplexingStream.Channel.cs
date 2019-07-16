@@ -43,9 +43,19 @@ namespace Nerdbank.Streams
             private readonly bool offeredLocally;
 
             /// <summary>
+            /// Indicates whether the <see cref="Dispose"/> method has been called.
+            /// </summary>
+            private bool isDisposed;
+
+            /// <summary>
             /// The <see cref="PipeReader"/> the underlying <see cref="Streams.MultiplexingStream"/> should use.
             /// </summary>
             private PipeReader mxStreamIOReader;
+
+            /// <summary>
+            /// A task that represents the completion of the <see cref="mxStreamIOReader"/>.
+            /// </summary>
+            private Task mxStreamIOReaderCompleted;
 
             /// <summary>
             /// The <see cref="PipeWriter"/> the underlying <see cref="Streams.MultiplexingStream"/> should use.
@@ -109,7 +119,7 @@ namespace Nerdbank.Streams
             public TraceSource TraceSource { get; private set; }
 
             /// <inheritdoc />
-            public bool IsDisposed => this.Completion.IsCompleted;
+            public bool IsDisposed => this.isDisposed || this.Completion.IsCompleted;
 
             /// <summary>
             /// Gets the reader used to receive data over the channel.
@@ -173,23 +183,64 @@ namespace Nerdbank.Streams
 
             /// <summary>
             /// Closes this channel and releases all resources associated with it.
+            /// Pending reads and writes may be abandoned if the channel was created with an <see cref="ChannelOptions.ExistingPipe"/>.
             /// </summary>
+            /// <remarks>
+            /// Because this method may terminate the channel immediately and thus can cause previously queued content to not actually be received by the remote party,
+            /// consider this method a "break glass" way of terminating a channel. The preferred method is that both sides "complete writing" and let the channel dispose itself.
+            /// </remarks>
             public void Dispose()
             {
                 if (!this.IsDisposed)
                 {
+                    // The code in this delegate needs to happen in several branches including possibly asynchronously.
+                    // We carefully define it here with no closure so that the C# compiler generates a static field for the delegate
+                    // thus avoiding any extra allocations from reusing code in this way.
+                    Action<object, object> finalDisposalAction = (exOrAntecedent, state) =>
+                    {
+                        var self = (Channel)state;
+                        self.completionSource.TrySetResult(null);
+                        self.MultiplexingStream.OnChannelDisposed(self);
+                    };
+
                     this.acceptanceSource.TrySetCanceled();
                     this.optionsAppliedTaskSource?.TrySetCanceled();
 
-                    // For the pipes, we Complete *our* ends, and leave the user's ends alone. The completion will propagate when it's ready to.
                     lock (this.SyncObject)
                     {
-                        this.mxStreamIOReader?.Complete();
-                        this.mxStreamIOWriter?.Complete();
-                    }
+                        this.isDisposed = true;
 
-                    this.completionSource.TrySetResult(null);
-                    this.MultiplexingStream.OnChannelDisposed(this);
+                        // We do NOT complete *our* writer (which reads data coming in from the remote) here because
+                        // another thread could be writing to it right now and we don't want to cause them to throw.
+                        // Instead, we'll just Cancel a pending flush to it as a signal to unblock if the mxstream is flushing now.
+                        // The mxstream itself will Complete writing.
+                        this.mxStreamIOWriter?.CancelPendingFlush();
+
+                        // If we're using our own Pipe to relay user messages, we can shutdown writing and allow for our reader to propagate what was already written
+                        // before actually shutting down.
+                        if (this.channelIO != null)
+                        {
+                            this.channelIO.Output.Complete();
+                            this.channelIO.Output.OnReaderCompleted(finalDisposalAction, this);
+                        }
+                        else
+                        {
+                            // We don't own the user's PipeWriter to complete it (so they can't write anything more to this channel).
+                            // We can't know whether there is or will be more bytes written to the user's PipeWriter,
+                            // but we need to terminate our reader for their writer as part of reclaiming resources.
+                            // We want to Cancel any concurrent or subsequent read and let the reader respond and complete itself to avoid race conditions.
+                            this.mxStreamIOReader?.CancelPendingRead();
+
+                            if (this.mxStreamIOReaderCompleted?.IsCompleted ?? true)
+                            {
+                                finalDisposalAction(null, this);
+                            }
+                            else
+                            {
+                                this.mxStreamIOReaderCompleted.ContinueWith(finalDisposalAction, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Forget();
+                            }
+                        }
+                    }
                 }
             }
 
@@ -326,9 +377,9 @@ namespace Nerdbank.Streams
                         this.InitializeOwnPipes();
                     }
 
-                    Task processOutboundTransmissions = this.ProcessOutboundTransmissionsAsync();
-                    this.DisposeSelfOnFailure(processOutboundTransmissions);
-                    this.DisposeSelfOnFailure(this.AutoCloseOnPipesClosureAsync(processOutboundTransmissions));
+                    this.mxStreamIOReaderCompleted = this.ProcessOutboundTransmissionsAsync();
+                    this.DisposeSelfOnFailure(this.mxStreamIOReaderCompleted);
+                    this.DisposeSelfOnFailure(this.AutoCloseOnPipesClosureAsync(this.mxStreamIOReaderCompleted));
                 }
                 catch (Exception ex)
                 {
@@ -365,37 +416,64 @@ namespace Nerdbank.Streams
             /// </summary>
             private async Task ProcessOutboundTransmissionsAsync()
             {
-                while (!this.IsDisposed)
+                try
                 {
-                    var result = await this.mxStreamIOReader.ReadAsync().ConfigureAwait(false);
-
-                    // We'll send whatever we've got, up to the maximum size of the frame.
-                    // Anything in excess of that we'll pick up next time the loop runs.
-                    var bufferToRelay = result.Buffer.Slice(0, Math.Min(result.Buffer.Length, this.MultiplexingStream.framePayloadMaxLength));
-
-                    if (bufferToRelay.Length > 0)
+                    while (!this.Completion.IsCompleted)
                     {
-                        FrameHeader header = new FrameHeader
+                        var result = await this.mxStreamIOReader.ReadAsync().ConfigureAwait(false);
+                        if (result.IsCanceled)
                         {
-                            Code = ControlCode.Content,
-                            ChannelId = this.Id,
-                            FramePayloadLength = (int)bufferToRelay.Length,
-                        };
+                            // We've been asked to cancel. Presumably the channel has been disposed.
+                            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
+                            {
+                                this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Transmission terminated because the read was canceled.");
+                            }
 
-                        await this.MultiplexingStream.SendFrameAsync(header, bufferToRelay, CancellationToken.None).ConfigureAwait(false);
+                            break;
+                        }
 
-                        // Let the pipe know exactly how much we read, which might be less than we were given.
-                        this.mxStreamIOReader.AdvanceTo(bufferToRelay.End);
+                        // We'll send whatever we've got, up to the maximum size of the frame.
+                        // Anything in excess of that we'll pick up next time the loop runs.
+                        var bufferToRelay = result.Buffer.Slice(0, Math.Min(result.Buffer.Length, this.MultiplexingStream.framePayloadMaxLength));
+                        if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
+                        {
+                            this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "{0} of {1} bytes will be transmitted.", bufferToRelay.Length, result.Buffer.Length);
+                        }
+
+                        if (bufferToRelay.Length > 0)
+                        {
+                            FrameHeader header = new FrameHeader
+                            {
+                                Code = ControlCode.Content,
+                                ChannelId = this.Id,
+                                FramePayloadLength = (int)bufferToRelay.Length,
+                            };
+
+                            await this.MultiplexingStream.SendFrameAsync(header, bufferToRelay, CancellationToken.None).ConfigureAwait(false);
+
+                            // Let the pipe know exactly how much we read, which might be less than we were given.
+                            this.mxStreamIOReader.AdvanceTo(bufferToRelay.End);
+                        }
+
+                        if (result.IsCompleted)
+                        {
+                            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
+                            {
+                                this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Transmission terminated because the writer completed.");
+                            }
+
+                            break;
+                        }
                     }
 
-                    if (result.IsCompleted)
-                    {
-                        this.MultiplexingStream.OnChannelWritingCompleted(this);
-                        break;
-                    }
+                    this.MultiplexingStream.OnChannelWritingCompleted(this);
+                    this.mxStreamIOReader.Complete();
                 }
-
-                this.mxStreamIOReader.Complete();
+                catch (Exception ex)
+                {
+                    this.mxStreamIOReader.Complete(ex);
+                    throw;
+                }
             }
 
             private async Task AutoCloseOnPipesClosureAsync(Task transmissionCompletion)

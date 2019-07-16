@@ -4,6 +4,7 @@
 namespace Nerdbank.Streams
 {
     using System;
+    using System.Diagnostics;
     using Microsoft;
 
     /// <content>
@@ -11,6 +12,7 @@ namespace Nerdbank.Streams
     /// </content>
     public partial class MultiplexingStream
     {
+        [DebuggerDisplay("{" + nameof(DebuggerDisplay) + "}")]
         private struct FrameHeader
         {
             internal static int HeaderLength => sizeof(ControlCode) + sizeof(int) + sizeof(short);
@@ -32,6 +34,11 @@ namespace Nerdbank.Streams
             /// Must be no greater than <see cref="ushort.MaxValue"/>.
             /// </remarks>
             internal int FramePayloadLength { get; set; }
+
+            /// <summary>
+            /// Gets the text to display in the debugger when an instance of this struct is displayed.
+            /// </summary>
+            private string DebuggerDisplay => $"{this.Code} {this.ChannelId} (payload size: {this.FramePayloadLength})";
 
             internal static FrameHeader Deserialize(ReadOnlySpan<byte> buffer)
             {

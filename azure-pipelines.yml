@@ -1,8 +1,8 @@
 trigger:
   branches:
-    include: ["master", "v2.*"]
+    include: ["master", "v2.*", "*_validate"]
   paths:
-    exclude: ["doc", "*.md", ".appveyor.yml", ".travis.yml"]
+    exclude: ["doc", "*.md"]
 
 variables:
   TreatWarningsAsErrors: true
@@ -11,20 +11,11 @@ variables:
   BuildPlatform: Any CPU
   codecov_token: b8be69b5-6dc3-40f8-a4c7-4e13a42654a3
 
-resources:
-  containers:
-  - container: xenial
-    image: andrewarnott/linux-buildagent
-
 jobs:
 - job: Windows
-  pool: Hosted VS2017
+  pool: Hosted Windows 2019 with VS2019
   steps:
-  - task: DotNetCoreInstaller@0
-    displayName: Install .NET Core SDK 2.2.104
-    inputs:
-      packageType: sdk
-      version: 2.2.104
+  - template: azure-pipelines/install-dependencies.yml
 
   - script: |
       dotnet tool install --tool-path .. nbgv
@@ -32,113 +23,25 @@ jobs:
     workingDirectory: src
     displayName: Set build number
 
-  - script: dotnet --info
-    displayName: Show dotnet SDK info
-
-  - task: DotNetCoreCLI@2
-    displayName: Restore NuGet packages
-    inputs:
-      command: restore
-      verbosityRestore: normal # detailed, normal, minimal
-      projects: src/**/*.sln
-      feedsToUse: config
-      nugetConfigPath: src/nuget.config
-      workingDirectory: src
-
-  - task: VSBuild@1
-    inputs:
-      vsVersion: 15.0
-      msbuildArgs: /t:build /m /v:m /bl:"$(Build.ArtifactStagingDirectory)/build_logs/msbuild.binlog"
-      platform: $(BuildPlatform)
-      configuration: $(BuildConfiguration)
-    displayName: Build Visual Studio solution
-
-  - task: DotNetCoreCLI@2
-    displayName: Run tests
-    inputs:
-      command: test
-      projects: src/Nerdbank.Streams.Tests/Nerdbank.Streams.Tests.csproj
-      arguments: --configuration $(BuildConfiguration) --no-build --filter "TestCategory!=FailsInCloudTest" -v n
-      workingDirectory: src
-
+  - template: azure-pipelines/dotnet.yml
   - template: azure-pipelines/node.yml
-    parameters:
-      projectdirectory: src/nerdbank-streams
-
-  - task: CopyFiles@1
-    inputs:
-      Contents: |
-        bin/*-*.tgz
-      TargetFolder: $(Build.ArtifactStagingDirectory)/deployables
-      flattenFolders: true
-    displayName: Collecting NPM package artifacts
-
-  - task: CopyFiles@1
-    inputs:
-      Contents: |
-        obj/**/project.assets.json
-      TargetFolder: $(Build.ArtifactStagingDirectory)/projectAssetsJson
-    displayName: Collecting project.assets.json artifacts
-    condition: succeededOrFailed()
-
-  - task: PublishBuildArtifacts@1
-    inputs:
-      PathtoPublish: $(Build.ArtifactStagingDirectory)/projectAssetsJson
-      ArtifactName: projectAssetsJson
-      ArtifactType: Container
-    displayName: Publish projectAssetsJson artifacts
-    condition: succeededOrFailed()
-
-  - task: PublishBuildArtifacts@1
-    inputs:
-      PathtoPublish: $(Build.ArtifactStagingDirectory)/build_logs
-      ArtifactName: build_logs
-      ArtifactType: Container
-    displayName: Publish build_logs artifacts
-    condition: succeededOrFailed()
-
-  - task: DotNetCoreCLI@2
-    displayName: Pack
-    inputs:
-      command: pack
-      projects: src/**/*.sln
-      nobuild: true
-      verbosityPack: normal
-      packDirectory: $(Build.ArtifactStagingDirectory)/deployables
-
-  - powershell: |
-      dotnet test -c Release --no-build src\Nerdbank.Streams.Tests -f netcoreapp2.2 --filter "TestCategory!=FailsInCloudTest" /p:CollectCoverage=true
-      $env:PATH = "C:\Python34;C:\Python34\Scripts;$env:PATH"
-      pip install codecov
-      codecov -f "src\Nerdbank.Streams.Tests\coverage.opencover.xml"
-    displayName: Run tests on netcoreapp2.2 (with code coverage)
-
-  - task: PublishBuildArtifacts@1
-    inputs:
-      PathtoPublish: $(Build.ArtifactStagingDirectory)/deployables
-      ArtifactName: deployables
-      ArtifactType: Container
-    displayName: Publish deployables artifacts
+  - template: azure-pipelines/collect-deployables.yml
+  - template: azure-pipelines/collect-logs.yml
 
 - job: Linux
   pool:
     vmImage: Ubuntu 16.04
-#  container: xenial
   steps:
-  - template: azure-pipelines/testfx.yml
-    parameters:
-      projectdirectory: src/Nerdbank.Streams.Tests
+  - template: azure-pipelines/install-dependencies.yml
+  - template: azure-pipelines/dotnet.yml
   - template: azure-pipelines/node.yml
-    parameters:
-      projectdirectory: src/nerdbank-streams
+  - template: azure-pipelines/collect-logs.yml
 
 - job: macOS
   pool:
     vmImage: macOS 10.13
   steps:
-  - template: azure-pipelines/testfx.yml
-    parameters:
-      projectdirectory: src/Nerdbank.Streams.Tests
+  - template: azure-pipelines/install-dependencies.yml
+  - template: azure-pipelines/dotnet.yml
   - template: azure-pipelines/node.yml
-    parameters:
-      projectdirectory: src/nerdbank-streams
+  - template: azure-pipelines/collect-logs.yml
