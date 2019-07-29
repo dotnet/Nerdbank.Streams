@@ -268,7 +268,7 @@ namespace Nerdbank.Streams
                         PipeWriter result = this.mxStreamIOWriter;
                         if (result == null)
                         {
-                            this.InitializeOwnPipes();
+                            this.InitializeOwnPipes(PipeOptions.Default);
                             result = this.mxStreamIOWriter;
                         }
 
@@ -370,11 +370,11 @@ namespace Nerdbank.Streams
                         ?? this.MultiplexingStream.DefaultChannelTraceSourceFactory?.Invoke(this.Id, this.Name)
                         ?? new TraceSource($"{nameof(Streams.MultiplexingStream)}.{nameof(Channel)} {this.Id} ({this.Name})", SourceLevels.Critical);
 
-                    if (channelOptions.ExistingPipe != null)
+                    lock (this.SyncObject)
                     {
-                        lock (this.SyncObject)
+                        Verify.NotDisposed(this);
+                        if (channelOptions.ExistingPipe != null)
                         {
-                            Verify.NotDisposed(this);
                             if (this.mxStreamIOWriter != null)
                             {
                                 // A Pipe was already created (because data has been coming in for this channel even before it was accepted).
@@ -411,10 +411,28 @@ namespace Nerdbank.Streams
 
                             this.mxStreamIOReader = channelOptions.ExistingPipe.Input;
                         }
-                    }
-                    else
-                    {
-                        this.InitializeOwnPipes();
+                        else if (channelOptions.InputPipeOptions != null && this.mxStreamIOWriter != null)
+                        {
+                            // Similar strategy to the situation above with ExistingPipe.
+                            // Take ownership of reading bytes that the MultiplexingStream may have already written to this channel.
+                            var mxStreamIncomingBytesReader = this.channelIO.Input;
+
+                            var writerRelay = new Pipe();
+                            var readerRelay = new Pipe(channelOptions.InputPipeOptions);
+                            this.mxStreamIOReader = writerRelay.Reader;
+                            this.channelIO = new DuplexPipe(readerRelay.Reader, writerRelay.Writer);
+
+                            this.switchingToExistingPipe = Task.Run(async delegate
+                            {
+                                // Await propagation of all bytes. Don't complete the readerRelay.Writer when we're done because we still want to use it.
+                                await mxStreamIncomingBytesReader.LinkToAsync(readerRelay.Writer, propagateSuccessfulCompletion: false).ConfigureAwait(false);
+                                return readerRelay.Writer;
+                            });
+                        }
+                        else
+                        {
+                            this.InitializeOwnPipes(channelOptions.InputPipeOptions ?? PipeOptions.Default);
+                        }
                     }
 
                     this.mxStreamIOReaderCompleted = this.ProcessOutboundTransmissionsAsync();
@@ -435,18 +453,21 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Set up our own (buffering) Pipes if they have not been set up yet.
             /// </summary>
-            private void InitializeOwnPipes()
+            /// <param name="inputPipeOptions">The options for the reading relay <see cref="Pipe"/>. Must not be null.</param>
+            private void InitializeOwnPipes(PipeOptions inputPipeOptions)
             {
+                Requires.NotNull(inputPipeOptions, nameof(inputPipeOptions));
+
                 lock (this.SyncObject)
                 {
                     Verify.NotDisposed(this);
                     if (this.mxStreamIOReader == null)
                     {
-                        var relayPipe1 = new Pipe();
-                        var relayPipe2 = new Pipe();
-                        this.mxStreamIOReader = relayPipe1.Reader;
-                        this.mxStreamIOWriter = relayPipe2.Writer;
-                        this.channelIO = new DuplexPipe(relayPipe2.Reader, relayPipe1.Writer);
+                        var writerRelay = new Pipe();
+                        var readerRelay = new Pipe(inputPipeOptions);
+                        this.mxStreamIOReader = writerRelay.Reader;
+                        this.mxStreamIOWriter = readerRelay.Writer;
+                        this.channelIO = new DuplexPipe(readerRelay.Reader, writerRelay.Writer);
                     }
                 }
             }

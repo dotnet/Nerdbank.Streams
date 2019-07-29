@@ -778,6 +778,85 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         Assert.Equal(packets[0].Concat(packets[1]).ToArray(), slowWriter.WrittenBytes.ToArray());
     }
 
+    [Fact]
+    public async Task CreateChannel_InputPipeOptions()
+    {
+        const int DataSize = 1024 * 1024;
+        var channelOptions = new MultiplexingStream.ChannelOptions
+        {
+            InputPipeOptions = new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024),
+        };
+
+        var channel1 = this.mx1.CreateChannel(channelOptions);
+
+        // Blast a bunch of data to the channel as soon as it is accepted.
+        await this.WaitForEphemeralChannelOfferToPropagate();
+        var channel2 = this.mx2.AcceptChannel(channel1.Id, channelOptions);
+        await channel2.Output.WriteAsync(new byte[DataSize], this.TimeoutToken);
+
+        // Read all the data, such that the PipeReader has to buffer until the whole payload is read.
+        // Since this is a LOT of data, this would normally overrun the Pipe's max buffer size.
+        // If this succeeds, then we know the PipeOptions instance we supplied was taken into account.
+        int bytesRead = 0;
+        while (bytesRead < DataSize)
+        {
+            var readResult = await channel1.Input.ReadAsync(this.TimeoutToken);
+            bytesRead += (int)readResult.Buffer.Length;
+            SequencePosition consumed = bytesRead == DataSize ? readResult.Buffer.End : readResult.Buffer.Start;
+            channel1.Input.AdvanceTo(consumed, readResult.Buffer.End);
+        }
+    }
+
+    [Theory]
+    [PairwiseData]
+    public async Task AcceptChannel_InputPipeOptions(bool acceptBeforeTransmit)
+    {
+        const int DataSize = 1024 * 1024;
+        var channelOptions = new MultiplexingStream.ChannelOptions
+        {
+            InputPipeOptions = new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024),
+        };
+
+        var channel1 = this.mx1.CreateChannel();
+        await this.WaitForEphemeralChannelOfferToPropagate();
+        var bytesWrittenEvent = new AsyncManualResetEvent();
+
+        await Task.WhenAll(Party1Async(), Party2Async());
+
+        async Task Party1Async()
+        {
+            if (acceptBeforeTransmit)
+            {
+                await channel1.Acceptance.WithCancellation(this.TimeoutToken);
+            }
+
+            await channel1.Output.WriteAsync(new byte[DataSize], this.TimeoutToken);
+            bytesWrittenEvent.Set();
+        }
+
+        async Task Party2Async()
+        {
+            if (!acceptBeforeTransmit)
+            {
+                await bytesWrittenEvent.WaitAsync(this.TimeoutToken);
+            }
+
+            var channel2 = this.mx2.AcceptChannel(channel1.Id, channelOptions);
+
+            // Read all the data, such that the PipeReader has to buffer until the whole payload is read.
+            // Since this is a LOT of data, this would normally overrun the Pipe's max buffer size.
+            // If this succeeds, then we know the PipeOptions instance we supplied was taken into account.
+            int bytesRead = 0;
+            while (bytesRead < DataSize)
+            {
+                var readResult = await channel2.Input.ReadAsync(this.TimeoutToken);
+                bytesRead += (int)readResult.Buffer.Length;
+                SequencePosition consumed = bytesRead == DataSize ? readResult.Buffer.End : readResult.Buffer.Start;
+                channel2.Input.AdvanceTo(consumed, readResult.Buffer.End);
+            }
+        }
+    }
+
     private static async Task<int> ReadAtLeastAsync(Stream stream, ArraySegment<byte> buffer, int requiredLength, CancellationToken cancellationToken)
     {
         Requires.NotNull(stream, nameof(stream));
