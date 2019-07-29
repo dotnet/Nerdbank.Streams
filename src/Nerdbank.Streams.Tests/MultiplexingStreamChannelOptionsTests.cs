@@ -83,6 +83,19 @@ public class MultiplexingStreamChannelOptionsTests : TestBase
         Assert.Throws<ArgumentNullException>(() => options.ExistingPipe = new MockDuplexPipe { Output = pipe.Writer });
     }
 
+    [Fact]
+    public void ReaderPipeOptions()
+    {
+        PipeOptions expected = new PipeOptions();
+        var options = new MultiplexingStream.ChannelOptions
+        {
+            InputPipeOptions = expected,
+        };
+        Assert.Same(expected, options.InputPipeOptions);
+        options.InputPipeOptions = null;
+        Assert.Null(options.InputPipeOptions);
+    }
+
     private class MockDuplexPipe : IDuplexPipe
     {
         public PipeReader Input { get; set; }

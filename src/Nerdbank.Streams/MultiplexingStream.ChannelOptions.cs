@@ -57,6 +57,12 @@ namespace Nerdbank.Streams
                     this.existingPipe = value == null || value is DuplexPipe ? value : new DuplexPipe(value.Input, value.Output);
                 }
             }
+
+            /// <summary>
+            /// Gets or sets the options for the <see cref="Pipe"/> created to relay local reading from this channel.
+            /// May be null. Will be ignored if <see cref="ExistingPipe"/> is not <c>null</c>.
+            /// </summary>
+            public PipeOptions InputPipeOptions { get; set; }
         }
     }
 }
