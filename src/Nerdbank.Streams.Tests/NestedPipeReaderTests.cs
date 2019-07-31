@@ -187,17 +187,48 @@ public class NestedPipeReaderTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
-    public void OnWriterCompleted_NotSupported()
+    public void OnWriterCompleted_NoOps()
     {
         var sliceReader = this.pipe.Reader.ReadSlice(5);
-        Assert.Throws<NotSupportedException>(() => sliceReader.OnWriterCompleted((e, s) => { }, null));
+        bool called = false;
+        sliceReader.OnWriterCompleted((e, s) => called = true, null);
+        this.pipe.Writer.Complete();
+        Assert.False(called);
     }
 
     [Fact]
-    public void Complete_NotSupported()
+    public void TryRead_ThrowsAfterCompleting()
     {
         var sliceReader = this.pipe.Reader.ReadSlice(5);
-        Assert.Throws<NotSupportedException>(() => sliceReader.Complete());
+        sliceReader.Complete();
+        Assert.Throws<InvalidOperationException>(() => sliceReader.TryRead(out ReadResult result));
+    }
+
+    [Fact]
+    public async Task ReadAsync_ThrowsAfterCompleting()
+    {
+        var sliceReader = this.pipe.Reader.ReadSlice(5);
+        sliceReader.Complete();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => sliceReader.ReadAsync(this.TimeoutToken).AsTask());
+    }
+
+    [Fact]
+    public void Complete_DoesNotCompleteUnderlyingReader()
+    {
+        var sliceReader = this.pipe.Reader.ReadSlice(5);
+        sliceReader.Complete();
+        Assert.True(this.pipe.Reader.TryRead(out ReadResult result));
+        Assert.Equal(OriginalBuffer.Length, result.Buffer.Length);
+        this.pipe.Reader.Complete();
+        Assert.Throws<InvalidOperationException>(() => this.pipe.Reader.TryRead(out result));
+    }
+
+    [Fact]
+    public void Complete_WithException_DoesCompleteUnderlyingReader()
+    {
+        var sliceReader = this.pipe.Reader.ReadSlice(5);
+        sliceReader.Complete(new Exception());
+        Assert.Throws<InvalidOperationException>(() => this.pipe.Reader.TryRead(out ReadResult result));
     }
 
     [Fact]
