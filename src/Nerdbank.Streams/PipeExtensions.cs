@@ -341,6 +341,14 @@ namespace Nerdbank.Streams
         }
 
         /// <summary>
+        /// Creates a <see cref="PipeReader"/> that can read no more than a given number of bytes from an underlying reader.
+        /// </summary>
+        /// <param name="reader">The <see cref="PipeReader"/> to read from.</param>
+        /// <param name="length">The number of bytes to read from the parent <paramref name="reader"/>.</param>
+        /// <returns>A reader that ends after <paramref name="length"/> bytes are read.</returns>
+        public static PipeReader ReadSlice(this PipeReader reader, long length) => new NestedPipeReader(reader, length);
+
+        /// <summary>
         /// Forwards all bytes coming from a <see cref="PipeReader"/> to the specified <see cref="PipeWriter"/>.
         /// </summary>
         /// <param name="reader">The reader to get bytes from.</param>

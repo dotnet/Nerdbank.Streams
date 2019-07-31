@@ -1,7 +1,7 @@
-# Read slice streams
+# Read sliced `Stream` or `PipeReader`
 
-The `Stream.ReadSlice(int)` extension methods returns a `Stream` instance that will only read up to a fixed set of bytes from an underlying `Stream`.
-This allows you, for example, to pass a `Stream` to a deserializer that will read to the end of the stream, even though your larger stream has more than your deserializer should see.
+The `Stream.ReadSlice(long)` and `PipeReader.ReadSlice(long)` extension methods returns a `Stream` or `PipeReader` instance that will only read up to a fixed set of bytes from the underlying source.
+This allows you, for example, to pass a `Stream` or `PipeReader` to a deserializer that will read to the end of the stream, even though your larger stream has more than your deserializer should see.
 
 ## Sample
 
