@@ -211,7 +211,7 @@ namespace Nerdbank.Streams
             slice.CopyTo(buffer);
             this.reader.AdvanceTo(slice.End);
 
-            if (readResult.IsCompleted)
+            if (readResult.IsCompleted && slice.End.Equals(readResult.Buffer.End))
             {
                 this.reader.Complete();
                 this.readingCompleted = true;
