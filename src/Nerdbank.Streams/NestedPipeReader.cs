@@ -40,6 +40,9 @@ namespace Nerdbank.Streams
             if (this.Consumed(consumed, consumed))
             {
                 this.pipeReader.AdvanceTo(consumed);
+
+                // When we call AdvanceTo on the underlying reader, we're not allowed to reference their buffer any more, so clear it to be safe.
+                this.resultOfPriorRead = new ReadResult(default, isCanceled: false, isCompleted: this.resultOfPriorRead.IsCompleted);
             }
         }
 
@@ -49,6 +52,9 @@ namespace Nerdbank.Streams
             if (this.Consumed(consumed, examined))
             {
                 this.pipeReader.AdvanceTo(consumed, examined);
+
+                // When we call AdvanceTo on the underlying reader, we're not allowed to reference their buffer any more, so clear it to be safe.
+                this.resultOfPriorRead = new ReadResult(default, isCanceled: false, isCompleted: this.resultOfPriorRead.IsCompleted);
             }
         }
 
