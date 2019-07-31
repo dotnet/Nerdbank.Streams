@@ -10,7 +10,6 @@
 
 namespace Nerdbank.Streams {
     using System;
-    using System.Reflection;
     
     
     /// <summary>
@@ -40,7 +39,7 @@ namespace Nerdbank.Streams {
         internal static global::System.Resources.ResourceManager ResourceManager {
             get {
                 if (object.ReferenceEquals(resourceMan, null)) {
-                    global::System.Resources.ResourceManager temp = new global::System.Resources.ResourceManager("Nerdbank.Streams.Strings", typeof(Strings).GetTypeInfo().Assembly);
+                    global::System.Resources.ResourceManager temp = new global::System.Resources.ResourceManager("Nerdbank.Streams.Strings", typeof(Strings).Assembly);
                     resourceMan = temp;
                 }
                 return resourceMan;
@@ -67,6 +66,15 @@ namespace Nerdbank.Streams {
         internal static string NotSupportedWhenExistingPipeSpecified {
             get {
                 return ResourceManager.GetString("NotSupportedWhenExistingPipeSpecified", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Reading not allowed after reader is completed..
+        /// </summary>
+        internal static string ReadingAfterCompletionNotAllowed {
+            get {
+                return ResourceManager.GetString("ReadingAfterCompletionNotAllowed", resourceCulture);
             }
         }
     }

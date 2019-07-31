@@ -21,6 +21,7 @@ namespace Nerdbank.Streams
         private long examinedLength;
         private ReadResult resultOfPriorRead;
         private bool nextReadCanceled;
+        private bool readerCompleted;
 
         public NestedPipeReader(PipeReader pipeReader, long length)
         {
@@ -65,23 +66,27 @@ namespace Nerdbank.Streams
         }
 
         /// <inheritdoc/>
-        /// <exception cref="NotSupportedException">Always thrown.</exception>
         public override void Complete(Exception exception = null)
         {
-            // We don't want a nested PipeReader to complete the underyling one.
-            throw new NotSupportedException();
+            // We don't want a nested PipeReader to complete the underlying one unless there was an exception.
+            if (exception != null)
+            {
+                this.pipeReader.Complete(exception);
+            }
+
+            this.readerCompleted = true;
         }
 
         /// <inheritdoc/>
-        /// <exception cref="NotSupportedException">Always thrown.</exception>
         public override void OnWriterCompleted(Action<Exception, object> callback, object state)
         {
-            throw new NotSupportedException();
+            // We will never call this back. The method is deprecated in .NET Core 3.0 anyway.
         }
 
         /// <inheritdoc/>
         public override async ValueTask<ReadResult> ReadAsync(CancellationToken cancellationToken = default)
         {
+            Verify.Operation(!this.readerCompleted, Strings.ReadingAfterCompletionNotAllowed);
             if (this.resultOfPriorRead.IsCompleted)
             {
                 var cachedResult = this.resultOfPriorRead = new ReadResult(this.resultOfPriorRead.Buffer, isCanceled: this.nextReadCanceled, isCompleted: true);
@@ -101,6 +106,7 @@ namespace Nerdbank.Streams
         /// <inheritdoc/>
         public override bool TryRead(out ReadResult result)
         {
+            Verify.Operation(!this.readerCompleted, Strings.ReadingAfterCompletionNotAllowed);
             if (this.resultOfPriorRead.IsCompleted)
             {
                 result = this.resultOfPriorRead = new ReadResult(this.resultOfPriorRead.Buffer, isCanceled: this.nextReadCanceled, isCompleted: true);
@@ -133,7 +139,7 @@ namespace Nerdbank.Streams
                 this.resultOfPriorRead = new ReadResult(this.resultOfPriorRead.Buffer.Slice(consumed), isCanceled: false, isCompleted: true);
             }
 
-            // The caller is allowed to propagate the AdvanceTo call to the underyling reader iff
+            // The caller is allowed to propagate the AdvanceTo call to the underlying reader iff
             // we will be reading again from it, or our own final buffer is empty.
             return !this.resultOfPriorRead.IsCompleted || this.resultOfPriorRead.Buffer.IsEmpty;
         }
