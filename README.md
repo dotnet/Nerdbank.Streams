@@ -25,7 +25,9 @@ Specialized .NET Stream classes
    `System.IO.Stream` for reading and/or writing.
 1. [`UsePipe()`](doc/UsePipe.md) enables reading from
    and writing to a `Stream` or `WebSocket` using the `PipeReader` and `PipeWriter` APIs.
-1. [`Stream.ReadSlice(int)`](doc/ReadSlice.md) creates a sub-stream that ends after
+1. [`Stream.ReadSlice(long)`](doc/ReadSlice.md) creates a sub-stream that ends after
+   a given number of bytes.
+1. [`PipeReader.ReadSlice(long)`](doc/ReadSlice.md) creates a sub-`PipeReader` that ends after
    a given number of bytes.
 1. [`MonitoringStream`](doc/MonitoringStream.md) wraps another Stream and raises events for
    all I/O calls so you can monitor and/or trace the data as it goes by.
