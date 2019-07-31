@@ -294,6 +294,22 @@ public class PipeStreamTests : TestBase
         Assert.Equal(sendBuffer.Take(3), recvBuffer.Take(3));
     }
 
+    [Fact]
+    public async Task ReadLessThanReadResultBuffer()
+    {
+        await this.pipe.Writer.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
+        this.pipe.Writer.Complete();
+
+        byte[] buffer = new byte[4];
+        int count = await this.stream.ReadAsync(buffer, 0, 2, this.TimeoutToken);
+        Assert.Equal(2, count); // we should get 2 because the underlying pipe has a buffer with all 3 in it.
+        count = await this.stream.ReadAsync(buffer, 2, 2, this.TimeoutToken);
+        Assert.Equal(1, count);
+        count = await this.stream.ReadAsync(buffer, 2, 2, this.TimeoutToken);
+        Assert.Equal(0, count);
+        Assert.Equal(new byte[] { 1, 2, 3, 0 }, buffer);
+    }
+
     protected override void Dispose(bool disposing)
     {
         this.stream.Dispose();
