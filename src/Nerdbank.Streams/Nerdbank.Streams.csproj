@@ -1,6 +1,6 @@
-﻿<Project Sdk="MSBuild.Sdk.Extras">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;net472;netcoreapp2.1</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0;netcoreapp2.1</TargetFrameworks>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\release.snk</AssemblyOriginatorKeyFile>
     <CodeAnalysisRuleSet>..\Nerdbank.Streams\Nerdbank.Streams.ruleset</CodeAnalysisRuleSet>
@@ -22,9 +22,6 @@
     <PackageReference Include="System.IO.Pipelines" Version="4.5.3" />
     <PackageReference Include="System.Net.WebSockets" Version="4.3.0" />
     <PackageReference Include="System.ValueTuple" Version="4.5.0" />
-  </ItemGroup>
-  <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard1.6' ">
-    <PackageReference Include="System.Diagnostics.TraceSource" Version="4.3.0" />
   </ItemGroup>
   <ItemGroup>
     <Compile Update="Strings.Designer.cs">
