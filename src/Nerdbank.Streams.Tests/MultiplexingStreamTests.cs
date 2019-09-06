@@ -97,10 +97,16 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         var ch1 = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = pipePair.Item2 });
         await this.WaitForEphemeralChannelOfferToPropagateAsync();
         var ch2 = this.mx2.AcceptChannel(ch1.Id);
+
+        // Confirm that any attempt to read from the channel is immediately completed.
+        var readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
+        Assert.True(readResult.IsCompleted);
+
+        // Now write to the channel.
         await ch2.Output.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
         ch2.Output.Complete();
 
-        var readResult = await pipePair.Item1.Input.ReadAsync(this.TimeoutToken);
+        readResult = await pipePair.Item1.Input.ReadAsync(this.TimeoutToken);
         Assert.Equal(3, readResult.Buffer.Length);
         pipePair.Item1.Input.AdvanceTo(readResult.Buffer.End);
         readResult = await pipePair.Item1.Input.ReadAsync(this.TimeoutToken);
