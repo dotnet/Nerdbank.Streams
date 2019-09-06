@@ -68,6 +68,48 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
+    public async Task OfferReadOnlyPipe()
+    {
+        // Prepare a readonly pipe that is already fully populated with data for the other end to read.
+        var pipePair = FullDuplexStream.CreatePipePair();
+        pipePair.Item1.Input.Complete(); // we don't read -- we only write.
+        await pipePair.Item1.Output.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
+        pipePair.Item1.Output.Complete();
+
+        var ch1 = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = pipePair.Item2 });
+        await this.WaitForEphemeralChannelOfferToPropagateAsync();
+        var ch2 = this.mx2.AcceptChannel(ch1.Id);
+        var readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
+        Assert.Equal(3, readResult.Buffer.Length);
+        ch2.Input.AdvanceTo(readResult.Buffer.End);
+        readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
+        Assert.True(readResult.IsCompleted);
+
+        await Task.WhenAll(ch1.Completion, ch2.Completion).WithCancellation(this.TimeoutToken);
+    }
+
+    [Fact]
+    public async Task OfferWriteOnlyPipe()
+    {
+        var pipePair = FullDuplexStream.CreatePipePair();
+        pipePair.Item1.Output.Complete(); // we don't write -- we only read.
+
+        var ch1 = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = pipePair.Item2 });
+        await this.WaitForEphemeralChannelOfferToPropagateAsync();
+        var ch2 = this.mx2.AcceptChannel(ch1.Id);
+        await ch2.Output.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
+        ch2.Output.Complete();
+
+        var readResult = await pipePair.Item1.Input.ReadAsync(this.TimeoutToken);
+        Assert.Equal(3, readResult.Buffer.Length);
+        pipePair.Item1.Input.AdvanceTo(readResult.Buffer.End);
+        readResult = await pipePair.Item1.Input.ReadAsync(this.TimeoutToken);
+        Assert.True(readResult.IsCompleted);
+
+        await Task.WhenAll(ch1.Completion, ch2.Completion).WithCancellation(this.TimeoutToken);
+    }
+
+    [Fact]
     public async Task Dispose_CancelsOutstandingOperations()
     {
         Task offer = this.mx1.OfferChannelAsync("offer");
@@ -721,7 +763,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         await channel1Stream.FlushAsync(this.TimeoutToken);
 
         // Accept the channel and read the bytes
-        await this.WaitForEphemeralChannelOfferToPropagate();
+        await this.WaitForEphemeralChannelOfferToPropagateAsync();
         var channel2 = this.mx2.AcceptChannel(channel1.Id, channel2Options);
         await this.VerifyReceivedDataAsync(channel2Stream, packets[0]);
 
@@ -760,7 +802,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         await channel1Stream.FlushAsync(this.TimeoutToken);
 
         // Accept the channel
-        await this.WaitForEphemeralChannelOfferToPropagate();
+        await this.WaitForEphemeralChannelOfferToPropagateAsync();
         var channel2 = this.mx2.AcceptChannel(channel1.Id, channel2Options);
 
         // Send MORE bytes
@@ -790,7 +832,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         var channel1 = this.mx1.CreateChannel(channelOptions);
 
         // Blast a bunch of data to the channel as soon as it is accepted.
-        await this.WaitForEphemeralChannelOfferToPropagate();
+        await this.WaitForEphemeralChannelOfferToPropagateAsync();
         var channel2 = this.mx2.AcceptChannel(channel1.Id, channelOptions);
         await channel2.Output.WriteAsync(new byte[DataSize], this.TimeoutToken);
 
@@ -818,7 +860,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         };
 
         var channel1 = this.mx1.CreateChannel();
-        await this.WaitForEphemeralChannelOfferToPropagate();
+        await this.WaitForEphemeralChannelOfferToPropagateAsync();
         var bytesWrittenEvent = new AsyncManualResetEvent();
 
         await Task.WhenAll(Party1Async(), Party2Async());
@@ -895,7 +937,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         return tcs.Task;
     }
 
-    private async Task WaitForEphemeralChannelOfferToPropagate()
+    private async Task WaitForEphemeralChannelOfferToPropagateAsync()
     {
         // Propagation of ephemeral channel offers must occur before the remote end can accept it.
         // The simplest way to guarantee that the offer has propagated is to send another message after the offer
