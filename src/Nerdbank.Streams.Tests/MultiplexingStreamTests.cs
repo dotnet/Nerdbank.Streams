@@ -84,6 +84,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         ch2.Input.AdvanceTo(readResult.Buffer.End);
         readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
         Assert.True(readResult.IsCompleted);
+        ch2.Output.Complete();
 
         await Task.WhenAll(ch1.Completion, ch2.Completion).WithCancellation(this.TimeoutToken);
     }
@@ -859,7 +860,9 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [PairwiseData]
     public async Task AcceptChannel_InputPipeOptions(bool acceptBeforeTransmit)
     {
-        const int DataSize = 1024 * 1024;
+        // We have to use a smaller data size when transmitting before acceptance to avoid a deadlock due to the limited buffer size of channels.
+        int dataSize = acceptBeforeTransmit ? 1024 * 1024 : 16 * 1024;
+
         var channelOptions = new MultiplexingStream.ChannelOptions
         {
             InputPipeOptions = new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024),
@@ -878,7 +881,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
                 await channel1.Acceptance.WithCancellation(this.TimeoutToken);
             }
 
-            await channel1.Output.WriteAsync(new byte[DataSize], this.TimeoutToken);
+            await channel1.Output.WriteAsync(new byte[dataSize], this.TimeoutToken);
             bytesWrittenEvent.Set();
         }
 
@@ -895,11 +898,11 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
             // Since this is a LOT of data, this would normally overrun the Pipe's max buffer size.
             // If this succeeds, then we know the PipeOptions instance we supplied was taken into account.
             int bytesRead = 0;
-            while (bytesRead < DataSize)
+            while (bytesRead < dataSize)
             {
                 var readResult = await channel2.Input.ReadAsync(this.TimeoutToken);
                 bytesRead += (int)readResult.Buffer.Length;
-                SequencePosition consumed = bytesRead == DataSize ? readResult.Buffer.End : readResult.Buffer.Start;
+                SequencePosition consumed = bytesRead == dataSize ? readResult.Buffer.End : readResult.Buffer.Start;
                 channel2.Input.AdvanceTo(consumed, readResult.Buffer.End);
             }
         }
