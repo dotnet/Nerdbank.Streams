@@ -371,6 +371,36 @@ namespace Nerdbank.Streams
         public static PipeReader ReadSlice(this PipeReader reader, long length) => new NestedPipeReader(reader, length);
 
         /// <summary>
+        /// Wraps a <see cref="PipeReader"/> in another object that will report when <see cref="PipeReader.Complete(Exception)"/> is called.
+        /// </summary>
+        /// <param name="reader">The reader to be wrapped.</param>
+        /// <param name="callback">
+        /// The callback to invoke when the <see cref="PipeReader.Complete(Exception)"/> method is called.
+        /// If this delegate throws an exception it will propagate to the caller of the <see cref="PipeReader.Complete(Exception)"/> method.
+        /// </param>
+        /// <param name="state">An optional state object to supply to the <paramref name="callback"/>.</param>
+        /// <returns>The wrapped <see cref="PipeReader"/> which should be exposed to have its <see cref="PipeReader.Complete(Exception)"/> method called.</returns>
+        /// <remarks>
+        /// If the <see cref="PipeReader"/> has already been completed, the provided <paramref name="callback"/> may never be invoked.
+        /// </remarks>
+        public static PipeReader OnCompleted(this PipeReader reader, Action<Exception?, object?> callback, object? state = null) => new PipeReaderCompletionWatcher(reader, callback, state);
+
+        /// <summary>
+        /// Wraps a <see cref="PipeWriter"/> in another object that will report when <see cref="PipeWriter.Complete(Exception)"/> is called.
+        /// </summary>
+        /// <param name="reader">The writer to be wrapped.</param>
+        /// <param name="callback">
+        /// The callback to invoke when the <see cref="PipeWriter.Complete(Exception)"/> method is called.
+        /// If this delegate throws an exception it will propagate to the caller of the <see cref="PipeWriter.Complete(Exception)"/> method.
+        /// </param>
+        /// <param name="state">An optional state object to supply to the <paramref name="callback"/>.</param>
+        /// <returns>The wrapped <see cref="PipeWriter"/> which should be exposed to have its <see cref="PipeWriter.Complete(Exception)"/> method called.</returns>
+        /// <remarks>
+        /// If the <see cref="PipeWriter"/> has already been completed, the provided <paramref name="callback"/> may never be invoked.
+        /// </remarks>
+        public static PipeWriter OnCompleted(this PipeWriter reader, Action<Exception?, object?> callback, object? state = null) => new PipeWriterCompletionWatcher(reader, callback, state);
+
+        /// <summary>
         /// Forwards all bytes coming from a <see cref="PipeReader"/> to the specified <see cref="PipeWriter"/>.
         /// </summary>
         /// <param name="reader">The reader to get bytes from.</param>
