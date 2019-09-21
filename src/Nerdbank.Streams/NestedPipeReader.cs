@@ -72,7 +72,7 @@ namespace Nerdbank.Streams
         }
 
         /// <inheritdoc/>
-        public override void Complete(Exception exception = null)
+        public override void Complete(Exception? exception = null)
         {
             // We don't want a nested PipeReader to complete the underlying one unless there was an exception.
             if (exception != null)
@@ -84,7 +84,7 @@ namespace Nerdbank.Streams
         }
 
         /// <inheritdoc/>
-        public override void OnWriterCompleted(Action<Exception, object> callback, object state)
+        public override void OnWriterCompleted(Action<Exception, object> callback, object? state)
         {
             // We will never call this back. The method is deprecated in .NET Core 3.0 anyway.
         }

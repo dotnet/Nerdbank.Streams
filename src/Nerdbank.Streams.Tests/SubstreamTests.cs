@@ -28,13 +28,13 @@ public class SubstreamTests : TestBase
     [Fact]
     public void WriteSubstream_Null()
     {
-        Assert.Throws<ArgumentNullException>(() => StreamExtensions.WriteSubstream(null));
+        Assert.Throws<ArgumentNullException>(() => StreamExtensions.WriteSubstream(null!));
     }
 
     [Fact]
     public void ReadSubstream_Null()
     {
-        Assert.Throws<ArgumentNullException>(() => StreamExtensions.ReadSubstream(null));
+        Assert.Throws<ArgumentNullException>(() => StreamExtensions.ReadSubstream(null!));
     }
 
     [Fact]

@@ -167,7 +167,7 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
         }
     }
 
-    private async Task JsonRpcPerf(bool useChannel, [CallerMemberName] string testMethodName = null)
+    private async Task JsonRpcPerf(bool useChannel, [CallerMemberName] string? testMethodName = null)
     {
         if (await this.ExecuteInIsolationAsync(testMethodName))
         {

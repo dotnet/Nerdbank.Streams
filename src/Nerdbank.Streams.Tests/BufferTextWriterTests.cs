@@ -28,8 +28,8 @@ public class BufferTextWriterTests : TestBase
     [Fact]
     public void Ctor_ValidatesArguments()
     {
-        Assert.Throws<ArgumentNullException>(() => new BufferTextWriter(null, DefaultEncoding));
-        Assert.Throws<ArgumentNullException>(() => new BufferTextWriter(this.sequence, null));
+        Assert.Throws<ArgumentNullException>(() => new BufferTextWriter(null!, DefaultEncoding));
+        Assert.Throws<ArgumentNullException>(() => new BufferTextWriter(this.sequence, null!));
     }
 
     [Fact]
@@ -44,8 +44,8 @@ public class BufferTextWriterTests : TestBase
     [Fact]
     public void Initialize_ValidatesArgs()
     {
-        Assert.Throws<ArgumentNullException>(() => this.bufferTextWriter.Initialize(new Sequence<byte>(), null));
-        Assert.Throws<ArgumentNullException>(() => this.bufferTextWriter.Initialize(null, Encoding.UTF8));
+        Assert.Throws<ArgumentNullException>(() => this.bufferTextWriter.Initialize(new Sequence<byte>(), null!));
+        Assert.Throws<ArgumentNullException>(() => this.bufferTextWriter.Initialize(null!, Encoding.UTF8));
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public class BufferTextWriterTests : TestBase
     [Fact]
     public void Initialize_SameEncoder()
     {
-        this.bufferTextWriter.Initialize(new Sequence<byte>(), this.bufferTextWriter.Encoding);
+        this.bufferTextWriter.Initialize(new Sequence<byte>(), this.bufferTextWriter.Encoding!);
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public class BufferTextWriterTests : TestBase
     [Fact]
     public void Write_String_Null()
     {
-        this.bufferTextWriter.Write((string)null);
+        this.bufferTextWriter.Write((string?)null);
         this.AssertWritten(string.Empty);
     }
 
@@ -143,7 +143,7 @@ public class BufferTextWriterTests : TestBase
         Assert.Equal(DefaultEncodingNoPreamble.GetBytes("b"), this.sequence.AsReadOnlySequence.ToArray());
     }
 
-    private void AssertWritten(string expected, Encoding encoding = null)
+    private void AssertWritten(string expected, Encoding? encoding = null)
     {
         encoding = encoding ?? DefaultEncoding;
         this.bufferTextWriter.Flush();

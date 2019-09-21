@@ -119,7 +119,7 @@ public class HalfDuplexStreamTests : TestBase
     [PairwiseData]
     public async Task Write_InputValidation(bool useAsync)
     {
-        await Assert.ThrowsAsync<ArgumentNullException>(() => this.WriteAsync(null, 0, 0, isAsync: useAsync));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => this.WriteAsync(null!, 0, 0, isAsync: useAsync));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.WriteAsync(new byte[5], 0, 6, isAsync: useAsync));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.WriteAsync(new byte[5], 5, 1, isAsync: useAsync));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.WriteAsync(new byte[5], 3, 3, isAsync: useAsync));

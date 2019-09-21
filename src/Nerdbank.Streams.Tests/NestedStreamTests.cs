@@ -33,7 +33,7 @@ public class NestedStreamTests : TestBase
     [Fact]
     public void Slice_InputValidation()
     {
-        Assert.Throws<ArgumentNullException>(() => StreamExtensions.ReadSlice(null, 1));
+        Assert.Throws<ArgumentNullException>(() => StreamExtensions.ReadSlice(null!, 1));
         Assert.Throws<ArgumentOutOfRangeException>(() => StreamExtensions.ReadSlice(new MemoryStream(), -1));
 
         var noReadStream = new Mock<Stream>(MockBehavior.Strict);

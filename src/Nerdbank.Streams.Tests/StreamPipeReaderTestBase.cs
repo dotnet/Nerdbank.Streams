@@ -25,7 +25,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
     [Fact]
     public void ThrowsOnNull()
     {
-        Assert.Throws<ArgumentNullException>(() => this.CreatePipeReader((Stream)null));
+        Assert.Throws<ArgumentNullException>(() => this.CreatePipeReader((Stream)null!));
     }
 
     [Fact]

@@ -53,7 +53,7 @@ namespace Nerdbank.Streams
         /// <summary>
         /// The buffer writer to use for all buffers after the original one obtained from <see cref="innerWriter"/>.
         /// </summary>
-        private Sequence<T> excessSequence;
+        private Sequence<T>? excessSequence;
 
         /// <summary>
         /// The buffer from <see cref="innerWriter"/> reserved for the fixed-length prefix.
@@ -82,7 +82,7 @@ namespace Nerdbank.Streams
         /// <param name="prefixSize">The length of the header to reserve space for. Must be a positive number.</param>
         /// <param name="payloadSizeHint">A hint at the expected max size of the payload. The real size may be more or less than this, but additional copying is avoided if it does not exceed this amount. If 0, a reasonable guess is made.</param>
         /// <param name="memoryPool">The memory pool to use for allocating additional memory when the payload exceeds <paramref name="payloadSizeHint"/>.</param>
-        public PrefixingBufferWriter(IBufferWriter<T> innerWriter, int prefixSize, int payloadSizeHint = 0, MemoryPool<T> memoryPool = null)
+        public PrefixingBufferWriter(IBufferWriter<T> innerWriter, int prefixSize, int payloadSizeHint = 0, MemoryPool<T>? memoryPool = null)
         {
             if (prefixSize <= 0)
             {
@@ -118,7 +118,7 @@ namespace Nerdbank.Streams
         {
             if (this.usingExcessMemory)
             {
-                this.excessSequence.Advance(count);
+                this.excessSequence!.Advance(count);
                 this.realMemory = default;
             }
             else
@@ -164,7 +164,7 @@ namespace Nerdbank.Streams
                 // Now copy any excess buffer.
                 if (this.usingExcessMemory)
                 {
-                    var span = this.innerWriter.GetSpan((int)this.excessSequence.Length);
+                    var span = this.innerWriter.GetSpan((int)this.excessSequence!.Length);
                     foreach (var segment in this.excessSequence.AsReadOnlySequence)
                     {
                         segment.Span.CopyTo(span);

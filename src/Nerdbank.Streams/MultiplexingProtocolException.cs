@@ -22,7 +22,7 @@ namespace Nerdbank.Streams
         /// Initializes a new instance of the <see cref="MultiplexingProtocolException"/> class.
         /// </summary>
         /// <param name="message">The message for the exception.</param>
-        public MultiplexingProtocolException(string message)
+        public MultiplexingProtocolException(string? message)
             : base(message)
         {
         }
@@ -32,7 +32,7 @@ namespace Nerdbank.Streams
         /// </summary>
         /// <param name="message">The message for the exception.</param>
         /// <param name="inner">The inner exception.</param>
-        public MultiplexingProtocolException(string message, Exception inner)
+        public MultiplexingProtocolException(string? message, Exception? inner)
             : base(message, inner)
         {
         }

@@ -12,9 +12,9 @@ using Microsoft.VisualStudio.Threading;
 
 internal class MockWebSocket : WebSocket
 {
-    private Message writingInProgress;
+    private Message? writingInProgress;
 
-    private Message readingInProgress;
+    private Message? readingInProgress;
 
     private bool closed;
 
@@ -45,13 +45,13 @@ internal class MockWebSocket : WebSocket
 
     public override async Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> output, CancellationToken cancellationToken)
     {
-        Message input = this.readingInProgress;
+        Message? input = this.readingInProgress;
         if (this.readingInProgress == null)
         {
             input = this.readingInProgress = await this.ReadQueue.DequeueAsync(cancellationToken);
         }
 
-        int bytesToCopy = Math.Min(input.Buffer.Length, output.Count);
+        int bytesToCopy = Math.Min(input!.Buffer.Length, output.Count);
         input.Buffer.Slice(0, bytesToCopy).CopyTo(output.Array.AsMemory(output.Offset, output.Count));
         bool finishedMessage = bytesToCopy == input.Buffer.Length;
         if (finishedMessage)

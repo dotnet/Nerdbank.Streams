@@ -50,17 +50,19 @@ namespace Nerdbank.Streams
         /// <summary>
         /// The encoding to use while decoding bytes into characters.
         /// </summary>
-        private Encoding encoding;
+        private Encoding? encoding;
 
         /// <summary>
         /// The decoder.
         /// </summary>
-        private Decoder decoder;
+        private Decoder? decoder;
 
+#pragma warning disable SA1011 // Closing square brackets should be spaced correctly
         /// <summary>
         /// The preamble for the <see cref="encoding"/> in use.
         /// </summary>
-        private byte[] encodingPreamble;
+        private byte[]? encodingPreamble;
+#pragma warning restore SA1011 // Closing square brackets should be spaced correctly
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SequenceTextReader"/> class
@@ -107,11 +109,11 @@ namespace Nerdbank.Streams
             }
             else
             {
-                this.decoder.Reset();
+                this.decoder!.Reset();
             }
 
             // Skip a preamble if we encounter one.
-            if (this.encodingPreamble.Length > 0 && sequence.Length >= this.encodingPreamble.Length)
+            if (this.encodingPreamble!.Length > 0 && sequence.Length >= this.encodingPreamble.Length)
             {
                 Span<byte> provisionalRead = stackalloc byte[this.encodingPreamble.Length];
                 sequence.Slice(0, this.encodingPreamble.Length).CopyTo(provisionalRead);
@@ -300,7 +302,7 @@ namespace Nerdbank.Streams
 
                 if (MemoryMarshal.TryGetArray(memory, out ArraySegment<byte> segment))
                 {
-                    this.decoder.Convert(segment.Array, segment.Offset, segment.Count, this.charBuffer, this.charBufferLength, this.charBuffer.Length - this.charBufferLength, flush: false, out int bytesUsed, out int charsUsed, out bool completed);
+                    this.decoder!.Convert(segment.Array, segment.Offset, segment.Count, this.charBuffer, this.charBufferLength, this.charBuffer.Length - this.charBufferLength, flush: false, out int bytesUsed, out int charsUsed, out bool completed);
                     this.charBufferLength += charsUsed;
                     this.sequencePosition = this.sequence.GetPosition(bytesUsed, this.sequencePosition);
                 }

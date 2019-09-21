@@ -45,7 +45,7 @@ public class StreamUseStrictPipeWriterTests : StreamPipeWriterTestBase
     {
         var streamMock = new Mock<Stream>(MockBehavior.Strict);
         streamMock.SetupGet(s => s.CanWrite).Returns(true);
-        var writeCompletedSource = new TaskCompletionSource<object>();
+        var writeCompletedSource = new TaskCompletionSource<object?>();
 
         // Set up for either WriteAsync method to be called. We expect it will be Memory<T> on .NET Core 2.1 and byte[] on all the others.
 #if SPAN_BUILTIN
@@ -70,7 +70,7 @@ public class StreamUseStrictPipeWriterTests : StreamPipeWriterTestBase
     {
         var streamMock = new Mock<Stream>(MockBehavior.Strict);
         streamMock.SetupGet(s => s.CanWrite).Returns(true);
-        var writeCompletedSource = new TaskCompletionSource<object>();
+        var writeCompletedSource = new TaskCompletionSource<object?>();
 
         // Set up for either WriteAsync method to be called. We expect it will be Memory<T> on .NET Core 2.1 and byte[] on all the others.
 #if SPAN_BUILTIN

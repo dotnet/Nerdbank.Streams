@@ -21,8 +21,8 @@ public class DuplexPipeTests
     public void Ctor_RejectsNulls()
     {
         var pipe = new Pipe();
-        Assert.Throws<ArgumentNullException>(() => new DuplexPipe(null, null));
-        Assert.Throws<ArgumentNullException>(() => new DuplexPipe(null, pipe.Writer));
-        Assert.Throws<ArgumentNullException>(() => new DuplexPipe(pipe.Reader, null));
+        Assert.Throws<ArgumentNullException>(() => new DuplexPipe(null!, null!));
+        Assert.Throws<ArgumentNullException>(() => new DuplexPipe(null!, pipe.Writer));
+        Assert.Throws<ArgumentNullException>(() => new DuplexPipe(pipe.Reader, null!));
     }
 }

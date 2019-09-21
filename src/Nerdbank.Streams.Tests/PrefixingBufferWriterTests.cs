@@ -129,7 +129,7 @@ public class PrefixingBufferWriterTests
     [Fact]
     public void Ctor_NullUnderwriter()
     {
-        Assert.Throws<ArgumentNullException>(() => new PrefixingBufferWriter<byte>(null, 5));
+        Assert.Throws<ArgumentNullException>(() => new PrefixingBufferWriter<byte>(null!, 5));
     }
 
     private void PayloadCompleteHelper(PrefixingBufferWriter<byte> prefixWriter)

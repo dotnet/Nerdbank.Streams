@@ -376,7 +376,7 @@ public class ReadOnlySequenceStreamTests : TestBase
 
     private class SeqSegment : ReadOnlySequenceSegment<byte>
     {
-        public SeqSegment(byte[] buffer, SeqSegment next)
+        public SeqSegment(byte[] buffer, SeqSegment? next)
         {
             this.Memory = buffer;
             this.Next = next;

@@ -25,9 +25,9 @@ public class FullDuplexStreamCombineTests : TestBase
     [Fact]
     public void JoinStreams_NullArgs()
     {
-        Assert.Throws<ArgumentNullException>(() => FullDuplexStream.Splice(null, null));
-        Assert.Throws<ArgumentNullException>(() => FullDuplexStream.Splice(null, Stream.Null));
-        Assert.Throws<ArgumentNullException>(() => FullDuplexStream.Splice(Stream.Null, null));
+        Assert.Throws<ArgumentNullException>(() => FullDuplexStream.Splice(null!, null!));
+        Assert.Throws<ArgumentNullException>(() => FullDuplexStream.Splice(null!, Stream.Null));
+        Assert.Throws<ArgumentNullException>(() => FullDuplexStream.Splice(Stream.Null, null!));
     }
 
     [Fact]

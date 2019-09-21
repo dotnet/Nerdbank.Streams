@@ -29,8 +29,8 @@ public class BufferWriterStreamTests : TestBase
     [Fact]
     public void Null_Throws()
     {
-        IBufferWriter<byte> writer = null;
-        Assert.Throws<ArgumentNullException>(() => writer.AsStream());
+        IBufferWriter<byte>? writer = null;
+        Assert.Throws<ArgumentNullException>(() => writer!.AsStream());
     }
 
     [Fact]

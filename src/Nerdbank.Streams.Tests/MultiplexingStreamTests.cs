@@ -24,7 +24,9 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     private MultiplexingStream mx1;
     private MultiplexingStream mx2;
 
+#pragma warning disable CS8618 // Fields initialized in InitializeAsync
     public MultiplexingStreamTests(ITestOutputHelper logger)
+#pragma warning restore CS8618 // Fields initialized in InitializeAsync
         : base(logger)
     {
     }
@@ -169,13 +171,13 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task CreateChannelAsync_NullId()
     {
-        await Assert.ThrowsAsync<ArgumentNullException>(() => this.mx1.OfferChannelAsync(null, this.TimeoutToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => this.mx1.OfferChannelAsync(null!, this.TimeoutToken));
     }
 
     [Fact]
     public async Task AcceptChannelAsync_NullId()
     {
-        await Assert.ThrowsAsync<ArgumentNullException>(() => this.mx1.AcceptChannelAsync(null, this.TimeoutToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => this.mx1.AcceptChannelAsync(null!, this.TimeoutToken));
     }
 
     [Fact]
@@ -512,7 +514,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         var offer = this.mx1.OfferChannelAsync(string.Empty, cts.Token);
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => offer).WithCancellation(this.TimeoutToken);
-        Stream acceptedStream = null;
+        Stream? acceptedStream = null;
         try
         {
             if (cancelFirst)
@@ -658,7 +660,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         };
 
         string channelName = "abc";
-        Task acceptTask = null;
+        Task? acceptTask = null;
         if (alreadyAccepted)
         {
             acceptTask = this.mx2.AcceptChannelAsync(channelName, this.TimeoutToken);
@@ -925,9 +927,9 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         return bytesRead;
     }
 
-    private static void AssertNoFault(MultiplexingStream stream)
+    private static void AssertNoFault(MultiplexingStream? stream)
     {
-        Exception fault = stream?.Completion.Exception?.InnerException;
+        Exception? fault = stream?.Completion.Exception?.InnerException;
         if (fault != null)
         {
             ExceptionDispatchInfo.Capture(fault).Throw();
@@ -1005,7 +1007,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     {
         private readonly Sequence<byte> writtenBytes = new Sequence<byte>();
 
-        private readonly TaskCompletionSource<object> completionSource = new TaskCompletionSource<object>();
+        private readonly TaskCompletionSource<object?> completionSource = new TaskCompletionSource<object?>();
 
         private CancellationTokenSource nextFlushToken = new CancellationTokenSource();
 
@@ -1023,7 +1025,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
         public override void CancelPendingFlush() => this.nextFlushToken.Cancel();
 
-        public override void Complete(Exception exception = null)
+        public override void Complete(Exception? exception = null)
         {
             if (exception == null)
             {

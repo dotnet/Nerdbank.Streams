@@ -22,7 +22,9 @@ namespace Nerdbank.Streams
 
         private readonly Stream underlyingStream;
 
-        private byte[] buffer;
+#pragma warning disable SA1011 // Closing square brackets should be spaced correctly
+        private byte[]? buffer;
+#pragma warning restore SA1011 // Closing square brackets should be spaced correctly
 
         private int count;
 
@@ -131,7 +133,7 @@ namespace Nerdbank.Streams
 
             Verify.NotDisposed(this);
 
-            int slack = this.buffer.Length - this.count;
+            int slack = this.buffer!.Length - this.count;
             if (count <= slack)
             {
                 Array.Copy(buffer, offset, this.buffer, this.count, count);
@@ -157,7 +159,7 @@ namespace Nerdbank.Streams
 
             Verify.NotDisposed(this);
 
-            int slack = this.buffer.Length - this.count;
+            int slack = this.buffer!.Length - this.count;
             if (count <= slack)
             {
                 Array.Copy(buffer, offset, this.buffer, this.count, count);

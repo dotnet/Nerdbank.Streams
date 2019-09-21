@@ -80,11 +80,11 @@ namespace Nerdbank.Streams
         {
             Requires.NotNull(writer, nameof(writer));
 
-            var readerDone = new TaskCompletionSource<object>();
+            var readerDone = new TaskCompletionSource<object?>();
             writer.OnReaderCompleted(
                 (ex, tcsObject) =>
                 {
-                    var tcs = (TaskCompletionSource<object>)tcsObject;
+                    var tcs = (TaskCompletionSource<object?>)tcsObject;
                     if (ex != null)
                     {
                         tcs.SetException(ex);
@@ -102,11 +102,11 @@ namespace Nerdbank.Streams
         {
             Requires.NotNull(reader, nameof(reader));
 
-            var writerDone = new TaskCompletionSource<object>();
+            var writerDone = new TaskCompletionSource<object?>();
             reader.OnWriterCompleted(
                 (ex, wdObject) =>
                 {
-                    var wd = (TaskCompletionSource<object>)wdObject;
+                    var wd = (TaskCompletionSource<object?>)wdObject;
                     if (ex != null)
                     {
                         wd.SetException(ex);

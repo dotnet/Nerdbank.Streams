@@ -24,7 +24,7 @@ namespace Nerdbank.Streams
         /// </summary>
         /// <param name="pipeOptions">Pipe options to initialize the internal pipes with.</param>
         /// <returns>A pair of streams.</returns>
-        public static (Stream, Stream) CreatePair(PipeOptions pipeOptions = null)
+        public static (Stream, Stream) CreatePair(PipeOptions? pipeOptions = null)
         {
             var (pipe1, pipe2) = CreatePipePair(pipeOptions);
             return (pipe1.AsStream(), pipe2.AsStream());
@@ -36,7 +36,7 @@ namespace Nerdbank.Streams
         /// </summary>
         /// <param name="pipeOptions">Pipe options to initialize the internal pipes with.</param>
         /// <returns>A pair of <see cref="IDuplexPipe"/> objects.</returns>
-        public static (IDuplexPipe, IDuplexPipe) CreatePipePair(PipeOptions pipeOptions = null)
+        public static (IDuplexPipe, IDuplexPipe) CreatePipePair(PipeOptions? pipeOptions = null)
         {
             var pipe1 = new Pipe(pipeOptions ?? PipeOptions.Default);
             var pipe2 = new Pipe(pipeOptions ?? PipeOptions.Default);

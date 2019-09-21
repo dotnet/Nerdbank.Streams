@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.VisualStudio.Threading" Version="16.0.102" PrivateAssets="build;analyzers;compile" />
+    <PackageReference Include="Microsoft.VisualStudio.Validation" Version="15.5.31" />
     <PackageReference Include="System.Buffers" Version="4.5.0" />
     <PackageReference Include="System.IO.Pipelines" Version="4.5.3" />
     <PackageReference Include="System.Net.WebSockets" Version="4.3.0" />

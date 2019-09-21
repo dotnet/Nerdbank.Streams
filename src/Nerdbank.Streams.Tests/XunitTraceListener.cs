@@ -25,7 +25,7 @@ internal class XunitTraceListener : TraceListener
     /// Gets or sets the <see cref="Encoding"/> to use to decode the data for readable trace messages
     /// if the data is encoded text.
     /// </summary>
-    public Encoding DataEncoding { get; set; } = null;
+    public Encoding? DataEncoding { get; set; }
 
     public override unsafe void TraceData(TraceEventCache eventCache, string source, TraceEventType eventType, int id, object data)
     {

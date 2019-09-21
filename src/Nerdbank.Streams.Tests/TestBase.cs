@@ -252,9 +252,9 @@ public abstract class TestBase : IDisposable
     /// </returns>
     /// <exception cref="Xunit.Sdk.XunitException">Thrown if the isolated test result is a Failure.</exception>
     /// <exception cref="SkipException">Thrown if on a platform that we do not yet support test isolation on.</exception>
-    protected Task<bool> ExecuteInIsolationAsync([CallerMemberName] string testMethodName = null)
+    protected Task<bool> ExecuteInIsolationAsync([CallerMemberName] string? testMethodName = null)
     {
-        return this.ExecuteInIsolationAsync(this, testMethodName, this.Logger);
+        return this.ExecuteInIsolationAsync(this, testMethodName!, this.Logger);
     }
 
     /// <summary>
@@ -268,10 +268,10 @@ public abstract class TestBase : IDisposable
     /// </returns>
     /// <exception cref="Xunit.Sdk.XunitException">Thrown if the isolated test result is a Failure.</exception>
     /// <exception cref="SkipException">Thrown if on a platform that we do not yet support test isolation on.</exception>
-    protected bool ExecuteInIsolation([CallerMemberName] string testMethodName = null)
+    protected bool ExecuteInIsolation([CallerMemberName] string? testMethodName = null)
     {
 #pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
-        return this.ExecuteInIsolationAsync(this, testMethodName, this.Logger).GetAwaiter().GetResult();
+        return this.ExecuteInIsolationAsync(this, testMethodName!, this.Logger).GetAwaiter().GetResult();
 #pragma warning restore VSTHRD002 // Avoid problematic synchronous waits
     }
 

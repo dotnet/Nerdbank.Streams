@@ -98,8 +98,8 @@ public class MultiplexingStreamChannelOptionsTests : TestBase
 
     private class MockDuplexPipe : IDuplexPipe
     {
-        public PipeReader Input { get; set; }
+        public PipeReader? Input { get; set; }
 
-        public PipeWriter Output { get; set; }
+        public PipeWriter? Output { get; set; }
     }
 }
