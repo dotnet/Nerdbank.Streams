@@ -43,6 +43,11 @@ namespace Nerdbank.Streams
         public delegate void ReadOnlySpanEventHandler(object sender, ReadOnlySpan<byte> span);
 
         /// <summary>
+        /// Occurs when any read method returns 0 bytes.
+        /// </summary>
+        public event EventHandler? ReadEndOfStream;
+
+        /// <summary>
         /// Occurs after <see cref="Seek(long, SeekOrigin)"/> is invoked.
         /// </summary>
         public event EventHandler<long>? DidSeek;
@@ -64,6 +69,7 @@ namespace Nerdbank.Streams
         public event EventHandler<ArraySegment<byte>>? DidRead;
 
 #pragma warning disable CS1574
+#pragma warning disable CS0067 // Only .NET Core 2.1 raises these
 
         /// <summary>
         /// Occurs before <see cref="ReadAsync(Memory{byte}, CancellationToken)"/> is invoked.
@@ -108,6 +114,7 @@ namespace Nerdbank.Streams
         /// </summary>
         public event EventHandler<ReadOnlyMemory<byte>>? DidWriteMemory;
 
+#pragma warning restore CS0067 // Only .NET Core 2.1 raises these
 #pragma warning restore CS1574
 
         /// <summary>
@@ -203,6 +210,7 @@ namespace Nerdbank.Streams
             this.WillRead?.Invoke(this, new ArraySegment<byte>(buffer, offset, count));
             int bytesRead = this.inner.Read(buffer, offset, count);
             this.DidRead?.Invoke(this, new ArraySegment<byte>(buffer, offset, bytesRead));
+            this.RaiseEndOfStreamIfNecessary(bytesRead);
             return bytesRead;
         }
 
@@ -212,6 +220,7 @@ namespace Nerdbank.Streams
             this.WillRead?.Invoke(this, new ArraySegment<byte>(buffer, offset, count));
             int bytesRead = await this.inner.ReadAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
             this.DidRead?.Invoke(this, new ArraySegment<byte>(buffer, offset, bytesRead));
+            this.RaiseEndOfStreamIfNecessary(bytesRead);
             return bytesRead;
         }
 
@@ -291,6 +300,11 @@ namespace Nerdbank.Streams
             this.WillReadByte?.Invoke(this, EventArgs.Empty);
             int result = this.inner.ReadByte();
             this.DidReadByte?.Invoke(this, result);
+            if (result == -1)
+            {
+                this.ReadEndOfStream?.Invoke(this, EventArgs.Empty);
+            }
+
             return result;
         }
 
@@ -309,6 +323,14 @@ namespace Nerdbank.Streams
             {
                 this.inner.Dispose();
                 this.Disposed?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        private void RaiseEndOfStreamIfNecessary(int bytesRead)
+        {
+            if (bytesRead == 0)
+            {
+                this.ReadEndOfStream?.Invoke(this, EventArgs.Empty);
             }
         }
     }
