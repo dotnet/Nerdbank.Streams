@@ -5,6 +5,8 @@ namespace Nerdbank.Streams
 {
     using System;
     using System.IO.Pipelines;
+    using System.Threading;
+    using System.Threading.Tasks;
 
     /// <summary>
     /// A basic implementation of <see cref="IDuplexPipe"/>.
@@ -22,10 +24,82 @@ namespace Nerdbank.Streams
             this.Output = output ?? throw new ArgumentNullException(nameof(output));
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DuplexPipe"/> class
+        /// that only allows reading. The <see cref="Output"/> property will reject writes.
+        /// </summary>
+        /// <param name="input">The reader.</param>
+        public DuplexPipe(PipeReader input)
+        {
+            this.Input = input ?? throw new ArgumentNullException(nameof(input));
+            this.Output = new CompletedPipeWriter();
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DuplexPipe"/> class
+        /// that only allows writing. The <see cref="Input"/> property will report completed reading.
+        /// </summary>
+        /// <param name="output">The writer.</param>
+        public DuplexPipe(PipeWriter output)
+        {
+            this.Input = new CompletedPipeReader();
+            this.Output = output ?? throw new ArgumentNullException(nameof(output));
+        }
+
         /// <inheritdoc />
         public PipeReader Input { get; }
 
         /// <inheritdoc />
         public PipeWriter Output { get; }
+
+        private class CompletedPipeWriter : PipeWriter
+        {
+            public override void Advance(int bytes) => ThrowInvalidOperationException();
+
+            public override void CancelPendingFlush()
+            {
+            }
+
+            public override void Complete(Exception? exception)
+            {
+            }
+
+            public override ValueTask<FlushResult> FlushAsync(CancellationToken cancellationToken) => default;
+
+            public override Memory<byte> GetMemory(int sizeHint) => throw ThrowInvalidOperationException();
+
+            public override Span<byte> GetSpan(int sizeHint) => throw ThrowInvalidOperationException();
+
+            public override void OnReaderCompleted(Action<Exception, object> callback, object state)
+            {
+            }
+
+            private static Exception ThrowInvalidOperationException() => throw new InvalidOperationException("Writing is completed.");
+        }
+
+        private class CompletedPipeReader : PipeReader
+        {
+            public override void AdvanceTo(SequencePosition consumed) => ThrowInvalidOperationException();
+
+            public override void AdvanceTo(SequencePosition consumed, SequencePosition examined) => ThrowInvalidOperationException();
+
+            public override void CancelPendingRead()
+            {
+            }
+
+            public override void Complete(Exception? exception)
+            {
+            }
+
+            public override void OnWriterCompleted(Action<Exception, object> callback, object state)
+            {
+            }
+
+            public override ValueTask<ReadResult> ReadAsync(CancellationToken cancellationToken) => throw ThrowInvalidOperationException();
+
+            public override bool TryRead(out ReadResult result) => throw ThrowInvalidOperationException();
+
+            private static Exception ThrowInvalidOperationException() => throw new InvalidOperationException("Reading is completed.");
+        }
     }
 }
