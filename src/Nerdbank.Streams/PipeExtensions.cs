@@ -224,8 +224,8 @@ namespace Nerdbank.Streams
             Requires.NotNull(stream, nameof(stream));
             Requires.Argument(stream.CanRead || stream.CanWrite, nameof(stream), "Stream is neither readable nor writable.");
 
-            PipeReader input = stream.CanRead ? stream.UsePipeReader(sizeHint, pipeOptions, cancellationToken) : null;
-            PipeWriter output = stream.CanWrite ? stream.UsePipeWriter(pipeOptions, cancellationToken) : null;
+            PipeReader? input = stream.CanRead ? stream.UsePipeReader(sizeHint, pipeOptions, cancellationToken) : null;
+            PipeWriter? output = stream.CanWrite ? stream.UsePipeWriter(pipeOptions, cancellationToken) : null;
 
             Task closeStreamAntecedent;
             if (input != null && output != null)
