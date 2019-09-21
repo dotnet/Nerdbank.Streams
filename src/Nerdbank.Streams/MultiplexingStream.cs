@@ -825,8 +825,17 @@ namespace Nerdbank.Streams
                 this.TraceSource.TraceData(TraceEventType.Verbose, (int)TraceEventId.FrameReceivedPayload, payload);
             }
 
-            // This API won't throw at us even if the PipeWriter has been completed (per current corefx implementation anyway).
-            writer.Advance(header.FramePayloadLength);
+            try
+            {
+                writer.Advance(header.FramePayloadLength);
+            }
+            catch (InvalidOperationException)
+            {
+                // Despite corefx source code suggesting otherwise, this API *does* sometimes throw InvalidOperationException when the writer is completed.
+                // Maybe it's because there are alternative PipeWriter implementations out there, but this caused indeterministic failures
+                // in our unit tests.
+                return;
+            }
 
             var flushResult = await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
             if (flushResult.IsCanceled)
