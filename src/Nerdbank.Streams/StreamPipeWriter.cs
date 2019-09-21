@@ -95,7 +95,7 @@ namespace Nerdbank.Streams
                 this.flushCancellationSource = new CancellationTokenSource();
             }
 
-            using (var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, this.flushCancellationSource.Token))
+            using (var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, this.flushCancellationSource!.Token))
             {
                 using (await this.flushingSemaphore.EnterAsync(cts.Token).ConfigureAwait(false))
                 {

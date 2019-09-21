@@ -125,7 +125,7 @@ namespace Nerdbank.Streams
                 memory = this.buffer.GetMemory(this.bufferSize);
             }
 
-            using (var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, this.readCancellationSource.Token))
+            using (var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, this.readCancellationSource!.Token))
             {
                 try
                 {

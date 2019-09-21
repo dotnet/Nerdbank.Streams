@@ -249,7 +249,7 @@ namespace Nerdbank.Streams
                     }
                     else
                     {
-                        this.mxStreamIOReaderCompleted.ContinueWith(finalDisposalAction, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Forget();
+                        this.mxStreamIOReaderCompleted!.ContinueWith(finalDisposalAction, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Forget();
                     }
                 }
             }
@@ -589,7 +589,7 @@ namespace Nerdbank.Streams
             {
                 if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Critical) ?? false)
                 {
-                    this.TraceSource.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Channel Closing self due to exception: {0}", exception);
+                    this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Channel Closing self due to exception: {0}", exception);
                 }
 
                 this.mxStreamIOReader?.Complete(exception);
