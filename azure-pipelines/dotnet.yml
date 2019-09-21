@@ -44,6 +44,7 @@ steps:
 
 - bash: bash <(curl -s https://codecov.io/bash)
   displayName: Publish code coverage results to codecov.io
+  continueOnError: true
   condition: succeededOrFailed()
 
 - task: CopyFiles@1
