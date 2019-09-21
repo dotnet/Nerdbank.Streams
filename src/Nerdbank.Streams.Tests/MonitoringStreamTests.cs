@@ -84,6 +84,22 @@ public class MonitoringStreamTests : TestBase
     }
 
     [Fact]
+    public void Read_RaisesEndOfStream()
+    {
+        bool wasReadEndOfStreamInvoked = false;
+        this.monitoringStream.EndOfStream += (s, e) =>
+        {
+            Assert.Same(this.monitoringStream, s);
+            wasReadEndOfStreamInvoked = true;
+        };
+
+        int bytesRead = this.monitoringStream.Read(this.buffer, 0, this.buffer.Length);
+        Assert.False(wasReadEndOfStreamInvoked);
+        this.monitoringStream.Read(this.buffer, 0, this.buffer.Length);
+        Assert.True(wasReadEndOfStreamInvoked);
+    }
+
+    [Fact]
     public async Task ReadAsync_RaisesEvents()
     {
         bool willReadInvoked = false;
@@ -114,6 +130,22 @@ public class MonitoringStreamTests : TestBase
     }
 
     [Fact]
+    public async Task ReadAsync_RaisesEndOfStream()
+    {
+        bool wasReadEndOfStreamInvoked = false;
+        this.monitoringStream.EndOfStream += (s, e) =>
+        {
+            Assert.Same(this.monitoringStream, s);
+            wasReadEndOfStreamInvoked = true;
+        };
+
+        int bytesRead = await this.monitoringStream.ReadAsync(this.buffer, 0, this.buffer.Length);
+        Assert.False(wasReadEndOfStreamInvoked);
+        await this.monitoringStream.ReadAsync(this.buffer, 0, this.buffer.Length);
+        Assert.True(wasReadEndOfStreamInvoked);
+    }
+
+    [Fact]
     public void ReadByte_RaisesEvents()
     {
         bool willReadInvoked = false;
@@ -137,6 +169,24 @@ public class MonitoringStreamTests : TestBase
         Assert.Equal(1, this.underlyingStream.Position);
         Assert.True(willReadInvoked);
         Assert.True(didReadInvoked);
+    }
+
+    [Fact]
+    public void ReadByte_RaisesEndOfStream()
+    {
+        bool wasReadEndOfStreamInvoked = false;
+        this.monitoringStream.EndOfStream += (s, e) =>
+        {
+            Assert.Same(this.monitoringStream, s);
+            wasReadEndOfStreamInvoked = true;
+        };
+
+        while (this.monitoringStream.ReadByte() != -1)
+        {
+            Assert.False(wasReadEndOfStreamInvoked);
+        }
+
+        Assert.True(wasReadEndOfStreamInvoked);
     }
 
     [Fact]
@@ -400,6 +450,22 @@ public class MonitoringStreamTests : TestBase
     }
 
     [Fact]
+    public void Read_Span_RaisesEndOfStream()
+    {
+        bool wasReadEndOfStreamInvoked = false;
+        this.monitoringStream.EndOfStream += (s, e) =>
+        {
+            Assert.Same(this.monitoringStream, s);
+            wasReadEndOfStreamInvoked = true;
+        };
+
+        int bytesRead = this.monitoringStream.Read(this.buffer);
+        Assert.False(wasReadEndOfStreamInvoked);
+        this.monitoringStream.Read(this.buffer);
+        Assert.True(wasReadEndOfStreamInvoked);
+    }
+
+    [Fact]
     public async Task ReadAsync_Memory_RaisesEvents()
     {
         bool willReadInvoked = false;
@@ -423,6 +489,22 @@ public class MonitoringStreamTests : TestBase
         Assert.Equal(bytesRead, this.underlyingStream.Position);
         Assert.True(willReadInvoked);
         Assert.True(didReadInvoked);
+    }
+
+    [Fact]
+    public async Task ReadAsync_Memory_RaisesEndOfStream()
+    {
+        bool wasReadEndOfStreamInvoked = false;
+        this.monitoringStream.EndOfStream += (s, e) =>
+        {
+            Assert.Same(this.monitoringStream, s);
+            wasReadEndOfStreamInvoked = true;
+        };
+
+        int bytesRead = await this.monitoringStream.ReadAsync(this.buffer);
+        Assert.False(wasReadEndOfStreamInvoked);
+        await this.monitoringStream.ReadAsync(this.buffer);
+        Assert.True(wasReadEndOfStreamInvoked);
     }
 
     [Fact]
