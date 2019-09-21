@@ -24,13 +24,13 @@ public class PipeExtensionsTests : TestBase
     [Fact]
     public void UsePipeReader_WebSocket_ThrowsOnNull()
     {
-        Assert.Throws<ArgumentNullException>(() => PipeExtensions.UsePipeReader((WebSocket)null));
+        Assert.Throws<ArgumentNullException>(() => PipeExtensions.UsePipeReader((WebSocket)null!));
     }
 
     [Fact]
     public void UsePipeWriter_WebSocket_ThrowsOnNull()
     {
-        Assert.Throws<ArgumentNullException>(() => PipeExtensions.UsePipeWriter((WebSocket)null));
+        Assert.Throws<ArgumentNullException>(() => PipeExtensions.UsePipeWriter((WebSocket)null!));
     }
 
     [Fact]

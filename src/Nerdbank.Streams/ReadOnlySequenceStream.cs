@@ -17,7 +17,7 @@ namespace Nerdbank.Streams
         /// <summary>
         /// A reusable task if two consecutive reads return the same number of bytes.
         /// </summary>
-        private Task<int> lastReadTask;
+        private Task<int>? lastReadTask;
 
         private ReadOnlySequence<byte> readOnlySequence;
 

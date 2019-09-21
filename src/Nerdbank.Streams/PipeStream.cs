@@ -23,12 +23,12 @@ namespace Nerdbank.Streams
         /// <summary>
         /// The <see cref="PipeWriter"/> to use when writing to this stream. May be null.
         /// </summary>
-        private readonly PipeWriter writer;
+        private readonly PipeWriter? writer;
 
         /// <summary>
         /// The <see cref="PipeReader"/> to use when reading from this stream. May be null.
         /// </summary>
-        private readonly PipeReader reader;
+        private readonly PipeReader? reader;
 
         /// <summary>
         /// A value indicating whether the <see cref="writer"/> and <see cref="reader"/> should be completed when this instance is disposed.
@@ -101,7 +101,15 @@ namespace Nerdbank.Streams
         }
 
         /// <inheritdoc />
-        public override async Task FlushAsync(CancellationToken cancellationToken) => await this.writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+        public override async Task FlushAsync(CancellationToken cancellationToken)
+        {
+            if (this.writer == null)
+            {
+                throw new NotSupportedException();
+            }
+
+            await this.writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
 
         /// <inheritdoc />
         public override long Seek(long offset, SeekOrigin origin) => throw this.ThrowDisposedOr(new NotSupportedException());
@@ -218,7 +226,15 @@ namespace Nerdbank.Streams
 #pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
 
         /// <inheritdoc />
-        public override void Flush() => this.writer.FlushAsync().GetAwaiter().GetResult();
+        public override void Flush()
+        {
+            if (this.writer == null)
+            {
+                throw new NotSupportedException();
+            }
+
+            this.writer.FlushAsync().GetAwaiter().GetResult();
+        }
 
         /// <inheritdoc />
         public override int Read(byte[] buffer, int offset, int count) => this.ReadAsync(buffer, offset, count).GetAwaiter().GetResult();
@@ -265,7 +281,7 @@ namespace Nerdbank.Streams
             long bytesToCopyCount = Math.Min(buffer.Length, readResult.Buffer.Length);
             ReadOnlySequence<byte> slice = readResult.Buffer.Slice(0, bytesToCopyCount);
             slice.CopyTo(buffer);
-            this.reader.AdvanceTo(slice.End);
+            this.reader!.AdvanceTo(slice.End);
 
             if (readResult.IsCompleted && slice.End.Equals(readResult.Buffer.End))
             {

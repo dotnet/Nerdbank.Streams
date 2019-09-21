@@ -27,17 +27,17 @@ namespace Nerdbank.Streams
 
         private SequencePosition examined;
 
-        private CancellationTokenSource readCancellationSource;
+        private CancellationTokenSource? readCancellationSource;
 
         private bool isReaderCompleted;
 
-        private Exception readerException;
+        private Exception? readerException;
 
         private bool isWriterCompleted;
 
-        private Exception writerException;
+        private Exception? writerException;
 
-        private List<(Action<Exception, object>, object)> writerCompletedCallbacks;
+        private List<(Action<Exception?, object?>, object?)>? writerCompletedCallbacks;
 
         internal StreamPipeReader(Stream stream, int bufferSize)
         {
@@ -64,7 +64,7 @@ namespace Nerdbank.Streams
         public override void CancelPendingRead() => this.readCancellationSource?.Cancel();
 
         /// <inheritdoc />
-        public override void Complete(Exception exception = null)
+        public override void Complete(Exception? exception = null)
         {
             lock (this.syncObject)
             {
@@ -75,8 +75,10 @@ namespace Nerdbank.Streams
         }
 
         /// <inheritdoc />
-        public override void OnWriterCompleted(Action<Exception, object> callback, object state)
+        public override void OnWriterCompleted(Action<Exception?, object?> callback, object? state)
         {
+            Requires.NotNull(callback, nameof(callback));
+
             bool invokeNow;
             lock (this.syncObject)
             {
@@ -89,7 +91,7 @@ namespace Nerdbank.Streams
                     invokeNow = false;
                     if (this.writerCompletedCallbacks == null)
                     {
-                        this.writerCompletedCallbacks = new List<(Action<Exception, object>, object)>();
+                        this.writerCompletedCallbacks = new List<(Action<Exception?, object?>, object?)>();
                     }
 
                     this.writerCompletedCallbacks.Add((callback, state));
@@ -123,7 +125,7 @@ namespace Nerdbank.Streams
                 memory = this.buffer.GetMemory(this.bufferSize);
             }
 
-            using (var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, this.readCancellationSource.Token))
+            using (var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, this.readCancellationSource!.Token))
             {
                 try
                 {
@@ -165,9 +167,9 @@ namespace Nerdbank.Streams
             }
         }
 
-        private void CompleteWriting(Exception writerException = null)
+        private void CompleteWriting(Exception? writerException = null)
         {
-            List<(Action<Exception, object>, object)> writerCompletedCallbacks = null;
+            List<(Action<Exception?, object?>, object?)>? writerCompletedCallbacks = null;
             lock (this.syncObject)
             {
                 if (!this.isWriterCompleted)

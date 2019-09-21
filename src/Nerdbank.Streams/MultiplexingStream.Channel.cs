@@ -25,17 +25,17 @@ namespace Nerdbank.Streams
             /// <summary>
             /// This task source completes when the channel has been accepted, rejected, or the offer is canceled.
             /// </summary>
-            private readonly TaskCompletionSource<object> acceptanceSource = new TaskCompletionSource<object>();
+            private readonly TaskCompletionSource<object?> acceptanceSource = new TaskCompletionSource<object?>();
 
             /// <summary>
             /// The source for the <see cref="Completion"/> property.
             /// </summary>
-            private readonly TaskCompletionSource<object> completionSource = new TaskCompletionSource<object>();
+            private readonly TaskCompletionSource<object?> completionSource = new TaskCompletionSource<object?>();
 
             /// <summary>
             /// The source for the <see cref="OptionsApplied"/> property. May be null if options were provided in ctor.
             /// </summary>
-            private readonly TaskCompletionSource<object> optionsAppliedTaskSource;
+            private readonly TaskCompletionSource<object?>? optionsAppliedTaskSource;
 
             /// <summary>
             /// A value indicating whether this channel originated locally (as opposed to remotely).
@@ -55,30 +55,30 @@ namespace Nerdbank.Streams
             /// <summary>
             /// The <see cref="PipeReader"/> the underlying <see cref="Streams.MultiplexingStream"/> should use.
             /// </summary>
-            private PipeReader mxStreamIOReader;
+            private PipeReader? mxStreamIOReader;
 
             /// <summary>
             /// A task that represents the completion of the <see cref="mxStreamIOReader"/>,
             /// signifying the point where we will stop relaying data from the channel to the <see cref="MultiplexingStream"/> for transmission to the remote party.
             /// </summary>
-            private Task mxStreamIOReaderCompleted;
+            private Task? mxStreamIOReaderCompleted;
 
             /// <summary>
             /// The <see cref="PipeWriter"/> the underlying <see cref="Streams.MultiplexingStream"/> should use.
             /// </summary>
-            private PipeWriter mxStreamIOWriter;
+            private PipeWriter? mxStreamIOWriter;
 
             /// <summary>
             /// The I/O to expose on this channel. Will be <c>null</c> if <see cref="ChannelOptions.ExistingPipe"/>
             /// was set to a non-null value when this channel was created.
             /// </summary>
-            private IDuplexPipe channelIO;
+            private IDuplexPipe? channelIO;
 
             /// <summary>
             /// A task that represents a transition from a <see cref="Pipe"/> to an owner-supplied <see cref="PipeWriter"/>
             /// for use by the underlying <see cref="MultiplexingStream"/> to publish bytes received over the channel.
             /// </summary>
-            private Task<PipeWriter> switchingToExistingPipe;
+            private Task<PipeWriter>? switchingToExistingPipe;
 
             /// <summary>
             /// Initializes a new instance of the <see cref="Channel"/> class.
@@ -88,7 +88,7 @@ namespace Nerdbank.Streams
             /// <param name="id">The ID of the channel.</param>
             /// <param name="name">The name of the channel.</param>
             /// <param name="channelOptions">The channel options. Should only be null if the channel is created in response to an offer that is not immediately accepted.</param>
-            internal Channel(MultiplexingStream multiplexingStream, bool offeredLocally, int id, string name, ChannelOptions channelOptions = null)
+            internal Channel(MultiplexingStream multiplexingStream, bool offeredLocally, int id, string name, ChannelOptions? channelOptions = null)
             {
                 Requires.NotNull(multiplexingStream, nameof(multiplexingStream));
                 Requires.NotNull(name, nameof(name));
@@ -100,7 +100,7 @@ namespace Nerdbank.Streams
 
                 if (channelOptions == null)
                 {
-                    this.optionsAppliedTaskSource = new TaskCompletionSource<object>();
+                    this.optionsAppliedTaskSource = new TaskCompletionSource<object?>();
                 }
                 else
                 {
@@ -122,7 +122,7 @@ namespace Nerdbank.Streams
             /// Gets the mechanism used for tracing activity related to this channel.
             /// </summary>
             /// <value>A non-null value, once <see cref="ApplyChannelOptions(ChannelOptions)"/> has been called.</value>
-            public TraceSource TraceSource { get; private set; }
+            public TraceSource? TraceSource { get; private set; }
 
             /// <inheritdoc />
             public bool IsDisposed => this.isDisposed || this.Completion.IsCompleted;
@@ -202,7 +202,7 @@ namespace Nerdbank.Streams
                     // The code in this delegate needs to happen in several branches including possibly asynchronously.
                     // We carefully define it here with no closure so that the C# compiler generates a static field for the delegate
                     // thus avoiding any extra allocations from reusing code in this way.
-                    Action<object, object> finalDisposalAction = (exOrAntecedent, state) =>
+                    Action<object?, object> finalDisposalAction = (exOrAntecedent, state) =>
                     {
                         var self = (Channel)state;
                         self.completionSource.TrySetResult(null);
@@ -212,7 +212,7 @@ namespace Nerdbank.Streams
                     this.acceptanceSource.TrySetCanceled();
                     this.optionsAppliedTaskSource?.TrySetCanceled();
 
-                    PipeWriter mxStreamIOWriter;
+                    PipeWriter? mxStreamIOWriter;
                     lock (this.SyncObject)
                     {
                         this.isDisposed = true;
@@ -249,7 +249,7 @@ namespace Nerdbank.Streams
                     }
                     else
                     {
-                        this.mxStreamIOReaderCompleted.ContinueWith(finalDisposalAction, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Forget();
+                        this.mxStreamIOReaderCompleted!.ContinueWith(finalDisposalAction, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Forget();
                     }
                 }
             }
@@ -265,11 +265,11 @@ namespace Nerdbank.Streams
                     Verify.NotDisposed(this);
                     if (this.switchingToExistingPipe == null)
                     {
-                        PipeWriter result = this.mxStreamIOWriter;
+                        PipeWriter? result = this.mxStreamIOWriter;
                         if (result == null)
                         {
                             this.InitializeOwnPipes(PipeOptions.Default);
-                            result = this.mxStreamIOWriter;
+                            result = this.mxStreamIOWriter!;
                         }
 
                         return result;
@@ -279,7 +279,7 @@ namespace Nerdbank.Streams
                 // Our (non-current) writer must not be writing to the last result we may have given them,
                 // since they're asking for access right now. So whatever they may have written on the last result
                 // is the last they get to write on that result, so Complete that result.
-                this.mxStreamIOWriter.Complete();
+                this.mxStreamIOWriter!.Complete();
 
                 // Now wait for whatever they may have written previously to propagate to the ChannelOptions.ExistingPipe.Output writer,
                 // and then redirect all writing to that writer.
@@ -388,7 +388,7 @@ namespace Nerdbank.Streams
                                 // Since this channel hasn't yet been exposed to the local owner, we can just replace the PipeWriter they use to transmit.
 
                                 // Take ownership of reading bytes that the MultiplexingStream may have already written to this channel.
-                                var mxStreamIncomingBytesReader = this.channelIO.Input;
+                                var mxStreamIncomingBytesReader = this.channelIO!.Input;
                                 this.channelIO = null;
 
                                 // Forward any bytes written by the MultiplexingStream to the ExistingPipe.Output writer,
@@ -415,7 +415,7 @@ namespace Nerdbank.Streams
                         {
                             // Similar strategy to the situation above with ExistingPipe.
                             // Take ownership of reading bytes that the MultiplexingStream may have already written to this channel.
-                            var mxStreamIncomingBytesReader = this.channelIO.Input;
+                            var mxStreamIncomingBytesReader = this.channelIO!.Input;
 
                             var writerRelay = new Pipe();
                             var readerRelay = new Pipe(channelOptions.InputPipeOptions);
@@ -489,12 +489,12 @@ namespace Nerdbank.Streams
                         ReadResult result;
                         try
                         {
-                            result = await this.mxStreamIOReader.ReadAsync().ConfigureAwait(false);
+                            result = await this.mxStreamIOReader!.ReadAsync().ConfigureAwait(false);
                         }
                         catch (InvalidOperationException ex)
                         {
                             // Someone completed the reader. The channel was probably disposed.
-                            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
+                            if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
                             {
                                 this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Transmission terminated because the reader threw: {0}", ex);
                             }
@@ -505,7 +505,7 @@ namespace Nerdbank.Streams
                         if (result.IsCanceled)
                         {
                             // We've been asked to cancel. Presumably the channel has been disposed.
-                            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
+                            if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
                             {
                                 this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Transmission terminated because the read was canceled.");
                             }
@@ -516,7 +516,7 @@ namespace Nerdbank.Streams
                         // We'll send whatever we've got, up to the maximum size of the frame.
                         // Anything in excess of that we'll pick up next time the loop runs.
                         var bufferToRelay = result.Buffer.Slice(0, Math.Min(result.Buffer.Length, this.MultiplexingStream.framePayloadMaxLength));
-                        if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
+                        if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
                         {
                             this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "{0} of {1} bytes will be transmitted.", bufferToRelay.Length, result.Buffer.Length);
                         }
@@ -560,11 +560,11 @@ namespace Nerdbank.Streams
                         }
                     }
 
-                    this.mxStreamIOReader.Complete();
+                    this.mxStreamIOReader!.Complete();
                 }
                 catch (Exception ex)
                 {
-                    this.mxStreamIOReader.Complete(ex);
+                    this.mxStreamIOReader!.Complete(ex);
                     throw;
                 }
                 finally
@@ -575,10 +575,9 @@ namespace Nerdbank.Streams
 
             private async Task AutoCloseOnPipesClosureAsync()
             {
-                PipeWriter initialWriter = this.mxStreamIOWriter;
                 await Task.WhenAll(this.mxStreamIOWriterCompleted.WaitAsync(), this.mxStreamIOReaderCompleted).ConfigureAwait(false);
 
-                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                 {
                     this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelAutoClosing, "Channel self-closing because both parties have completed transmission.");
                 }
@@ -588,12 +587,12 @@ namespace Nerdbank.Streams
 
             private void Fault(Exception exception)
             {
-                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Critical))
+                if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Critical) ?? false)
                 {
-                    this.TraceSource.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Channel Closing self due to exception: {0}", exception);
+                    this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Channel Closing self due to exception: {0}", exception);
                 }
 
-                this.mxStreamIOReader.Complete(exception);
+                this.mxStreamIOReader?.Complete(exception);
                 this.Dispose();
             }
 

@@ -25,7 +25,7 @@ public abstract class StreamPipeWriterTestBase : TestBase
     [Fact]
     public void ThrowsOnNull()
     {
-        Assert.Throws<ArgumentNullException>(() => this.CreatePipeWriter(null));
+        Assert.Throws<ArgumentNullException>(() => this.CreatePipeWriter(null!));
     }
 
     [Fact]

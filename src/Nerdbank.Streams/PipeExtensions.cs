@@ -71,7 +71,7 @@ namespace Nerdbank.Streams
         /// When the caller invokes <see cref="PipeReader.Complete(Exception)"/> on the result value,
         /// this leads to the associated <see cref="PipeWriter.Complete(Exception)"/> to be automatically called as well.
         /// </remarks>
-        public static PipeReader UsePipeReader(this Stream stream, int sizeHint = 0, PipeOptions pipeOptions = null, CancellationToken cancellationToken = default)
+        public static PipeReader UsePipeReader(this Stream stream, int sizeHint = 0, PipeOptions? pipeOptions = null, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(stream, nameof(stream));
             Requires.Argument(stream.CanRead, nameof(stream), "Stream must be readable.");
@@ -150,7 +150,7 @@ namespace Nerdbank.Streams
         /// <param name="pipeOptions">Optional pipe options to use.</param>
         /// <param name="cancellationToken">A cancellation token that aborts writing to the <paramref name="stream"/>.</param>
         /// <returns>A <see cref="PipeWriter"/>.</returns>
-        public static PipeWriter UsePipeWriter(this Stream stream, PipeOptions pipeOptions = null, CancellationToken cancellationToken = default)
+        public static PipeWriter UsePipeWriter(this Stream stream, PipeOptions? pipeOptions = null, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(stream, nameof(stream));
             Requires.Argument(stream.CanWrite, nameof(stream), "Stream must be writable.");
@@ -219,7 +219,7 @@ namespace Nerdbank.Streams
         /// <param name="pipeOptions">Optional pipe options to use.</param>
         /// <param name="cancellationToken">A token that may cancel async processes to read from and write to the <paramref name="stream"/>.</param>
         /// <returns>An <see cref="IDuplexPipe"/> instance.</returns>
-        public static IDuplexPipe UsePipe(this Stream stream, int sizeHint = 0, PipeOptions pipeOptions = null, CancellationToken cancellationToken = default)
+        public static IDuplexPipe UsePipe(this Stream stream, int sizeHint = 0, PipeOptions? pipeOptions = null, CancellationToken cancellationToken = default)
         {
             PipeReader input = stream.UsePipeReader(sizeHint, pipeOptions, cancellationToken);
             PipeWriter output = stream.UsePipeWriter(pipeOptions, cancellationToken);
@@ -239,7 +239,7 @@ namespace Nerdbank.Streams
         /// <param name="pipeOptions">Optional pipe options to use.</param>
         /// <param name="cancellationToken">A cancellation token that aborts reading from the <paramref name="webSocket"/>.</param>
         /// <returns>A <see cref="PipeReader"/>.</returns>
-        public static PipeReader UsePipeReader(this WebSocket webSocket, int sizeHint = 0, PipeOptions pipeOptions = null, CancellationToken cancellationToken = default)
+        public static PipeReader UsePipeReader(this WebSocket webSocket, int sizeHint = 0, PipeOptions? pipeOptions = null, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(webSocket, nameof(webSocket));
 
@@ -287,7 +287,7 @@ namespace Nerdbank.Streams
         /// <param name="pipeOptions">Optional pipe options to use.</param>
         /// <param name="cancellationToken">A cancellation token that aborts writing to the <paramref name="webSocket"/>.</param>
         /// <returns>A <see cref="PipeWriter"/>.</returns>
-        public static PipeWriter UsePipeWriter(this WebSocket webSocket, PipeOptions pipeOptions = null, CancellationToken cancellationToken = default)
+        public static PipeWriter UsePipeWriter(this WebSocket webSocket, PipeOptions? pipeOptions = null, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(webSocket, nameof(webSocket));
 
@@ -335,7 +335,7 @@ namespace Nerdbank.Streams
         /// <param name="pipeOptions">Optional pipe options to use.</param>
         /// <param name="cancellationToken">A token that may cancel async processes to read from and write to the <paramref name="webSocket"/>.</param>
         /// <returns>An <see cref="IDuplexPipe"/> instance.</returns>
-        public static IDuplexPipe UsePipe(this WebSocket webSocket, int sizeHint = 0, PipeOptions pipeOptions = null, CancellationToken cancellationToken = default)
+        public static IDuplexPipe UsePipe(this WebSocket webSocket, int sizeHint = 0, PipeOptions? pipeOptions = null, CancellationToken cancellationToken = default)
         {
             return new DuplexPipe(webSocket.UsePipeReader(sizeHint, pipeOptions, cancellationToken), webSocket.UsePipeWriter(pipeOptions, cancellationToken));
         }

@@ -32,7 +32,7 @@ public class MonitoringStreamTests : TestBase
     [Fact]
     public void Ctor_ThrowsOnNull()
     {
-        Assert.Throws<ArgumentNullException>(() => new MonitoringStream(null));
+        Assert.Throws<ArgumentNullException>(() => new MonitoringStream(null!));
     }
 
     [Fact]

@@ -22,7 +22,7 @@ public class MultiplexingStreamBasicTests : TestBase
     [Fact]
     public async Task Ctor_ThrowsOnNull()
     {
-        await Assert.ThrowsAsync<ArgumentNullException>(() => MultiplexingStream.CreateAsync(null, this.TimeoutToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => MultiplexingStream.CreateAsync(null!, this.TimeoutToken));
     }
 
     [Fact]

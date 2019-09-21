@@ -29,7 +29,7 @@ public class SequenceTextReaderTests : TestBase
     [Fact]
     public void Ctor_ValidatesArguments()
     {
-        Assert.Throws<ArgumentNullException>(() => new SequenceTextReader(default, null));
+        Assert.Throws<ArgumentNullException>(() => new SequenceTextReader(default, null!));
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public class SequenceTextReaderTests : TestBase
     [Fact]
     public void Initialize_ValidatesArgs()
     {
-        Assert.Throws<ArgumentNullException>(() => this.sequenceTextReader.Initialize(default, null));
+        Assert.Throws<ArgumentNullException>(() => this.sequenceTextReader.Initialize(default, null!));
     }
 
     [Fact]
@@ -187,7 +187,7 @@ public class SequenceTextReaderTests : TestBase
     [Fact]
     public void Read_Buffer_InvalidInputs()
     {
-        Assert.Throws<ArgumentNullException>(() => this.sequenceTextReader.Read(null, 0, 0));
+        Assert.Throws<ArgumentNullException>(() => this.sequenceTextReader.Read(null!, 0, 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => this.sequenceTextReader.Read(new char[2], 0, -1));
         Assert.Throws<ArgumentOutOfRangeException>(() => this.sequenceTextReader.Read(new char[2], -1, 2));
         Assert.Throws<ArgumentException>(() => this.sequenceTextReader.Read(new char[2], 0, 3));

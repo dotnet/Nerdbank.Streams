@@ -20,7 +20,7 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Backing field for the <see cref="ExistingPipe"/> property.
             /// </summary>
-            private IDuplexPipe existingPipe;
+            private IDuplexPipe? existingPipe;
 
             /// <summary>
             /// Initializes a new instance of the <see cref="ChannelOptions" /> class.
@@ -33,7 +33,7 @@ namespace Nerdbank.Streams
             /// Gets or sets the mechanism used for tracing activity related to this channel.
             /// </summary>
             /// <value>The trace source. May be null.</value>
-            public TraceSource TraceSource { get; set; }
+            public TraceSource? TraceSource { get; set; }
 
             /// <summary>
             /// Gets or sets an existing <see cref="IDuplexPipe"/> instance used to exchange data with the channel.
@@ -46,7 +46,7 @@ namespace Nerdbank.Streams
             /// since their values are implementation details of the existing pipe set here.
             /// </remarks>
             /// <exception cref="ArgumentException">Thrown if set to an <see cref="IDuplexPipe"/> that returns <c>null</c> for either of its properties.</exception>
-            public IDuplexPipe ExistingPipe
+            public IDuplexPipe? ExistingPipe
             {
                 get => this.existingPipe;
                 set
@@ -62,7 +62,7 @@ namespace Nerdbank.Streams
             /// Gets or sets the options for the <see cref="Pipe"/> created to relay local reading from this channel.
             /// May be null. Will be ignored if <see cref="ExistingPipe"/> is not <c>null</c>.
             /// </summary>
-            public PipeOptions InputPipeOptions { get; set; }
+            public PipeOptions? InputPipeOptions { get; set; }
         }
     }
 }

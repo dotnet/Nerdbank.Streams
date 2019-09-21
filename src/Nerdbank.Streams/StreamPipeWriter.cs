@@ -26,17 +26,17 @@ namespace Nerdbank.Streams
 
         private readonly AsyncSemaphore flushingSemaphore = new AsyncSemaphore(1);
 
-        private List<(Action<Exception, object>, object)> readerCompletedCallbacks;
+        private List<(Action<Exception?, object?>, object?)>? readerCompletedCallbacks;
 
-        private CancellationTokenSource flushCancellationSource;
+        private CancellationTokenSource? flushCancellationSource;
 
         private bool isReaderCompleted;
 
-        private Exception readerException;
+        private Exception? readerException;
 
         private bool isWriterCompleted;
 
-        private Exception writerException;
+        private Exception? writerException;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="StreamPipeWriter"/> class.
@@ -60,7 +60,7 @@ namespace Nerdbank.Streams
         public override void CancelPendingFlush() => this.flushCancellationSource?.Cancel();
 
         /// <inheritdoc />
-        public override void Complete(Exception exception = null)
+        public override void Complete(Exception? exception = null)
         {
             lock (this.syncObject)
             {
@@ -95,7 +95,7 @@ namespace Nerdbank.Streams
                 this.flushCancellationSource = new CancellationTokenSource();
             }
 
-            using (var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, this.flushCancellationSource.Token))
+            using (var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, this.flushCancellationSource!.Token))
             {
                 using (await this.flushingSemaphore.EnterAsync(cts.Token).ConfigureAwait(false))
                 {
@@ -147,7 +147,7 @@ namespace Nerdbank.Streams
         }
 
         /// <inheritdoc />
-        public override void OnReaderCompleted(Action<Exception, object> callback, object state)
+        public override void OnReaderCompleted(Action<Exception?, object?> callback, object? state)
         {
             bool invokeNow;
             lock (this.syncObject)
@@ -161,7 +161,7 @@ namespace Nerdbank.Streams
                     invokeNow = false;
                     if (this.readerCompletedCallbacks == null)
                     {
-                        this.readerCompletedCallbacks = new List<(Action<Exception, object>, object)>();
+                        this.readerCompletedCallbacks = new List<(Action<Exception?, object?>, object?)>();
                     }
 
                     this.readerCompletedCallbacks.Add((callback, state));
@@ -174,9 +174,9 @@ namespace Nerdbank.Streams
             }
         }
 
-        private void CompleteReading(Exception readerException = null)
+        private void CompleteReading(Exception? readerException = null)
         {
-            List<(Action<Exception, object>, object)> readerCompletedCallbacks = null;
+            List<(Action<Exception?, object?>, object?)>? readerCompletedCallbacks = null;
             lock (this.syncObject)
             {
                 if (!this.isReaderCompleted)

@@ -99,7 +99,7 @@ namespace Nerdbank.Streams
         /// <summary>
         /// The source for the <see cref="Completion"/> property.
         /// </summary>
-        private readonly TaskCompletionSource<object> completionSource = new TaskCompletionSource<object>();
+        private readonly TaskCompletionSource<object?> completionSource = new TaskCompletionSource<object?>();
 
         /// <summary>
         /// A buffer used only by <see cref="SendFrameAsync(FrameHeader, ReadOnlySequence{byte}, CancellationToken)"/>.
@@ -142,7 +142,7 @@ namespace Nerdbank.Streams
         /// <summary>
         /// Occurs when the remote party offers to establish a channel.
         /// </summary>
-        public event EventHandler<ChannelOfferEventArgs> ChannelOffered;
+        public event EventHandler<ChannelOfferEventArgs>? ChannelOffered;
 
         private enum TraceEventId
         {
@@ -197,7 +197,7 @@ namespace Nerdbank.Streams
         /// Gets a factory for <see cref="TraceSource"/> instances to attach to a newly opened <see cref="Channel"/>
         /// when its <see cref="ChannelOptions.TraceSource"/> is <c>null</c>.
         /// </summary>
-        private Func<int, string, TraceSource> DefaultChannelTraceSourceFactory { get; }
+        private Func<int, string, TraceSource?>? DefaultChannelTraceSourceFactory { get; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MultiplexingStream"/> class.
@@ -216,7 +216,7 @@ namespace Nerdbank.Streams
         /// <param name="cancellationToken">A cancellation token.</param>
         /// <returns>The multiplexing stream, once the handshake is complete.</returns>
         /// <exception cref="EndOfStreamException">Thrown if the remote end disconnects before the handshake is complete.</exception>
-        public static async Task<MultiplexingStream> CreateAsync(Stream stream, Options options, CancellationToken cancellationToken = default)
+        public static async Task<MultiplexingStream> CreateAsync(Stream stream, Options? options, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(stream, nameof(stream));
             Requires.Argument(stream.CanRead, nameof(stream), "Stream must be readable.");
@@ -297,7 +297,7 @@ namespace Nerdbank.Streams
         /// Note that while the channel is created immediately, any local write to that channel will be buffered locally
         /// until the remote party accepts the channel.
         /// </remarks>
-        public Channel CreateChannel(ChannelOptions options = default)
+        public Channel CreateChannel(ChannelOptions? options = default)
         {
             Channel channel = new Channel(this, offeredLocally: true, this.GetUnusedChannelId(), string.Empty, options ?? DefaultChannelOptions);
             lock (this.syncObject)
@@ -322,7 +322,7 @@ namespace Nerdbank.Streams
         /// for a channel offer if a matching one has not been made yet, this method only accepts an offer
         /// for a channel that has already been made.
         /// </remarks>
-        public Channel AcceptChannel(int id, ChannelOptions options = default)
+        public Channel AcceptChannel(int id, ChannelOptions? options = default)
         {
             options = options ?? DefaultChannelOptions;
             Channel channel;
@@ -390,7 +390,7 @@ namespace Nerdbank.Streams
         /// or faults with <see cref="MultiplexingProtocolException"/> if the remote end rejects the channel.
         /// </returns>
         /// <exception cref="OperationCanceledException">Thrown if <paramref name="cancellationToken"/> is canceled before the channel is accepted by the remote end.</exception>
-        public async Task<Channel> OfferChannelAsync(string name, ChannelOptions options = default, CancellationToken cancellationToken = default)
+        public async Task<Channel> OfferChannelAsync(string name, ChannelOptions? options = default, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(name, nameof(name));
 
@@ -444,7 +444,7 @@ namespace Nerdbank.Streams
         /// </remarks>
         /// <exception cref="InvalidOperationException">Thrown if the channel is already accepted or is no longer offered by the remote party.</exception>
         /// <exception cref="OperationCanceledException">Thrown if <paramref name="cancellationToken"/> is canceled before a request to create the channel has been received.</exception>
-        public async Task<Channel> AcceptChannelAsync(string name, ChannelOptions options = default, CancellationToken cancellationToken = default)
+        public async Task<Channel> AcceptChannelAsync(string name, ChannelOptions? options = default, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(name, nameof(name));
             Verify.NotDisposed(this);
@@ -453,8 +453,8 @@ namespace Nerdbank.Streams
 
             while (true)
             {
-                Channel channel = null;
-                TaskCompletionSource<Channel> pendingAcceptChannel = null;
+                Channel? channel = null;
+                TaskCompletionSource<Channel>? pendingAcceptChannel = null;
                 lock (this.syncObject)
                 {
                     if (this.channelsOfferedByThemByName.TryGetValue(name, out var channelsOfferedByThem))
@@ -505,7 +505,7 @@ namespace Nerdbank.Streams
                 {
                     using (cancellationToken.Register(this.AcceptChannelCanceled, Tuple.Create(pendingAcceptChannel, name), false))
                     {
-                        channel = await pendingAcceptChannel.Task.ConfigureAwait(false);
+                        channel = await pendingAcceptChannel!.Task.ConfigureAwait(false);
 
                         // Don't expose the Channel until the thread that is accepting it has applied options.
                         await channel.OptionsApplied.ConfigureAwait(false);

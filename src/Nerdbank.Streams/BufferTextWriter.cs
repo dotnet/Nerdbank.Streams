@@ -30,7 +30,7 @@ namespace Nerdbank.Streams
         /// <summary>
         /// The internal buffer writer to use for writing encoded characters.
         /// </summary>
-        private IBufferWriter<byte> bufferWriter;
+        private IBufferWriter<byte>? bufferWriter;
 
         /// <summary>
         /// The last buffer received from <see cref="bufferWriter"/>.
@@ -55,7 +55,7 @@ namespace Nerdbank.Streams
         /// <summary>
         /// The encoding currently in use.
         /// </summary>
-        private Encoding encoding;
+        private Encoding? encoding;
 
         /// <summary>
         /// The preamble for the current <see cref="encoding"/>.
@@ -69,7 +69,7 @@ namespace Nerdbank.Streams
         /// <summary>
         /// An encoder obtained from the current <see cref="encoding"/> used for incrementally encoding written characters.
         /// </summary>
-        private Encoder encoder;
+        private Encoder? encoder;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="BufferTextWriter"/> class.
@@ -93,7 +93,7 @@ namespace Nerdbank.Streams
         }
 
         /// <inheritdoc />
-        public override Encoding Encoding => this.encoding;
+        public override Encoding? Encoding => this.encoding;
 
         /// <summary>
         /// Gets the number of uninitialized characters remaining in <see cref="charBuffer"/>.
@@ -122,7 +122,8 @@ namespace Nerdbank.Streams
             }
             else
             {
-                this.encoder.Reset();
+                // this.encoder != null because if it were, this.encoding == null too, so we would have been in the first branch above.
+                this.encoder!.Reset();
             }
         }
 
@@ -165,7 +166,7 @@ namespace Nerdbank.Streams
         }
 
         /// <inheritdoc />
-        public override void Write(string value)
+        public override void Write(string? value)
         {
             if (value == null)
             {
@@ -246,7 +247,7 @@ namespace Nerdbank.Streams
         {
             if (this.charBufferPosition > 0)
             {
-                int maxBytesLength = this.Encoding.GetMaxByteCount(this.charBufferPosition);
+                int maxBytesLength = this.Encoding!.GetMaxByteCount(this.charBufferPosition);
                 if (!this.preambleWritten)
                 {
                     maxBytesLength += this.encodingPreamble.Length;
@@ -255,7 +256,7 @@ namespace Nerdbank.Streams
                 if (this.memory.Length - this.memoryPosition < maxBytesLength)
                 {
                     this.CommitBytes();
-                    this.memory = this.bufferWriter.GetMemory(maxBytesLength);
+                    this.memory = this.bufferWriter!.GetMemory(maxBytesLength);
                 }
 
                 if (!this.preambleWritten)
@@ -267,14 +268,14 @@ namespace Nerdbank.Streams
 
                 if (MemoryMarshal.TryGetArray(this.memory, out ArraySegment<byte> segment))
                 {
-                    this.memoryPosition += this.encoder.GetBytes(this.charBuffer, 0, this.charBufferPosition, segment.Array, segment.Offset + this.memoryPosition, flush: flushEncoder);
+                    this.memoryPosition += this.encoder!.GetBytes(this.charBuffer, 0, this.charBufferPosition, segment.Array, segment.Offset + this.memoryPosition, flush: flushEncoder);
                 }
                 else
                 {
                     byte[] rentedByteBuffer = ArrayPool<byte>.Shared.Rent(maxBytesLength);
                     try
                     {
-                        int bytesWritten = this.encoder.GetBytes(this.charBuffer, 0, this.charBufferPosition, rentedByteBuffer, 0, flush: flushEncoder);
+                        int bytesWritten = this.encoder!.GetBytes(this.charBuffer, 0, this.charBufferPosition, rentedByteBuffer, 0, flush: flushEncoder);
                         rentedByteBuffer.CopyTo(this.memory.Span.Slice(this.memoryPosition));
                         this.memoryPosition += bytesWritten;
                     }
@@ -300,7 +301,7 @@ namespace Nerdbank.Streams
         {
             if (this.memoryPosition > 0)
             {
-                this.bufferWriter.Advance(this.memoryPosition);
+                this.bufferWriter!.Advance(this.memoryPosition);
                 this.memoryPosition = 0;
                 this.memory = default;
             }

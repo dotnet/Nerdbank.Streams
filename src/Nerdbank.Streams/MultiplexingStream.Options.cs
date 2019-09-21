@@ -50,7 +50,7 @@ namespace Nerdbank.Streams
             /// <remarks>
             /// The delegate receives a channel ID and name, and may return a <see cref="TraceSource"/> or <c>null</c>.
             /// </remarks>
-            public Func<int, string, TraceSource> DefaultChannelTraceSourceFactory { get; set; }
+            public Func<int, string, TraceSource?>? DefaultChannelTraceSourceFactory { get; set; }
         }
     }
 }

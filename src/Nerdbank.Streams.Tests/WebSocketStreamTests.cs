@@ -41,7 +41,7 @@ public partial class WebSocketStreamTests : TestBase
     [Fact]
     public void Ctor_ThrowsANE()
     {
-        Assert.Throws<ArgumentNullException>(() => StreamExtensions.AsStream((WebSocket)null));
+        Assert.Throws<ArgumentNullException>(() => StreamExtensions.AsStream((WebSocket)null!));
     }
 
     [Fact]

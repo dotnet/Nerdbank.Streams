@@ -30,7 +30,7 @@ namespace Nerdbank.Streams
         /// <summary>
         /// Occurs after <see cref="Seek(long, SeekOrigin)"/> is invoked.
         /// </summary>
-        public event EventHandler<long> DidSeek;
+        public event EventHandler<long>? DidSeek;
 
         /// <summary>
         /// Occurs before <see cref="Read(byte[], int, int)"/> or <see cref="ReadAsync(byte[], int, int, CancellationToken)"/> is invoked.
@@ -38,7 +38,7 @@ namespace Nerdbank.Streams
         /// <remarks>
         /// The <see cref="ArraySegment{T}.Count"/> value is the maximum bytes that may be read.
         /// </remarks>
-        public event EventHandler<ArraySegment<byte>> WillRead;
+        public event EventHandler<ArraySegment<byte>>? WillRead;
 
         /// <summary>
         /// Occurs after <see cref="Read(byte[], int, int)"/> or <see cref="ReadAsync(byte[], int, int, CancellationToken)"/> is invoked.
@@ -46,52 +46,52 @@ namespace Nerdbank.Streams
         /// <remarks>
         /// The <see cref="ArraySegment{T}.Count"/> value is the actual bytes that were read.
         /// </remarks>
-        public event EventHandler<ArraySegment<byte>> DidRead;
+        public event EventHandler<ArraySegment<byte>>? DidRead;
 
         /// <summary>
         /// Occurs before <see cref="Write(byte[], int, int)"/> or <see cref="WriteAsync(byte[], int, int, CancellationToken)"/> is invoked.
         /// </summary>
-        public event EventHandler<ArraySegment<byte>> WillWrite;
+        public event EventHandler<ArraySegment<byte>>? WillWrite;
 
         /// <summary>
         /// Occurs after <see cref="Write(byte[], int, int)"/> or <see cref="WriteAsync(byte[], int, int, CancellationToken)"/> is invoked.
         /// </summary>
-        public event EventHandler<ArraySegment<byte>> DidWrite;
+        public event EventHandler<ArraySegment<byte>>? DidWrite;
 
         /// <summary>
         /// Occurs before <see cref="SetLength(long)"/> is invoked.
         /// </summary>
-        public event EventHandler<long> WillSetLength;
+        public event EventHandler<long>? WillSetLength;
 
         /// <summary>
         /// Occurs after <see cref="SetLength(long)"/> is invoked.
         /// </summary>
-        public event EventHandler<long> DidSetLength;
+        public event EventHandler<long>? DidSetLength;
 
         /// <summary>
         /// Occurs before <see cref="ReadByte"/> is invoked.
         /// </summary>
-        public event EventHandler WillReadByte;
+        public event EventHandler? WillReadByte;
 
         /// <summary>
         /// Occurs after <see cref="ReadByte"/> is invoked.
         /// </summary>
-        public event EventHandler<int> DidReadByte;
+        public event EventHandler<int>? DidReadByte;
 
         /// <summary>
         /// Occurs before <see cref="WriteByte(byte)"/> is invoked.
         /// </summary>
-        public event EventHandler<byte> WillWriteByte;
+        public event EventHandler<byte>? WillWriteByte;
 
         /// <summary>
         /// Occurs after <see cref="WriteByte(byte)"/> is invoked.
         /// </summary>
-        public event EventHandler<byte> DidWriteByte;
+        public event EventHandler<byte>? DidWriteByte;
 
         /// <summary>
         /// Occurs when <see cref="Stream.Dispose()"/> is invoked.
         /// </summary>
-        public event EventHandler Disposed;
+        public event EventHandler? Disposed;
 
         /// <inheritdoc/>
         public override bool CanRead => this.inner.CanRead;
