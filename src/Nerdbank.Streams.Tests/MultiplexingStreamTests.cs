@@ -11,7 +11,6 @@ using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft;
-using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
@@ -70,6 +69,27 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
+    public async Task OfferReadOnlyDuplexPipe()
+    {
+        // Prepare a readonly pipe that is already fully populated with data for the other end to read.
+        var pipe = new Pipe();
+        await pipe.Writer.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
+        pipe.Writer.Complete();
+
+        var ch1 = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(pipe.Reader) });
+        await this.WaitForEphemeralChannelOfferToPropagateAsync();
+        var ch2 = this.mx2.AcceptChannel(ch1.Id);
+        var readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
+        Assert.Equal(3, readResult.Buffer.Length);
+        ch2.Input.AdvanceTo(readResult.Buffer.End);
+        readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
+        Assert.True(readResult.IsCompleted);
+        ch2.Output.Complete();
+
+        await Task.WhenAll(ch1.Completion, ch2.Completion).WithCancellation(this.TimeoutToken);
+    }
+
+    [Fact]
     public async Task OfferReadOnlyPipe()
     {
         // Prepare a readonly pipe that is already fully populated with data for the other end to read.
@@ -87,6 +107,32 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
         Assert.True(readResult.IsCompleted);
         ch2.Output.Complete();
+
+        await Task.WhenAll(ch1.Completion, ch2.Completion).WithCancellation(this.TimeoutToken);
+    }
+
+    [Fact]
+    public async Task OfferWriteOnlyDuplexPipe()
+    {
+        var pipe = new Pipe();
+
+        var ch1 = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(pipe.Writer) });
+        await this.WaitForEphemeralChannelOfferToPropagateAsync();
+        var ch2 = this.mx2.AcceptChannel(ch1.Id);
+
+        // Confirm that any attempt to read from the channel is immediately completed.
+        var readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
+        Assert.True(readResult.IsCompleted);
+
+        // Now write to the channel.
+        await ch2.Output.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
+        ch2.Output.Complete();
+
+        readResult = await pipe.Reader.ReadAsync(this.TimeoutToken);
+        Assert.Equal(3, readResult.Buffer.Length);
+        pipe.Reader.AdvanceTo(readResult.Buffer.End);
+        readResult = await pipe.Reader.ReadAsync(this.TimeoutToken);
+        Assert.True(readResult.IsCompleted);
 
         await Task.WhenAll(ch1.Completion, ch2.Completion).WithCancellation(this.TimeoutToken);
     }
