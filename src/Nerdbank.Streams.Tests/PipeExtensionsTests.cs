@@ -2,8 +2,10 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 
 using System;
+using System.Buffers;
 using System.IO;
 using System.IO.Pipelines;
+using System.Linq;
 using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,7 +16,7 @@ using Nerdbank.Streams;
 using Xunit;
 using Xunit.Abstractions;
 
-public class PipeExtensionsTests : TestBase
+public partial class PipeExtensionsTests : TestBase
 {
     public PipeExtensionsTests(ITestOutputHelper logger)
         : base(logger)
@@ -51,12 +53,7 @@ public class PipeExtensionsTests : TestBase
         IDuplexPipe pipe = ms.UsePipe(cancellationToken: this.TimeoutToken);
         pipe.Output.Complete();
         pipe.Input.Complete();
-        while (!ms.IsDisposed && !this.TimeoutToken.IsCancellationRequested)
-        {
-            await Task.Yield();
-        }
-
-        Assert.True(ms.IsDisposed);
+        await this.AssertStreamClosesAsync(ms);
     }
 
     [Theory]
@@ -104,6 +101,59 @@ public class PipeExtensionsTests : TestBase
                 await pipe.Output.WriteAsync(new byte[1], this.TimeoutToken);
             }
         });
+    }
+
+    [Fact]
+    public async Task UsePipe_Stream_ReadOnlyStream()
+    {
+        var streamPair = FullDuplexStream.CreatePair();
+
+        byte[] expected = new byte[] { 1, 2, 3 };
+        await streamPair.Item2.WriteAsync(expected, 0, expected.Length, this.TimeoutToken);
+        await streamPair.Item2.FlushAsync(this.TimeoutToken);
+
+        var readOnlyStream = new OneWayStreamWrapper(streamPair.Item1, canRead: true);
+        var duplexPipe = readOnlyStream.UsePipe();
+        var readResult = await duplexPipe.Input.ReadAsync(this.TimeoutToken);
+        Assert.Equal(expected, readResult.Buffer.ToArray());
+
+        Assert.Throws<InvalidOperationException>(() => duplexPipe.Output.GetSpan());
+
+        // Complete reading and verify stream closed.
+        duplexPipe.Input.Complete();
+        await this.AssertStreamClosesAsync(streamPair.Item1);
+    }
+
+    [Fact]
+    public async Task UsePipe_Stream_WriteOnlyStream()
+    {
+        var streamPair = FullDuplexStream.CreatePair();
+        var writeOnlyStream = new OneWayStreamWrapper(streamPair.Item1, canWrite: true);
+        var duplexPipe = writeOnlyStream.UsePipe();
+
+        // Verify that reading isn't allowed.
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await duplexPipe.Input.ReadAsync(this.TimeoutToken));
+
+        byte[] expected = new byte[] { 1, 2, 3 };
+        await duplexPipe.Output.WriteAsync(expected, this.TimeoutToken);
+        duplexPipe.Output.Complete();
+
+        int totalBytesRead = 0;
+        byte[] readBytes = new byte[10];
+        int bytesRead;
+        do
+        {
+            bytesRead = await streamPair.Item2.ReadAsync(readBytes, totalBytesRead, readBytes.Length - totalBytesRead, this.TimeoutToken);
+            this.Logger.WriteLine("Read {0} bytes", bytesRead);
+            totalBytesRead += bytesRead;
+        }
+        while (bytesRead > 0);
+
+        Assert.Equal(expected, readBytes.Take(totalBytesRead));
+
+        // Complete writing and verify stream closed.
+        duplexPipe.Output.Complete();
+        await this.AssertStreamClosesAsync(streamPair.Item1);
     }
 
     [Fact]
@@ -171,5 +221,19 @@ public class PipeExtensionsTests : TestBase
                 await pipe.Output.WriteAsync(new byte[1], this.TimeoutToken);
             }
         });
+    }
+
+    private async Task AssertStreamClosesAsync(Stream stream)
+    {
+        Requires.NotNull(stream, nameof(stream));
+
+        Func<bool> isDisposed = stream is IDisposableObservable observableStream ? new Func<bool>(() => observableStream.IsDisposed) : new Func<bool>(() => !stream.CanRead && !stream.CanWrite);
+
+        while (!this.TimeoutToken.IsCancellationRequested && !isDisposed())
+        {
+            await Task.Yield();
+        }
+
+        Assert.True(isDisposed());
     }
 }

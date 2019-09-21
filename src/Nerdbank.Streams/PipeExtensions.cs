@@ -221,13 +221,35 @@ namespace Nerdbank.Streams
         /// <returns>An <see cref="IDuplexPipe"/> instance.</returns>
         public static IDuplexPipe UsePipe(this Stream stream, int sizeHint = 0, PipeOptions? pipeOptions = null, CancellationToken cancellationToken = default)
         {
-            PipeReader input = stream.UsePipeReader(sizeHint, pipeOptions, cancellationToken);
-            PipeWriter output = stream.UsePipeWriter(pipeOptions, cancellationToken);
+            Requires.NotNull(stream, nameof(stream));
+            Requires.Argument(stream.CanRead || stream.CanWrite, nameof(stream), "Stream is neither readable nor writable.");
 
-            // Arrange for closing the stream when *both* input/output are completed.
-            Task ioCompleted = Task.WhenAll(input.WaitForWriterCompletionAsync(), output.WaitForReaderCompletionAsync());
-            ioCompleted.ContinueWith((_, state) => ((Stream)state).Dispose(), stream, cancellationToken, TaskContinuationOptions.None, TaskScheduler.Default).Forget();
+            PipeReader input = stream.CanRead ? stream.UsePipeReader(sizeHint, pipeOptions, cancellationToken) : null;
+            PipeWriter output = stream.CanWrite ? stream.UsePipeWriter(pipeOptions, cancellationToken) : null;
 
+            Task closeStreamAntecedent;
+            if (input != null && output != null)
+            {
+                // Arrange for closing the stream when *both* input/output are completed.
+                closeStreamAntecedent = Task.WhenAll(input.WaitForWriterCompletionAsync(), output.WaitForReaderCompletionAsync());
+            }
+            else if (input != null)
+            {
+                closeStreamAntecedent = input.WaitForWriterCompletionAsync();
+
+                output = new Pipe().Writer;
+                output.Complete();
+            }
+            else
+            {
+                Assumes.NotNull(output);
+                closeStreamAntecedent = output.WaitForReaderCompletionAsync();
+
+                input = new Pipe().Reader;
+                input.Complete();
+            }
+
+            closeStreamAntecedent.ContinueWith((_, state) => ((Stream)state).Dispose(), stream, cancellationToken, TaskContinuationOptions.None, TaskScheduler.Default).Forget();
             return new DuplexPipe(input, output);
         }
 
