@@ -16,12 +16,12 @@ namespace Nerdbank.Streams
         /// <summary>
         /// Initializes a new instance of the <see cref="DuplexPipe"/> class.
         /// </summary>
-        /// <param name="input">The reader. Must not be null.</param>
-        /// <param name="output">The writer. Must not be null.</param>
-        public DuplexPipe(PipeReader input, PipeWriter output)
+        /// <param name="input">The reader. If null, a completed reader will be emulated.</param>
+        /// <param name="output">The writer. If null, a completed writer will be emulated.</param>
+        public DuplexPipe(PipeReader? input, PipeWriter? output)
         {
-            this.Input = input ?? throw new ArgumentNullException(nameof(input));
-            this.Output = output ?? throw new ArgumentNullException(nameof(output));
+            this.Input = input ?? CompletedPipeReader.Singleton;
+            this.Output = output ?? CompletedPipeWriter.Singleton;
         }
 
         /// <summary>
@@ -30,9 +30,8 @@ namespace Nerdbank.Streams
         /// </summary>
         /// <param name="input">The reader.</param>
         public DuplexPipe(PipeReader input)
+            : this(input, output: null)
         {
-            this.Input = input ?? throw new ArgumentNullException(nameof(input));
-            this.Output = new CompletedPipeWriter();
         }
 
         /// <summary>
@@ -41,9 +40,8 @@ namespace Nerdbank.Streams
         /// </summary>
         /// <param name="output">The writer.</param>
         public DuplexPipe(PipeWriter output)
+            : this(input: null, output)
         {
-            this.Input = new CompletedPipeReader();
-            this.Output = output ?? throw new ArgumentNullException(nameof(output));
         }
 
         /// <inheritdoc />
@@ -54,6 +52,12 @@ namespace Nerdbank.Streams
 
         private class CompletedPipeWriter : PipeWriter
         {
+            internal static readonly PipeWriter Singleton = new CompletedPipeWriter();
+
+            private CompletedPipeWriter()
+            {
+            }
+
             public override void Advance(int bytes) => ThrowInvalidOperationException();
 
             public override void CancelPendingFlush()
@@ -79,6 +83,12 @@ namespace Nerdbank.Streams
 
         private class CompletedPipeReader : PipeReader
         {
+            internal static readonly PipeReader Singleton = new CompletedPipeReader();
+
+            private CompletedPipeReader()
+            {
+            }
+
             public override void AdvanceTo(SequencePosition consumed) => ThrowInvalidOperationException();
 
             public override void AdvanceTo(SequencePosition consumed, SequencePosition examined) => ThrowInvalidOperationException();

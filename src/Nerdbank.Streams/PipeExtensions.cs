@@ -236,17 +236,11 @@ namespace Nerdbank.Streams
             else if (input != null)
             {
                 closeStreamAntecedent = input.WaitForWriterCompletionAsync();
-
-                output = new Pipe().Writer;
-                output.Complete();
             }
             else
             {
                 Assumes.NotNull(output);
                 closeStreamAntecedent = output.WaitForReaderCompletionAsync();
-
-                input = new Pipe().Reader;
-                input.Complete();
             }
 
             closeStreamAntecedent.ContinueWith((_, state) => ((Stream)state).Dispose(), stream, cancellationToken, TaskContinuationOptions.None, TaskScheduler.Default).Forget();

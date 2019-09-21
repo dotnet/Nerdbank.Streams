@@ -73,14 +73,14 @@ public class MultiplexingStreamChannelOptionsTests : TestBase
     }
 
     [Fact]
-    public void ExistingPipe_RejectsHalfDuplex()
+    public void ExistingPipe_AcceptsHalfDuplex()
     {
         var options = new MultiplexingStream.ChannelOptions();
 
         var pipe = new Pipe();
-        Assert.Throws<ArgumentNullException>(() => options.ExistingPipe = new MockDuplexPipe());
-        Assert.Throws<ArgumentNullException>(() => options.ExistingPipe = new MockDuplexPipe { Input = pipe.Reader });
-        Assert.Throws<ArgumentNullException>(() => options.ExistingPipe = new MockDuplexPipe { Output = pipe.Writer });
+        Assert.Throws<ArgumentException>(() => options.ExistingPipe = new MockDuplexPipe());
+        options.ExistingPipe = new MockDuplexPipe { Input = pipe.Reader };
+        options.ExistingPipe = new MockDuplexPipe { Output = pipe.Writer };
     }
 
     [Fact]

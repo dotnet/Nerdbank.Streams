@@ -51,6 +51,11 @@ namespace Nerdbank.Streams
                 get => this.existingPipe;
                 set
                 {
+                    if (value != null && value.Input == null && value.Output == null)
+                    {
+                        throw new ArgumentException("At least a reader or writer must be specified.");
+                    }
+
                     // If the value is actually an instance of IDuplexPipe, "snap" the input and output into our own type
                     // to ensure the values don't change in the future.
                     // If it's already a DuplexType instance, we know it's immutable and can trust it.
