@@ -221,8 +221,27 @@ namespace Nerdbank.Streams
         /// <returns>An <see cref="IDuplexPipe"/> instance.</returns>
         public static IDuplexPipe UsePipe(this Stream stream, int sizeHint = 0, PipeOptions? pipeOptions = null, CancellationToken cancellationToken = default)
         {
+            return UsePipe(stream, allowUnwrap: false, sizeHint: sizeHint, pipeOptions: pipeOptions, cancellationToken: cancellationToken);
+        }
+
+        /// <summary>
+        /// Enables reading and writing to a <see cref="Stream"/> using <see cref="PipeWriter"/> and <see cref="PipeReader"/>.
+        /// </summary>
+        /// <param name="stream">The stream to access using a pipe.</param>
+        /// <param name="allowUnwrap"><c>true</c> to allow returning a pipe that underlies the <paramref name="stream"/> instead of adding a pipe adapter on top, if possible; <c>false</c> to unconditionally add a pipe adapter on top.</param>
+        /// <param name="sizeHint">A hint at the size of messages that are commonly transferred. Use 0 for a commonly reasonable default.</param>
+        /// <param name="pipeOptions">Optional pipe options to use.</param>
+        /// <param name="cancellationToken">A token that may cancel async processes to read from and write to the <paramref name="stream"/>.</param>
+        /// <returns>An <see cref="IDuplexPipe"/> instance.</returns>
+        public static IDuplexPipe UsePipe(this Stream stream, bool allowUnwrap, int sizeHint = 0, PipeOptions? pipeOptions = null, CancellationToken cancellationToken = default)
+        {
             Requires.NotNull(stream, nameof(stream));
             Requires.Argument(stream.CanRead || stream.CanWrite, nameof(stream), "Stream is neither readable nor writable.");
+
+            if (allowUnwrap && stream is PipeStream pipeStream)
+            {
+                return new DuplexPipe(pipeStream.UnderlyingPipeReader, pipeStream.UnderlyingPipeWriter);
+            }
 
             PipeReader? input = stream.CanRead ? stream.UsePipeReader(sizeHint, pipeOptions, cancellationToken) : null;
             PipeWriter? output = stream.CanWrite ? stream.UsePipeWriter(pipeOptions, cancellationToken) : null;
@@ -236,17 +255,11 @@ namespace Nerdbank.Streams
             else if (input != null)
             {
                 closeStreamAntecedent = input.WaitForWriterCompletionAsync();
-
-                output = new Pipe().Writer;
-                output.Complete();
             }
             else
             {
                 Assumes.NotNull(output);
                 closeStreamAntecedent = output.WaitForReaderCompletionAsync();
-
-                input = new Pipe().Reader;
-                input.Complete();
             }
 
             closeStreamAntecedent.ContinueWith((_, state) => ((Stream)state).Dispose(), stream, cancellationToken, TaskContinuationOptions.None, TaskScheduler.Default).Forget();
