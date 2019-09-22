@@ -100,6 +100,16 @@ namespace Nerdbank.Streams
             set => throw this.ThrowDisposedOr(new NotSupportedException());
         }
 
+        /// <summary>
+        /// Gets the underlying <see cref="PipeReader"/> (for purposes of unwrapping instead of stacking adapters).
+        /// </summary>
+        internal PipeReader? UnderlyingPipeReader => this.reader;
+
+        /// <summary>
+        /// Gets the underlying <see cref="PipeWriter"/> (for purposes of unwrapping instead of stacking adapters).
+        /// </summary>
+        internal PipeWriter? UnderlyingPipeWriter => this.writer;
+
         /// <inheritdoc />
         public override async Task FlushAsync(CancellationToken cancellationToken)
         {
