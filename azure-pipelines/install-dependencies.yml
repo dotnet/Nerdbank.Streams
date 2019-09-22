@@ -1,24 +1,15 @@
+parameters:
+  initArgs:
+
 steps:
-- script: dotnet --info
-  displayName: .NET Core SDK/runtimes (on host)
 
-- task: UseDotNet@2
-  displayName: Install .NET Core SDK 3.0.100-rc1-014190
+- powershell: |
+    .\init.ps1 -AccessToken '$(System.AccessToken)' ${{ parameters['initArgs'] }}
+    dotnet --info
+  displayName: Install prerequisites
+
+- task: PowerShell@2
   inputs:
-    packageType: sdk
-    version: 3.0.100-rc1-014190
-
-- task: UseDotNet@2
-  displayName: Install .NET Core runtime 2.2.7
-  inputs:
-    packageType: runtime
-    version: 2.2.7
-
-- task: UseDotNet@2
-  displayName: Install .NET Core runtime 2.1.11
-  inputs:
-    packageType: runtime
-    version: 2.1.11
-
-- script: dotnet --info
-  displayName: .NET Core SDK/runtimes (explicitly installed)
+    filePath: azure-pipelines/variables/_pipelines.ps1
+    failOnStderr: true
+  displayName: Set pipeline variables based on source

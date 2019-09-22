@@ -1,7 +1,4 @@
 steps:
-- script: dotnet restore  /v:m /bl:"$(Build.ArtifactStagingDirectory)/build_logs/restore.binlog"
-  displayName: dotnet restore
-  workingDirectory: src
 
 - script: dotnet build --no-restore -c $(BuildConfiguration) /v:m /bl:"$(Build.ArtifactStagingDirectory)/build_logs/build.binlog"
   displayName: dotnet build
@@ -11,54 +8,27 @@ steps:
   displayName: dotnet pack
   workingDirectory: src
 
-- script: dotnet test --no-build -c $(BuildConfiguration) -f net472 --filter "TestCategory!=FailsInCloudTest" -v n -l trx /p:CollectCoverage=true
+- task: DotNetCoreCLI@2
   displayName: dotnet test -f net472
-  workingDirectory: src
-  continueOnError: true
-  condition: eq(variables['Agent.OS'], 'Windows_NT')
-- script: dotnet test --no-build -c $(BuildConfiguration) -f netcoreapp2.1 --filter "TestCategory!=FailsInCloudTest" -v n -l trx /p:CollectCoverage=true
+  inputs:
+    command: test
+    arguments: --no-build -c $(BuildConfiguration) -f net472 --filter "TestCategory!=FailsInCloudTest" -v n /p:CollectCoverage=true
+    testRunTitle: net472-$(Agent.JobName)
+    workingDirectory: src
+  condition: and(succeeded(), eq(variables['Agent.OS'], 'Windows_NT'))
+
+- task: DotNetCoreCLI@2
   displayName: dotnet test -f netcoreapp2.1
-  workingDirectory: src
-  continueOnError: true
-- script: dotnet test --no-build -c $(BuildConfiguration) -f netcoreapp2.2 --filter "TestCategory!=FailsInCloudTest" -v n -l trx /p:CollectCoverage=true
+  inputs:
+    command: test
+    arguments: --no-build -c $(BuildConfiguration) -f netcoreapp2.1 --filter "TestCategory!=FailsInCloudTest" -v n /p:CollectCoverage=true
+    testRunTitle: netcoreapp2.1-$(Agent.JobName)
+    workingDirectory: src
+
+- task: DotNetCoreCLI@2
   displayName: dotnet test -f netcoreapp2.2
-  workingDirectory: src
-  continueOnError: true
-
-- task: PublishTestResults@2
-  displayName: Publish test results
   inputs:
-    testRunner: VSTest
-    #mergeTestResults: true
-    testResultsFormat: trx
-    testResultsFiles: '**/*.trx'
-    failTaskOnFailedTests: true
-  condition: succeededOrFailed()
-
-- task: PublishCodeCoverageResults@1
-  displayName: Publish code coverage results to Azure DevOps
-  inputs:
-    codeCoverageTool: cobertura
-    summaryFileLocation: '**/coverage.cobertura.xml'
-  condition: succeededOrFailed()
-
-- bash: bash <(curl -s https://codecov.io/bash)
-  displayName: Publish code coverage results to codecov.io
-  continueOnError: true
-  condition: succeededOrFailed()
-
-- task: CopyFiles@1
-  inputs:
-    Contents: |
-      obj/**/project.assets.json
-    TargetFolder: $(Build.ArtifactStagingDirectory)/projectAssetsJson
-  displayName: Collecting project.assets.json artifacts
-  condition: succeededOrFailed()
-
-- task: PublishBuildArtifacts@1
-  inputs:
-    PathtoPublish: $(Build.ArtifactStagingDirectory)/projectAssetsJson
-    ArtifactName: projectAssetsJson-$(Agent.JobName)
-    ArtifactType: Container
-  displayName: Publish projectAssetsJson artifacts
-  condition: succeededOrFailed()
+    command: test
+    arguments: --no-build -c $(BuildConfiguration) -f netcoreapp2.2 --filter "TestCategory!=FailsInCloudTest" -v n /p:CollectCoverage=true
+    testRunTitle: netcoreapp2.2-$(Agent.JobName)
+    workingDirectory: src

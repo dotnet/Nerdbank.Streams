@@ -2,11 +2,10 @@
   <PropertyGroup>
     <TargetFrameworks>net472;netcoreapp2.1;netcoreapp2.2</TargetFrameworks>
     <IsPackable>false</IsPackable>
-    <IsTestProject>true</IsTestProject>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    <CodeAnalysisRuleSet>Nerdbank.Streams.Tests.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet>..\tests.ruleset</CodeAnalysisRuleSet>
     <RootNamespace />
 
     <!-- https://github.com/tonerdo/coverlet -->
@@ -26,20 +25,12 @@
     <PackageReference Include="xunit" Version="2.4.1" />
     <PackageReference Include="xunit.combinatorial" Version="1.2.7" />
     <PackageReference Include="xunit.skippablefact" Version="1.3.12" />
-    <PackageReference Include="xunit.runner.console" Version="2.4.1">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.1">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
-    </PackageReference>
+    <PackageReference Include="xunit.runner.console" Version="2.4.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.1" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.2.0" />
     <PackageReference Include="Moq" Version="4.12.0" />
     <PackageReference Include="System.IO.Pipes" Version="4.3.0" />
-    <PackageReference Include="coverlet.msbuild" Version="2.6.3">
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
+    <PackageReference Include="coverlet.msbuild" Version="2.6.3" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="2.2.0" />
     <PackageReference Include="Microsoft.AspNetCore" Version="2.2.0" />
   </ItemGroup>

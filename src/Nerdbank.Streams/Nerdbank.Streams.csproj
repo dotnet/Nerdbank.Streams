@@ -3,7 +3,7 @@
     <TargetFrameworks>netstandard2.0;netcoreapp2.1</TargetFrameworks>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\release.snk</AssemblyOriginatorKeyFile>
-    <CodeAnalysisRuleSet>..\Nerdbank.Streams\Nerdbank.Streams.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet>..\shipping.ruleset</CodeAnalysisRuleSet>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
     <Summary>Streams for full duplex in-proc communication, wrap a WebSocket, split a stream into multiple channels, etc.</Summary>

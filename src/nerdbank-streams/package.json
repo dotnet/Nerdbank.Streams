@@ -30,7 +30,7 @@
   },
   "devDependencies": {
     "@types/jasmine": "^2.8.8",
-    "@types/node": "^10.9.2",
+    "@types/node": "^12.7.5",
     "@types/promise": "^7.1.30",
     "gulp": "^3.9.1",
     "gulp-typescript": "^5.0.0-alpha.3",
@@ -45,6 +45,7 @@
   },
   "dependencies": {
     "cancellationtoken": "^2.0.1",
-    "caught": "^0.1.2"
+    "caught": "^0.1.2",
+    "mkdirp": "^0.5.1"
   }
 }

@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as gulp from "gulp";
 import * as nbgv from "nerdbank-gitversioning";
 import * as path from "path";
+import * as mkdirp from "mkdirp";
 import * as ap from "./asyncprocess";
 
 const outDir = "dist";
@@ -27,8 +28,9 @@ gulp.task("setPackageVersion", ["copyPackageContents"], () => {
 });
 
 gulp.task("package", ["setPackageVersion"], (done) => {
-    const binDir = path.join(__dirname, "../../bin");
-    fs.mkdir(binDir, async () => {
+    const config = process.env.BUILDCONFIGURATION || 'Debug';
+    const binDir = path.join(__dirname, `../../bin/Packages/${config}/npm`);
+    mkdirp(binDir, async () => {
         await ap.execAsync(`npm pack "${path.join(__dirname, outDir)}"`, { cwd: binDir });
         done();
     });

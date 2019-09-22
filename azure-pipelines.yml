@@ -1,8 +1,14 @@
 trigger:
   branches:
-    include: ["master", "v2.*", "*_validate"]
+    include:
+    - master
+    - v2.*
+    - 'validate/*'
   paths:
-    exclude: ["doc", "*.md"]
+    exclude:
+    - doc/
+    - '*.md'
+    - .vscode/
 
 variables:
   TreatWarningsAsErrors: true
@@ -10,38 +16,8 @@ variables:
   BuildConfiguration: Release
   BuildPlatform: Any CPU
   codecov_token: b8be69b5-6dc3-40f8-a4c7-4e13a42654a3
+  ci_feed: 6ed146e5-8e9c-46d6-a40f-da9367ed50cd/c20edbb7-8403-4456-8f43-f46b47e360b1
+  NUGET_PACKAGES: $(Agent.TempDirectory)/.nuget/packages
 
 jobs:
-- job: Windows
-  pool: Hosted Windows 2019 with VS2019
-  steps:
-  - template: azure-pipelines/install-dependencies.yml
-
-  - script: |
-      dotnet tool install --tool-path .. nbgv
-      ..\nbgv cloud
-    workingDirectory: src
-    displayName: Set build number
-
-  - template: azure-pipelines/dotnet.yml
-  - template: azure-pipelines/node.yml
-  - template: azure-pipelines/collect-deployables.yml
-  - template: azure-pipelines/collect-logs.yml
-
-- job: Linux
-  pool:
-    vmImage: Ubuntu 16.04
-  steps:
-  - template: azure-pipelines/install-dependencies.yml
-  - template: azure-pipelines/dotnet.yml
-  - template: azure-pipelines/node.yml
-  - template: azure-pipelines/collect-logs.yml
-
-- job: macOS
-  pool:
-    vmImage: macOS 10.13
-  steps:
-  - template: azure-pipelines/install-dependencies.yml
-  - template: azure-pipelines/dotnet.yml
-  - template: azure-pipelines/node.yml
-  - template: azure-pipelines/collect-logs.yml
+- template: azure-pipelines/build.yml
