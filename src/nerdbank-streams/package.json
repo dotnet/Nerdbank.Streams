@@ -36,6 +36,7 @@
     "gulp-typescript": "^5.0.0-alpha.3",
     "jasmine": "^3.2.0",
     "jshint": "^2.9.6",
+    "mkdirp": "^0.5.1",
     "nerdbank-gitversioning": "^2.2.7",
     "path": "^0.12.7",
     "promise": "^8.0.1",
@@ -45,7 +46,6 @@
   },
   "dependencies": {
     "cancellationtoken": "^2.0.1",
-    "caught": "^0.1.2",
-    "mkdirp": "^0.5.1"
+    "caught": "^0.1.2"
   }
 }
