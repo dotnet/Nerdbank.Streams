@@ -29,23 +29,24 @@
     "test": "jasmine"
   },
   "devDependencies": {
-    "@types/jasmine": "^2.8.8",
+    "@types/jasmine": "^3.4.0",
+    "@types/mkdirp": "^0.5.2",
     "@types/node": "^12.7.5",
     "@types/promise": "^7.1.30",
-    "gulp": "^3.9.1",
-    "gulp-typescript": "^5.0.0-alpha.3",
-    "jasmine": "^3.2.0",
-    "jshint": "^2.9.6",
-    "nerdbank-gitversioning": "^2.2.7",
+    "gulp": "^4.0.2",
+    "gulp-typescript": "^5.0.1",
+    "jasmine": "^3.5.0",
+    "jshint": "^2.10.2",
+    "mkdirp": "^0.5.1",
+    "nerdbank-gitversioning": "^3.1.12-beta",
     "path": "^0.12.7",
-    "promise": "^8.0.1",
-    "tslint": "^5.11.0",
-    "typescript": "^3.0.1",
-    "vscode-jsonrpc": "^3.6.2"
+    "promise": "^8.0.3",
+    "tslint": "^5.20.0",
+    "typescript": "^3.6.3",
+    "vscode-jsonrpc": "^4.0.0"
   },
   "dependencies": {
     "cancellationtoken": "^2.0.1",
-    "caught": "^0.1.2",
-    "mkdirp": "^0.5.1"
+    "caught": "^0.1.2"
   }
 }

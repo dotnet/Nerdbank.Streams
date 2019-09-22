@@ -1,41 +1,46 @@
 import * as fs from "fs";
 import * as gulp from "gulp";
+import * as mkdirp from "mkdirp";
 import * as nbgv from "nerdbank-gitversioning";
 import * as path from "path";
-import * as mkdirp from "mkdirp";
+import { promisify } from "util";
 import * as ap from "./asyncprocess";
 
+const mkdirpAsync = promisify(mkdirp);
 const outDir = "dist";
 
-gulp.task("tsc", () => {
-    return ap.execAsync(`node ./node_modules/typescript/bin/tsc -p tsconfig.json`, { cwd: __dirname });
-});
+async function tsc() {
+    await ap.execAsync(`node ./node_modules/typescript/bin/tsc -p tsconfig.json`, { cwd: __dirname });
+}
 
-gulp.task("copyPackageContents", ["tsc"], () => {
-    return gulp
+async function copyPackageContents() {
+    await gulp
         .src([
             "package.json",
             "README.md",
             "out/*",
         ])
         .pipe(gulp.dest(outDir));
-});
+}
 
-gulp.task("setPackageVersion", ["copyPackageContents"], () => {
+async function setPackageVersion() {
     // Stamp the copy of the NPM package in outDir, but use this
     // source directory as a reference for calculating the git version.
-    return nbgv.setPackageVersion(outDir, ".");
-});
+    await nbgv.setPackageVersion(outDir, ".");
+}
 
-gulp.task("package", ["setPackageVersion"], (done) => {
-    const config = process.env.BUILDCONFIGURATION || 'Debug';
+async function pack() {
+    const config = process.env.BUILDCONFIGURATION || "Debug";
     const binDir = path.join(__dirname, `../../bin/Packages/${config}/npm`);
-    mkdirp(binDir, async () => {
-        await ap.execAsync(`npm pack "${path.join(__dirname, outDir)}"`, { cwd: binDir });
-        done();
-    });
-});
+    await mkdirpAsync(binDir);
+    await ap.execAsync(`npm pack "${path.join(__dirname, outDir)}"`, { cwd: binDir });
+}
 
-gulp.task("default", ["package"], () => {
-    // Nothing more to do here.
-});
+exports.build = gulp.series(
+    tsc,
+    copyPackageContents,
+    setPackageVersion,
+    pack,
+);
+
+exports.default = exports.build;
