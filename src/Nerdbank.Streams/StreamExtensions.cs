@@ -7,6 +7,9 @@ namespace Nerdbank.Streams
     using System.Buffers;
     using System.IO;
     using System.Net.WebSockets;
+    using System.Threading;
+    using System.Threading.Tasks;
+    using Microsoft;
 
     /// <summary>
     /// Stream extension methods.
@@ -61,5 +64,62 @@ namespace Nerdbank.Streams
         /// <param name="stream">The underlying stream to read from.</param>
         /// <returns>A stream that will read just to the end of the substream and then end.</returns>
         public static Stream ReadSubstream(this Stream stream) => new SubstreamReader(stream);
+
+        /// <summary>
+        /// Fills a given buffer with bytes from the specified <see cref="Stream"/>.
+        /// </summary>
+        /// <param name="stream">The stream to read from.</param>
+        /// <param name="buffer">The buffer to fill from the <paramref name="stream"/>.</param>
+        /// <param name="cancellationToken">A cancellation token.</param>
+        /// <returns>
+        /// A task that represents the asynchronous read operation. Its resulting value contains the total number of bytes read into the buffer.
+        /// The result value can be less than the length of the given buffer if the end of the stream has been reached.
+        /// </returns>
+        /// <exception cref="OperationCanceledException">May be thrown if <paramref name="cancellationToken"/> is canceled before reading has completed.</exception>
+        /// <remarks>
+        /// The returned task does not complete until either the <paramref name="buffer"/> is filled or the end of the <paramref name="stream"/> has been reached.
+        /// </remarks>
+        public static async ValueTask<int> ReadBlockAsync(this Stream stream, Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            Requires.NotNull(stream, nameof(stream));
+
+            int totalBytesRead = 0;
+            while (buffer.Length > totalBytesRead)
+            {
+                int bytesJustRead = await stream.ReadAsync(buffer.Slice(totalBytesRead), cancellationToken);
+                totalBytesRead += bytesJustRead;
+                if (bytesJustRead == 0)
+                {
+                    // We've reached the end of the stream.
+                    break;
+                }
+            }
+
+            return totalBytesRead;
+        }
+
+        /// <summary>
+        /// Fills a given buffer with bytes from the specified <see cref="Stream"/>
+        /// or throws if the end of the stream is reached first.
+        /// </summary>
+        /// <param name="stream">The stream to read from.</param>
+        /// <param name="buffer">The buffer to fill from the <paramref name="stream"/>.</param>
+        /// <param name="cancellationToken">A cancellation token.</param>
+        /// <returns>
+        /// A task that represents the asynchronous read operation.
+        /// </returns>
+        /// <exception cref="OperationCanceledException">May be thrown if <paramref name="cancellationToken"/> is canceled before reading has completed.</exception>
+        /// <exception cref="EndOfStreamException">Thrown if the end of the stream is encountered before filling the buffer.</exception>
+        /// <remarks>
+        /// The returned task does not complete until either the <paramref name="buffer"/> is filled or the end of the <paramref name="stream"/> has been reached.
+        /// </remarks>
+        public static async ValueTask ReadBlockOrThrowAsync(this Stream stream, Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            int bytesRead = await ReadBlockAsync(stream, buffer, cancellationToken);
+            if (bytesRead < buffer.Length)
+            {
+                throw new EndOfStreamException($"Expected {buffer.Length} bytes but only received {bytesRead} before the stream ended.");
+            }
+        }
     }
 }
