@@ -7,14 +7,14 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nerdbank.Streams", "Nerdban
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{2B416DBB-F2EF-4815-A851-E14D5579055C}"
 	ProjectSection(SolutionItems) = preProject
+		..\.editorconfig = ..\.editorconfig
 		..\.gitignore = ..\.gitignore
 		..\azure-pipelines.yml = ..\azure-pipelines.yml
 		Directory.Build.props = Directory.Build.props
-		global.json = global.json
-		..\LICENSE.txt = ..\LICENSE.txt
-		nuget.config = nuget.config
+		..\global.json = ..\global.json
+		..\nuget.config = ..\nuget.config
 		..\README.md = ..\README.md
-		version.json = version.json
+		..\version.json = ..\version.json
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nerdbank.Streams.Tests", "Nerdbank.Streams.Tests\Nerdbank.Streams.Tests.csproj", "{266AC3D0-164A-47C7-87E6-06302291900B}"
@@ -25,7 +25,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nerdbank.Streams.Interop.Te
 EndProject
 Project("{9092AA53-FB77-4645-B42D-1CCCA6BD08BD}") = "nerdbank-streams", "nerdbank-streams\nerdbank-streams.njsproj", "{9C64CF35-FD7C-4D57-B10A-5BD2F112B8D2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nerdbank.Streams.Benchmark", "Nerdbank.Streams.Benchmark\Nerdbank.Streams.Benchmark.csproj", "{DD19E7F3-2D17-4B4F-9984-B1F422231FBF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nerdbank.Streams.Benchmark", "Nerdbank.Streams.Benchmark\Nerdbank.Streams.Benchmark.csproj", "{DD19E7F3-2D17-4B4F-9984-B1F422231FBF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

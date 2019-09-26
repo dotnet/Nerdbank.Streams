@@ -755,7 +755,7 @@ namespace Nerdbank.Streams
             {
                 try
                 {
-                    var writer = await channel.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
+                    var writer = await channel!.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
                     writer.Complete();
                 }
                 catch (ObjectDisposedException)
