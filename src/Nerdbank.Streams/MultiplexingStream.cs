@@ -732,7 +732,7 @@ namespace Nerdbank.Streams
         /// <param name="channelId">The ID of the terminated channel.</param>
         private async Task OnChannelTerminatedAsync(int channelId)
         {
-            Channel channel;
+            Channel? channel;
             lock (this.syncObject)
             {
                 if (this.openChannels.TryGetValue(channelId, out channel))
@@ -751,7 +751,7 @@ namespace Nerdbank.Streams
 
             // We Complete the writer because only the writing (logical) thread should complete it
             // to avoid race conditions, and Channel.Dispose can be called from any thread.
-            if (!channel.IsDisposed)
+            if (channel?.IsDisposed ?? false)
             {
                 try
                 {
