@@ -86,7 +86,7 @@ namespace Nerdbank.Streams
             int totalBytesRead = 0;
             while (buffer.Length > totalBytesRead)
             {
-                int bytesJustRead = await stream.ReadAsync(buffer.Slice(totalBytesRead), cancellationToken);
+                int bytesJustRead = await stream.ReadAsync(buffer.Slice(totalBytesRead), cancellationToken).ConfigureAwait(false);
                 totalBytesRead += bytesJustRead;
                 if (bytesJustRead == 0)
                 {
@@ -115,7 +115,7 @@ namespace Nerdbank.Streams
         /// </remarks>
         public static async ValueTask ReadBlockOrThrowAsync(this Stream stream, Memory<byte> buffer, CancellationToken cancellationToken = default)
         {
-            int bytesRead = await ReadBlockAsync(stream, buffer, cancellationToken);
+            int bytesRead = await ReadBlockAsync(stream, buffer, cancellationToken).ConfigureAwait(false);
             if (bytesRead < buffer.Length)
             {
                 throw new EndOfStreamException($"Expected {buffer.Length} bytes but only received {bytesRead} before the stream ended.");
