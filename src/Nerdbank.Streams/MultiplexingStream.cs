@@ -538,9 +538,10 @@ namespace Nerdbank.Streams
                     this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.StreamDisposed, "Disposing.");
                 }
 
-                this.stream.Dispose();
                 lock (this.syncObject)
                 {
+                    this.stream.Dispose();
+
                     foreach (var entry in this.openChannels)
                     {
                         entry.Value.Dispose();
