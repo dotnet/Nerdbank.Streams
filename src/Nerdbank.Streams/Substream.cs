@@ -75,11 +75,12 @@ namespace Nerdbank.Streams
         public async ValueTask DisposeAsync(CancellationToken cancellationToken = default)
         {
             // Write out and clear any buffered data.
-            await this.FlushAsync(cancellationToken).ConfigureAwait(false);
+            await this.FlushAsync(flushUnderlyingStream: false, cancellationToken).ConfigureAwait(false);
 
             // Write out that this is the end of the substream by emitting a int32=0 value.
             Array.Clear(this.buffer, 0, 4);
             await this.underlyingStream.WriteAsync(this.buffer, 0, 4, cancellationToken).ConfigureAwait(false);
+            await this.underlyingStream.FlushAsync(cancellationToken);
 
             ArrayPool<byte>.Shared.Return(this.buffer);
             this.buffer = null;
@@ -90,26 +91,10 @@ namespace Nerdbank.Streams
 #pragma warning restore AvoidAsyncSuffix // Avoid Async suffix
 
         /// <inheritdoc/>
-        public override void Flush()
-        {
-            if (this.count > 0)
-            {
-                this.WriteLengthHeader(this.count);
-                this.underlyingStream.Write(this.buffer, 0, this.count);
-                this.count = 0;
-            }
-        }
+        public override void Flush() => this.Flush(flushUnderlyingStream: true);
 
         /// <inheritdoc/>
-        public override async Task FlushAsync(CancellationToken cancellationToken)
-        {
-            if (this.count > 0)
-            {
-                await this.WriteLengthHeaderAsync(this.count, cancellationToken).ConfigureAwait(false);
-                await this.underlyingStream.WriteAsync(this.buffer, 0, this.count, cancellationToken).ConfigureAwait(false);
-                this.count = 0;
-            }
-        }
+        public override Task FlushAsync(CancellationToken cancellationToken) => this.FlushAsync(flushUnderlyingStream: true, cancellationToken);
 
         /// <inheritdoc/>
         public override int Read(byte[] buffer, int offset, int count) => throw this.ThrowDisposedOr(new NotSupportedException());
@@ -182,11 +167,12 @@ namespace Nerdbank.Streams
             {
                 if (!this.IsDisposed)
                 {
-                    this.Flush();
+                    this.Flush(flushUnderlyingStream: false);
 
                     // Write out that this is the end of the substream by emitting a int32=0 value.
                     Array.Clear(this.buffer, 0, 4);
                     this.underlyingStream.Write(this.buffer, 0, 4);
+                    this.underlyingStream.Flush();
 
                     ArrayPool<byte>.Shared.Return(this.buffer);
                     this.buffer = null;
@@ -194,6 +180,36 @@ namespace Nerdbank.Streams
             }
 
             base.Dispose(disposing);
+        }
+
+        private void Flush(bool flushUnderlyingStream)
+        {
+            if (this.count > 0)
+            {
+                this.WriteLengthHeader(this.count);
+                this.underlyingStream.Write(this.buffer, 0, this.count);
+                if (flushUnderlyingStream)
+                {
+                    this.underlyingStream.Flush();
+                }
+
+                this.count = 0;
+            }
+        }
+
+        private async Task FlushAsync(bool flushUnderlyingStream, CancellationToken cancellationToken)
+        {
+            if (this.count > 0)
+            {
+                await this.WriteLengthHeaderAsync(this.count, cancellationToken).ConfigureAwait(false);
+                await this.underlyingStream.WriteAsync(this.buffer, 0, this.count, cancellationToken).ConfigureAwait(false);
+                if (flushUnderlyingStream)
+                {
+                    await this.underlyingStream.FlushAsync(cancellationToken);
+                }
+
+                this.count = 0;
+            }
         }
 
         private void WriteLengthHeader(int length)
