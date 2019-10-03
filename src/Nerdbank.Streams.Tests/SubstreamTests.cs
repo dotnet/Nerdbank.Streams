@@ -291,6 +291,42 @@ public class SubstreamTests : TestBase
 
     [Theory]
     [PairwiseData]
+    public async Task Dispose_FlushesFinalBytes(bool async)
+    {
+        var monitoredStream = new InstrumentedStream(this.underlyingStream);
+        int lastOperation = 0;
+        monitoredStream.DidWrite += (s, e) => lastOperation = 1;
+        monitoredStream.DidWriteMemory += (s, e) => lastOperation = 1;
+        monitoredStream.DidWriteSpan += (s, e) => lastOperation = 1;
+        monitoredStream.DidWriteByte += (s, e) => lastOperation = 1;
+        monitoredStream.DidFlush += (s, e) => lastOperation = 2;
+
+        const int bufferSize = 64;
+        var substream = monitoredStream.WriteSubstream(bufferSize);
+        var substreamBuffer = this.GetRandomBuffer(256);
+        await this.DisposeSyncOrAsync(substream, async);
+        Assert.Equal(2, lastOperation);
+    }
+
+    [Theory]
+    [PairwiseData]
+    public async Task Flush_FlushesUnderlyingStream(bool async)
+    {
+        var monitoredStream = new InstrumentedStream(this.underlyingStream);
+        int flushed = 0;
+        monitoredStream.DidFlush += (s, e) => flushed++;
+
+        const int bufferSize = 4;
+        var substreamBuffer = this.GetRandomBuffer(bufferSize);
+        var substream = monitoredStream.WriteSubstream(64);
+        await this.WriteSyncOrAsync(substream, async, substreamBuffer, 0, substreamBuffer.Length, this.TimeoutToken);
+        Assert.Equal(0, flushed);
+        await this.FlushSyncOrAsync(substream, async);
+        Assert.Equal(1, flushed);
+    }
+
+    [Theory]
+    [PairwiseData]
     public async Task Write_AfterDisposeThrows(bool async)
     {
         var substream = this.underlyingStream.WriteSubstream();
@@ -344,6 +380,28 @@ public class SubstreamTests : TestBase
         else
         {
             stream.Dispose();
+        }
+    }
+
+    private class InstrumentedStream : MonitoringStream
+    {
+        public InstrumentedStream(Stream inner)
+            : base(inner)
+        {
+        }
+
+        public event EventHandler? DidFlush;
+
+        public override void Flush()
+        {
+            base.Flush();
+            this.DidFlush?.Invoke(this, EventArgs.Empty);
+        }
+
+        public override async Task FlushAsync(CancellationToken cancellationToken)
+        {
+            await base.FlushAsync(cancellationToken);
+            this.DidFlush?.Invoke(this, EventArgs.Empty);
         }
     }
 }
