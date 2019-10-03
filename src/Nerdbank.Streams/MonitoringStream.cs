@@ -263,7 +263,7 @@ namespace Nerdbank.Streams
         public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
         {
             this.WillWriteMemory?.Invoke(this, buffer);
-            await base.WriteAsync(buffer, cancellationToken);
+            await base.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
             this.DidWriteMemory?.Invoke(this, buffer);
         }
 

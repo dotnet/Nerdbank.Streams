@@ -80,7 +80,7 @@ namespace Nerdbank.Streams
             // Write out that this is the end of the substream by emitting a int32=0 value.
             Array.Clear(this.buffer, 0, 4);
             await this.underlyingStream.WriteAsync(this.buffer, 0, 4, cancellationToken).ConfigureAwait(false);
-            await this.underlyingStream.FlushAsync(cancellationToken);
+            await this.underlyingStream.FlushAsync(cancellationToken).ConfigureAwait(false);
 
             ArrayPool<byte>.Shared.Return(this.buffer);
             this.buffer = null;
@@ -205,7 +205,7 @@ namespace Nerdbank.Streams
                 await this.underlyingStream.WriteAsync(this.buffer, 0, this.count, cancellationToken).ConfigureAwait(false);
                 if (flushUnderlyingStream)
                 {
-                    await this.underlyingStream.FlushAsync(cancellationToken);
+                    await this.underlyingStream.FlushAsync(cancellationToken).ConfigureAwait(false);
                 }
 
                 this.count = 0;
