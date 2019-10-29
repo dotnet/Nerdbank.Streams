@@ -15,7 +15,9 @@ export async function getBufferFrom(
             const bytesAvailable = new Deferred<void>();
             readable.once("readable", bytesAvailable.resolve.bind(bytesAvailable));
             readable.once("end", streamEnded.resolve.bind(streamEnded));
-            await Promise.race([bytesAvailable.promise, streamEnded.promise]);
+            const endPromise = Promise.race([bytesAvailable.promise, streamEnded.promise]);
+            await (cancellationToken ? cancellationToken.racePromise(endPromise) : endPromise);
+
             if (bytesAvailable.isCompleted) {
                 continue;
             }
