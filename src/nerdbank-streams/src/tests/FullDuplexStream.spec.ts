@@ -1,4 +1,5 @@
-import { PassThrough } from "stream";
+import { PassThrough, Readable, Writable } from "stream";
+import { Deferred } from "../Deferred";
 import { FullDuplexStream } from "../FullDuplexStream";
 import { getBufferFrom } from "../Utilities";
 
@@ -10,29 +11,49 @@ describe("FullDuplexStream.CreatePair", () => {
         expect(pair.second).not.toBe(null);
     });
 
-    it("stream1.write should pass to stream2.read", () => {
+    it("stream1.write should pass to stream2.read", async () => {
         const pair = FullDuplexStream.CreatePair();
-        pair.first.write("abc");
-        expect(pair.second.read()).toEqual(new Buffer("abc"));
+        await writePropagation(pair.first, pair.second);
+        await writePropagation(pair.second, pair.first);
     });
 
-    it("stream2.write should pass to stream1.read", () => {
+    it("stream1 write end leads to stream2 end event", async () => {
         const pair = FullDuplexStream.CreatePair();
-        pair.second.write("abc");
-        expect(pair.first.read()).toEqual(new Buffer("abc"));
+        await endPropagatesEndEvent(pair.first, pair.second);
+        await endPropagatesEndEvent(pair.second, pair.first);
     });
 
-    it("stream1 write end leads to stream2 read end", async () => {
+    it("stream1 write end leads to stream2 finish event", async () => {
         const pair = FullDuplexStream.CreatePair();
-        pair.first.end();
-        expect(pair.first.read()).toBeNull();
+        await endPropagatesFinishEvent(pair.first, pair.second);
+        await endPropagatesFinishEvent(pair.second, pair.first);
     });
 
-    it("stream2 write end leads to stream1 read end", async () => {
-        const pair = FullDuplexStream.CreatePair();
-        pair.second.end();
-        expect(pair.first.read()).toBeNull();
-    });
+    async function writePropagation(first: Writable, second: Readable): Promise<void> {
+        first.write("abc");
+        expect(second.read()).toEqual(new Buffer("abc"));
+    }
+
+    async function endPropagatesFinishEvent(first: Writable, second: Readable): Promise<void> {
+        const signal = new Deferred<void>();
+        second.once("finish", () => {
+            signal.resolve();
+        });
+        expect(signal.isCompleted).toBe(false);
+        first.end();
+        await signal.promise;
+    }
+
+    async function endPropagatesEndEvent(first: Writable, second: Readable): Promise<void> {
+        const signal = new Deferred<void>();
+        second.once("end", () => {
+            signal.resolve();
+        });
+        expect(signal.isCompleted).toBe(false);
+        first.end();
+        second.resume();
+        await signal.promise;
+    }
 });
 
 describe("FullDuplexStream.Splice", () => {

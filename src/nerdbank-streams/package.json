@@ -26,6 +26,7 @@
   "private": false,
   "scripts": {
     "build": "tsc -p gulpfile.tsconfig.json && gulp",
+    "watch": "node ./node_modules/typescript/bin/tsc -p tsconfig.json -w",
     "test": "jasmine"
   },
   "devDependencies": {

@@ -1,15 +1,6 @@
-import { Channel } from "./Channel";
-import { ChannelOptions } from "./ChannelOptions";
-import { FullDuplexStream } from "./FullDuplexStream";
-import { IDisposableObservable } from "./IDisposableObservable";
-import { MultiplexingStream } from "./MultiplexingStream";
-import { MultiplexingStreamOptions } from "./MultiplexingStreamOptions";
-
-export {
-    FullDuplexStream,
-    MultiplexingStream,
-    MultiplexingStreamOptions,
-    Channel,
-    ChannelOptions,
-    IDisposableObservable,
-};
+export { Channel } from "./Channel";
+export { ChannelOptions } from "./ChannelOptions";
+export { FullDuplexStream } from "./FullDuplexStream";
+export { IDisposableObservable } from "./IDisposableObservable";
+export { MultiplexingStream } from "./MultiplexingStream";
+export { MultiplexingStreamOptions } from "./MultiplexingStreamOptions";
