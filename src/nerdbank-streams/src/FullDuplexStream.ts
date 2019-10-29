@@ -1,36 +1,16 @@
-import { Duplex } from "stream";
+import { Duplex, PassThrough } from "stream";
 
 export class FullDuplexStream {
     public static CreatePair(): { first: Duplex, second: Duplex } {
-        let duplex2: Duplex;
-        const duplex1 = new Duplex({
-            write(chunk, encoding, callback) {
-                duplex2.push(chunk, encoding);
-                callback();
-            },
-
-            read(size) {
-                // Nothing to do here, since our buddy pushes directly to us.
-            },
-        });
-        duplex2 = new Duplex({
-            write(chunk, encoding, callback) {
-                duplex1.push(chunk, encoding);
-                callback();
-            },
-
-            read(size) {
-                // Nothing to do here, since our buddy pushes directly to us.
-            },
-        });
-
+        const pass1 = new PassThrough();
+        const pass2 = new PassThrough();
         return {
-            first: duplex1,
-            second: duplex2,
+            first: FullDuplexStream.Splice(pass1, pass2),
+            second: FullDuplexStream.Splice(pass2, pass1),
         };
     }
 
-    public static Splice(readable: NodeJS.ReadableStream, writable: NodeJS.WritableStream): NodeJS.ReadWriteStream {
+    public static Splice(readable: NodeJS.ReadableStream, writable: NodeJS.WritableStream): Duplex {
         const duplex = new Duplex({
             write(chunk, encoding, callback) {
                 writable.write(chunk, encoding, callback);
