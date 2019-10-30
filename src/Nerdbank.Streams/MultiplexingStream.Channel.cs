@@ -482,7 +482,7 @@ namespace Nerdbank.Streams
                     // Don't transmit data on the channel until the remote party has accepted it.
                     // This is not just a courtesy: it ensure we don't transmit data from the offering party before the offer frame itself.
                     // Likewise: it may help prevent transmitting data from the accepting party before the acceptance frame itself.
-                    await this.Acceptance;
+                    await this.Acceptance.ConfigureAwait(false);
 
                     while (!this.Completion.IsCompleted)
                     {

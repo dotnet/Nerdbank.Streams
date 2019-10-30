@@ -100,7 +100,7 @@ namespace Nerdbank.Streams
                 return cachedResult;
             }
 
-            var result = await this.pipeReader.ReadAsync(cancellationToken);
+            var result = await this.pipeReader.ReadAsync(cancellationToken).ConfigureAwait(false);
             if (result.Buffer.Length >= this.RemainingLength)
             {
                 result = new ReadResult(result.Buffer.Slice(0, this.RemainingLength), isCanceled: false, isCompleted: true);
