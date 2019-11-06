@@ -29,7 +29,7 @@ namespace Nerdbank.Streams
         /// Initializes a new instance of the <see cref="HalfDuplexStream"/> class.
         /// </summary>
         public HalfDuplexStream()
-            : this(32 * 1024, 16 * 1024)
+            : this(16 * 1024, 32 * 1024)
         {
         }
 
