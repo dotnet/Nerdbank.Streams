@@ -308,16 +308,22 @@ namespace Nerdbank.Streams
                         try
                         {
                             var writer = await this.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
-                            writer.Complete();
+                            await writer.CompleteAsync().ConfigureAwait(false);
                         }
                         catch (ObjectDisposedException)
                         {
-                            this.mxStreamIOWriter?.Complete();
+                            if (this.mxStreamIOWriter != null)
+                            {
+                                await this.mxStreamIOWriter.CompleteAsync().ConfigureAwait(false);
+                            }
                         }
                     }
                     else
                     {
-                        this.mxStreamIOWriter?.Complete();
+                        if (this.mxStreamIOWriter != null)
+                        {
+                            await this.mxStreamIOWriter.CompleteAsync().ConfigureAwait(false);
+                        }
                     }
 
                     this.mxStreamIOWriterCompleted.Set();
@@ -560,11 +566,11 @@ namespace Nerdbank.Streams
                         }
                     }
 
-                    this.mxStreamIOReader!.Complete();
+                    await this.mxStreamIOReader!.CompleteAsync().ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
-                    this.mxStreamIOReader!.Complete(ex);
+                    await this.mxStreamIOReader!.CompleteAsync(ex).ConfigureAwait(false);
                     throw;
                 }
                 finally

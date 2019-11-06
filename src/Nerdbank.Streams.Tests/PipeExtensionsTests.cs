@@ -176,7 +176,9 @@ public partial class PipeExtensionsTests : TestBase
         var pipeWriter = webSocket.UsePipeWriter(cancellationToken: this.TimeoutToken);
         await pipeWriter.WriteAsync(expectedBuffer, this.TimeoutToken);
         pipeWriter.Complete();
+#pragma warning disable CS0618 // Type or member is obsolete
         await pipeWriter.WaitForReaderCompletionAsync();
+#pragma warning restore CS0618 // Type or member is obsolete
         var message = webSocket.WrittenQueue.Dequeue();
         Assert.Equal(expectedBuffer, message.Buffer.ToArray());
     }
@@ -195,7 +197,9 @@ public partial class PipeExtensionsTests : TestBase
 
         await pipe.Output.WriteAsync(expectedBuffer, this.TimeoutToken);
         pipe.Output.Complete();
+#pragma warning disable CS0618 // Type or member is obsolete
         await pipe.Output.WaitForReaderCompletionAsync();
+#pragma warning restore CS0618 // Type or member is obsolete
         var message = webSocket.WrittenQueue.Dequeue();
         Assert.Equal(expectedBuffer, message.Buffer.ToArray());
     }

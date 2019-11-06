@@ -49,7 +49,9 @@ public abstract class StreamPipeWriterTestBase : TestBase
         // As a means of waiting for the async process that copies what we write onto the stream,
         // complete our writer and wait for the reader to complete also.
         writer.Complete();
+#pragma warning disable CS0618 // Type or member is obsolete
         await writer.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken);
+#pragma warning restore CS0618 // Type or member is obsolete
 
         Assert.Equal(expectedBuffer, stream.ToArray());
     }
@@ -64,7 +66,7 @@ public abstract class StreamPipeWriterTestBase : TestBase
         writer.Complete();
         Assert.Throws<InvalidOperationException>(() => writer.GetMemory());
         Assert.Throws<InvalidOperationException>(() => writer.GetSpan());
-        Assert.Throws<InvalidOperationException>(() => writer.Advance(0));
+        writer.Advance(0);
     }
 
     [Fact]
@@ -84,7 +86,9 @@ public abstract class StreamPipeWriterTestBase : TestBase
     {
         var stream = new MemoryStream();
         var writer = this.CreatePipeWriter(stream);
+#pragma warning disable CS0618 // Type or member is obsolete
         Task readerCompleted = writer.WaitForReaderCompletionAsync();
+#pragma warning restore CS0618 // Type or member is obsolete
         writer.Complete();
         await readerCompleted.WithCancellation(this.TimeoutToken);
     }
@@ -94,7 +98,9 @@ public abstract class StreamPipeWriterTestBase : TestBase
     {
         var stream = new MemoryStream();
         var writer = this.CreatePipeWriter(stream);
+#pragma warning disable CS0618 // Type or member is obsolete
         Task readerCompleted = writer.WaitForReaderCompletionAsync();
+#pragma warning restore CS0618 // Type or member is obsolete
         var mem = writer.GetMemory(1);
         writer.Advance(1);
 

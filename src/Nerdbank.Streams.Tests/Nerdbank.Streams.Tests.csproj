@@ -19,18 +19,21 @@
     <Compile Include="..\Nerdbank.Streams\Utilities.cs" Link="Utilities.cs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.VisualStudio.Threading" Version="16.0.102" />
-    <PackageReference Include="PInvoke.Kernel32" Version="0.5.184" />
-    <PackageReference Include="StreamJsonRpc" Version="2.0.208" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading" Version="16.4.16" />
+    <PackageReference Include="PInvoke.Kernel32" Version="0.6.6" />
+    <PackageReference Include="StreamJsonRpc" Version="2.2.34" />
     <PackageReference Include="xunit" Version="2.4.1" />
     <PackageReference Include="xunit.combinatorial" Version="1.2.7" />
     <PackageReference Include="xunit.skippablefact" Version="1.3.12" />
     <PackageReference Include="xunit.runner.console" Version="2.4.1" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.1" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.2.0" />
-    <PackageReference Include="Moq" Version="4.12.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.4.0" />
+    <PackageReference Include="Moq" Version="4.13.1" />
     <PackageReference Include="System.IO.Pipes" Version="4.3.0" />
-    <PackageReference Include="coverlet.msbuild" Version="2.6.3" />
+    <PackageReference Include="coverlet.msbuild" Version="2.7.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="2.2.0" />
     <PackageReference Include="Microsoft.AspNetCore" Version="2.2.0" />
   </ItemGroup>
