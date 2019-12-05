@@ -182,6 +182,24 @@ namespace Nerdbank.Streams
         public Span<T> GetSpan(int sizeHint) => this.GetSegment(sizeHint).RemainingSpan;
 
         /// <summary>
+        /// Adds an existing memory location to this sequence without copying.
+        /// </summary>
+        /// <param name="memory">The memory to add.</param>
+        /// <remarks>
+        /// This *may* leave significant slack space in a previously allocated block if calls to <see cref="Append(ReadOnlyMemory{T})"/>
+        /// follow calls to <see cref="GetMemory(int)"/> or <see cref="GetSpan(int)"/>.
+        /// </remarks>
+        public void Append(ReadOnlyMemory<T> memory)
+        {
+            if (memory.Length > 0)
+            {
+                var segment = this.segmentPool.Count > 0 ? this.segmentPool.Pop() : new SequenceSegment();
+                segment.AssignForeign(memory);
+                this.Append(segment);
+            }
+        }
+
+        /// <summary>
         /// Clears the entire sequence, recycles associated memory into pools,
         /// and resets this instance for reuse.
         /// This invalidates any <see cref="ReadOnlySequence{T}"/> previously produced by this instance.
@@ -356,6 +374,11 @@ namespace Nerdbank.Streams
             }
 
             /// <summary>
+            /// Gets a value indicating whether this segment refers to memory that came from outside and that we cannot write to nor recycle.
+            /// </summary>
+            internal bool IsForeignMemory => this.array == null && this.MemoryOwner == null;
+
+            /// <summary>
             /// Assigns this (recyclable) segment a new area in memory.
             /// </summary>
             /// <param name="memoryOwner">The memory and a means to recycle it.</param>
@@ -373,6 +396,16 @@ namespace Nerdbank.Streams
             {
                 this.array = array;
                 this.Memory = array;
+            }
+
+            /// <summary>
+            /// Assigns this (recyclable) segment a new area in memory.
+            /// </summary>
+            /// <param name="memory">A memory block obtained from outside, that we do not own and should not recycle.</param>
+            internal void AssignForeign(ReadOnlyMemory<T> memory)
+            {
+                this.Memory = memory;
+                this.End = memory.Length;
             }
 
             /// <summary>
@@ -407,10 +440,14 @@ namespace Nerdbank.Streams
                 this.Next = segment;
                 segment.RunningIndex = this.RunningIndex + this.Start + this.Length;
 
-                // When setting Memory, we start with index 0 instead of this.Start because
-                // the first segment has an explicit index set anyway,
-                // and we don't want to double-count it here.
-                this.Memory = this.AvailableMemory.Slice(0, this.Start + this.Length);
+                // Trim any slack on this segment.
+                if (!this.IsForeignMemory)
+                {
+                    // When setting Memory, we start with index 0 instead of this.Start because
+                    // the first segment has an explicit index set anyway,
+                    // and we don't want to double-count it here.
+                    this.Memory = this.AvailableMemory.Slice(0, this.Start + this.Length);
+                }
             }
 
             /// <summary>
