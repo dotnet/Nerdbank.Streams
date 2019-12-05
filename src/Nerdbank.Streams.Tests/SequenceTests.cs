@@ -440,7 +440,7 @@ public class SequenceTests : TestBase
         {
             var mem = seq.GetMemory(3);
             Assumes.True(MemoryMarshal.TryGetArray<char>(mem, out var segment));
-            expected.Add(segment.Array);
+            expected.Add(segment.Array!);
             seq.Advance(mem.Length);
         }
 

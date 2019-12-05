@@ -35,7 +35,7 @@ public class FullDuplexStreamPairTests : TestBase
     [Fact]
     public void Write_InvalidArgs()
     {
-        Assert.Throws<ArgumentNullException>(() => this.stream1.Write(null, 0, 0));
+        Assert.Throws<ArgumentNullException>(() => this.stream1.Write(null!, 0, 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => this.stream1.Write(new byte[0], -1, 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => this.stream1.Write(new byte[0], 0, -1));
         Assert.Throws<ArgumentOutOfRangeException>(() => this.stream1.Write(new byte[0], 1, 0));

@@ -386,7 +386,7 @@ public class ReadOnlySequenceStreamTests : TestBase
             {
                 next.RunningIndex = current.RunningIndex + current.Memory.Length;
                 current = next;
-                next = (SeqSegment)next.Next;
+                next = (SeqSegment?)next.Next;
             }
         }
     }

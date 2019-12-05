@@ -238,7 +238,7 @@ public abstract class TestBase : IDisposable
     internal Task<bool> ExecuteInIsolationAsync(object testClass, string testMethodName, ITestOutputHelper logger)
     {
         Requires.NotNull(testClass, nameof(testClass));
-        return this.ExecuteInIsolationAsync(testClass.GetType().FullName, testMethodName, logger);
+        return this.ExecuteInIsolationAsync(testClass.GetType().FullName!, testMethodName, logger);
     }
 
     /// <summary>

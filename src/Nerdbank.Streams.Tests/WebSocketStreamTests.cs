@@ -304,7 +304,7 @@ public partial class WebSocketStreamTests : TestBase
                             break;
                         }
 
-                        await webSocket.SendAsync(new ArraySegment<byte>(buffer.Array, 0, response.Count), WebSocketMessageType.Binary, true, context.RequestAborted);
+                        await webSocket.SendAsync(new ArraySegment<byte>(buffer.Array!, 0, response.Count), WebSocketMessageType.Binary, true, context.RequestAborted);
                     }
                 }
 

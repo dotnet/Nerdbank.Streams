@@ -129,7 +129,7 @@ public class SequenceTextReaderTests : TestBase
     [Fact]
     public void ReadLine()
     {
-        string actual, expected;
+        string? actual, expected;
         do
         {
             actual = this.sequenceTextReader.ReadLine();

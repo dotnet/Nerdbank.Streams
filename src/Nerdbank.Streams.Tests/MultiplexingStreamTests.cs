@@ -969,7 +969,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     private static async Task<int> ReadAtLeastAsync(Stream stream, ArraySegment<byte> buffer, int requiredLength, CancellationToken cancellationToken)
     {
         Requires.NotNull(stream, nameof(stream));
-        Requires.NotNull(buffer.Array, nameof(buffer));
+        Requires.NotNull(buffer.Array!, nameof(buffer));
         Requires.Range(requiredLength >= 0, nameof(requiredLength));
 
         int bytesRead = 0;
@@ -998,7 +998,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         Task.WhenAll(tasks).ApplyResultTo(tcs);
         foreach (var task in tasks)
         {
-            task.ContinueWith(t => tcs.TrySetException(t.Exception), CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default).Forget();
+            task.ContinueWith(t => tcs.TrySetException(t.Exception!), CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default).Forget();
         }
 
         return tcs.Task;
@@ -1118,7 +1118,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         public override Span<byte> GetSpan(int sizeHint = 0) => this.GetMemory(sizeHint).Span;
 
         [Obsolete]
-        public override void OnReaderCompleted(Action<Exception, object> callback, object state)
+        public override void OnReaderCompleted(Action<Exception?, object> callback, object state)
         {
             // We don't have a reader that consumers of this mock need to worry about,
             // so just say we're done when the writing is done.
