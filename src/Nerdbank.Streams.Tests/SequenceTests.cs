@@ -469,6 +469,79 @@ public class SequenceTests : TestBase
         Assert.Equal(3, seq.AsReadOnlySequence.Length);
     }
 
+    [Fact]
+    public void Append()
+    {
+        var first = new int[] { 1, 2, 3 };
+        var second = new int[] { 4, 5, 6 };
+        var third = new int[] { 7, 8, 9 };
+
+        // Arrange for an array pool that will definitely create slack space so we can verify it is handled properly.
+        var arrayPool = new MockArrayPool<int> { MinArraySizeFactor = 2 };
+        var seq = new Sequence<int>(arrayPool);
+
+        first.CopyTo(seq.GetSpan(first.Length).Slice(0, first.Length));
+        seq.Advance(first.Length);
+        Assert.Equal(first.Length, seq.Length);
+
+        seq.Append(second);
+        Assert.Equal(first.Length + second.Length, seq.Length);
+
+        third.CopyTo(seq.GetSpan(third.Length).Slice(0, third.Length));
+        seq.Advance(third.Length);
+        Assert.Equal(first.Length + second.Length + third.Length, seq.Length);
+
+        var ros = seq.AsReadOnlySequence;
+        Assert.Equal(Enumerable.Range(1, 9), ros.ToArray());
+
+        // Verify that the second segment is the only one that has reference equality with the original buffer.
+        int idx = 0;
+        foreach (var segment in ros)
+        {
+            switch (idx++)
+            {
+                case 0:
+                    Assert.NotEqual(first, segment);
+                    break;
+                case 1:
+                    Assert.Equal(second, segment);
+                    break;
+                case 2:
+                    Assert.NotEqual(third, segment);
+                    break;
+                default:
+                    Assert.False(true);
+                    break;
+            }
+        }
+
+        // Verify that the appended array does NOT get returned to the array pool.
+        seq.Reset();
+        Assert.Equal(2, arrayPool.Contents.Count);
+        Assert.DoesNotContain(second, arrayPool.Contents);
+    }
+
+    [Fact]
+    public void Append_Empty()
+    {
+        var arrayPool = new MockArrayPool<int> { MinArraySizeFactor = 2 };
+        var seq = new Sequence<int>(arrayPool);
+
+        seq.Append(default);
+        Assert.Equal(0, seq.Length);
+
+        seq.Append(default);
+        Assert.Equal(0, seq.Length);
+
+        seq.Append(new int[] { 1, 2, 3 });
+        Assert.Equal(3, seq.Length);
+
+        seq.Append(default);
+        Assert.Equal(3, seq.Length);
+
+        Assert.Equal(new int[] { 1, 2, 3 }, seq.AsReadOnlySequence.ToArray());
+    }
+
     /// <summary>
     /// Adds a reference to an object in the sequence and returns a weak reference to it.
     /// </summary>
