@@ -419,6 +419,8 @@ namespace Nerdbank.Streams
                         }
                         else if (channelOptions.InputPipeOptions != null && this.mxStreamIOWriter != null)
                         {
+                            this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Data received on channel {0} before it was accepted. Migrating data from temporary buffer to accepted channel's new pipe.", this.Id);
+
                             // Similar strategy to the situation above with ExistingPipe.
                             // Take ownership of reading bytes that the MultiplexingStream may have already written to this channel.
                             var mxStreamIncomingBytesReader = this.channelIO!.Input;
@@ -432,6 +434,8 @@ namespace Nerdbank.Streams
                             {
                                 // Await propagation of all bytes. Don't complete the readerRelay.Writer when we're done because we still want to use it.
                                 await mxStreamIncomingBytesReader.LinkToAsync(readerRelay.Writer, propagateSuccessfulCompletion: false).ConfigureAwait(false);
+                                this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Data from temporary buffer to accepted channel {0}'s new pipe is completed.", this.Id);
+
                                 return readerRelay.Writer;
                             });
                         }
