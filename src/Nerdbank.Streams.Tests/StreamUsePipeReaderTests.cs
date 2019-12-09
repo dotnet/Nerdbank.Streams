@@ -37,7 +37,9 @@ public class StreamUsePipeReaderTests : StreamPipeReaderTestBase
 #endif
 
         var reader = this.CreatePipeReader(unreadableStream.Object);
+#pragma warning disable CS0618 // Type or member is obsolete
         var actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => reader.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken));
+#pragma warning restore CS0618 // Type or member is obsolete
         Assert.Same(expectedException, actualException);
     }
 
@@ -46,7 +48,9 @@ public class StreamUsePipeReaderTests : StreamPipeReaderTestBase
     {
         var stream = new HalfDuplexStream();
         var reader = this.CreatePipeReader(stream);
+#pragma warning disable CS0618 // Type or member is obsolete
         Task writerCompletion = reader.WaitForWriterCompletionAsync();
+#pragma warning restore CS0618 // Type or member is obsolete
         reader.Complete();
         await writerCompletion.WithCancellation(this.TimeoutToken);
     }

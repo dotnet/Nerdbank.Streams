@@ -308,16 +308,22 @@ namespace Nerdbank.Streams
                         try
                         {
                             var writer = await this.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
-                            writer.Complete();
+                            await writer.CompleteAsync().ConfigureAwait(false);
                         }
                         catch (ObjectDisposedException)
                         {
-                            this.mxStreamIOWriter?.Complete();
+                            if (this.mxStreamIOWriter != null)
+                            {
+                                await this.mxStreamIOWriter.CompleteAsync().ConfigureAwait(false);
+                            }
                         }
                     }
                     else
                     {
-                        this.mxStreamIOWriter?.Complete();
+                        if (this.mxStreamIOWriter != null)
+                        {
+                            await this.mxStreamIOWriter.CompleteAsync().ConfigureAwait(false);
+                        }
                     }
 
                     this.mxStreamIOWriterCompleted.Set();
@@ -413,6 +419,8 @@ namespace Nerdbank.Streams
                         }
                         else if (channelOptions.InputPipeOptions != null && this.mxStreamIOWriter != null)
                         {
+                            this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Data received on channel {0} before it was accepted. Migrating data from temporary buffer to accepted channel's new pipe.", this.Id);
+
                             // Similar strategy to the situation above with ExistingPipe.
                             // Take ownership of reading bytes that the MultiplexingStream may have already written to this channel.
                             var mxStreamIncomingBytesReader = this.channelIO!.Input;
@@ -426,6 +434,8 @@ namespace Nerdbank.Streams
                             {
                                 // Await propagation of all bytes. Don't complete the readerRelay.Writer when we're done because we still want to use it.
                                 await mxStreamIncomingBytesReader.LinkToAsync(readerRelay.Writer, propagateSuccessfulCompletion: false).ConfigureAwait(false);
+                                this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Data from temporary buffer to accepted channel {0}'s new pipe is completed.", this.Id);
+
                                 return readerRelay.Writer;
                             });
                         }
@@ -516,6 +526,7 @@ namespace Nerdbank.Streams
                         // We'll send whatever we've got, up to the maximum size of the frame.
                         // Anything in excess of that we'll pick up next time the loop runs.
                         var bufferToRelay = result.Buffer.Slice(0, Math.Min(result.Buffer.Length, this.MultiplexingStream.framePayloadMaxLength));
+                        bool isCompleted = result.IsCompleted && result.Buffer.Length == bufferToRelay.Length;
                         if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
                         {
                             this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "{0} of {1} bytes will be transmitted.", bufferToRelay.Length, result.Buffer.Length);
@@ -536,6 +547,10 @@ namespace Nerdbank.Streams
                             {
                                 // Let the pipe know exactly how much we read, which might be less than we were given.
                                 this.mxStreamIOReader.AdvanceTo(bufferToRelay.End);
+
+                                // We mustn't accidentally access the memory that may have been recycled now that we called AdvanceTo.
+                                bufferToRelay = default;
+                                result.ScrubAfterAdvanceTo();
                             }
                             catch (InvalidOperationException ex)
                             {
@@ -549,7 +564,7 @@ namespace Nerdbank.Streams
                             }
                         }
 
-                        if (result.IsCompleted)
+                        if (isCompleted)
                         {
                             if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
                             {
@@ -560,11 +575,11 @@ namespace Nerdbank.Streams
                         }
                     }
 
-                    this.mxStreamIOReader!.Complete();
+                    await this.mxStreamIOReader!.CompleteAsync().ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
-                    this.mxStreamIOReader!.Complete(ex);
+                    await this.mxStreamIOReader!.CompleteAsync(ex).ConfigureAwait(false);
                     throw;
                 }
                 finally

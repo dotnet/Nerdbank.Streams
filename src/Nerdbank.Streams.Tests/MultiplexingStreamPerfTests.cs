@@ -136,14 +136,14 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
                     {
                         await Task.WhenAll(
                             Enumerable.Range(1, ChannelCount).Select(c => Task.Run(async delegate
-                             {
-                                 byte[] serverBuffer = serverBuffers[c - 1];
-                                 var channel = await mxServer.OfferChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
-                                 for (int i = 0; i < segmentCount / ChannelCount; i++)
-                                 {
+                            {
+                                byte[] serverBuffer = serverBuffers[c - 1];
+                                var channel = await mxServer.OfferChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
+                                for (int i = 0; i < segmentCount / ChannelCount; i++)
+                                {
                                      await channel.Output.WriteAsync(serverBuffer, this.TimeoutToken);
-                                 }
-                             })));
+                                }
+                            })));
                     }),
                     Task.Run(async delegate
                     {
@@ -156,8 +156,9 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
                                 do
                                 {
                                     var readResult = await channel.Input.ReadAsync(this.TimeoutToken);
-                                    channel.Input.AdvanceTo(readResult.Buffer.End);
                                     totalBytesRead += (int)readResult.Buffer.Length;
+                                    channel.Input.AdvanceTo(readResult.Buffer.End);
+                                    readResult.ScrubAfterAdvanceTo();
                                 }
                                 while (totalBytesRead < expectedTotalBytesRead);
                                 Assert.Equal(expectedTotalBytesRead, totalBytesRead);

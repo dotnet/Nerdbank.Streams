@@ -191,7 +191,9 @@ public class NestedPipeReaderTests : TestBase, IAsyncLifetime
     {
         var sliceReader = this.pipe.Reader.ReadSlice(5);
         bool called = false;
+#pragma warning disable CS0618 // Type or member is obsolete
         sliceReader.OnWriterCompleted((e, s) => called = true, null);
+#pragma warning restore CS0618 // Type or member is obsolete
         this.pipe.Writer.Complete();
         Assert.False(called);
     }

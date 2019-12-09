@@ -189,8 +189,10 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         this.mx1.Dispose();
         Assert.True(channel1.IsDisposed);
         await channel1.Completion.WithCancellation(this.TimeoutToken);
+#pragma warning disable CS0618 // Type or member is obsolete
         await channel1.Input.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
         await channel1.Output.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken);
+#pragma warning restore CS0618 // Type or member is obsolete
     }
 
     [Fact]
@@ -422,7 +424,9 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         Assert.Equal(buffer.Length, readBytes.Length);
         Assert.Equal(buffer, readBytes.ToArray());
 
+#pragma warning disable CS0618 // Type or member is obsolete
         await b.Input.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
+#pragma warning restore CS0618 // Type or member is obsolete
     }
 
     /// <summary>
@@ -452,7 +456,9 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         // so drain the pipe insofar as it has bytes. Just don't assert how many were read.
         await this.DrainReaderTillCompletedAsync(b.Input);
 
+#pragma warning disable CS0618 // Type or member is obsolete
         await b.Input.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
+#pragma warning restore CS0618 // Type or member is obsolete
     }
 
     /// <summary>
@@ -741,7 +747,9 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         var aMsgReceived = await b.Input.ReadAsync(this.TimeoutToken);
         Assert.Equal(aMsg, aMsgReceived.Buffer.First.Span.ToArray());
         b.Input.AdvanceTo(aMsgReceived.Buffer.End);
+#pragma warning disable CS0618 // Type or member is obsolete
         await b.Input.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
+#pragma warning restore CS0618 // Type or member is obsolete
         Assert.True((await b.Input.ReadAsync(this.TimeoutToken)).IsCompleted);
         b.Input.Complete(); // ack the last message we received
 
@@ -750,7 +758,9 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         var bMsgReceived = await a.Input.ReadAsync(this.TimeoutToken);
         Assert.Equal(bMsg, bMsgReceived.Buffer.First.Span.ToArray());
         a.Input.AdvanceTo(bMsgReceived.Buffer.End);
+#pragma warning disable CS0618 // Type or member is obsolete
         await a.Input.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
+#pragma warning restore CS0618 // Type or member is obsolete
         Assert.True((await a.Input.ReadAsync(this.TimeoutToken)).IsCompleted);
         a.Input.Complete(); // ack the last message we received
 
@@ -959,7 +969,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     private static async Task<int> ReadAtLeastAsync(Stream stream, ArraySegment<byte> buffer, int requiredLength, CancellationToken cancellationToken)
     {
         Requires.NotNull(stream, nameof(stream));
-        Requires.NotNull(buffer.Array, nameof(buffer));
+        Requires.NotNull(buffer.Array!, nameof(buffer));
         Requires.Range(requiredLength >= 0, nameof(requiredLength));
 
         int bytesRead = 0;
@@ -988,7 +998,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         Task.WhenAll(tasks).ApplyResultTo(tcs);
         foreach (var task in tasks)
         {
-            task.ContinueWith(t => tcs.TrySetException(t.Exception), CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default).Forget();
+            task.ContinueWith(t => tcs.TrySetException(t.Exception!), CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default).Forget();
         }
 
         return tcs.Task;
@@ -1107,7 +1117,8 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
         public override Span<byte> GetSpan(int sizeHint = 0) => this.GetMemory(sizeHint).Span;
 
-        public override void OnReaderCompleted(Action<Exception, object> callback, object state)
+        [Obsolete]
+        public override void OnReaderCompleted(Action<Exception?, object> callback, object state)
         {
             // We don't have a reader that consumers of this mock need to worry about,
             // so just say we're done when the writing is done.

@@ -44,7 +44,9 @@ public abstract class StreamPipeReaderTestBase : TestBase
         var stream = new MemoryStream(expectedBuffer);
         var reader = this.CreatePipeReader(stream, sizeHint: 50);
 
+#pragma warning disable CS0618 // Type or member is obsolete
         Task writerCompletedTask = reader.WaitForWriterCompletionAsync();
+#pragma warning restore CS0618 // Type or member is obsolete
 
         // This next assertion is only guaranteeed for the strict pipe reader.
         // For the normal one, its role of reading from the stream is concurrent with our code,
@@ -151,7 +153,9 @@ public abstract class StreamPipeReaderTestBase : TestBase
         // The exception throwing test is disabled due to https://github.com/dotnet/corefx/issues/31695
         ////// This will verify that a callback that throws doesn't stop subsequent callbacks from being invoked.
         ////reader.OnWriterCompleted((ex, s) => throw new InvalidOperationException(), null);
+#pragma warning disable CS0618 // Type or member is obsolete
         Task writerCompletedTask = reader.WaitForWriterCompletionAsync();
+#pragma warning restore CS0618 // Type or member is obsolete
 
         // Read everything.
         while (true)
@@ -168,7 +172,9 @@ public abstract class StreamPipeReaderTestBase : TestBase
         await writerCompletedTask.WithCancellation(this.TimeoutToken);
 
         // Verify that a callback only registered now gets invoked too:
+#pragma warning disable CS0618 // Type or member is obsolete
         await reader.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
+#pragma warning restore CS0618 // Type or member is obsolete
     }
 
     [Fact]

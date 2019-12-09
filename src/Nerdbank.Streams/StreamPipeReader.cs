@@ -75,6 +75,7 @@ namespace Nerdbank.Streams
         }
 
         /// <inheritdoc />
+        [Obsolete]
         public override void OnWriterCompleted(Action<Exception?, object?> callback, object? state)
         {
             Requires.NotNull(callback, nameof(callback));
