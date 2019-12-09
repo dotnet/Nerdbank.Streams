@@ -180,5 +180,14 @@ namespace Nerdbank.Streams
             buffer[0] = (byte)(value >> 8);
             buffer[1] = (byte)value;
         }
+
+        /// <summary>
+        /// Removes the memory from <see cref="ReadResult"/> that may have been recycled by a call to <see cref="PipeReader.AdvanceTo(SequencePosition)"/>.
+        /// </summary>
+        /// <param name="readResult">The <see cref="ReadResult"/> to scrub.</param>
+        /// <remarks>
+        /// The <see cref="ReadResult.IsCanceled"/> and <see cref="ReadResult.IsCompleted"/> values are preserved, but the <see cref="ReadResult.Buffer"/> is made empty by this call.
+        /// </remarks>
+        internal static void ScrubAfterAdvanceTo(this ref ReadResult readResult) => readResult = new ReadResult(default, readResult.IsCanceled, readResult.IsCompleted);
     }
 }

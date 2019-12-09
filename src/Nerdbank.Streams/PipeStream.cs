@@ -290,10 +290,13 @@ namespace Nerdbank.Streams
 
             long bytesToCopyCount = Math.Min(buffer.Length, readResult.Buffer.Length);
             ReadOnlySequence<byte> slice = readResult.Buffer.Slice(0, bytesToCopyCount);
+            var isCompleted = readResult.IsCompleted && slice.End.Equals(readResult.Buffer.End);
             slice.CopyTo(buffer);
             this.reader!.AdvanceTo(slice.End);
+            readResult.ScrubAfterAdvanceTo();
+            slice = default;
 
-            if (readResult.IsCompleted && slice.End.Equals(readResult.Buffer.End))
+            if (isCompleted)
             {
                 this.reader.Complete();
                 this.readingCompleted = true;

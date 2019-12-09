@@ -178,6 +178,7 @@ namespace Nerdbank.Streams
                         }
 
                         pipe.Reader.AdvanceTo(readResult.Buffer.End);
+                        readResult.ScrubAfterAdvanceTo();
 
                         if (readResult.IsCompleted)
                         {
@@ -351,6 +352,7 @@ namespace Nerdbank.Streams
                         }
 
                         pipe.Reader.AdvanceTo(readResult.Buffer.End);
+                        readResult.ScrubAfterAdvanceTo();
 
                         if (readResult.IsCompleted)
                         {
@@ -449,6 +451,7 @@ namespace Nerdbank.Streams
                         var result = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
                         writer.Write(result.Buffer);
                         reader.AdvanceTo(result.Buffer.End);
+                        result.ScrubAfterAdvanceTo();
                         await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
                         if (result.IsCompleted)
                         {
