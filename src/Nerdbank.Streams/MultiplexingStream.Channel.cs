@@ -516,6 +516,7 @@ namespace Nerdbank.Streams
                         // We'll send whatever we've got, up to the maximum size of the frame.
                         // Anything in excess of that we'll pick up next time the loop runs.
                         var bufferToRelay = result.Buffer.Slice(0, Math.Min(result.Buffer.Length, this.MultiplexingStream.framePayloadMaxLength));
+                        bool isCompleted = result.IsCompleted && result.Buffer.Length == bufferToRelay.Length;
                         if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
                         {
                             this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "{0} of {1} bytes will be transmitted.", bufferToRelay.Length, result.Buffer.Length);
@@ -536,6 +537,10 @@ namespace Nerdbank.Streams
                             {
                                 // Let the pipe know exactly how much we read, which might be less than we were given.
                                 this.mxStreamIOReader.AdvanceTo(bufferToRelay.End);
+
+                                // We mustn't accidentally access the memory that may have been recycled now that we called AdvanceTo.
+                                bufferToRelay = default;
+                                result.ScrubAfterAdvanceTo();
                             }
                             catch (InvalidOperationException ex)
                             {
@@ -549,7 +554,7 @@ namespace Nerdbank.Streams
                             }
                         }
 
-                        if (result.IsCompleted)
+                        if (isCompleted)
                         {
                             if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
                             {
