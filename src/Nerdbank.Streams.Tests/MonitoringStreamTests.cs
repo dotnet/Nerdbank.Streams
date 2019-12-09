@@ -392,7 +392,10 @@ public class MonitoringStreamTests : TestBase
         var mockedUnderlyingStream = new Mock<Stream>(MockBehavior.Strict);
         mockedUnderlyingStream.Setup(s => s.Flush());
         var monitoringStream = new MonitoringStream(mockedUnderlyingStream.Object);
+        bool didFlushRaised = false;
+        monitoringStream.DidFlush += (s, e) => didFlushRaised = true;
         monitoringStream.Flush();
+        Assert.True(didFlushRaised);
         mockedUnderlyingStream.VerifyAll();
     }
 
@@ -402,7 +405,10 @@ public class MonitoringStreamTests : TestBase
         var mockedUnderlyingStream = new Mock<Stream>(MockBehavior.Strict);
         mockedUnderlyingStream.Setup(s => s.FlushAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var monitoringStream = new MonitoringStream(mockedUnderlyingStream.Object);
+        bool didFlushRaised = false;
+        monitoringStream.DidFlush += (s, e) => didFlushRaised = true;
         await monitoringStream.FlushAsync();
+        Assert.True(didFlushRaised);
         mockedUnderlyingStream.VerifyAll();
     }
 
