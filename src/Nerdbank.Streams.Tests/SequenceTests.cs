@@ -184,6 +184,21 @@ public class SequenceTests : TestBase
     }
 
     [Fact]
+    public void AdvanceTo_EmptySequence()
+    {
+        using var seq = new Sequence<byte>();
+        seq.AdvanceTo(seq.AsReadOnlySequence.Start);
+        Assert.Equal(0, seq.Length);
+    }
+
+    [Fact]
+    public void AdvanceTo_DefaultSequencePosition()
+    {
+        using var seq = new Sequence<byte>();
+        Assert.Throws<ArgumentException>(() => seq.AdvanceTo(default));
+    }
+
+    [Fact]
     public void AdvanceTo_ReturnsArraysToPool()
     {
         MockMemoryPool<char> mockPool = new MockMemoryPool<char>();
