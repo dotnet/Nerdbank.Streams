@@ -25,6 +25,8 @@ namespace Nerdbank.Streams
     {
         private static readonly int DefaultLengthFromArrayPool = 1 + (4095 / Marshal.SizeOf<T>());
 
+        private static readonly ReadOnlySequence<T> Empty = new ReadOnlySequence<T>(SequenceSegment.Empty, 0, SequenceSegment.Empty, 0);
+
         private readonly Stack<SequenceSegment> segmentPool = new Stack<SequenceSegment>();
 
         private readonly MemoryPool<T>? memoryPool;
@@ -110,7 +112,7 @@ namespace Nerdbank.Streams
         {
             return sequence.first != null
                 ? new ReadOnlySequence<T>(sequence.first, sequence.first.Start, sequence.last, sequence.last!.End)
-                : ReadOnlySequence<T>.Empty;
+                : Empty;
         }
 
         /// <summary>
@@ -124,6 +126,18 @@ namespace Nerdbank.Streams
         public void AdvanceTo(SequencePosition position)
         {
             var firstSegment = (SequenceSegment)position.GetObject();
+            if (firstSegment == null)
+            {
+                // Emulate PipeReader behavior which is to just return for default(SequencePosition)
+                return;
+            }
+
+            if (ReferenceEquals(firstSegment, SequenceSegment.Empty) && this.Length == 0)
+            {
+                // We were called with our own empty buffer segment.
+                return;
+            }
+
             int firstIndex = position.GetInteger();
 
             // Before making any mutations, confirm that the block specified belongs to this sequence.
@@ -309,6 +323,8 @@ namespace Nerdbank.Streams
 
         private class SequenceSegment : ReadOnlySequenceSegment<T>
         {
+            internal static readonly SequenceSegment Empty = new SequenceSegment();
+
             /// <summary>
             /// A value indicating whether the element is a value type.
             /// </summary>
