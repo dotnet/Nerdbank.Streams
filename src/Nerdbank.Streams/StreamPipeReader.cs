@@ -33,9 +33,17 @@ namespace Nerdbank.Streams
 
         private Exception? readerException;
 
+        /// <summary>
+        /// Indicates when we have drained the underlying stream of all bytes.
+        /// </summary>
         private bool isWriterCompleted;
 
         private Exception? writerException;
+
+        /// <summary>
+        /// A flag indicating that the owner is in between read and AdvanceTo calls.
+        /// </summary>
+        private bool clientIsReading;
 
         private List<(Action<Exception?, object?>, object?)>? writerCompletedCallbacks;
 
@@ -56,6 +64,7 @@ namespace Nerdbank.Streams
             lock (this.syncObject)
             {
                 this.buffer.AdvanceTo(consumed);
+                this.clientIsReading = false;
                 this.examined = examined;
             }
         }
@@ -133,12 +142,14 @@ namespace Nerdbank.Streams
                     if (bytesRead == 0)
                     {
                         this.CompleteWriting();
+                        this.clientIsReading = true;
                         return new ReadResult(this.buffer, isCanceled: false, isCompleted: true);
                     }
 
                     lock (this.syncObject)
                     {
                         this.buffer.Advance(bytesRead);
+                        this.clientIsReading = true;
                         return new ReadResult(this.buffer, isCanceled: false, isCompleted: false);
                     }
                 }
@@ -154,11 +165,13 @@ namespace Nerdbank.Streams
         {
             lock (this.syncObject)
             {
+                Verify.Operation(!this.clientIsReading, Strings.ReadingMustBeFollowedByAdvance);
                 Verify.Operation(!this.isReaderCompleted, "Reading is already completed.");
 
-                if (this.buffer.AsReadOnlySequence.Length > 0 && !this.buffer.AsReadOnlySequence.End.Equals(this.examined))
+                if (this.isWriterCompleted || (this.buffer.AsReadOnlySequence.Length > 0 && !this.buffer.AsReadOnlySequence.End.Equals(this.examined)))
                 {
                     result = new ReadResult(this.buffer, isCanceled: false, isCompleted: this.isWriterCompleted);
+                    this.clientIsReading = true;
                     return true;
                 }
 

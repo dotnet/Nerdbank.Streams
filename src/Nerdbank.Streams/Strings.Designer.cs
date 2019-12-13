@@ -77,5 +77,14 @@ namespace Nerdbank.Streams {
                 return ResourceManager.GetString("ReadingAfterCompletionNotAllowed", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Reading has already begun. Call AdvanceTo before reading again..
+        /// </summary>
+        internal static string ReadingMustBeFollowedByAdvance {
+            get {
+                return ResourceManager.GetString("ReadingMustBeFollowedByAdvance", resourceCulture);
+            }
+        }
     }
 }

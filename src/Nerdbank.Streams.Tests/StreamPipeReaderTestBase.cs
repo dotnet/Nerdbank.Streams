@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Pipelines;
@@ -138,6 +139,38 @@ public abstract class StreamPipeReaderTestBase : TestBase
         Assert.Equal(expectedBuffer.AsSpan(1, 20).ToArray(), result.Buffer.First.Span.Slice(0, 20).ToArray());
 
         reader.AdvanceTo(result.Buffer.End);
+    }
+
+    [Theory, PairwiseData]
+    public async Task ReadAsync_TwiceInARow(bool emptyStream)
+    {
+        var stream = new MemoryStream(emptyStream ? Array.Empty<byte>() : new byte[3]);
+        var reader = this.CreatePipeReader(stream, sizeHint: 50);
+        await reader.ReadAsync(this.TimeoutToken);
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await reader.ReadAsync(this.TimeoutToken));
+    }
+
+    [Theory, PairwiseData]
+    public async Task TryRead_TwiceInARow(bool emptyStream)
+    {
+        var stream = new MemoryStream(emptyStream ? Array.Empty<byte>() : new byte[3]);
+        var reader = this.CreatePipeReader(stream, sizeHint: 50);
+
+        // Read asynchronously once to guarantee that there's a non-empty buffer in the reader.
+        var readResult = await reader.ReadAsync(this.TimeoutToken);
+        reader.AdvanceTo(readResult.Buffer.Start);
+
+        Assert.True(reader.TryRead(out _));
+        Assert.Throws<InvalidOperationException>(() => reader.TryRead(out _));
+    }
+
+    [Fact]
+    public void AdvanceTo_BeforeRead()
+    {
+        var stream = new MemoryStream();
+        var reader = this.CreatePipeReader(stream, sizeHint: 50);
+        reader.AdvanceTo(default);
+        Assert.Throws<InvalidCastException>(() => reader.AdvanceTo(ReadOnlySequence<byte>.Empty.Start));
     }
 
     [Fact]

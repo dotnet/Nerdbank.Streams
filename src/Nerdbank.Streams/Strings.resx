@@ -123,4 +123,7 @@
   <data name="ReadingAfterCompletionNotAllowed" xml:space="preserve">
     <value>Reading not allowed after reader is completed.</value>
   </data>
+  <data name="ReadingMustBeFollowedByAdvance" xml:space="preserve">
+    <value>Reading has already begun. Call AdvanceTo before reading again.</value>
+  </data>
 </root>
