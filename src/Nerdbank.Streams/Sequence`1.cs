@@ -25,6 +25,8 @@ namespace Nerdbank.Streams
     {
         private static readonly int DefaultLengthFromArrayPool = 1 + (4095 / Marshal.SizeOf<T>());
 
+        private static readonly ReadOnlySequence<T> Empty = new ReadOnlySequence<T>(SequenceSegment.Empty, 0, SequenceSegment.Empty, 0);
+
         private readonly Stack<SequenceSegment> segmentPool = new Stack<SequenceSegment>();
 
         private readonly MemoryPool<T>? memoryPool;
@@ -110,7 +112,7 @@ namespace Nerdbank.Streams
         {
             return sequence.first != null
                 ? new ReadOnlySequence<T>(sequence.first, sequence.first.Start, sequence.last, sequence.last!.End)
-                : ReadOnlySequence<T>.Empty;
+                : Empty;
         }
 
         /// <summary>
@@ -123,14 +125,20 @@ namespace Nerdbank.Streams
         /// </param>
         public void AdvanceTo(SequencePosition position)
         {
-            var firstSegment = position.GetObject() as SequenceSegment;
-            int firstIndex = position.GetInteger();
-
-            if (firstSegment is null && firstIndex == 0 && position.GetObject() is byte[] byteArray && byteArray.Length == 0 && this.Length == 0)
+            var firstSegment = (SequenceSegment)position.GetObject();
+            if (firstSegment == null)
             {
-                // The SequencePosition was taken from an ReadOnlySequence<T>.Empty, and we're empty, so no-op.
+                // Emulate PipeReader behavior which is to just return for default(SequencePosition)
                 return;
             }
+
+            if (ReferenceEquals(firstSegment, SequenceSegment.Empty) && this.Length == 0)
+            {
+                // We were called with our own empty buffer segment.
+                return;
+            }
+
+            int firstIndex = position.GetInteger();
 
             // Before making any mutations, confirm that the block specified belongs to this sequence.
             var current = this.first;
@@ -139,7 +147,7 @@ namespace Nerdbank.Streams
                 current = current.Next;
             }
 
-            Requires.Argument(firstSegment is object && current is object, nameof(position), "Position does not represent a valid position in this sequence.");
+            Requires.Argument(current != null, nameof(position), "Position does not represent a valid position in this sequence.");
 
             // Also confirm that the position is not a prior position in the block.
             Requires.Argument(firstIndex >= current.Start, nameof(position), "Position must not be earlier than current position.");
@@ -297,6 +305,8 @@ namespace Nerdbank.Streams
 
         private class SequenceSegment : ReadOnlySequenceSegment<T>
         {
+            internal static readonly SequenceSegment Empty = new SequenceSegment();
+
             /// <summary>
             /// A value indicating whether the element is a value type.
             /// </summary>

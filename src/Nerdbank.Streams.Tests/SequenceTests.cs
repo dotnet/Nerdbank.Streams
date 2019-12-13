@@ -195,7 +195,9 @@ public class SequenceTests : TestBase
     public void AdvanceTo_DefaultSequencePosition()
     {
         using var seq = new Sequence<byte>();
-        Assert.Throws<ArgumentException>(() => seq.AdvanceTo(default));
+
+        // PipeReader.AdvanceTo(default) simply no-ops. We emulate that here.
+        seq.AdvanceTo(default);
     }
 
     [Fact]
