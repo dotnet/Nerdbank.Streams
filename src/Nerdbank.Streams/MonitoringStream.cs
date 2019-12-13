@@ -163,6 +163,11 @@ namespace Nerdbank.Streams
         public event EventHandler<byte>? DidWriteByte;
 
         /// <summary>
+        /// Occurs after <see cref="Flush"/> or <see cref="FlushAsync(CancellationToken)"/> is invoked.
+        /// </summary>
+        public event EventHandler? DidFlush;
+
+        /// <summary>
         /// Occurs when <see cref="Stream.Dispose()"/> is invoked.
         /// </summary>
         public event EventHandler? Disposed;
@@ -204,10 +209,18 @@ namespace Nerdbank.Streams
         public override bool CanTimeout => this.inner.CanTimeout;
 
         /// <inheritdoc/>
-        public override void Flush() => this.inner.Flush();
+        public override void Flush()
+        {
+            this.inner.Flush();
+            this.DidFlush?.Invoke(this, EventArgs.Empty);
+        }
 
         /// <inheritdoc/>
-        public override Task FlushAsync(CancellationToken cancellationToken) => this.inner.FlushAsync(cancellationToken);
+        public override async Task FlushAsync(CancellationToken cancellationToken)
+        {
+            await this.inner.FlushAsync(cancellationToken).ConfigureAwait(false);
+            this.DidFlush?.Invoke(this, EventArgs.Empty);
+        }
 
         /// <inheritdoc/>
         public override int Read(byte[] buffer, int offset, int count)

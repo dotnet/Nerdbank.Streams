@@ -46,6 +46,7 @@ namespace Nerdbank.Streams
         public override Span<byte> GetSpan(int sizeHint = 0) => this.inner.GetSpan(sizeHint);
 
         /// <inheritdoc/>
+        [Obsolete]
         public override void OnReaderCompleted(Action<Exception?, object?> callback, object? state) => this.inner.OnReaderCompleted(callback, state);
     }
 }

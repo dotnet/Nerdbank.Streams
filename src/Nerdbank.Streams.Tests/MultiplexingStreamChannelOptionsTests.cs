@@ -73,7 +73,7 @@ public class MultiplexingStreamChannelOptionsTests : TestBase
     }
 
     [Fact]
-    public void ExistingPipe_AcceptsHalfDuplex()
+    public void ExistingPipe_AcceptsSimplex()
     {
         var options = new MultiplexingStream.ChannelOptions();
 

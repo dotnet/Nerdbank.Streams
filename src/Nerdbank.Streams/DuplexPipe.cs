@@ -58,7 +58,13 @@ namespace Nerdbank.Streams
             {
             }
 
-            public override void Advance(int bytes) => ThrowInvalidOperationException();
+            public override void Advance(int bytes)
+            {
+                if (bytes > 0)
+                {
+                    ThrowInvalidOperationException();
+                }
+            }
 
             public override void CancelPendingFlush()
             {
@@ -74,6 +80,7 @@ namespace Nerdbank.Streams
 
             public override Span<byte> GetSpan(int sizeHint) => throw ThrowInvalidOperationException();
 
+            [Obsolete]
             public override void OnReaderCompleted(Action<Exception, object> callback, object state)
             {
             }
@@ -101,6 +108,7 @@ namespace Nerdbank.Streams
             {
             }
 
+            [Obsolete]
             public override void OnWriterCompleted(Action<Exception, object> callback, object state)
             {
             }

@@ -84,6 +84,7 @@ namespace Nerdbank.Streams
         }
 
         /// <inheritdoc/>
+        [Obsolete]
         public override void OnWriterCompleted(Action<Exception, object> callback, object? state)
         {
             // We will never call this back. The method is deprecated in .NET Core 3.0 anyway.

@@ -17,6 +17,7 @@ namespace Nerdbank.Streams
     /// <summary>
     /// A <see cref="Stream"/> that acts as a queue for bytes, in that what gets written to it
     /// can then be read from it, in order.
+    /// This is actually a "simplex" stream -- not a half duplex stream. Naming bug.
     /// </summary>
     public class HalfDuplexStream : Stream, IBufferWriter<byte>, IDisposableObservable
     {

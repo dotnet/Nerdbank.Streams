@@ -79,8 +79,12 @@ namespace Nerdbank.Streams
             var pipe = new Pipe(pipeOptions ?? PipeOptions.Default);
 
             // Notice when the pipe reader isn't listening any more, and terminate our loop that reads from the stream.
+            // OBSOLETE API USAGE NOTICE: If at some point we need to stop relying on PipeWriter.OnReaderCompleted (since it is deprecated and may be removed later),
+            //                            we can return a decorated PipeReader that calls us from its Complete method directly.
             var combinedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+#pragma warning disable CS0618 // Type or member is obsolete
             pipe.Writer.OnReaderCompleted((ex, state) => ((CancellationTokenSource)state).Cancel(), combinedTokenSource);
+#pragma warning restore CS0618 // Type or member is obsolete
 
             Task.Run(async delegate
             {
@@ -108,7 +112,7 @@ namespace Nerdbank.Streams
                     catch (Exception ex)
                     {
                         // Propagate the exception to the reader.
-                        pipe.Writer.Complete(ex);
+                        await pipe.Writer.CompleteAsync(ex).ConfigureAwait(false);
                         return;
                     }
 
@@ -120,7 +124,7 @@ namespace Nerdbank.Streams
                 }
 
                 // Tell the PipeReader that there's no more data coming
-                pipe.Writer.Complete();
+                await pipe.Writer.CompleteAsync().ConfigureAwait(false);
             }).Forget();
             return pipe.Reader;
         }
@@ -182,12 +186,12 @@ namespace Nerdbank.Streams
                         }
                     }
 
-                    pipe.Reader.Complete();
+                    await pipe.Reader.CompleteAsync().ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
                     // Propagate the exception to the writer.
-                    pipe.Reader.Complete(ex);
+                    await pipe.Reader.CompleteAsync(ex).ConfigureAwait(false);
                     return;
                 }
             }).Forget();
@@ -247,6 +251,9 @@ namespace Nerdbank.Streams
             PipeReader? input = stream.CanRead ? stream.UsePipeReader(sizeHint, pipeOptions, cancellationToken) : null;
             PipeWriter? output = stream.CanWrite ? stream.UsePipeWriter(pipeOptions, cancellationToken) : null;
 
+            // OBSOLETE API USAGE NOTICE: If at some point we need to stop relying on these obsolete callbacks,
+            //                            we can return a decorated PipeReader/PipeWriter that calls us from its Complete method directly.
+#pragma warning disable CS0618 // Type or member is obsolete
             Task closeStreamAntecedent;
             if (input != null && output != null)
             {
@@ -262,6 +269,7 @@ namespace Nerdbank.Streams
                 Assumes.NotNull(output);
                 closeStreamAntecedent = output.WaitForReaderCompletionAsync();
             }
+#pragma warning restore CS0618 // Type or member is obsolete
 
             closeStreamAntecedent.ContinueWith((_, state) => ((Stream)state).Dispose(), stream, cancellationToken, TaskContinuationOptions.None, TaskScheduler.Default).Forget();
             return new DuplexPipe(input, output);
@@ -298,7 +306,7 @@ namespace Nerdbank.Streams
                     catch (Exception ex)
                     {
                         // Propagate the exception to the reader.
-                        pipe.Writer.Complete(ex);
+                        await pipe.Writer.CompleteAsync(ex).ConfigureAwait(false);
                         return;
                     }
 
@@ -310,7 +318,7 @@ namespace Nerdbank.Streams
                 }
 
                 // Tell the PipeReader that there's no more data coming
-                pipe.Writer.Complete();
+                await pipe.Writer.CompleteAsync().ConfigureAwait(false);
             }).Forget();
 
             return pipe.Reader;
@@ -352,12 +360,12 @@ namespace Nerdbank.Streams
                         }
                     }
 
-                    pipe.Reader.Complete();
+                    await pipe.Reader.CompleteAsync().ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
                     // Propagate the exception to the writer.
-                    pipe.Reader.Complete(ex);
+                    await pipe.Reader.CompleteAsync(ex).ConfigureAwait(false);
                     return;
                 }
             }).Forget();
@@ -449,7 +457,7 @@ namespace Nerdbank.Streams
                         {
                             if (propagateSuccessfulCompletion)
                             {
-                                writer.Complete();
+                                await writer.CompleteAsync().ConfigureAwait(false);
                             }
 
                             break;
@@ -458,7 +466,7 @@ namespace Nerdbank.Streams
                 }
                 catch (Exception ex)
                 {
-                    writer.Complete(ex);
+                    await writer.CompleteAsync(ex).ConfigureAwait(false);
                 }
             });
         }

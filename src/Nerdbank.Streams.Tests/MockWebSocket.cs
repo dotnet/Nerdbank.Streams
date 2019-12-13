@@ -77,7 +77,7 @@ internal class MockWebSocket : WebSocket
         if (this.writingInProgress == null)
         {
             byte[] bufferCopy = new byte[input.Count];
-            Buffer.BlockCopy(input.Array, input.Offset, bufferCopy, 0, input.Count);
+            Buffer.BlockCopy(input.Array!, input.Offset, bufferCopy, 0, input.Count);
             this.writingInProgress = new Message { Buffer = new ArraySegment<byte>(bufferCopy) };
         }
         else
