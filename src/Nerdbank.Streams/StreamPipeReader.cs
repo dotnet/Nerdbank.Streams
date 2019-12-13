@@ -63,6 +63,7 @@ namespace Nerdbank.Streams
         {
             lock (this.syncObject)
             {
+                Verify.Operation(this.clientIsReading, Strings.ReadBeforeAdvanceTo);
                 this.buffer.AdvanceTo(consumed);
                 this.clientIsReading = false;
                 this.examined = examined;

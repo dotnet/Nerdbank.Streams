@@ -171,8 +171,9 @@ public abstract class StreamPipeReaderTestBase : TestBase
     {
         var stream = new MemoryStream();
         var reader = this.CreatePipeReader(stream, sizeHint: 50);
-        reader.AdvanceTo(default);
-        Assert.Throws<InvalidCastException>(() => reader.AdvanceTo(ReadOnlySequence<byte>.Empty.Start));
+        Assert.Throws<InvalidOperationException>(() => reader.AdvanceTo(default));
+        var ex = Assert.ThrowsAny<Exception>(() => reader.AdvanceTo(ReadOnlySequence<byte>.Empty.Start));
+        Assert.True(ex is InvalidCastException || ex is InvalidOperationException);
     }
 
     [Fact]

@@ -70,6 +70,15 @@ namespace Nerdbank.Streams {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to No reading operation to complete..
+        /// </summary>
+        internal static string ReadBeforeAdvanceTo {
+            get {
+                return ResourceManager.GetString("ReadBeforeAdvanceTo", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Reading not allowed after reader is completed..
         /// </summary>
         internal static string ReadingAfterCompletionNotAllowed {
