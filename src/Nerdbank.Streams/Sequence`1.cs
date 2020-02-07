@@ -23,6 +23,8 @@ namespace Nerdbank.Streams
     [DebuggerDisplay("{" + nameof(DebuggerDisplay) + ",nq}")]
     public class Sequence<T> : IBufferWriter<T>, IDisposable
     {
+        private const int MaximumAutoGrowSize = 32 * 1024;
+
         private static readonly int DefaultLengthFromArrayPool = 1 + (4095 / Marshal.SizeOf<T>());
 
         private static readonly ReadOnlySequence<T> Empty = new ReadOnlySequence<T>(SequenceSegment.Empty, 0, SequenceSegment.Empty, 0);
@@ -85,8 +87,20 @@ namespace Nerdbank.Streams
         /// The <see cref="MemoryPool{T}"/> in use may itself have a minimum array length as well,
         /// in which case the higher of the two minimums dictate the minimum array size that will be allocated.
         /// </para>
+        /// <para>
+        /// If <see cref="AutoIncreaseMinimumSpanLength"/> is <c>true</c>, this value may be automatically increased as the length of a sequence grows.
+        /// </para>
         /// </remarks>
         public int MinimumSpanLength { get; set; } = 0;
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the <see cref="MinimumSpanLength"/> should be
+        /// intelligently increased as the length of the sequence grows.
+        /// </summary>
+        /// <remarks>
+        /// This can help prevent long sequences made up of many very small arrays.
+        /// </remarks>
+        public bool AutoIncreaseMinimumSpanLength { get; set; } = true;
 
         /// <summary>
         /// Gets this sequence expressed as a <see cref="ReadOnlySequence{T}"/>.
@@ -179,6 +193,7 @@ namespace Nerdbank.Streams
             SequenceSegment? last = this.last;
             Verify.Operation(last != null, "Cannot advance before acquiring memory.");
             last.Advance(count);
+            this.ConsiderMinimumSizeIncrease();
         }
 
         /// <summary>
@@ -319,6 +334,18 @@ namespace Nerdbank.Streams
             recycledSegment.ResetMemory(this.arrayPool);
             this.segmentPool.Push(recycledSegment);
             return nextSegment;
+        }
+
+        private void ConsiderMinimumSizeIncrease()
+        {
+            if (this.AutoIncreaseMinimumSpanLength && this.MinimumSpanLength < MaximumAutoGrowSize)
+            {
+                int autoSize = Math.Min(MaximumAutoGrowSize, (int)Math.Min(int.MaxValue, this.Length / 2));
+                if (this.MinimumSpanLength < autoSize)
+                {
+                    this.MinimumSpanLength = autoSize;
+                }
+            }
         }
 
         private class SequenceSegment : ReadOnlySequenceSegment<T>
