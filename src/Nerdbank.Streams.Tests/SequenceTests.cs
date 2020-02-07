@@ -423,10 +423,11 @@ public class SequenceTests : TestBase
     [Fact]
     public void MinimumSpanLength_ZeroGetsPoolRecommendation()
     {
-        var seq = new Sequence<int>(new MockMemoryPool<int>());
+        var pool = new MockMemoryPool<int>();
+        var seq = new Sequence<int>(pool);
         seq.MinimumSpanLength = 0;
         var span = seq.GetSpan(0);
-        Assert.Equal(MockMemoryPool<int>.DefaultLength, span.Length);
+        Assert.Equal(pool.DefaultLength, span.Length);
     }
 
     [Fact]
@@ -557,6 +558,109 @@ public class SequenceTests : TestBase
         Assert.Equal(3, seq.Length);
 
         Assert.Equal(new int[] { 1, 2, 3 }, seq.AsReadOnlySequence.ToArray());
+    }
+
+    [Fact]
+    public void AutoIncreaseMinimumSpanLength_Default()
+    {
+        Assert.True(new Sequence<byte>().AutoIncreaseMinimumSpanLength);
+    }
+
+    [Fact]
+    public void AutoIncreaseMinimumSpanLength_TrueBehavior()
+    {
+        var sequence = new Sequence<int>(new MockArrayPool<int>()) { AutoIncreaseMinimumSpanLength = true, MinimumSpanLength = 4 };
+        var span = sequence.GetSpan(2);
+        Assert.Equal(4, span.Length);
+        sequence.Advance(2);
+
+        span = sequence.GetSpan(0);
+        Assert.Equal(2, span.Length);
+        sequence.Advance(2);
+
+        span = sequence.GetSpan(2);
+        Assert.Equal(4, span.Length);
+        sequence.Advance(4);
+
+        span = sequence.GetSpan(2);
+        Assert.Equal(4, span.Length);
+        sequence.Advance(4);
+
+        // At this point, the sequence length is 12, so the minimum new span should be 6 (half the existing length).
+        Assert.Equal(6, sequence.MinimumSpanLength);
+        span = sequence.GetSpan(2);
+        Assert.Equal(6, span.Length);
+
+        // Confirm that the minimum span creeps up as required to stay at 50% of the current length,
+        // but never exceeds 32KB on its own.
+        while (sequence.Length < 32 * 1024 * 3)
+        {
+            span = sequence.GetSpan(sequence.MinimumSpanLength - 1);
+            Assert.Equal(sequence.MinimumSpanLength, span.Length);
+            sequence.Advance(span.Length);
+            Assert.Equal(Math.Min(32 * 1024, sequence.Length / 2), sequence.MinimumSpanLength);
+        }
+
+        // Now artificially raise it beyond 32KB and confirm it just stays put.
+        sequence.MinimumSpanLength = 48 * 1024;
+        span = sequence.GetSpan(100 * 1024);
+        Assert.Equal(100 * 1024, span.Length);
+        sequence.Advance(span.Length);
+        Assert.Equal(48 * 1024, sequence.MinimumSpanLength);
+        span = sequence.GetSpan(4);
+        Assert.Equal(48 * 1024, span.Length);
+    }
+
+    [Fact]
+    public void AutoIncreaseMinimumSpanLength_DoesNotResetWhenClearingSequence()
+    {
+        var sequence = new Sequence<int>(new MockArrayPool<int>()) { AutoIncreaseMinimumSpanLength = true, MinimumSpanLength = 4 };
+        sequence.GetSpan(16);
+        sequence.Advance(16);
+        Assert.Equal(8, sequence.MinimumSpanLength);
+        sequence.Reset();
+        Assert.Equal(8, sequence.MinimumSpanLength);
+    }
+
+    [Fact]
+    public void AutoIncreaseMinimumSpanLength_DoesNotReduceSpanFromMinSizePools()
+    {
+        var sequence = new Sequence<int>(new MockMemoryPool<int> { DefaultLength = 32 }) { AutoIncreaseMinimumSpanLength = true };
+        var span = sequence.GetSpan(0);
+        Assert.Equal(32, span.Length);
+        sequence.Advance(32);
+
+        // At this point, the auto-incrementing value might be 16 (half the length),
+        // but if we explicitly ask for that, it may shrink the 'default' min size from the pool. That's undesirable.
+        // So assert that we still get the pool size.
+        span = sequence.GetSpan(0);
+        Assert.Equal(32, span.Length);
+        sequence.Advance(1);
+    }
+
+    [Fact]
+    public void AutoIncreaseMinimumSpanLength_FalseBehavior()
+    {
+        var sequence = new Sequence<int>(new MockArrayPool<int>()) { AutoIncreaseMinimumSpanLength = false, MinimumSpanLength = 4 };
+        var span = sequence.GetSpan(2);
+        Assert.Equal(4, span.Length);
+        sequence.Advance(2);
+
+        span = sequence.GetSpan(0);
+        Assert.Equal(2, span.Length);
+        sequence.Advance(2);
+
+        span = sequence.GetSpan(2);
+        Assert.Equal(4, span.Length);
+        sequence.Advance(4);
+
+        span = sequence.GetSpan(2);
+        Assert.Equal(4, span.Length);
+        sequence.Advance(4);
+
+        Assert.Equal(4, sequence.MinimumSpanLength);
+        span = sequence.GetSpan(2);
+        Assert.Equal(4, span.Length);
     }
 
     /// <summary>
