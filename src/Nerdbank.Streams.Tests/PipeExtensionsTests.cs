@@ -38,7 +38,7 @@ public partial class PipeExtensionsTests : TestBase
     [Fact]
     public async Task UsePipe_Stream()
     {
-        var ms = new HalfDuplexStream();
+        var ms = new SimplexStream();
         IDuplexPipe pipe = ms.UsePipe(cancellationToken: this.TimeoutToken);
         await pipe.Output.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
         var readResult = await pipe.Input.ReadAsync(this.TimeoutToken);
@@ -49,7 +49,7 @@ public partial class PipeExtensionsTests : TestBase
     [Fact]
     public async Task UsePipe_Stream_Disposal()
     {
-        var ms = new HalfDuplexStream();
+        var ms = new SimplexStream();
         IDuplexPipe pipe = ms.UsePipe(cancellationToken: this.TimeoutToken);
         pipe.Output.Complete();
         pipe.Input.Complete();
@@ -60,7 +60,7 @@ public partial class PipeExtensionsTests : TestBase
     [PairwiseData]
     public async Task UsePipe_Stream_OneDirectionDoesNotDispose(bool completeOutput)
     {
-        var ms = new HalfDuplexStream();
+        var ms = new SimplexStream();
         IDuplexPipe pipe = ms.UsePipe(cancellationToken: this.TimeoutToken);
         if (completeOutput)
         {

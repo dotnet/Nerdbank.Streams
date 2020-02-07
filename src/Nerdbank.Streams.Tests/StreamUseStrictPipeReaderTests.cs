@@ -44,7 +44,7 @@ public class StreamUseStrictPipeReaderTests : StreamPipeReaderTestBase
     [Fact] // Bizarre behavior when using the built-in Pipe class: https://github.com/dotnet/corefx/issues/31696
     public async Task CancelPendingRead()
     {
-        var stream = new HalfDuplexStream();
+        var stream = new SimplexStream();
         var reader = this.CreatePipeReader(stream, sizeHint: 50);
 
         ValueTask<ReadResult> readTask = reader.ReadAsync(this.TimeoutToken);

@@ -93,7 +93,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
     public async Task ReadAsyncAfterExamining()
     {
         byte[] expectedBuffer = this.GetRandomBuffer(2048);
-        var stream = new HalfDuplexStream();
+        var stream = new SimplexStream();
         stream.Write(expectedBuffer, 0, 50);
         await stream.FlushAsync(this.TimeoutToken);
         var reader = this.CreatePipeReader(stream, sizeHint: 50);
@@ -214,7 +214,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
     [Fact]
     public async Task CancelPendingRead_WithCancellationToken()
     {
-        var stream = new HalfDuplexStream();
+        var stream = new SimplexStream();
         var reader = this.CreatePipeReader(stream, sizeHint: 50);
 
         var cts = new CancellationTokenSource();
@@ -226,7 +226,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
     [Fact]
     public async Task Complete_DoesNotCauseStreamDisposal()
     {
-        var stream = new HalfDuplexStream();
+        var stream = new SimplexStream();
         var reader = this.CreatePipeReader(stream);
         reader.Complete();
 

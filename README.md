@@ -9,7 +9,7 @@ Specialized .NET Stream classes
 
 ## Features
 
-1. [`HalfDuplexStream`](doc/HalfDuplexStream.md) is meant to allow two parties to communicate *one direction*.
+1. [`SimplexStream`](doc/SimplexStream.md) is meant to allow two parties to communicate *one direction*.
    Anything written to the stream can subsequently be read from it. You can share this `Stream`
    with any two parties (in the same AppDomain) and one can send messages to the other.
 1. [`FullDuplexStream`](doc/FullDuplexStream.md) creates a pair of bidirectional streams for
