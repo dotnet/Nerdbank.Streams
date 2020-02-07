@@ -13,9 +13,7 @@ using Nerdbank.Streams;
 using Xunit;
 using Xunit.Abstractions;
 
-#pragma warning disable CS0618 // Type or member is obsolete
-
-public class HalfDuplexStreamTests : TestBase
+public class SimplexStreamTests : TestBase
 {
     private const int ResumeThreshold = 39;
 
@@ -23,9 +21,9 @@ public class HalfDuplexStreamTests : TestBase
 
     private readonly Random random = new Random();
 
-    private HalfDuplexStream stream = new HalfDuplexStream(ResumeThreshold, PauseThreshold);
+    private SimplexStream stream = new SimplexStream(ResumeThreshold, PauseThreshold);
 
-    public HalfDuplexStreamTests(ITestOutputHelper logger)
+    public SimplexStreamTests(ITestOutputHelper logger)
         : base(logger)
     {
     }
@@ -33,7 +31,7 @@ public class HalfDuplexStreamTests : TestBase
     [Fact]
     public void DefaultCtor()
     {
-        var stream = new HalfDuplexStream();
+        var stream = new SimplexStream();
         stream.Dispose();
     }
 

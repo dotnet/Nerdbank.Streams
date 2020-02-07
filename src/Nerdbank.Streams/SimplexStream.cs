@@ -17,10 +17,8 @@ namespace Nerdbank.Streams
     /// <summary>
     /// A <see cref="Stream"/> that acts as a queue for bytes, in that what gets written to it
     /// can then be read from it, in order.
-    /// This is actually a "simplex" stream -- not a half duplex stream. Naming bug.
     /// </summary>
-    [Obsolete("Use " + nameof(SimplexStream) + " instead.")]
-    public class HalfDuplexStream : Stream, IBufferWriter<byte>, IDisposableObservable
+    public class SimplexStream : Stream, IBufferWriter<byte>, IDisposableObservable
     {
         /// <summary>
         /// The pipe that does all the hard work.
@@ -28,19 +26,19 @@ namespace Nerdbank.Streams
         private readonly Pipe pipe;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="HalfDuplexStream"/> class.
+        /// Initializes a new instance of the <see cref="SimplexStream"/> class.
         /// </summary>
-        public HalfDuplexStream()
+        public SimplexStream()
             : this(16 * 1024, 32 * 1024)
         {
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="HalfDuplexStream"/> class.
+        /// Initializes a new instance of the <see cref="SimplexStream"/> class.
         /// </summary>
         /// <param name="resumeWriterThreshold">The size the buffer must shrink to after hitting <paramref name="pauseWriterThreshold"/> before writing is allowed to resume.</param>
         /// <param name="pauseWriterThreshold">The maximum size the buffer is allowed to grow before write calls are blocked (pending a read that will release buffer space.</param>
-        public HalfDuplexStream(int resumeWriterThreshold, int pauseWriterThreshold)
+        public SimplexStream(int resumeWriterThreshold, int pauseWriterThreshold)
         {
             PipeOptions options = new PipeOptions(
                 pauseWriterThreshold: pauseWriterThreshold,
@@ -95,7 +93,7 @@ namespace Nerdbank.Streams
 
             ReadResult readResult = await this.pipe.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
             int bytesRead = 0;
-            System.Buffers.ReadOnlySequence<byte> slice = readResult.Buffer.Slice(0, Math.Min(count, readResult.Buffer.Length));
+            ReadOnlySequence<byte> slice = readResult.Buffer.Slice(0, Math.Min(count, readResult.Buffer.Length));
             foreach (ReadOnlyMemory<byte> span in slice)
             {
                 int bytesToCopy = Math.Min(count, span.Length);

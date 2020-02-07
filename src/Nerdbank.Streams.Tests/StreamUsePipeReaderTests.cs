@@ -46,7 +46,7 @@ public class StreamUsePipeReaderTests : StreamPipeReaderTestBase
     [Fact]
     public async Task Complete_CausesWriterCompletion()
     {
-        var stream = new HalfDuplexStream();
+        var stream = new SimplexStream();
         var reader = this.CreatePipeReader(stream);
 #pragma warning disable CS0618 // Type or member is obsolete
         Task writerCompletion = reader.WaitForWriterCompletionAsync();
