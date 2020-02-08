@@ -241,6 +241,30 @@ public abstract class TestBase : IDisposable
         return this.ExecuteInIsolationAsync(testClass.GetType().FullName, testMethodName, logger);
     }
 
+    protected static Task WhenAllSucceedOrAnyFail(params Task[] tasks)
+    {
+        var tcs = new TaskCompletionSource<int>();
+        Task.WhenAll(tasks).ApplyResultTo(tcs);
+        foreach (var task in tasks)
+        {
+            task.ContinueWith(t => tcs.TrySetException(t.Exception!), CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default).Forget();
+        }
+
+        return tcs.Task;
+    }
+
+    protected static Task<T[]> WhenAllSucceedOrAnyFail<T>(params Task<T>[] tasks)
+    {
+        var tcs = new TaskCompletionSource<T[]>();
+        Task.WhenAll(tasks).ApplyResultTo(tcs);
+        foreach (var task in tasks)
+        {
+            task.ContinueWith(t => tcs.TrySetException(t.Exception!), CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default).Forget();
+        }
+
+        return tcs.Task;
+    }
+
     /// <summary>
     /// Executes the specified test method in its own process, offering maximum isolation from ambient noise from other threads
     /// and GC.
