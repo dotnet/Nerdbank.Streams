@@ -982,18 +982,6 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         }
     }
 
-    private static Task<T[]> WhenAllSucceedOrAnyFail<T>(params Task<T>[] tasks)
-    {
-        var tcs = new TaskCompletionSource<T[]>();
-        Task.WhenAll(tasks).ApplyResultTo(tcs);
-        foreach (var task in tasks)
-        {
-            task.ContinueWith(t => tcs.TrySetException(t.Exception), CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default).Forget();
-        }
-
-        return tcs.Task;
-    }
-
     private async Task WaitForEphemeralChannelOfferToPropagateAsync()
     {
         // Propagation of ephemeral channel offers must occur before the remote end can accept it.

@@ -73,56 +73,7 @@ namespace Nerdbank.Streams
         /// </remarks>
         public static PipeReader UsePipeReader(this Stream stream, int sizeHint = 0, PipeOptions? pipeOptions = null, CancellationToken cancellationToken = default)
         {
-            Requires.NotNull(stream, nameof(stream));
-            Requires.Argument(stream.CanRead, nameof(stream), "Stream must be readable.");
-
-            var pipe = new Pipe(pipeOptions ?? PipeOptions.Default);
-
-            // Notice when the pipe reader isn't listening any more, and terminate our loop that reads from the stream.
-            var combinedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            pipe.Writer.OnReaderCompleted((ex, state) => ((CancellationTokenSource)state).Cancel(), combinedTokenSource);
-
-            Task.Run(async delegate
-            {
-                while (!combinedTokenSource.Token.IsCancellationRequested)
-                {
-                    Memory<byte> memory = pipe.Writer.GetMemory(sizeHint);
-                    try
-                    {
-                        int bytesRead = await stream.ReadAsync(memory, combinedTokenSource.Token).ConfigureAwait(false);
-                        if (bytesRead == 0)
-                        {
-                            break;
-                        }
-
-                        pipe.Writer.Advance(bytesRead);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        break;
-                    }
-                    catch (ObjectDisposedException)
-                    {
-                        break;
-                    }
-                    catch (Exception ex)
-                    {
-                        // Propagate the exception to the reader.
-                        pipe.Writer.Complete(ex);
-                        return;
-                    }
-
-                    FlushResult result = await pipe.Writer.FlushAsync().ConfigureAwait(false);
-                    if (result.IsCompleted)
-                    {
-                        break;
-                    }
-                }
-
-                // Tell the PipeReader that there's no more data coming
-                pipe.Writer.Complete();
-            }).Forget();
-            return pipe.Reader;
+            return UsePipeReader(stream, sizeHint, pipeOptions, null, cancellationToken);
         }
 
         /// <summary>
@@ -244,14 +195,14 @@ namespace Nerdbank.Streams
                 return new DuplexPipe(pipeStream.UnderlyingPipeReader, pipeStream.UnderlyingPipeWriter);
             }
 
-            PipeReader? input = stream.CanRead ? stream.UsePipeReader(sizeHint, pipeOptions, cancellationToken) : null;
             PipeWriter? output = stream.CanWrite ? stream.UsePipeWriter(pipeOptions, cancellationToken) : null;
+            PipeReader? input = stream.CanRead ? stream.UsePipeReader(sizeHint, pipeOptions, output?.WaitForReaderCompletionAsync(), cancellationToken) : null;
 
-            Task closeStreamAntecedent;
+            Task? closeStreamAntecedent;
             if (input != null && output != null)
             {
-                // Arrange for closing the stream when *both* input/output are completed.
-                closeStreamAntecedent = Task.WhenAll(input.WaitForWriterCompletionAsync(), output.WaitForReaderCompletionAsync());
+                // The UsePipeReader function will be responsible for disposing the stream in this case.
+                closeStreamAntecedent = null;
             }
             else if (input != null)
             {
@@ -263,7 +214,7 @@ namespace Nerdbank.Streams
                 closeStreamAntecedent = output.WaitForReaderCompletionAsync();
             }
 
-            closeStreamAntecedent.ContinueWith((_, state) => ((Stream)state).Dispose(), stream, cancellationToken, TaskContinuationOptions.None, TaskScheduler.Default).Forget();
+            closeStreamAntecedent?.ContinueWith((_, state) => ((Stream)state).Dispose(), stream, cancellationToken, TaskContinuationOptions.None, TaskScheduler.Default).Forget();
             return new DuplexPipe(input, output);
         }
 
@@ -461,6 +412,89 @@ namespace Nerdbank.Streams
                     writer.Complete(ex);
                 }
             });
+        }
+
+        /// <summary>
+        /// Enables efficiently reading a stream using <see cref="PipeReader"/>.
+        /// </summary>
+        /// <param name="stream">The stream to read from using a pipe.</param>
+        /// <param name="sizeHint">A hint at the size of messages that are commonly transferred. Use 0 for a commonly reasonable default.</param>
+        /// <param name="pipeOptions">Optional pipe options to use.</param>
+        /// <param name="disposeWhenReaderCompleted">A task which, when complete, signals that this method should dispose of the <paramref name="stream"/>.</param>
+        /// <param name="cancellationToken">A cancellation token that aborts reading from the <paramref name="stream"/>.</param>
+        /// <returns>A <see cref="PipeReader"/>.</returns>
+        /// <remarks>
+        /// When the caller invokes <see cref="PipeReader.Complete(Exception)"/> on the result value,
+        /// this leads to the associated <see cref="PipeWriter.Complete(Exception)"/> to be automatically called as well.
+        /// </remarks>
+        private static PipeReader UsePipeReader(this Stream stream, int sizeHint = 0, PipeOptions? pipeOptions = null, Task? disposeWhenReaderCompleted = null, CancellationToken cancellationToken = default)
+        {
+            Requires.NotNull(stream, nameof(stream));
+            Requires.Argument(stream.CanRead, nameof(stream), "Stream must be readable.");
+
+            var pipe = new Pipe(pipeOptions ?? PipeOptions.Default);
+
+            // Notice when the pipe reader isn't listening any more, and terminate our loop that reads from the stream.
+            var combinedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            pipe.Writer.OnReaderCompleted((ex, state) => ((CancellationTokenSource)state).Cancel(), combinedTokenSource);
+
+            // When this argument is provided, it provides a means to ensure we don't hang while reading from an I/O pipe
+            // that doesn't respect the CancellationToken. Disposing a Stream while reading is a means to terminate the ReadAsync operation.
+            if (disposeWhenReaderCompleted is object)
+            {
+                disposeWhenReaderCompleted.ContinueWith(
+                    (_, s1) =>
+                    {
+                        var tuple = (Tuple<Pipe, Stream>)s1;
+                        tuple.Item1.Writer.OnReaderCompleted((ex, s2) => ((Stream)s2).Dispose(), tuple.Item2);
+                    },
+                    Tuple.Create(pipe, stream),
+                    cancellationToken,
+                    TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default).Forget();
+            }
+
+            Task.Run(async delegate
+            {
+                while (!combinedTokenSource.Token.IsCancellationRequested)
+                {
+                    Memory<byte> memory = pipe.Writer.GetMemory(sizeHint);
+                    try
+                    {
+                        int bytesRead = await stream.ReadAsync(memory, combinedTokenSource.Token).ConfigureAwait(false);
+                        if (bytesRead == 0)
+                        {
+                            break;
+                        }
+
+                        pipe.Writer.Advance(bytesRead);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        // Propagate the exception to the reader.
+                        pipe.Writer.Complete(ex);
+                        return;
+                    }
+
+                    FlushResult result = await pipe.Writer.FlushAsync().ConfigureAwait(false);
+                    if (result.IsCompleted)
+                    {
+                        break;
+                    }
+                }
+
+                // Tell the PipeReader that there's no more data coming
+                pipe.Writer.Complete();
+            }).Forget();
+            return pipe.Reader;
         }
 
         /// <summary>
