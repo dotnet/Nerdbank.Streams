@@ -228,6 +228,17 @@ namespace Nerdbank.Streams
             this.WriteLine();
         }
 
+        /// <inheritdoc />
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                this.Flush();
+            }
+
+            base.Dispose(disposing);
+        }
+
         /// <summary>
         /// Encodes the written characters if the character buffer is full.
         /// </summary>

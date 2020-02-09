@@ -5,6 +5,7 @@ using System;
 using System.Buffers;
 using System.IO;
 using System.IO.Pipelines;
+using System.IO.Pipes;
 using System.Linq;
 using System.Net.WebSockets;
 using System.Threading;
@@ -15,6 +16,7 @@ using Moq;
 using Nerdbank.Streams;
 using Xunit;
 using Xunit.Abstractions;
+using IPC = System.IO.Pipes;
 
 public partial class PipeExtensionsTests : TestBase
 {
@@ -54,6 +56,54 @@ public partial class PipeExtensionsTests : TestBase
         pipe.Output.Complete();
         pipe.Input.Complete();
         await this.AssertStreamClosesAsync(ms);
+    }
+
+    /// <summary>
+    /// Verify that completing the <see cref="PipeReader"/> and <see cref="PipeWriter"/> lead to the disposal of the
+    /// IPC <see cref="Stream"/> on both sides.
+    /// </summary>
+    /// <remarks>
+    /// This is worth a special test because on .NET Framework, IPC stream reads are not cancelable.
+    /// </remarks>
+    [Fact]
+    public async Task UsePipe_IpcPipeStream_Disposal()
+    {
+        var guid = Guid.NewGuid().ToString();
+
+        var ipcServerTask = Task.Run(async delegate
+        {
+            using var ipcServerPipe = new NamedPipeServerStream(guid, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, IPC.PipeOptions.Asynchronous);
+            await ipcServerPipe.WaitForConnectionAsync(this.TimeoutToken);
+            int bytesRead = await ipcServerPipe.ReadAsync(new byte[1], 0, 1, this.TimeoutToken).WithCancellation(this.TimeoutToken);
+            ipcServerPipe.Dispose();
+            this.Logger.WriteLine("The server stream closed.");
+        });
+        var ipcClientTask = Task.Run(async delegate
+        {
+            using var ipcClientPipe = new NamedPipeClientStream(".", guid, IPC.PipeDirection.InOut, IPC.PipeOptions.Asynchronous);
+            await ipcClientPipe.ConnectAsync(this.TimeoutToken);
+
+            // We need to time this so that we don't call Complete() until reading from the PipeStream has already started.
+            // Use our MonitoringStream for this purpose, and also to know when Dispose is called.
+            var monitoredStream = new MonitoringStream(ipcClientPipe);
+            var disposed = new TaskCompletionSource<object?>();
+            var readStarted = new TaskCompletionSource<object?>();
+            monitoredStream.Disposed += (s, e) => disposed.SetResult(null);
+            monitoredStream.WillRead += (s, e) => readStarted.SetResult(null);
+            monitoredStream.WillReadMemory += (s, e) => readStarted.SetResult(null);
+            monitoredStream.WillReadSpan += (s, e) => readStarted.SetResult(null);
+
+            IDuplexPipe pipe = monitoredStream.UsePipe(cancellationToken: this.TimeoutToken);
+            await readStarted.Task.WithCancellation(this.TimeoutToken);
+
+            pipe.Output.Complete();
+            pipe.Input.Complete();
+
+            await disposed.Task.WithCancellation(this.TimeoutToken);
+            this.Logger.WriteLine("The client stream closed.");
+        });
+
+        await WhenAllSucceedOrAnyFail(ipcClientTask, ipcServerTask);
     }
 
     [Theory]
@@ -241,7 +291,10 @@ public partial class PipeExtensionsTests : TestBase
     {
         Requires.NotNull(stream, nameof(stream));
 
-        Func<bool> isDisposed = stream is IDisposableObservable observableStream ? new Func<bool>(() => observableStream.IsDisposed) : new Func<bool>(() => !stream.CanRead && !stream.CanWrite);
+        Func<bool> isDisposed =
+            stream is IDisposableObservable observableStream ? new Func<bool>(() => observableStream.IsDisposed) :
+            stream is PipeStream pipeStream ? new Func<bool>(() => !pipeStream.IsConnected) :
+            new Func<bool>(() => !stream.CanRead && !stream.CanWrite);
 
         while (!this.TimeoutToken.IsCancellationRequested && !isDisposed())
         {
