@@ -65,7 +65,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         this.mx1?.TraceSource.Listeners.OfType<XunitTraceListener>().SingleOrDefault()?.Dispose();
         this.mx2?.TraceSource.Listeners.OfType<XunitTraceListener>().SingleOrDefault()?.Dispose();
 
-        return TplExtensions.CompletedTask;
+        return Task.CompletedTask;
     }
 
     [Fact]
@@ -732,7 +732,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         Assert.Equal(alreadyAccepted, mx2EventArgs.IsAccepted);
 
         Assert.False(mx1EventArgsSource.Task.IsCompleted);
-        await acceptTask.WithCancellation(this.TimeoutToken); // Rethrow any exceptions
+        await acceptTask!.WithCancellation(this.TimeoutToken); // Rethrow any exceptions
     }
 
     [Fact]
