@@ -143,7 +143,7 @@ namespace Nerdbank.Streams
 
             cancellationToken.ThrowIfCancellationRequested();
             this.writer.Write(buffer.AsSpan(offset, count));
-            return TplExtensions.CompletedTask;
+            return Task.CompletedTask;
         }
 
         /// <inheritdoc />
