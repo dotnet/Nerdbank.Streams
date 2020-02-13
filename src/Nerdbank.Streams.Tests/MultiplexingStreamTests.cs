@@ -502,6 +502,55 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
+    public async Task Backpressure()
+    {
+        const int backpressureThreshold = 64 * 1024;
+        var (a, b) = await this.EstablishChannelsAsync("a");
+        const int chunksize = backpressureThreshold * 2 / 5; // chosen so the 3rd chunk will cross the threshold.
+        var chunk = new byte[chunksize];
+
+        // Write freely.
+        for (int i = 0; i < 2; i++)
+        {
+            a.Output.Write(chunk);
+            await a.Output.FlushAsync(this.TimeoutToken);
+        }
+
+        // This write should be held up.
+        a.Output.Write(chunk);
+        Task flushTask = a.Output.FlushAsync(this.TimeoutToken).AsTask();
+        Assert.False(flushTask.IsCompleted);
+
+        // Verify that another channel can be created and communicate while the first channel is still blocked.
+        var (c, d) = await this.EstablishChannelsAsync("b");
+        for (int i = 0; i < 5; i++)
+        {
+            c.Output.Write(chunk);
+            await c.Output.FlushAsync(this.TimeoutToken);
+            await this.DrainAsync(d.Input, chunk.Length);
+        }
+
+        // Assert that the original channel is still blocked.
+        Assert.False(flushTask.IsCompleted);
+
+        // Verify that the blocked channel still accepts communication going the other way.
+        for (int i = 0; i < 5; i++)
+        {
+            b.Output.Write(chunk);
+            await b.Output.FlushAsync(this.TimeoutToken);
+            await this.DrainAsync(a.Input, chunk.Length);
+        }
+
+        // Assert that the original channel is still blocked.
+        Assert.False(flushTask.IsCompleted);
+
+        // Now read from the channel and verify it unblocks the writer.
+        await this.DrainAsync(b.Input, chunk.Length * 3);
+
+        await flushTask.WithCancellation(this.TimeoutToken);
+    }
+
+    [Fact]
     public async Task CanProperties()
     {
         var (s1, s2) = await this.EstablishChannelStreamsAsync(string.Empty);

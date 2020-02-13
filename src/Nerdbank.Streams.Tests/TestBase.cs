@@ -122,6 +122,23 @@ public abstract class TestBase : IDisposable
         return bytesReceived.AsReadOnlySequence;
     }
 
+    public async Task DrainAsync(PipeReader reader, long requiredLength)
+    {
+        Requires.NotNull(reader, nameof(reader));
+
+        while (requiredLength > 0)
+        {
+            ReadResult readResult = await reader.ReadAsync(this.TimeoutToken);
+            long bytesToConsume = Math.Min(requiredLength, readResult.Buffer.Length);
+            reader.AdvanceTo(readResult.Buffer.GetPosition(bytesToConsume));
+            requiredLength -= bytesToConsume;
+            if (readResult.IsCompleted && requiredLength > 0)
+            {
+                throw new EndOfStreamException("End of stream encountered before we read all the expected bytes.");
+            }
+        }
+    }
+
     public async Task DrainReaderTillCompletedAsync(PipeReader reader)
     {
         while (true)
