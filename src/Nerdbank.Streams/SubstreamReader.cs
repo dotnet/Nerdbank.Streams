@@ -71,7 +71,7 @@ namespace Nerdbank.Streams
             {
                 while (bytesRead < 4)
                 {
-                    int bytesJustRead = this.underlyingStream.Read(this.intBuffer, 0, 4 - bytesRead);
+                    int bytesJustRead = this.underlyingStream.Read(this.intBuffer, bytesRead, 4 - bytesRead);
                     if (bytesJustRead == 0)
                     {
                         throw new EndOfStreamException();
@@ -103,7 +103,7 @@ namespace Nerdbank.Streams
             {
                 while (bytesRead < 4)
                 {
-                    int bytesJustRead = await this.underlyingStream.ReadAsync(this.intBuffer, 0, 4 - bytesRead).ConfigureAwait(false);
+                    int bytesJustRead = await this.underlyingStream.ReadAsync(this.intBuffer, bytesRead, 4 - bytesRead).ConfigureAwait(false);
                     if (bytesJustRead == 0)
                     {
                         throw new EndOfStreamException();
