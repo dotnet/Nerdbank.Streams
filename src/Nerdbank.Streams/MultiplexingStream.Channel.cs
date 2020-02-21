@@ -4,8 +4,14 @@
 namespace Nerdbank.Streams
 {
     using System;
+    using System.Buffers;
+    using System.CodeDom.Compiler;
     using System.Diagnostics;
+    using System.IO;
     using System.IO.Pipelines;
+    using System.Runtime.CompilerServices;
+    using System.Runtime.InteropServices;
+    using System.Runtime.Serialization;
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft;
@@ -19,13 +25,13 @@ namespace Nerdbank.Streams
         /// <summary>
         /// An individual channel within a <see cref="Streams.MultiplexingStream"/>.
         /// </summary>
-        [DebuggerDisplay("{" + nameof(DebuggerDisplay) + "}")]
+        [DebuggerDisplay("{" + nameof(DebuggerDisplay) + ",nq}")]
         public class Channel : IDisposableObservable, IDuplexPipe
         {
             /// <summary>
             /// This task source completes when the channel has been accepted, rejected, or the offer is canceled.
             /// </summary>
-            private readonly TaskCompletionSource<object?> acceptanceSource = new TaskCompletionSource<object?>();
+            private readonly TaskCompletionSource<AcceptanceParameters> acceptanceSource = new TaskCompletionSource<AcceptanceParameters>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             /// <summary>
             /// The source for the <see cref="Completion"/> property.
@@ -48,12 +54,35 @@ namespace Nerdbank.Streams
             private readonly AsyncManualResetEvent mxStreamIOWriterCompleted = new AsyncManualResetEvent();
 
             /// <summary>
+            /// Gets a signal which indicates when the <see cref="RemoteWindowRemaining"/> is non-zero.
+            /// </summary>
+            private readonly AsyncManualResetEvent remoteWindowNonEmpty = new AsyncManualResetEvent(initialState: true);
+
+            /// <summary>
+            /// The number of bytes transmitted from here but not yet acknowledged as processed from there,
+            /// and thus occupying some portion of the full <see cref="AcceptanceParameters.RemoteWindowSize"/>.
+            /// </summary>
+            /// <remarks>
+            /// All access to this field should be made within a lock on the <see cref="SyncObject"/> object.
+            /// </remarks>
+            private long remoteWindowFilled = 0;
+
+            /// <summary>
+            /// The number of bytes that may be transmitted before receiving acknowledgment that those bytes have been processed.
+            /// </summary>
+            /// <remarks>
+            /// This field is set to the value of <see cref="OfferParameters.RemoteWindowSize"/> if we accepted the channel,
+            /// or the value of <see cref="AcceptanceParameters.RemoteWindowSize"/> if we offered the channel.
+            /// </remarks>
+            private long remoteWindowSize = -1;
+
+            /// <summary>
             /// Indicates whether the <see cref="Dispose"/> method has been called.
             /// </summary>
             private bool isDisposed;
 
             /// <summary>
-            /// The <see cref="PipeReader"/> the underlying <see cref="Streams.MultiplexingStream"/> should use.
+            /// The <see cref="PipeReader"/> to use to get data to be transmitted over the <see cref="Streams.MultiplexingStream"/>.
             /// </summary>
             private PipeReader? mxStreamIOReader;
 
@@ -86,17 +115,22 @@ namespace Nerdbank.Streams
             /// <param name="multiplexingStream">The owning <see cref="Streams.MultiplexingStream"/>.</param>
             /// <param name="offeredLocally">A value indicating whether this channel originated locally (as opposed to remotely).</param>
             /// <param name="id">The ID of the channel.</param>
-            /// <param name="name">The name of the channel.</param>
+            /// <param name="offerParameters">The parameters of the channel from the offering party.</param>
             /// <param name="channelOptions">The channel options. Should only be null if the channel is created in response to an offer that is not immediately accepted.</param>
-            internal Channel(MultiplexingStream multiplexingStream, bool offeredLocally, int id, string name, ChannelOptions? channelOptions = null)
+            internal Channel(MultiplexingStream multiplexingStream, bool offeredLocally, int id, OfferParameters offerParameters, ChannelOptions? channelOptions = null)
             {
                 Requires.NotNull(multiplexingStream, nameof(multiplexingStream));
-                Requires.NotNull(name, nameof(name));
+                Requires.NotNull(offerParameters, nameof(offerParameters));
 
                 this.MultiplexingStream = multiplexingStream;
                 this.offeredLocally = offeredLocally;
                 this.Id = id;
-                this.Name = name;
+                this.OfferParams = offerParameters;
+
+                if (!offeredLocally)
+                {
+                    this.remoteWindowSize = offerParameters.RemoteWindowSize;
+                }
 
                 if (channelOptions == null)
                 {
@@ -161,11 +195,15 @@ namespace Nerdbank.Streams
             /// </summary>
             public MultiplexingStream MultiplexingStream { get; }
 
-            internal string Name { get; set; }
+            internal OfferParameters OfferParams { get; }
+
+            internal string Name => this.OfferParams.Name;
 
             internal bool IsAccepted => this.Acceptance.Status == TaskStatus.RanToCompletion;
 
             internal bool IsRejectedOrCanceled => this.Acceptance.Status == TaskStatus.Canceled;
+
+            internal bool IsRemotelyTerminated { get; set; }
 
             /// <summary>
             /// Gets a <see cref="Task"/> that completes when options have been applied to this <see cref="Channel"/>.
@@ -186,6 +224,22 @@ namespace Nerdbank.Streams
             /// We reuse an object we already have to avoid having to create a new System.Object instance just to lock with.
             /// </remarks>
             private object SyncObject => this.acceptanceSource;
+
+            /// <summary>
+            /// Gets the number of bytes that may be transmitted over this channel given the
+            /// remaining space in the <see cref="remoteWindowSize"/>.
+            /// </summary>
+            private long RemoteWindowRemaining
+            {
+                get
+                {
+                    lock (this.SyncObject)
+                    {
+                        Assumes.True(this.remoteWindowSize > 0);
+                        return this.remoteWindowSize - this.remoteWindowFilled;
+                    }
+                }
+            }
 
             /// <summary>
             /// Closes this channel and releases all resources associated with it.
@@ -242,6 +296,9 @@ namespace Nerdbank.Streams
                         this.mxStreamIOReader?.CancelPendingRead();
                     }
 
+                    // Unblock the reader that might be waiting on this.
+                    this.remoteWindowNonEmpty.Set();
+
                     // As a minor perf optimization, avoid allocating a continuation task if the antecedent is already completed.
                     if (this.mxStreamIOReaderCompleted?.IsCompleted ?? true)
                     {
@@ -268,7 +325,7 @@ namespace Nerdbank.Streams
                         PipeWriter? result = this.mxStreamIOWriter;
                         if (result == null)
                         {
-                            this.InitializeOwnPipes(PipeOptions.Default);
+                            this.InitializeOwnPipes(PipeOptions.Default, PipeOptions.Default);
                             result = this.mxStreamIOWriter!;
                         }
 
@@ -337,9 +394,20 @@ namespace Nerdbank.Streams
             /// <returns>A value indicating whether the offer was accepted. It may fail if the channel was already closed or the offer rescinded.</returns>
             internal bool TryAcceptOffer(ChannelOptions channelOptions)
             {
-                if (this.acceptanceSource.TrySetResult(null))
+                var acceptanceParameters = new AcceptanceParameters((channelOptions.InputPipeOptions?.PauseWriterThreshold ?? this.MultiplexingStream.defaultChannelPauseWriterThreshold) - 1);
+                if (this.acceptanceSource.TrySetResult(acceptanceParameters))
                 {
-                    this.MultiplexingStream.SendFrame(ControlCode.OfferAccepted, this.Id);
+                    var payload = new Sequence<byte>(); // don't dispose, since the buffer needs to live longer than this synchronous method.
+                    acceptanceParameters.Serialize(payload);
+                    this.MultiplexingStream.SendFrame(
+                        new FrameHeader
+                        {
+                            Code = ControlCode.OfferAccepted,
+                            ChannelId = this.Id,
+                            FramePayloadLength = 4,
+                        },
+                        payload,
+                        CancellationToken.None);
                     try
                     {
                         this.ApplyChannelOptions(channelOptions);
@@ -358,8 +426,41 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Occurs when the remote party has accepted our offer of this channel.
             /// </summary>
+            /// <param name="acceptanceParameters">The channel parameters provided by the accepting party.</param>
             /// <returns>A value indicating whether the acceptance went through; <c>false</c> if the channel is already accepted, rejected or offer rescinded.</returns>
-            internal bool OnAccepted() => this.acceptanceSource.TrySetResult(null);
+            internal bool OnAccepted(AcceptanceParameters acceptanceParameters)
+            {
+                lock (this.SyncObject)
+                {
+                    if (this.acceptanceSource.TrySetResult(acceptanceParameters))
+                    {
+                        this.remoteWindowSize = acceptanceParameters.RemoteWindowSize;
+                        return true;
+                    }
+
+                    return false;
+                }
+            }
+
+            /// <summary>
+            /// Invoked when the remote party acknowledges bytes we previously transmitted as processed,
+            /// thereby allowing us to consider that data removed from the remote party's "window"
+            /// and thus enables us to send more data to them.
+            /// </summary>
+            /// <param name="bytesProcessed">The number of bytes processed by the remote party.</param>
+            internal void OnContentProcessed(long bytesProcessed)
+            {
+                Requires.Range(bytesProcessed >= 0, nameof(bytesProcessed), "A non-negative number is required.");
+                lock (this.SyncObject)
+                {
+                    Assumes.True(bytesProcessed <= this.remoteWindowFilled);
+                    this.remoteWindowFilled -= bytesProcessed;
+                    if (this.remoteWindowFilled < this.remoteWindowSize)
+                    {
+                        this.remoteWindowNonEmpty.Set();
+                    }
+                }
+            }
 
             /// <summary>
             /// Apply channel options to this channel, including setting up or migrating to an user-supplied pipe writer/reader pair.
@@ -441,7 +542,7 @@ namespace Nerdbank.Streams
                         }
                         else
                         {
-                            this.InitializeOwnPipes(channelOptions.InputPipeOptions ?? PipeOptions.Default);
+                            this.InitializeOwnPipes(channelOptions.InputPipeOptions ?? PipeOptions.Default, channelOptions.OutputPipeOptions ?? PipeOptions.Default);
                         }
                     }
 
@@ -464,20 +565,19 @@ namespace Nerdbank.Streams
             /// Set up our own (buffering) Pipes if they have not been set up yet.
             /// </summary>
             /// <param name="inputPipeOptions">The options for the reading relay <see cref="Pipe"/>. Must not be null.</param>
-            private void InitializeOwnPipes(PipeOptions inputPipeOptions)
+            /// <param name="outputPipeOptions">The options for the writing relay <see cref="Pipe"/>. Must not be null.</param>
+            private void InitializeOwnPipes(PipeOptions inputPipeOptions, PipeOptions outputPipeOptions)
             {
-                Requires.NotNull(inputPipeOptions, nameof(inputPipeOptions));
-
                 lock (this.SyncObject)
                 {
                     Verify.NotDisposed(this);
                     if (this.mxStreamIOReader == null)
                     {
-                        var writerRelay = new Pipe();
+                        var writerRelay = new Pipe(outputPipeOptions);
                         var readerRelay = new Pipe(inputPipeOptions);
                         this.mxStreamIOReader = writerRelay.Reader;
                         this.mxStreamIOWriter = readerRelay.Writer;
-                        this.channelIO = new DuplexPipe(readerRelay.Reader, writerRelay.Writer);
+                        this.channelIO = new DuplexPipe(new WindowPipeReader(this, readerRelay.Reader), writerRelay.Writer);
                     }
                 }
             }
@@ -496,6 +596,22 @@ namespace Nerdbank.Streams
 
                     while (!this.Completion.IsCompleted)
                     {
+                        if (!this.remoteWindowNonEmpty.IsSet && this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
+                        {
+                            this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Remote window is full. Waiting for remote party to process data before sending more.");
+                        }
+
+                        await this.remoteWindowNonEmpty.WaitAsync().ConfigureAwait(false);
+                        if (this.IsRemotelyTerminated)
+                        {
+                            if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
+                            {
+                                this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Transmission on channel {0} \"{1}\" terminated the remote party terminated the channel.", this.Id, this.Name);
+                            }
+
+                            break;
+                        }
+
                         ReadResult result;
                         try
                         {
@@ -523,9 +639,10 @@ namespace Nerdbank.Streams
                             break;
                         }
 
-                        // We'll send whatever we've got, up to the maximum size of the frame.
+                        // We'll send whatever we've got, up to the maximum size of the frame or available window size.
                         // Anything in excess of that we'll pick up next time the loop runs.
-                        var bufferToRelay = result.Buffer.Slice(0, Math.Min(result.Buffer.Length, this.MultiplexingStream.framePayloadMaxLength));
+                        var bufferToRelay = result.Buffer.Slice(0, Math.Min(this.RemoteWindowRemaining, Math.Min(result.Buffer.Length, FramePayloadMaxLength)));
+                        this.OnTransmittingBytes(bufferToRelay.Length);
                         bool isCompleted = result.IsCompleted && result.Buffer.Length == bufferToRelay.Length;
                         if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
                         {
@@ -542,26 +659,26 @@ namespace Nerdbank.Streams
                             };
 
                             await this.MultiplexingStream.SendFrameAsync(header, bufferToRelay, CancellationToken.None).ConfigureAwait(false);
+                        }
 
-                            try
+                        try
+                        {
+                            // Let the pipe know exactly how much we read, which might be less than we were given.
+                            this.mxStreamIOReader.AdvanceTo(bufferToRelay.End);
+
+                            // We mustn't accidentally access the memory that may have been recycled now that we called AdvanceTo.
+                            bufferToRelay = default;
+                            result.ScrubAfterAdvanceTo();
+                        }
+                        catch (InvalidOperationException ex)
+                        {
+                            // Someone completed the reader. The channel was probably disposed.
+                            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
                             {
-                                // Let the pipe know exactly how much we read, which might be less than we were given.
-                                this.mxStreamIOReader.AdvanceTo(bufferToRelay.End);
-
-                                // We mustn't accidentally access the memory that may have been recycled now that we called AdvanceTo.
-                                bufferToRelay = default;
-                                result.ScrubAfterAdvanceTo();
+                                this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Transmission terminated because the reader threw: {0}", ex);
                             }
-                            catch (InvalidOperationException ex)
-                            {
-                                // Someone completed the reader. The channel was probably disposed.
-                                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
-                                {
-                                    this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Transmission terminated because the reader threw: {0}", ex);
-                                }
 
-                                break;
-                            }
+                            break;
                         }
 
                         if (isCompleted)
@@ -588,13 +705,47 @@ namespace Nerdbank.Streams
                 }
             }
 
+            /// <summary>
+            /// Invoked when we transmit data to the remote party
+            /// so we can track how much data we're sending them so we don't overrun their receiving buffer.
+            /// </summary>
+            /// <param name="transmittedBytes">The number of bytes being transmitted.</param>
+            private void OnTransmittingBytes(long transmittedBytes)
+            {
+                Requires.Range(transmittedBytes >= 0, nameof(transmittedBytes), "A non-negative number is required.");
+                lock (this.SyncObject)
+                {
+                    Requires.Range(this.remoteWindowFilled + transmittedBytes <= this.remoteWindowSize, nameof(transmittedBytes), "The value exceeds the space remaining in the window size.");
+                    this.remoteWindowFilled += transmittedBytes;
+                    if (this.remoteWindowFilled == this.remoteWindowSize)
+                    {
+                        this.remoteWindowNonEmpty.Reset();
+                    }
+                }
+            }
+
+            private void LocalContentProcessed(long bytesProcessed)
+            {
+                Memory<byte> memory = new byte[4];
+                Utilities.Write(memory.Span, (int)bytesProcessed);
+                this.MultiplexingStream.SendFrame(
+                    new FrameHeader
+                    {
+                        Code = ControlCode.ContentProcessed,
+                        ChannelId = this.Id,
+                        FramePayloadLength = 4,
+                    },
+                    new ReadOnlySequence<byte>(memory),
+                    CancellationToken.None);
+            }
+
             private async Task AutoCloseOnPipesClosureAsync()
             {
                 await Task.WhenAll(this.mxStreamIOWriterCompleted.WaitAsync(), this.mxStreamIOReaderCompleted).ConfigureAwait(false);
 
                 if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                 {
-                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelAutoClosing, "Channel self-closing because both parties have completed transmission.");
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelAutoClosing, "Channel {0} \"{1}\" self-closing because both reader and writer are complete.", this.Id, this.Name);
                 }
 
                 this.Dispose();
@@ -630,6 +781,170 @@ namespace Nerdbank.Streams
                         CancellationToken.None,
                         TaskContinuationOptions.OnlyOnFaulted,
                         TaskScheduler.Default).Forget();
+                }
+            }
+
+            [DataContract]
+            internal class OfferParameters
+            {
+                /// <summary>
+                /// Initializes a new instance of the <see cref="OfferParameters"/> class.
+                /// </summary>
+                /// <param name="name">The name of the channel.</param>
+                /// <param name="remoteWindowSize">
+                /// The maximum number of bytes that may be transmitted and not yet acknowledged as processed by the remote party.
+                /// When based on <see cref="PipeOptions.PauseWriterThreshold"/>, this value should be -1 of that value in order
+                /// to avoid the actual pause that would be fatal to the read loop of the multiplexing stream.
+                /// </param>
+                internal OfferParameters(string name, long remoteWindowSize)
+                {
+                    this.Name = name ?? throw new ArgumentNullException(nameof(name));
+                    this.RemoteWindowSize = remoteWindowSize;
+                }
+
+                /// <summary>
+                /// Gets the name of the channel.
+                /// </summary>
+                [DataMember]
+                internal string Name { get; }
+
+                /// <summary>
+                /// Gets the maximum number of bytes that may be transmitted and not yet acknowledged as processed by the remote party.
+                /// </summary>
+                [DataMember]
+                internal long RemoteWindowSize { get; }
+
+                internal static unsafe OfferParameters Deserialize(ReadOnlyMemory<byte> buffer)
+                {
+                    ReadOnlySpan<byte> nameSlice = buffer.Span.Slice(0, buffer.Length - 4);
+                    ReadOnlySpan<byte> remoteWindowSizeSpan = buffer.Span.Slice(buffer.Length - 4);
+                    fixed (byte* pName = nameSlice)
+                    {
+                        return new OfferParameters(
+                            pName != null ? ControlFrameEncoding.GetString(pName, nameSlice.Length) : string.Empty,
+                            Utilities.ReadInt(remoteWindowSizeSpan));
+                    }
+                }
+
+                internal unsafe void Serialize(IBufferWriter<byte> writer)
+                {
+                    var buffer = writer.GetSpan(ControlFrameEncoding.GetMaxByteCount(this.Name.Length));
+                    fixed (byte* pBuffer = buffer)
+                    fixed (char* pName = this.Name)
+                    {
+                        int byteLength = ControlFrameEncoding.GetBytes(pName, this.Name.Length, pBuffer, buffer.Length);
+                        writer.Advance(byteLength);
+                    }
+
+                    buffer = writer.GetSpan(4);
+                    Utilities.Write(buffer, checked((int)this.RemoteWindowSize));
+                    writer.Advance(4);
+                }
+            }
+
+            [DataContract]
+            internal class AcceptanceParameters
+            {
+                /// <summary>
+                /// Initializes a new instance of the <see cref="AcceptanceParameters"/> class.
+                /// </summary>
+                /// <param name="remoteWindowSize">
+                /// The maximum number of bytes that may be transmitted and not yet acknowledged as processed by the remote party.
+                /// When based on <see cref="PipeOptions.PauseWriterThreshold"/>, this value should be -1 of that value in order
+                /// to avoid the actual pause that would be fatal to the read loop of the multiplexing stream.
+                /// </param>
+                internal AcceptanceParameters(long remoteWindowSize) => this.RemoteWindowSize = remoteWindowSize;
+
+                /// <summary>
+                /// Gets the maximum number of bytes that may be transmitted and not yet acknowledged as processed by the remote party.
+                /// </summary>
+                [DataMember]
+                internal long RemoteWindowSize { get; }
+
+                internal static AcceptanceParameters Deserialize(ReadOnlyMemory<byte> buffer)
+                {
+                    return new AcceptanceParameters(Utilities.ReadInt(buffer.Span));
+                }
+
+                internal void Serialize(IBufferWriter<byte> writer)
+                {
+                    var buffer = writer.GetSpan(4);
+                    Utilities.Write(buffer, checked((int)this.RemoteWindowSize));
+                    writer.Advance(4);
+                }
+            }
+
+            private class WindowPipeReader : PipeReader
+            {
+                private readonly Channel owner;
+                private readonly PipeReader inner;
+                private ReadResult lastReadResult;
+                private long bytesProcessed;
+
+                internal WindowPipeReader(Channel owner, PipeReader inner)
+                {
+                    this.owner = owner;
+                    this.inner = inner;
+                }
+
+                public override void AdvanceTo(SequencePosition consumed)
+                {
+                    this.Consumed(consumed);
+                    this.inner.AdvanceTo(consumed);
+                }
+
+                public override void AdvanceTo(SequencePosition consumed, SequencePosition examined)
+                {
+                    // The reader demands more data if examined == End and consumed < End.
+                    bool moreDataRequired = !examined.Equals(consumed) && examined.Equals(this.lastReadResult.Buffer.End);
+                    this.Consumed(consumed, moreDataRequired);
+                    this.inner.AdvanceTo(consumed, examined);
+                }
+
+                public override void CancelPendingRead() => this.inner.CancelPendingRead();
+
+                public override void Complete(Exception? exception = null) => this.inner.Complete(exception);
+
+                public override async ValueTask<ReadResult> ReadAsync(CancellationToken cancellationToken = default)
+                {
+                    return this.lastReadResult = await this.inner.ReadAsync(cancellationToken).ConfigureAwait(false);
+                }
+
+                public override bool TryRead(out ReadResult readResult)
+                {
+                    bool result = this.inner.TryRead(out readResult);
+                    this.lastReadResult = readResult;
+                    return result;
+                }
+
+                public override Stream AsStream(bool leaveOpen = false) => this.inner.AsStream();
+
+                public override ValueTask CompleteAsync(Exception? exception = null) => this.inner.CompleteAsync(exception);
+
+                public override Task CopyToAsync(PipeWriter destination, CancellationToken cancellationToken = default) => this.inner.CopyToAsync(destination, cancellationToken);
+
+                public override Task CopyToAsync(Stream destination, CancellationToken cancellationToken = default) => this.inner.CopyToAsync(destination, cancellationToken);
+
+                [Obsolete]
+                public override void OnWriterCompleted(Action<Exception, object> callback, object state) => this.inner.OnWriterCompleted(callback, state);
+
+                private void Consumed(SequencePosition consumed, bool moreDataRequired = false)
+                {
+                    long bytesJustProcessed =
+                        this.lastReadResult.Buffer.End.Equals(consumed) ? this.lastReadResult.Buffer.Length :
+                        this.lastReadResult.Buffer.Slice(this.lastReadResult.Buffer.Start, consumed).Length;
+                    this.bytesProcessed += bytesJustProcessed;
+
+                    // Only send the 'more bytes please' message if we've consumed at least a max frame's worth of data
+                    // or if our reader indicates that more data is required before it will examine any more.
+                    if (this.bytesProcessed >= FramePayloadMaxLength || moreDataRequired)
+                    {
+                        // TODO: review moreDataRequired scenario, particularly considering latency where the sender may have already
+                        // transmitted additional data. We wouldn't want to advise them to overstep the window to send more data if
+                        // we already have or will soon get more data that will appease our reader.
+                        this.owner.LocalContentProcessed(this.bytesProcessed);
+                        this.bytesProcessed = 0;
+                    }
                 }
             }
         }

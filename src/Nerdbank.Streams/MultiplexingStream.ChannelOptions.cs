@@ -65,9 +65,23 @@ namespace Nerdbank.Streams
 
             /// <summary>
             /// Gets or sets the options for the <see cref="Pipe"/> created to relay local reading from this channel.
-            /// May be null. Will be ignored if <see cref="ExistingPipe"/> is not <c>null</c>.
             /// </summary>
+            /// <remarks>
+            /// This property may be null.
+            /// It will be largely ignored if <see cref="ExistingPipe"/> is not <c>null</c>,
+            /// but will still be used to fetch the <see cref="PipeOptions.PauseWriterThreshold"/> value
+            /// as this determines the receiving window size.
+            /// </remarks>
             public PipeOptions? InputPipeOptions { get; set; }
+
+            /// <summary>
+            /// Gets or sets the options for the <see cref="Pipe"/> created to relay local writing to this channel.
+            /// </summary>
+            /// <remarks>
+            /// This property may be null.
+            /// It will be ignored if <see cref="ExistingPipe"/> is not <c>null</c>.
+            /// </remarks>
+            public PipeOptions? OutputPipeOptions { get; set; }
         }
     }
 }

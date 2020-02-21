@@ -61,6 +61,15 @@ namespace Nerdbank.Streams {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to InputPipeOptions.PauseWriterThreshold cannot be less than the default window size of {0}..
+        /// </summary>
+        internal static string ChannelReceivingWindowCannotBeSmallerThanDefault {
+            get {
+                return ResourceManager.GetString("ChannelReceivingWindowCannotBeSmallerThanDefault", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to This operation is not supported when the Channel is created with ChannelOptions.ExistingPipe set..
         /// </summary>
         internal static string NotSupportedWhenExistingPipeSpecified {
