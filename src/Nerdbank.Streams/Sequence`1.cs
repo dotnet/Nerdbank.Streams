@@ -23,7 +23,7 @@ namespace Nerdbank.Streams
     [DebuggerDisplay("{" + nameof(DebuggerDisplay) + ",nq}")]
     public class Sequence<T> : IBufferWriter<T>, IDisposable
     {
-        private static readonly int DefaultLengthFromArrayPool = 1 + (4095 / Marshal.SizeOf<T>());
+        private static readonly int DefaultLengthFromArrayPool = 1 + (4095 / Unsafe.SizeOf<T>());
 
         private static readonly ReadOnlySequence<T> Empty = new ReadOnlySequence<T>(SequenceSegment.Empty, 0, SequenceSegment.Empty, 0);
 
