@@ -663,6 +663,16 @@ public class SequenceTests : TestBase
         Assert.Equal(4, span.Length);
     }
 
+    [Fact]
+    public void SequenceOfManagedType()
+    {
+        var seq = new Sequence<object>();
+        seq.Write(new object[] { new object(), new object() });
+        Assert.Equal(2, seq.Length);
+        Assert.IsType<object>(seq.AsReadOnlySequence.First.Span[0]);
+        Assert.IsType<object>(seq.AsReadOnlySequence.First.Span[1]);
+    }
+
     /// <summary>
     /// Adds a reference to an object in the sequence and returns a weak reference to it.
     /// </summary>
