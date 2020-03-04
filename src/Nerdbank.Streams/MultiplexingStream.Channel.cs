@@ -724,10 +724,10 @@ namespace Nerdbank.Streams
                 }
             }
 
-            private void LocalContentProcessed(long bytesProcessed)
+            private void LocalContentExamined(long bytesExamined)
             {
                 Memory<byte> memory = new byte[4];
-                Utilities.Write(memory.Span, (int)bytesProcessed);
+                Utilities.Write(memory.Span, (int)bytesExamined);
                 this.MultiplexingStream.SendFrame(
                     new FrameHeader
                     {
@@ -880,6 +880,7 @@ namespace Nerdbank.Streams
                 private readonly PipeReader inner;
                 private ReadResult lastReadResult;
                 private long bytesProcessed;
+                private SequencePosition lastExaminedPosition;
 
                 internal WindowPipeReader(Channel owner, PipeReader inner)
                 {
@@ -889,15 +890,13 @@ namespace Nerdbank.Streams
 
                 public override void AdvanceTo(SequencePosition consumed)
                 {
-                    this.Consumed(consumed);
+                    this.Consumed(consumed, consumed);
                     this.inner.AdvanceTo(consumed);
                 }
 
                 public override void AdvanceTo(SequencePosition consumed, SequencePosition examined)
                 {
-                    // The reader demands more data if examined == End and consumed < End.
-                    bool moreDataRequired = !examined.Equals(consumed) && examined.Equals(this.lastReadResult.Buffer.End);
-                    this.Consumed(consumed, moreDataRequired);
+                    this.Consumed(consumed, examined);
                     this.inner.AdvanceTo(consumed, examined);
                 }
 
@@ -928,23 +927,33 @@ namespace Nerdbank.Streams
                 [Obsolete]
                 public override void OnWriterCompleted(Action<Exception, object> callback, object state) => this.inner.OnWriterCompleted(callback, state);
 
-                private void Consumed(SequencePosition consumed, bool moreDataRequired = false)
+                private void Consumed(SequencePosition consumed, SequencePosition examined)
                 {
+                    var lastExamined = this.lastExaminedPosition;
+                    if (lastExamined.Equals(default))
+                    {
+                        lastExamined = this.lastReadResult.Buffer.Start;
+                    }
+
+                    // If the entirety of the buffer was examined for the first time, just use the buffer length as a perf optimization.
+                    // Otherwise, slice the buffer from last examined to new examined to get the number of freshly examined bytes.
                     long bytesJustProcessed =
-                        this.lastReadResult.Buffer.End.Equals(consumed) ? this.lastReadResult.Buffer.Length :
-                        this.lastReadResult.Buffer.Slice(this.lastReadResult.Buffer.Start, consumed).Length;
+                        lastExamined.Equals(this.lastReadResult.Buffer.Start) && this.lastReadResult.Buffer.End.Equals(examined) ? this.lastReadResult.Buffer.Length :
+                        this.lastReadResult.Buffer.Slice(lastExamined, examined).Length;
+
                     this.bytesProcessed += bytesJustProcessed;
 
                     // Only send the 'more bytes please' message if we've consumed at least a max frame's worth of data
                     // or if our reader indicates that more data is required before it will examine any more.
-                    if (this.bytesProcessed >= FramePayloadMaxLength || moreDataRequired)
+                    if (this.bytesProcessed >= FramePayloadMaxLength)
                     {
-                        // TODO: review moreDataRequired scenario, particularly considering latency where the sender may have already
-                        // transmitted additional data. We wouldn't want to advise them to overstep the window to send more data if
-                        // we already have or will soon get more data that will appease our reader.
-                        this.owner.LocalContentProcessed(this.bytesProcessed);
+                        this.owner.LocalContentExamined(this.bytesProcessed); // this accumulates too much. Also: when it throws, the test hangs.
                         this.bytesProcessed = 0;
                     }
+
+                    // Only store the examined position if it is ahead of the consumed position.
+                    // Otherwise we'd store a position in an array that may be recycled.
+                    this.lastExaminedPosition = consumed.Equals(examined) ? default : examined;
                 }
             }
         }

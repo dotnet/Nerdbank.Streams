@@ -566,6 +566,38 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
+    public async Task Backpressure_FullButNeedMoreBytesToProcess()
+    {
+        const int backpressureThreshold = 80 * 1024;
+        var (a, b) = await this.EstablishChannelsAsync("a", new PipeOptions(pauseWriterThreshold: backpressureThreshold));
+
+        // Write far more than would be allowed.
+        const int bytesWritten = backpressureThreshold * 5;
+        this.Logger.WriteLine("Writing {0} bytes.", bytesWritten);
+        Task<FlushResult> writeTask = a.Output.WriteAsync(new byte[bytesWritten], this.TimeoutToken).AsTask();
+
+        while (true)
+        {
+            var readResult = await b.Input.ReadAsync(this.TimeoutToken);
+            this.Logger.WriteLine("Read returned buffer with length: {0}", readResult.Buffer.Length);
+
+            if (readResult.Buffer.Length < bytesWritten)
+            {
+                // Demand more by claiming to have examined everything.
+                b.Input.AdvanceTo(readResult.Buffer.Start, readResult.Buffer.End);
+            }
+            else
+            {
+                // We got it all at once. So go ahead and consume it.
+                b.Input.AdvanceTo(readResult.Buffer.End);
+                break;
+            }
+        }
+
+        await writeTask;
+    }
+
+    [Fact]
     public async Task CanProperties()
     {
         var (s1, s2) = await this.EstablishChannelStreamsAsync(string.Empty);
