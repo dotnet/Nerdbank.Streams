@@ -598,6 +598,49 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
+    public async Task Backpressure_ExistingPipe()
+    {
+        const int backpressureThreshold = 80 * 1024;
+        var mx2Pipe = FullDuplexStream.CreatePipePair(new PipeOptions(pauseWriterThreshold: backpressureThreshold));
+        var mx1ChannelTask = this.mx1.OfferChannelAsync("a", this.TimeoutToken);
+        var mx2ChannelTask = this.mx2.AcceptChannelAsync(
+            "a",
+            new MultiplexingStream.ChannelOptions
+            {
+                ExistingPipe = mx2Pipe.Item1,
+                InputPipeOptions = new PipeOptions(pauseWriterThreshold: backpressureThreshold),
+            },
+            this.TimeoutToken);
+        var channels = await WhenAllSucceedOrAnyFail(mx1ChannelTask, mx2ChannelTask).WithCancellation(this.TimeoutToken);
+        var (a, b) = (channels[0], channels[1]);
+
+        // Write far more than would be allowed.
+        const int bytesWritten = backpressureThreshold * 5;
+        this.Logger.WriteLine("Writing {0} bytes.", bytesWritten);
+        Task<FlushResult> writeTask = a.Output.WriteAsync(new byte[bytesWritten], this.TimeoutToken).AsTask();
+
+        while (true)
+        {
+            var readResult = await mx2Pipe.Item2.Input.ReadAsync(this.TimeoutToken);
+            this.Logger.WriteLine("Read returned buffer with length: {0}", readResult.Buffer.Length);
+
+            if (readResult.Buffer.Length < bytesWritten)
+            {
+                // Demand more by claiming to have examined everything.
+                mx2Pipe.Item2.Input.AdvanceTo(readResult.Buffer.Start, readResult.Buffer.End);
+            }
+            else
+            {
+                // We got it all at once. So go ahead and consume it.
+                mx2Pipe.Item2.Input.AdvanceTo(readResult.Buffer.End);
+                break;
+            }
+        }
+
+        await writeTask;
+    }
+
+    [Fact]
     public async Task CanProperties()
     {
         var (s1, s2) = await this.EstablishChannelStreamsAsync(string.Empty);
