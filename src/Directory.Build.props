@@ -30,4 +30,10 @@
     <AdditionalFiles Include="$(MSBuildThisFileDirectory)stylecop.json" Link="stylecop.json" />
   </ItemGroup>
 
+  <Target Name="PrepareReleaseNotes" BeforeTargets="GenerateNuspec" DependsOnTargets="GetBuildVersion">
+    <PropertyGroup>
+      <PackageReleaseNotes>https://github.com/AArnott/Nerdbank.Streams/releases/tag/v$(Version)</PackageReleaseNotes>
+    </PropertyGroup>
+  </Target>
+
 </Project>
