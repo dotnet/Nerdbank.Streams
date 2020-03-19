@@ -55,7 +55,11 @@ namespace Nerdbank.Streams
         /// The default window size for a new channel,
         /// which also serves as the minimum window size for any channel.
         /// </summary>
-        private readonly long defaultChannelPauseWriterThreshold = Math.Min(new PipeOptions().PauseWriterThreshold, (FramePayloadMaxLength * 10) + 1);
+        /// <remarks>
+        /// Using an integer multiple of <see cref="FramePayloadMaxLength"/> ensures that the client can send full frames
+        /// instead of ending with a partial frame when the remote window limit is reached.
+        /// </remarks>
+        private static readonly long RecommendedDefaultChannelReceivingWindowSize = 5 * FramePayloadMaxLength;
 
         /// <summary>
         /// A value indicating whether this is the "odd" party in the conversation (where the other one would be "even").
@@ -139,6 +143,7 @@ namespace Nerdbank.Streams
             this.lastOfferedChannelId = isOdd ? -1 : 0; // the first channel created should be 1 or 2
             this.TraceSource = options.TraceSource;
             this.DefaultChannelTraceSourceFactory = options.DefaultChannelTraceSourceFactory;
+            this.DefaultChannelReceivingWindowSize = options.DefaultChannelReceivingWindowSize;
 
             // Initiate reading from the transport stream. This will not end until the stream does, or we're disposed.
             // If reading the stream fails, we'll dispose ourselves.
@@ -195,6 +200,14 @@ namespace Nerdbank.Streams
         /// </summary>
         /// <value>Never null.</value>
         public TraceSource TraceSource { get; }
+
+        /// <summary>
+        /// Gets the default window size used for new channels that do not specify a value for <see cref="ChannelOptions.ChannelReceivingWindowSize"/>.
+        /// </summary>
+        /// <remarks>
+        /// This value can be set at the time of creation of the <see cref="MultiplexingStream"/> via <see cref="Options.DefaultChannelReceivingWindowSize"/>.
+        /// </remarks>
+        public long DefaultChannelReceivingWindowSize { get; }
 
         /// <inheritdoc />
         bool IDisposableObservable.IsDisposed => this.Completion.IsCompleted;
@@ -311,11 +324,9 @@ namespace Nerdbank.Streams
         /// </remarks>
         public Channel CreateChannel(ChannelOptions? options = default)
         {
-            Requires.Argument(options is null || options.InputPipeOptions is null || options.InputPipeOptions.PauseWriterThreshold >= this.defaultChannelPauseWriterThreshold, nameof(options), Strings.ChannelReceivingWindowCannotBeSmallerThanDefault, this.defaultChannelPauseWriterThreshold);
-
             Verify.NotDisposed(this);
 
-            var offerParameters = new Channel.OfferParameters(string.Empty, (options?.InputPipeOptions?.PauseWriterThreshold ?? this.defaultChannelPauseWriterThreshold) - 1);
+            var offerParameters = new Channel.OfferParameters(string.Empty, options?.ChannelReceivingWindowSize ?? this.DefaultChannelReceivingWindowSize);
             using (var payload = new Sequence<byte>(ArrayPool<byte>.Shared))
             {
                 offerParameters.Serialize(payload);
@@ -422,12 +433,11 @@ namespace Nerdbank.Streams
         public async Task<Channel> OfferChannelAsync(string name, ChannelOptions? options = default, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(name, nameof(name));
-            Requires.Argument(options is null || options.InputPipeOptions is null || options.InputPipeOptions.PauseWriterThreshold >= this.defaultChannelPauseWriterThreshold, nameof(options), Strings.ChannelReceivingWindowCannotBeSmallerThanDefault, this.defaultChannelPauseWriterThreshold);
 
             cancellationToken.ThrowIfCancellationRequested();
             Verify.NotDisposed(this);
 
-            var offerParameters = new Channel.OfferParameters(name, (options?.InputPipeOptions?.PauseWriterThreshold ?? this.defaultChannelPauseWriterThreshold) - 1);
+            var offerParameters = new Channel.OfferParameters(name, options?.ChannelReceivingWindowSize ?? this.DefaultChannelReceivingWindowSize);
             using (var payload = new Sequence<byte>(ArrayPool<byte>.Shared))
             {
                 offerParameters.Serialize(payload);
@@ -481,7 +491,6 @@ namespace Nerdbank.Streams
         public async Task<Channel> AcceptChannelAsync(string name, ChannelOptions? options = default, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(name, nameof(name));
-            Requires.Argument(options is null || options.InputPipeOptions is null || options.InputPipeOptions.PauseWriterThreshold >= this.defaultChannelPauseWriterThreshold, nameof(options), Strings.ChannelReceivingWindowCannotBeSmallerThanDefault, this.defaultChannelPauseWriterThreshold);
             Verify.NotDisposed(this);
 
             options = options ?? DefaultChannelOptions;
@@ -780,23 +789,9 @@ namespace Nerdbank.Streams
                 }
             }
 
-            // We Complete the writer because only the writing (logical) thread should complete it
-            // to avoid race conditions, and Channel.Dispose can be called from any thread.
-            if (channel?.IsDisposed ?? false)
-            {
-                try
-                {
-                    var writer = await channel!.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
-                    await writer.CompleteAsync().ConfigureAwait(false);
-                }
-                catch (ObjectDisposedException)
-                {
-                    // We fell victim to a race condition. It's OK to just swallow it because the writer was never created, so it needn't be completed.
-                }
-            }
-
             if (channel is Channel)
             {
+                await channel.OnChannelTerminatedAsync().ConfigureAwait(false);
                 channel.IsRemotelyTerminated = true;
                 channel.Dispose();
             }
@@ -838,46 +833,9 @@ namespace Nerdbank.Streams
                 return;
             }
 
-            // Read directly from the transport stream to memory that the targeted channel's reader will read from for 0 extra buffer copies.
-            PipeWriter writer = await channel.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
-            Memory<byte> memory;
-            try
+            if (header.FramePayloadLength > 0)
             {
-                memory = writer.GetMemory(header.FramePayloadLength);
-            }
-            catch (InvalidOperationException)
-            {
-                // Someone completed the writer.
-                await this.DiscardDataAsync(header, cancellationToken).ConfigureAwait(false);
-                return;
-            }
-
-            var payload = memory.Slice(0, header.FramePayloadLength);
-            await ReadToFillAsync(this.stream, payload, throwOnEmpty: true, cancellationToken).ConfigureAwait(false);
-
-            if (!payload.IsEmpty && this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
-            {
-                this.TraceSource.TraceData(TraceEventType.Verbose, (int)TraceEventId.FrameReceivedPayload, payload);
-            }
-
-            try
-            {
-                writer.Advance(header.FramePayloadLength);
-            }
-            catch (InvalidOperationException)
-            {
-                // Despite corefx source code suggesting otherwise, this API *does* sometimes throw InvalidOperationException when the writer is completed.
-                // Maybe it's because there are alternative PipeWriter implementations out there, but this caused indeterministic failures
-                // in our unit tests.
-                return;
-            }
-
-            var flushResult = await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
-            if (flushResult.IsCanceled)
-            {
-                // This happens when the channel is disposed (while or before flushing).
-                Assumes.True(channel.IsDisposed);
-                writer.Complete();
+                await channel.OnContentAsync(this.stream, header, cancellationToken).ConfigureAwait(false);
             }
         }
 

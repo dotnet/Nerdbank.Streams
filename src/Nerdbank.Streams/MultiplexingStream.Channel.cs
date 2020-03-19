@@ -74,7 +74,16 @@ namespace Nerdbank.Streams
             /// This field is set to the value of <see cref="OfferParameters.RemoteWindowSize"/> if we accepted the channel,
             /// or the value of <see cref="AcceptanceParameters.RemoteWindowSize"/> if we offered the channel.
             /// </remarks>
-            private long remoteWindowSize = -1;
+            private long? remoteWindowSize;
+
+            /// <summary>
+            /// The number of bytes that may be received and buffered for processing.
+            /// </summary>
+            /// <remarks>
+            /// This field is set to the value of <see cref="OfferParameters.RemoteWindowSize"/> if we offered the channel,
+            /// or the value of <see cref="AcceptanceParameters.RemoteWindowSize"/> if we accepted the channel.
+            /// </remarks>
+            private long? localWindowSize;
 
             /// <summary>
             /// Indicates whether the <see cref="Dispose"/> method has been called.
@@ -104,10 +113,9 @@ namespace Nerdbank.Streams
             private IDuplexPipe? channelIO;
 
             /// <summary>
-            /// A task that represents a transition from a <see cref="Pipe"/> to an owner-supplied <see cref="PipeWriter"/>
-            /// for use by the underlying <see cref="MultiplexingStream"/> to publish bytes received over the channel.
+            /// A value indicating whether this <see cref="Channel"/> was created or accepted with a non-null value for <see cref="ChannelOptions.ExistingPipe"/>.
             /// </summary>
-            private Task<PipeWriter>? switchingToExistingPipe;
+            private bool? existingPipeGiven;
 
             /// <summary>
             /// Initializes a new instance of the <see cref="Channel"/> class.
@@ -127,7 +135,11 @@ namespace Nerdbank.Streams
                 this.Id = id;
                 this.OfferParams = offerParameters;
 
-                if (!offeredLocally)
+                if (offeredLocally)
+                {
+                    this.localWindowSize = offerParameters.RemoteWindowSize;
+                }
+                else
                 {
                     this.remoteWindowSize = offerParameters.RemoteWindowSize;
                 }
@@ -165,13 +177,35 @@ namespace Nerdbank.Streams
             /// Gets the reader used to receive data over the channel.
             /// </summary>
             /// <exception cref="NotSupportedException">Thrown if the channel was created with a non-null value in <see cref="ChannelOptions.ExistingPipe"/>.</exception>
-            public PipeReader Input => this.channelIO?.Input ?? throw new NotSupportedException(Strings.NotSupportedWhenExistingPipeSpecified);
+            public PipeReader Input
+            {
+                get
+                {
+                    // Before the user should ever have a chance to call this property (before we expose this Channel object)
+                    // we should have received a ChannelOptions object from them and initialized these fields.
+                    Assumes.True(this.existingPipeGiven.HasValue);
+                    Assumes.NotNull(this.channelIO);
+
+                    return this.existingPipeGiven.Value ? throw new NotSupportedException(Strings.NotSupportedWhenExistingPipeSpecified) : this.channelIO.Input;
+                }
+            }
 
             /// <summary>
             /// Gets the writer used to transmit data over the channel.
             /// </summary>
             /// <exception cref="NotSupportedException">Thrown if the channel was created with a non-null value in <see cref="ChannelOptions.ExistingPipe"/>.</exception>
-            public PipeWriter Output => this.channelIO?.Output ?? throw new NotSupportedException(Strings.NotSupportedWhenExistingPipeSpecified);
+            public PipeWriter Output
+            {
+                get
+                {
+                    // Before the user should ever have a chance to call this property (before we expose this Channel object)
+                    // we should have received a ChannelOptions object from them and initialized these fields.
+                    Assumes.True(this.existingPipeGiven.HasValue);
+                    Assumes.NotNull(this.channelIO);
+
+                    return this.existingPipeGiven.Value ? throw new NotSupportedException(Strings.NotSupportedWhenExistingPipeSpecified) : this.channelIO.Output;
+                }
+            }
 
             /// <summary>
             /// Gets a <see cref="Task"/> that completes when the channel is accepted, rejected, or canceled.
@@ -236,14 +270,13 @@ namespace Nerdbank.Streams
                     lock (this.SyncObject)
                     {
                         Assumes.True(this.remoteWindowSize > 0);
-                        return this.remoteWindowSize - this.remoteWindowFilled;
+                        return this.remoteWindowSize.Value - this.remoteWindowFilled;
                     }
                 }
             }
 
             /// <summary>
             /// Closes this channel and releases all resources associated with it.
-            /// Pending reads and writes may be abandoned if the channel was created with an <see cref="ChannelOptions.ExistingPipe"/>.
             /// </summary>
             /// <remarks>
             /// Because this method may terminate the channel immediately and thus can cause previously queued content to not actually be received by the remote party,
@@ -311,46 +344,78 @@ namespace Nerdbank.Streams
                 }
             }
 
-            /// <summary>
-            /// Gets the pipe writer to use when a message is received for this channel, so that the channel owner will notice and read it.
-            /// </summary>
-            /// <returns>A <see cref="PipeWriter"/>.</returns>
-            internal async ValueTask<PipeWriter> GetReceivedMessagePipeWriterAsync()
+            internal async Task OnChannelTerminatedAsync()
             {
-                lock (this.SyncObject)
+                if (this.IsDisposed)
                 {
-                    Verify.NotDisposed(this);
-                    if (this.switchingToExistingPipe == null)
-                    {
-                        PipeWriter? result = this.mxStreamIOWriter;
-                        if (result == null)
-                        {
-                            this.InitializeOwnPipes(PipeOptions.Default, PipeOptions.Default);
-                            result = this.mxStreamIOWriter!;
-                        }
-
-                        return result;
-                    }
+                    return;
                 }
 
-                // Our (non-current) writer must not be writing to the last result we may have given them,
-                // since they're asking for access right now. So whatever they may have written on the last result
-                // is the last they get to write on that result, so Complete that result.
-                this.mxStreamIOWriter!.Complete();
-
-                // Now wait for whatever they may have written previously to propagate to the ChannelOptions.ExistingPipe.Output writer,
-                // and then redirect all writing to that writer.
-                PipeWriter newWriter = await this.switchingToExistingPipe.ConfigureAwait(false);
-                lock (this.SyncObject)
+                try
                 {
-                    Verify.NotDisposed(this);
-                    this.mxStreamIOWriter = newWriter;
+                    // We Complete the writer because only the writing (logical) thread should complete it
+                    // to avoid race conditions, and Channel.Dispose can be called from any thread.
+                    var writer = this.GetReceivedMessagePipeWriter();
+                    await writer.CompleteAsync().ConfigureAwait(false);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // We fell victim to a race condition. It's OK to just swallow it because the writer was never created, so it needn't be completed.
+                }
+            }
 
-                    // Skip all this next time.
-                    this.switchingToExistingPipe = null;
+            internal async ValueTask OnContentAsync(Stream stream, FrameHeader header, CancellationToken cancellationToken)
+            {
+                // Read directly from the transport stream to memory that the targeted channel's reader will read from for 0 extra buffer copies.
+                PipeWriter writer = this.GetReceivedMessagePipeWriter();
+                Memory<byte> memory;
+                try
+                {
+                    memory = writer.GetMemory(header.FramePayloadLength);
+                }
+                catch (InvalidOperationException)
+                {
+                    // Someone completed the writer.
+                    await this.MultiplexingStream.DiscardDataAsync(header, cancellationToken).ConfigureAwait(false);
+                    return;
                 }
 
-                return this.mxStreamIOWriter;
+                var payload = memory.Slice(0, header.FramePayloadLength);
+                await ReadToFillAsync(stream, payload, throwOnEmpty: true, cancellationToken).ConfigureAwait(false);
+
+                if (!payload.IsEmpty && this.MultiplexingStream.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
+                {
+                    this.MultiplexingStream.TraceSource.TraceData(TraceEventType.Verbose, (int)TraceEventId.FrameReceivedPayload, payload);
+                }
+
+                try
+                {
+                    writer.Advance(header.FramePayloadLength);
+                }
+                catch (InvalidOperationException)
+                {
+                    // Despite corefx source code suggesting otherwise, this API *does* sometimes throw InvalidOperationException when the writer is completed.
+                    // Maybe it's because there are alternative PipeWriter implementations out there, but this caused indeterministic failures
+                    // in our unit tests.
+                    return;
+                }
+
+                ValueTask<FlushResult> flushResult = writer.FlushAsync(cancellationToken);
+                if (!flushResult.IsCompleted)
+                {
+                    // The incoming data has overrun the size of the write buffer inside the PipeWriter.
+                    // This should never happen if we created the Pipe because we specify the Pause threshold to exceed the window size.
+                    // If it happens, it should be because someone specified an ExistingPipe with an inappropriately sized buffer in its PipeWriter.
+                    Assumes.True(this.existingPipeGiven == true); // Make sure this isn't an internal error
+                    this.Fault(new InvalidOperationException(Strings.ExistingPipeOutputHasPauseThresholdSetTooLow));
+                }
+
+                if (flushResult.IsCanceled)
+                {
+                    // This happens when the channel is disposed (while or before flushing).
+                    Assumes.True(this.IsDisposed);
+                    writer.Complete();
+                }
             }
 
             /// <summary>
@@ -364,7 +429,7 @@ namespace Nerdbank.Streams
                     {
                         try
                         {
-                            var writer = await this.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
+                            var writer = this.GetReceivedMessagePipeWriter();
                             await writer.CompleteAsync().ConfigureAwait(false);
                         }
                         catch (ObjectDisposedException)
@@ -394,7 +459,14 @@ namespace Nerdbank.Streams
             /// <returns>A value indicating whether the offer was accepted. It may fail if the channel was already closed or the offer rescinded.</returns>
             internal bool TryAcceptOffer(ChannelOptions channelOptions)
             {
-                var acceptanceParameters = new AcceptanceParameters((channelOptions.InputPipeOptions?.PauseWriterThreshold ?? this.MultiplexingStream.defaultChannelPauseWriterThreshold) - 1);
+                lock (this.SyncObject)
+                {
+                    // If the local window size has already been determined, we have to keep that since it can't be expanded once the Pipe is created.
+                    // Otherwise use what the ChannelOptions asked for, so long as it is no smaller than the default channel size, since we can't make it smaller either.
+                    this.localWindowSize ??= channelOptions.ChannelReceivingWindowSize is long windowSize ? Math.Max(windowSize, this.MultiplexingStream.DefaultChannelReceivingWindowSize) : this.MultiplexingStream.DefaultChannelReceivingWindowSize;
+                }
+
+                var acceptanceParameters = new AcceptanceParameters(this.localWindowSize.Value);
                 if (this.acceptanceSource.TrySetResult(acceptanceParameters))
                 {
                     var payload = new Sequence<byte>(); // don't dispose, since the buffer needs to live longer than this synchronous method.
@@ -463,7 +535,28 @@ namespace Nerdbank.Streams
             }
 
             /// <summary>
-            /// Apply channel options to this channel, including setting up or migrating to an user-supplied pipe writer/reader pair.
+            /// Gets the pipe writer to use when a message is received for this channel, so that the channel owner will notice and read it.
+            /// </summary>
+            /// <returns>A <see cref="PipeWriter"/>.</returns>
+            private PipeWriter GetReceivedMessagePipeWriter()
+            {
+                lock (this.SyncObject)
+                {
+                    Verify.NotDisposed(this);
+
+                    PipeWriter? result = this.mxStreamIOWriter;
+                    if (result == null)
+                    {
+                        this.InitializeOwnPipes();
+                        result = this.mxStreamIOWriter!;
+                    }
+
+                    return result;
+                }
+            }
+
+            /// <summary>
+            /// Apply channel options to this channel, including setting up or linking to an user-supplied pipe writer/reader pair.
             /// </summary>
             /// <param name="channelOptions">The channel options to apply.</param>
             private void ApplyChannelOptions(ChannelOptions channelOptions)
@@ -480,69 +573,16 @@ namespace Nerdbank.Streams
                     lock (this.SyncObject)
                     {
                         Verify.NotDisposed(this);
-                        if (channelOptions.ExistingPipe != null)
+                        this.InitializeOwnPipes();
+                        if (channelOptions.ExistingPipe is object)
                         {
-                            if (this.mxStreamIOWriter != null)
-                            {
-                                // A Pipe was already created (because data has been coming in for this channel even before it was accepted).
-                                // To be most efficient, we need to:
-                                // 1. Start forwarding all bytes written with this.mxStreamIOWriter to channelOptions.ExistingPipe.Output
-                                // 2. Arrange for the *next* call to GetReceivedMessagePipeWriterAsync to:
-                                //      call this.mxStreamIOWriter.Complete()
-                                //      wait for our forwarding code to finish (without propagating copmletion to channel.ExistingPipe.Output)
-                                //      return channel.ExistingPipe.Output
-                                //    From then on, GetReceivedMessagePipeWriterAsync should simply return channel.ExistingPipe.Output
-                                // Since this channel hasn't yet been exposed to the local owner, we can just replace the PipeWriter they use to transmit.
-
-                                // Take ownership of reading bytes that the MultiplexingStream may have already written to this channel.
-                                var mxStreamIncomingBytesReader = this.channelIO!.Input;
-                                this.channelIO = null;
-
-                                // Forward any bytes written by the MultiplexingStream to the ExistingPipe.Output writer,
-                                // and make that ExistingPipe.Output writer available only after the old Pipe-based writer has completed.
-                                // First, capture the ExistingPipe as a local since ChannelOptions is a mutable type, and we're going to need
-                                // its current value later on.
-                                var existingPipe = channelOptions.ExistingPipe;
-                                this.switchingToExistingPipe = Task.Run(async delegate
-                                {
-                                    // Await propagation of all bytes. Don't complete the ExistingPipe.Output when we're done because we still want to use it.
-                                    await mxStreamIncomingBytesReader.LinkToAsync(existingPipe.Output, propagateSuccessfulCompletion: false).ConfigureAwait(false);
-                                    return existingPipe.Output;
-                                });
-                            }
-                            else
-                            {
-                                // We haven't created a Pipe yet, so we can simply direct all writing to the ExistingPipe.Output immediately.
-                                this.mxStreamIOWriter = channelOptions.ExistingPipe.Output;
-                            }
-
-                            this.mxStreamIOReader = channelOptions.ExistingPipe.Input;
-                        }
-                        else if (channelOptions.InputPipeOptions != null && this.mxStreamIOWriter != null)
-                        {
-                            this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Data received on channel {0} before it was accepted. Migrating data from temporary buffer to accepted channel's new pipe.", this.Id);
-
-                            // Similar strategy to the situation above with ExistingPipe.
-                            // Take ownership of reading bytes that the MultiplexingStream may have already written to this channel.
-                            var mxStreamIncomingBytesReader = this.channelIO!.Input;
-
-                            var writerRelay = new Pipe();
-                            var readerRelay = new Pipe(channelOptions.InputPipeOptions);
-                            this.mxStreamIOReader = writerRelay.Reader;
-                            this.channelIO = new DuplexPipe(readerRelay.Reader, writerRelay.Writer);
-
-                            this.switchingToExistingPipe = Task.Run(async delegate
-                            {
-                                // Await propagation of all bytes. Don't complete the readerRelay.Writer when we're done because we still want to use it.
-                                await mxStreamIncomingBytesReader.LinkToAsync(readerRelay.Writer, propagateSuccessfulCompletion: false).ConfigureAwait(false);
-                                this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Data from temporary buffer to accepted channel {0}'s new pipe is completed.", this.Id);
-
-                                return readerRelay.Writer;
-                            });
+                            Assumes.NotNull(this.channelIO);
+                            this.DisposeSelfOnFailure(this.channelIO.LinkToAsync(channelOptions.ExistingPipe, propagateSuccessfulCompletion: true));
+                            this.existingPipeGiven = true;
                         }
                         else
                         {
-                            this.InitializeOwnPipes(channelOptions.InputPipeOptions ?? PipeOptions.Default, channelOptions.OutputPipeOptions ?? PipeOptions.Default);
+                            this.existingPipeGiven = false;
                         }
                     }
 
@@ -564,17 +604,22 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Set up our own (buffering) Pipes if they have not been set up yet.
             /// </summary>
-            /// <param name="inputPipeOptions">The options for the reading relay <see cref="Pipe"/>. Must not be null.</param>
-            /// <param name="outputPipeOptions">The options for the writing relay <see cref="Pipe"/>. Must not be null.</param>
-            private void InitializeOwnPipes(PipeOptions inputPipeOptions, PipeOptions outputPipeOptions)
+            private void InitializeOwnPipes()
             {
                 lock (this.SyncObject)
                 {
                     Verify.NotDisposed(this);
-                    if (this.mxStreamIOReader == null)
+                    if (this.mxStreamIOReader is null)
                     {
-                        var writerRelay = new Pipe(outputPipeOptions);
-                        var readerRelay = new Pipe(inputPipeOptions);
+                        if (this.localWindowSize is null)
+                        {
+                            // If an offer came in along with data before we accepted the channel, we have to set up the pipe
+                            // before we know what the preferred local window size is. We can't change it after the fact, so just use the default.
+                            this.localWindowSize = this.MultiplexingStream.DefaultChannelReceivingWindowSize;
+                        }
+
+                        var writerRelay = new Pipe();
+                        var readerRelay = new Pipe(new PipeOptions(pauseWriterThreshold: this.localWindowSize.Value + 1)); // +1 prevents pause when remote window is exactly filled
                         this.mxStreamIOReader = writerRelay.Reader;
                         this.mxStreamIOWriter = readerRelay.Writer;
                         this.channelIO = new DuplexPipe(new WindowPipeReader(this, readerRelay.Reader), writerRelay.Writer);

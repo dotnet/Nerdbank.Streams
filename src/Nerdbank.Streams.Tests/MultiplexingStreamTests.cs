@@ -525,8 +525,8 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task Backpressure()
     {
-        const int backpressureThreshold = 80 * 1024;
-        var (a, b) = await this.EstablishChannelsAsync("a", new PipeOptions(pauseWriterThreshold: backpressureThreshold));
+        long backpressureThreshold = this.mx1.DefaultChannelReceivingWindowSize;
+        var (a, b) = await this.EstablishChannelsAsync("a");
 
         var biteSizeChunk = new byte[backpressureThreshold * 2 / 5];
         var hugeChunk = new byte[backpressureThreshold * 2]; // enough to fill the remote and local windows
@@ -568,11 +568,10 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task Backpressure_FullButNeedMoreBytesToProcess()
     {
-        const int backpressureThreshold = 80 * 1024;
-        var (a, b) = await this.EstablishChannelsAsync("a", new PipeOptions(pauseWriterThreshold: backpressureThreshold));
+        var (a, b) = await this.EstablishChannelsAsync("a");
 
         // Write far more than would be allowed.
-        const int bytesWritten = backpressureThreshold * 5;
+        long bytesWritten = this.mx2.DefaultChannelReceivingWindowSize * 5;
         this.Logger.WriteLine("Writing {0} bytes.", bytesWritten);
         Task<FlushResult> writeTask = a.Output.WriteAsync(new byte[bytesWritten], this.TimeoutToken).AsTask();
 
@@ -608,7 +607,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
             new MultiplexingStream.ChannelOptions
             {
                 ExistingPipe = mx2Pipe.Item1,
-                InputPipeOptions = new PipeOptions(pauseWriterThreshold: backpressureThreshold),
+                ChannelReceivingWindowSize = backpressureThreshold,
             },
             this.TimeoutToken);
         var channels = await WhenAllSucceedOrAnyFail(mx1ChannelTask, mx2ChannelTask).WithCancellation(this.TimeoutToken);
@@ -1025,12 +1024,12 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
-    public async Task CreateChannel_InputPipeOptions()
+    public async Task CreateChannel_BlastLotsOfData()
     {
         const int DataSize = 1024 * 1024;
         var channelOptions = new MultiplexingStream.ChannelOptions
         {
-            InputPipeOptions = new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024),
+            ChannelReceivingWindowSize = DataSize,
         };
 
         var channel1 = this.mx1.CreateChannel(channelOptions);
@@ -1062,7 +1061,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
         var channelOptions = new MultiplexingStream.ChannelOptions
         {
-            InputPipeOptions = new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024),
+            ChannelReceivingWindowSize = 2 * 1024 * 1024,
         };
 
         var channel1 = this.mx1.CreateChannel();
@@ -1103,6 +1102,17 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
                 channel2.Input.AdvanceTo(consumed, readResult.Buffer.End);
             }
         }
+    }
+
+    [Fact]
+    public void Options_DefaultChannelReceivingWindowSize()
+    {
+        var options = new MultiplexingStream.Options();
+        Assert.True(options.DefaultChannelReceivingWindowSize > 0);
+        options.DefaultChannelReceivingWindowSize = 5;
+        Assert.Equal(5, options.DefaultChannelReceivingWindowSize);
+        Assert.Throws<ArgumentOutOfRangeException>(() => options.DefaultChannelReceivingWindowSize = 0);
+        Assert.Throws<ArgumentOutOfRangeException>(() => options.DefaultChannelReceivingWindowSize = -1);
     }
 
     private static async Task<int> ReadAtLeastAsync(Stream stream, ArraySegment<byte> buffer, int requiredLength, CancellationToken cancellationToken)
@@ -1180,9 +1190,9 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         }
     }
 
-    private async Task<(MultiplexingStream.Channel, MultiplexingStream.Channel)> EstablishChannelsAsync(string identifier, PipeOptions? inputPipeOptions = null, PipeOptions? outputPipeOptions = null)
+    private async Task<(MultiplexingStream.Channel, MultiplexingStream.Channel)> EstablishChannelsAsync(string identifier, long? receivingWindowSize = null)
     {
-        var channelOptions = new MultiplexingStream.ChannelOptions { InputPipeOptions = inputPipeOptions, OutputPipeOptions = outputPipeOptions };
+        var channelOptions = new MultiplexingStream.ChannelOptions { ChannelReceivingWindowSize = receivingWindowSize };
         var mx1ChannelTask = this.mx1.OfferChannelAsync(identifier, channelOptions, this.TimeoutToken);
         var mx2ChannelTask = this.mx2.AcceptChannelAsync(identifier, channelOptions, this.TimeoutToken);
         var channels = await WhenAllSucceedOrAnyFail(mx1ChannelTask, mx2ChannelTask).WithCancellation(this.TimeoutToken);
@@ -1191,9 +1201,9 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         return (channels[0], channels[1]);
     }
 
-    private async Task<(Stream, Stream)> EstablishChannelStreamsAsync(string identifier, PipeOptions? inputPipeOptions = null, PipeOptions? outputPipeOptions = null)
+    private async Task<(Stream, Stream)> EstablishChannelStreamsAsync(string identifier, long? receivingWindowSize = null)
     {
-        var (channel1, channel2) = await this.EstablishChannelsAsync(identifier, inputPipeOptions, outputPipeOptions);
+        var (channel1, channel2) = await this.EstablishChannelsAsync(identifier, receivingWindowSize);
         return (channel1.AsStream(), channel2.AsStream());
     }
 

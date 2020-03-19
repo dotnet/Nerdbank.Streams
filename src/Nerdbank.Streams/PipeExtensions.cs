@@ -419,6 +419,30 @@ namespace Nerdbank.Streams
         }
 
         /// <summary>
+        /// Forwards all bytes coming from either <see cref="IDuplexPipe"/> to the other <see cref="IDuplexPipe"/>.
+        /// </summary>
+        /// <param name="pipe1">The first duplex pipe.</param>
+        /// <param name="pipe2">The second duplex pipe.</param>
+        /// <param name="propagateSuccessfulCompletion"><c>true</c> to complete an <see cref="IDuplexPipe.Output"/> when its connected <see cref="IDuplexPipe.Input"/> completes.</param>
+        /// <param name="cancellationToken">A cancellation token.</param>
+        /// <returns>
+        /// A <see cref="Task"/> that completes when both <see cref="PipeReader"/> instances are finished producing bytes, or an error occurs.
+        /// This <see cref="Task"/> never faults, since any exceptions are used to complete the <see cref="PipeWriter" /> objects.
+        /// </returns>
+        /// <remarks>
+        /// If an error occurs during reading or writing, the <see cref="PipeWriter"/> is completed with the exception.
+        /// </remarks>
+        internal static Task LinkToAsync(this IDuplexPipe pipe1, IDuplexPipe pipe2, bool propagateSuccessfulCompletion, CancellationToken cancellationToken = default)
+        {
+            Requires.NotNull(pipe1, nameof(pipe1));
+            Requires.NotNull(pipe2, nameof(pipe2));
+
+            return Task.WhenAll(
+                pipe1.Input.LinkToAsync(pipe2.Output, propagateSuccessfulCompletion, cancellationToken),
+                pipe2.Input.LinkToAsync(pipe1.Output, propagateSuccessfulCompletion, cancellationToken));
+        }
+
+        /// <summary>
         /// Enables efficiently reading a stream using <see cref="PipeReader"/>.
         /// </summary>
         /// <param name="stream">The stream to read from using a pipe.</param>

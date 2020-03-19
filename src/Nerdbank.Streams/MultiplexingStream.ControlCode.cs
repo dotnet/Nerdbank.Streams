@@ -11,7 +11,7 @@ namespace Nerdbank.Streams
         /// <summary>
         /// Signals what kind of frame is being transmitted.
         /// </summary>
-        private enum ControlCode : byte
+        internal enum ControlCode : byte
         {
             /// <summary>
             /// A channel is proposed to the remote party.

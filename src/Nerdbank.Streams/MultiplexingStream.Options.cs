@@ -22,6 +22,11 @@ namespace Nerdbank.Streams
             /// </summary>
             private TraceSource traceSource = new TraceSource(nameof(MultiplexingStream), SourceLevels.Critical);
 
+            /// <summary>
+            /// Backing field for the <see cref="DefaultChannelReceivingWindowSize"/> property.
+            /// </summary>
+            private long defaultChannelReceivingWindowSize = RecommendedDefaultChannelReceivingWindowSize;
+
             /////// <summary>
             /////// Gets or sets the maximum number of channel offers from the remote party that are allowed before the
             /////// connection is terminated for abuse.
@@ -40,6 +45,23 @@ namespace Nerdbank.Streams
                 {
                     Requires.NotNull(value, nameof(value));
                     this.traceSource = value;
+                }
+            }
+
+            /// <summary>
+            /// Gets or sets the number of received bytes that may be buffered locally per channel (transmitted from the remote party but not yet processed).
+            /// </summary>
+            /// <value>
+            /// Must be a positive value.
+            /// </value>
+            /// <exception cref="ArgumentOutOfRangeException">Thrown if set to a non-positive value.</exception>
+            public long DefaultChannelReceivingWindowSize
+            {
+                get => this.defaultChannelReceivingWindowSize;
+                set
+                {
+                    Requires.Range(value > 0, nameof(value));
+                    this.defaultChannelReceivingWindowSize = value;
                 }
             }
 
