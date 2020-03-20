@@ -249,7 +249,6 @@ namespace Nerdbank.Streams
             options = options ?? new Options();
 
             // Send the protocol magic number, and a random GUID to establish even/odd assignments.
-            // TODO: also send our default receiving window size.
             var randomSendBuffer = Guid.NewGuid().ToByteArray();
             var sendBuffer = new byte[ProtocolMagicNumber.Length + randomSendBuffer.Length];
             Array.Copy(ProtocolMagicNumber, sendBuffer, ProtocolMagicNumber.Length);
