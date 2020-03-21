@@ -18,6 +18,16 @@ namespace Nerdbank.Streams
         public class Options
         {
             /// <summary>
+            /// The default window size for a new channel,
+            /// which also serves as the minimum window size for any channel.
+            /// </summary>
+            /// <remarks>
+            /// Using an integer multiple of <see cref="FramePayloadMaxLength"/> ensures that the client can send full frames
+            /// instead of ending with a partial frame when the remote window limit is reached.
+            /// </remarks>
+            private static readonly long RecommendedDefaultChannelReceivingWindowSize = 5 * FramePayloadMaxLength;
+
+            /// <summary>
             /// Backing field for the <see cref="TraceSource"/> property.
             /// </summary>
             private TraceSource traceSource = new TraceSource(nameof(MultiplexingStream), SourceLevels.Critical);
@@ -73,7 +83,7 @@ namespace Nerdbank.Streams
             /// 1 is the original and default version.
             /// 2 is a protocol breaking change and adds backpressure support.
             /// </remarks>
-            public int MajorProtocolVersion { get; set; } = 1;
+            public int ProtocolMajorVersion { get; set; } = 1;
 
             /// <summary>
             /// Gets or sets a factory for <see cref="TraceSource"/> instances to attach to a newly opened <see cref="Channel"/>

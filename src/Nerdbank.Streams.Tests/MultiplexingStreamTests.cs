@@ -33,7 +33,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     {
     }
 
-    protected virtual int MajorProtocolVersion { get; } = 1;
+    protected virtual int ProtocolMajorVersion { get; } = 1;
 
     public async Task InitializeAsync()
     {
@@ -54,8 +54,8 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         Func<int, string, TraceSource> mx2TraceSourceFactory = (int id, string name) => traceSourceFactory(nameof(this.mx2), id, name);
 
         (this.transport1, this.transport2) = FullDuplexStream.CreatePair(new System.IO.Pipelines.PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024));
-        var mx1 = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { MajorProtocolVersion = this.MajorProtocolVersion, TraceSource = mx1TraceSource, DefaultChannelTraceSourceFactory = mx1TraceSourceFactory }, this.TimeoutToken);
-        var mx2 = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { MajorProtocolVersion = this.MajorProtocolVersion, TraceSource = mx2TraceSource, DefaultChannelTraceSourceFactory = mx2TraceSourceFactory }, this.TimeoutToken);
+        var mx1 = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, TraceSource = mx1TraceSource, DefaultChannelTraceSourceFactory = mx1TraceSourceFactory }, this.TimeoutToken);
+        var mx2 = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, TraceSource = mx2TraceSource, DefaultChannelTraceSourceFactory = mx2TraceSourceFactory }, this.TimeoutToken);
         this.mx1 = await mx1;
         this.mx2 = await mx2;
     }
@@ -76,7 +76,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public void DefaultMajorProtocolVersion()
     {
-        Assert.Equal(1, new MultiplexingStream.Options().MajorProtocolVersion);
+        Assert.Equal(1, new MultiplexingStream.Options().ProtocolMajorVersion);
     }
 
     [Fact]

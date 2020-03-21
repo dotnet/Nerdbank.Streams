@@ -58,16 +58,6 @@ namespace Nerdbank.Streams
         private static readonly ChannelOptions DefaultChannelOptions = new ChannelOptions();
 
         /// <summary>
-        /// The default window size for a new channel,
-        /// which also serves as the minimum window size for any channel.
-        /// </summary>
-        /// <remarks>
-        /// Using an integer multiple of <see cref="FramePayloadMaxLength"/> ensures that the client can send full frames
-        /// instead of ending with a partial frame when the remote window limit is reached.
-        /// </remarks>
-        private static readonly long RecommendedDefaultChannelReceivingWindowSize = 5 * FramePayloadMaxLength;
-
-        /// <summary>
         /// A value indicating whether this is the "odd" party in the conversation (where the other one would be "even").
         /// </summary>
         /// <remarks>
@@ -155,7 +145,7 @@ namespace Nerdbank.Streams
             this.TraceSource = options.TraceSource;
             this.DefaultChannelTraceSourceFactory = options.DefaultChannelTraceSourceFactory;
             this.DefaultChannelReceivingWindowSize = options.DefaultChannelReceivingWindowSize;
-            this.protocolMajorVersion = options.MajorProtocolVersion;
+            this.protocolMajorVersion = options.ProtocolMajorVersion;
 
             // Initiate reading from the transport stream. This will not end until the stream does, or we're disposed.
             // If reading the stream fails, we'll dispose ourselves.
@@ -262,15 +252,15 @@ namespace Nerdbank.Streams
 
             if (options.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
             {
-                options.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.HandshakeSuccessful, $"Multiplexing protocol handshake beginning with major version {options.MajorProtocolVersion}.");
+                options.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.HandshakeSuccessful, $"Multiplexing protocol handshake beginning with major version {options.ProtocolMajorVersion}.");
             }
 
             // Send the protocol magic number, and a random GUID to establish even/odd assignments.
-            var protocolMagicNumber = options.MajorProtocolVersion switch
+            var protocolMagicNumber = options.ProtocolMajorVersion switch
             {
                 1 => ProtocolMagicNumberV1,
                 2 => ProtocolMagicNumberV2,
-                _ => throw new NotSupportedException($"Protocol major version {options.MajorProtocolVersion} is not supported."),
+                _ => throw new NotSupportedException($"Protocol major version {options.ProtocolMajorVersion} is not supported."),
             };
             var randomSendBuffer = Guid.NewGuid().ToByteArray();
             var sendBuffer = new byte[protocolMagicNumber.Length + randomSendBuffer.Length];

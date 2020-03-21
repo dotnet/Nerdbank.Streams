@@ -24,7 +24,7 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
     {
     }
 
-    protected override int MajorProtocolVersion => 2;
+    protected override int ProtocolMajorVersion => 2;
 
     [Fact]
     public async Task Backpressure()
