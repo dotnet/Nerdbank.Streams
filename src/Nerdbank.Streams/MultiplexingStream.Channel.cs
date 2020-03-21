@@ -56,7 +56,7 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Gets a signal which indicates when the <see cref="RemoteWindowRemaining"/> is non-zero.
             /// </summary>
-            private readonly AsyncManualResetEvent remoteWindowNonEmpty = new AsyncManualResetEvent(initialState: true);
+            private readonly AsyncManualResetEvent remoteWindowHasCapacity = new AsyncManualResetEvent(initialState: true);
 
             /// <summary>
             /// The number of bytes transmitted from here but not yet acknowledged as processed from there,
@@ -276,6 +276,11 @@ namespace Nerdbank.Streams
             }
 
             /// <summary>
+            /// Gets a value indicating whether backpressure support is enabled.
+            /// </summary>
+            private bool BackpressureSupportEnabled => this.MultiplexingStream.protocolMajorVersion > 1;
+
+            /// <summary>
             /// Closes this channel and releases all resources associated with it.
             /// </summary>
             /// <remarks>
@@ -330,7 +335,7 @@ namespace Nerdbank.Streams
                     }
 
                     // Unblock the reader that might be waiting on this.
-                    this.remoteWindowNonEmpty.Set();
+                    this.remoteWindowHasCapacity.Set();
 
                     // As a minor perf optimization, avoid allocating a continuation task if the antecedent is already completed.
                     if (this.mxStreamIOReaderCompleted?.IsCompleted ?? true)
@@ -401,13 +406,20 @@ namespace Nerdbank.Streams
                 }
 
                 ValueTask<FlushResult> flushResult = writer.FlushAsync(cancellationToken);
-                if (!flushResult.IsCompleted)
+                if (this.BackpressureSupportEnabled)
                 {
-                    // The incoming data has overrun the size of the write buffer inside the PipeWriter.
-                    // This should never happen if we created the Pipe because we specify the Pause threshold to exceed the window size.
-                    // If it happens, it should be because someone specified an ExistingPipe with an inappropriately sized buffer in its PipeWriter.
-                    Assumes.True(this.existingPipeGiven == true); // Make sure this isn't an internal error
-                    this.Fault(new InvalidOperationException(Strings.ExistingPipeOutputHasPauseThresholdSetTooLow));
+                    if (!flushResult.IsCompleted)
+                    {
+                        // The incoming data has overrun the size of the write buffer inside the PipeWriter.
+                        // This should never happen if we created the Pipe because we specify the Pause threshold to exceed the window size.
+                        // If it happens, it should be because someone specified an ExistingPipe with an inappropriately sized buffer in its PipeWriter.
+                        Assumes.True(this.existingPipeGiven == true); // Make sure this isn't an internal error
+                        this.Fault(new InvalidOperationException(Strings.ExistingPipeOutputHasPauseThresholdSetTooLow));
+                    }
+                }
+                else
+                {
+                    await flushResult.ConfigureAwait(false);
                 }
 
                 if (flushResult.IsCanceled)
@@ -470,13 +482,13 @@ namespace Nerdbank.Streams
                 if (this.acceptanceSource.TrySetResult(acceptanceParameters))
                 {
                     var payload = new Sequence<byte>(); // don't dispose, since the buffer needs to live longer than this synchronous method.
-                    acceptanceParameters.Serialize(payload);
+                    acceptanceParameters.Serialize(payload, this.MultiplexingStream.protocolMajorVersion);
                     this.MultiplexingStream.SendFrame(
                         new FrameHeader
                         {
                             Code = ControlCode.OfferAccepted,
                             ChannelId = this.Id,
-                            FramePayloadLength = 4,
+                            FramePayloadLength = (int)payload.Length,
                         },
                         payload,
                         CancellationToken.None);
@@ -529,7 +541,7 @@ namespace Nerdbank.Streams
                     this.remoteWindowFilled -= bytesProcessed;
                     if (this.remoteWindowFilled < this.remoteWindowSize)
                     {
-                        this.remoteWindowNonEmpty.Set();
+                        this.remoteWindowHasCapacity.Set();
                     }
                 }
             }
@@ -619,10 +631,12 @@ namespace Nerdbank.Streams
                         }
 
                         var writerRelay = new Pipe();
-                        var readerRelay = new Pipe(new PipeOptions(pauseWriterThreshold: this.localWindowSize.Value + 1)); // +1 prevents pause when remote window is exactly filled
+                        var readerRelay = this.BackpressureSupportEnabled
+                            ? new Pipe(new PipeOptions(pauseWriterThreshold: this.localWindowSize.Value + 1)) // +1 prevents pause when remote window is exactly filled
+                            : new Pipe();
                         this.mxStreamIOReader = writerRelay.Reader;
                         this.mxStreamIOWriter = readerRelay.Writer;
-                        this.channelIO = new DuplexPipe(new WindowPipeReader(this, readerRelay.Reader), writerRelay.Writer);
+                        this.channelIO = new DuplexPipe(this.BackpressureSupportEnabled ? new WindowPipeReader(this, readerRelay.Reader) : readerRelay.Reader, writerRelay.Writer);
                     }
                 }
             }
@@ -641,12 +655,12 @@ namespace Nerdbank.Streams
 
                     while (!this.Completion.IsCompleted)
                     {
-                        if (!this.remoteWindowNonEmpty.IsSet && this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
+                        if (!this.remoteWindowHasCapacity.IsSet && this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
                         {
                             this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Remote window is full. Waiting for remote party to process data before sending more.");
                         }
 
-                        await this.remoteWindowNonEmpty.WaitAsync().ConfigureAwait(false);
+                        await this.remoteWindowHasCapacity.WaitAsync().ConfigureAwait(false);
                         if (this.IsRemotelyTerminated)
                         {
                             if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
@@ -686,7 +700,13 @@ namespace Nerdbank.Streams
 
                         // We'll send whatever we've got, up to the maximum size of the frame or available window size.
                         // Anything in excess of that we'll pick up next time the loop runs.
-                        var bufferToRelay = result.Buffer.Slice(0, Math.Min(this.RemoteWindowRemaining, Math.Min(result.Buffer.Length, FramePayloadMaxLength)));
+                        long bytesToSend = Math.Min(result.Buffer.Length, FramePayloadMaxLength);
+                        if (this.BackpressureSupportEnabled)
+                        {
+                            bytesToSend = Math.Min(this.RemoteWindowRemaining, bytesToSend);
+                        }
+
+                        var bufferToRelay = result.Buffer.Slice(0, bytesToSend);
                         this.OnTransmittingBytes(bufferToRelay.Length);
                         bool isCompleted = result.IsCompleted && result.Buffer.Length == bufferToRelay.Length;
                         if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
@@ -757,14 +777,17 @@ namespace Nerdbank.Streams
             /// <param name="transmittedBytes">The number of bytes being transmitted.</param>
             private void OnTransmittingBytes(long transmittedBytes)
             {
-                Requires.Range(transmittedBytes >= 0, nameof(transmittedBytes), "A non-negative number is required.");
-                lock (this.SyncObject)
+                if (this.BackpressureSupportEnabled)
                 {
-                    Requires.Range(this.remoteWindowFilled + transmittedBytes <= this.remoteWindowSize, nameof(transmittedBytes), "The value exceeds the space remaining in the window size.");
-                    this.remoteWindowFilled += transmittedBytes;
-                    if (this.remoteWindowFilled == this.remoteWindowSize)
+                    Requires.Range(transmittedBytes >= 0, nameof(transmittedBytes), "A non-negative number is required.");
+                    lock (this.SyncObject)
                     {
-                        this.remoteWindowNonEmpty.Reset();
+                        Requires.Range(this.remoteWindowFilled + transmittedBytes <= this.remoteWindowSize, nameof(transmittedBytes), "The value exceeds the space remaining in the window size.");
+                        this.remoteWindowFilled += transmittedBytes;
+                        if (this.remoteWindowFilled == this.remoteWindowSize)
+                        {
+                            this.remoteWindowHasCapacity.Reset();
+                        }
                     }
                 }
             }
@@ -778,7 +801,7 @@ namespace Nerdbank.Streams
                     {
                         Code = ControlCode.ContentProcessed,
                         ChannelId = this.Id,
-                        FramePayloadLength = 4,
+                        FramePayloadLength = memory.Length,
                     },
                     new ReadOnlySequence<byte>(memory),
                     CancellationToken.None);
@@ -841,7 +864,7 @@ namespace Nerdbank.Streams
                 /// When based on <see cref="PipeOptions.PauseWriterThreshold"/>, this value should be -1 of that value in order
                 /// to avoid the actual pause that would be fatal to the read loop of the multiplexing stream.
                 /// </param>
-                internal OfferParameters(string name, long remoteWindowSize)
+                internal OfferParameters(string name, long? remoteWindowSize)
                 {
                     this.Name = name ?? throw new ArgumentNullException(nameof(name));
                     this.RemoteWindowSize = remoteWindowSize;
@@ -857,21 +880,37 @@ namespace Nerdbank.Streams
                 /// Gets the maximum number of bytes that may be transmitted and not yet acknowledged as processed by the remote party.
                 /// </summary>
                 [DataMember]
-                internal long RemoteWindowSize { get; }
+                internal long? RemoteWindowSize { get; }
 
-                internal static unsafe OfferParameters Deserialize(ReadOnlyMemory<byte> buffer)
+                internal static unsafe OfferParameters Deserialize(ReadOnlyMemory<byte> buffer, int majorProtocolVersion)
                 {
-                    ReadOnlySpan<byte> nameSlice = buffer.Span.Slice(0, buffer.Length - 4);
-                    ReadOnlySpan<byte> remoteWindowSizeSpan = buffer.Span.Slice(buffer.Length - 4);
-                    fixed (byte* pName = nameSlice)
+                    switch (majorProtocolVersion)
                     {
-                        return new OfferParameters(
-                            pName != null ? ControlFrameEncoding.GetString(pName, nameSlice.Length) : string.Empty,
-                            Utilities.ReadInt(remoteWindowSizeSpan));
+                        case 1:
+                            ReadOnlySpan<byte> nameSlice = buffer.Span;
+                            fixed (byte* pName = nameSlice)
+                            {
+                                return new OfferParameters(
+                                    pName != null ? ControlFrameEncoding.GetString(pName, nameSlice.Length) : string.Empty,
+                                    null);
+                            }
+
+                        case 2:
+                            nameSlice = buffer.Span.Slice(0, buffer.Length - 4);
+                            ReadOnlySpan<byte> remoteWindowSizeSpan = buffer.Span.Slice(buffer.Length - 4);
+                            fixed (byte* pName = nameSlice)
+                            {
+                                return new OfferParameters(
+                                    pName != null ? ControlFrameEncoding.GetString(pName, nameSlice.Length) : string.Empty,
+                                    Utilities.ReadInt(remoteWindowSizeSpan));
+                            }
+
+                        default:
+                            throw new NotSupportedException();
                     }
                 }
 
-                internal unsafe void Serialize(IBufferWriter<byte> writer)
+                internal unsafe void Serialize(IBufferWriter<byte> writer, int majorProtocolVersion)
                 {
                     var buffer = writer.GetSpan(ControlFrameEncoding.GetMaxByteCount(this.Name.Length));
                     fixed (byte* pBuffer = buffer)
@@ -881,9 +920,13 @@ namespace Nerdbank.Streams
                         writer.Advance(byteLength);
                     }
 
-                    buffer = writer.GetSpan(4);
-                    Utilities.Write(buffer, checked((int)this.RemoteWindowSize));
-                    writer.Advance(4);
+                    if (majorProtocolVersion > 1)
+                    {
+                        Assumes.True(this.RemoteWindowSize.HasValue);
+                        buffer = writer.GetSpan(4);
+                        Utilities.Write(buffer, checked((int)this.RemoteWindowSize.Value));
+                        writer.Advance(4);
+                    }
                 }
             }
 
@@ -898,24 +941,28 @@ namespace Nerdbank.Streams
                 /// When based on <see cref="PipeOptions.PauseWriterThreshold"/>, this value should be -1 of that value in order
                 /// to avoid the actual pause that would be fatal to the read loop of the multiplexing stream.
                 /// </param>
-                internal AcceptanceParameters(long remoteWindowSize) => this.RemoteWindowSize = remoteWindowSize;
+                internal AcceptanceParameters(long? remoteWindowSize) => this.RemoteWindowSize = remoteWindowSize;
 
                 /// <summary>
                 /// Gets the maximum number of bytes that may be transmitted and not yet acknowledged as processed by the remote party.
                 /// </summary>
                 [DataMember]
-                internal long RemoteWindowSize { get; }
+                internal long? RemoteWindowSize { get; }
 
-                internal static AcceptanceParameters Deserialize(ReadOnlyMemory<byte> buffer)
+                internal static AcceptanceParameters Deserialize(ReadOnlyMemory<byte> buffer, int majorProtocolVersion)
                 {
-                    return new AcceptanceParameters(Utilities.ReadInt(buffer.Span));
+                    return new AcceptanceParameters(majorProtocolVersion > 1 ? (long?)Utilities.ReadInt(buffer.Span) : null);
                 }
 
-                internal void Serialize(IBufferWriter<byte> writer)
+                internal void Serialize(IBufferWriter<byte> writer, int majorProtocolVersion)
                 {
-                    var buffer = writer.GetSpan(4);
-                    Utilities.Write(buffer, checked((int)this.RemoteWindowSize));
-                    writer.Advance(4);
+                    if (majorProtocolVersion > 1)
+                    {
+                        Assumes.True(this.RemoteWindowSize.HasValue);
+                        var buffer = writer.GetSpan(4);
+                        Utilities.Write(buffer, checked((int)this.RemoteWindowSize));
+                        writer.Advance(4);
+                    }
                 }
             }
 

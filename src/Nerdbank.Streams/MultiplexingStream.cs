@@ -31,12 +31,18 @@ namespace Nerdbank.Streams
         private const int FramePayloadMaxLength = 20 * 1024;
 
         /// <summary>
-        /// The magic number to send at the start of communication.
+        /// The magic number to send at the start of communication when using v1 of the protocol.
+        /// </summary>
+        private static readonly byte[] ProtocolMagicNumberV1 = new byte[] { 0x2f, 0xdf, 0x1d, 0x50 };
+
+        /// <summary>
+        /// The magic number to send at the start of communication when using v2 of the protocol.
         /// </summary>
         /// <remarks>
-        /// If the protocol ever changes, change this random number. It serves both as a way to recognize the other end actually supports multiplexing and ensure compatibility.
+        /// If the protocol ever changes, change this random number and define as a new private field.
+        /// It serves both as a way to recognize the other end actually supports multiplexing and ensure compatibility.
         /// </remarks>
-        private static readonly byte[] ProtocolMagicNumber = new byte[] { 0x2f, 0xdf, 0x1d, 0x51 };
+        private static readonly byte[] ProtocolMagicNumberV2 = new byte[] { 0x2f, 0xdf, 0x1d, 0x51 };
 
         /// <summary>
         /// The encoding used for characters in control frames.
@@ -122,6 +128,11 @@ namespace Nerdbank.Streams
         private readonly CancellationTokenSource disposalTokenSource = new CancellationTokenSource();
 
         /// <summary>
+        /// The major version of the protocol being used for this connection.
+        /// </summary>
+        private readonly int protocolMajorVersion;
+
+        /// <summary>
         /// The last number assigned to a channel.
         /// Each use of this should increment by two.
         /// </summary>
@@ -144,6 +155,7 @@ namespace Nerdbank.Streams
             this.TraceSource = options.TraceSource;
             this.DefaultChannelTraceSourceFactory = options.DefaultChannelTraceSourceFactory;
             this.DefaultChannelReceivingWindowSize = options.DefaultChannelReceivingWindowSize;
+            this.protocolMajorVersion = options.MajorProtocolVersion;
 
             // Initiate reading from the transport stream. This will not end until the stream does, or we're disposed.
             // If reading the stream fails, we'll dispose ourselves.
@@ -248,11 +260,22 @@ namespace Nerdbank.Streams
 
             options = options ?? new Options();
 
+            if (options.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+            {
+                options.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.HandshakeSuccessful, $"Multiplexing protocol handshake beginning with major version {options.MajorProtocolVersion}.");
+            }
+
             // Send the protocol magic number, and a random GUID to establish even/odd assignments.
+            var protocolMagicNumber = options.MajorProtocolVersion switch
+            {
+                1 => ProtocolMagicNumberV1,
+                2 => ProtocolMagicNumberV2,
+                _ => throw new NotSupportedException($"Protocol major version {options.MajorProtocolVersion} is not supported."),
+            };
             var randomSendBuffer = Guid.NewGuid().ToByteArray();
-            var sendBuffer = new byte[ProtocolMagicNumber.Length + randomSendBuffer.Length];
-            Array.Copy(ProtocolMagicNumber, sendBuffer, ProtocolMagicNumber.Length);
-            Array.Copy(randomSendBuffer, 0, sendBuffer, ProtocolMagicNumber.Length, randomSendBuffer.Length);
+            var sendBuffer = new byte[protocolMagicNumber.Length + randomSendBuffer.Length];
+            Array.Copy(protocolMagicNumber, sendBuffer, protocolMagicNumber.Length);
+            Array.Copy(randomSendBuffer, 0, sendBuffer, protocolMagicNumber.Length, randomSendBuffer.Length);
             Task writeTask = WriteAndFlushAsync(stream, new ArraySegment<byte>(sendBuffer), cancellationToken);
 
             var recvBuffer = new byte[sendBuffer.Length];
@@ -261,9 +284,9 @@ namespace Nerdbank.Streams
             // Realize any exceptions from writing to the stream.
             await writeTask.ConfigureAwait(false);
 
-            for (int i = 0; i < ProtocolMagicNumber.Length; i++)
+            for (int i = 0; i < protocolMagicNumber.Length; i++)
             {
-                if (recvBuffer[i] != ProtocolMagicNumber[i])
+                if (recvBuffer[i] != protocolMagicNumber[i])
                 {
                     string message = "Protocol handshake mismatch.";
                     if (options.TraceSource.Switch.ShouldTrace(TraceEventType.Critical))
@@ -279,7 +302,7 @@ namespace Nerdbank.Streams
             for (int i = 0; i < randomSendBuffer.Length; i++)
             {
                 byte sent = randomSendBuffer[i];
-                byte recv = recvBuffer[ProtocolMagicNumber.Length + i];
+                byte recv = recvBuffer[protocolMagicNumber.Length + i];
                 if (sent > recv)
                 {
                     isOdd = true;
@@ -328,7 +351,7 @@ namespace Nerdbank.Streams
             var offerParameters = new Channel.OfferParameters(string.Empty, options?.ChannelReceivingWindowSize ?? this.DefaultChannelReceivingWindowSize);
             using (var payload = new Sequence<byte>(ArrayPool<byte>.Shared))
             {
-                offerParameters.Serialize(payload);
+                offerParameters.Serialize(payload, this.protocolMajorVersion);
 
                 Channel channel = new Channel(this, offeredLocally: true, this.GetUnusedChannelId(), offerParameters, options ?? DefaultChannelOptions);
                 lock (this.syncObject)
@@ -439,7 +462,7 @@ namespace Nerdbank.Streams
             var offerParameters = new Channel.OfferParameters(name, options?.ChannelReceivingWindowSize ?? this.DefaultChannelReceivingWindowSize);
             using (var payload = new Sequence<byte>(ArrayPool<byte>.Shared))
             {
-                offerParameters.Serialize(payload);
+                offerParameters.Serialize(payload, this.protocolMajorVersion);
                 Requires.Argument(payload.Length <= FramePayloadMaxLength, nameof(name), "{0} encoding of value exceeds maximum frame payload length.", ControlFrameEncoding.EncodingName);
                 Channel channel = new Channel(this, offeredLocally: true, this.GetUnusedChannelId(), offerParameters, options ?? DefaultChannelOptions);
                 lock (this.syncObject)
@@ -852,7 +875,7 @@ namespace Nerdbank.Streams
         private async Task OnOfferAcceptedAsync(FrameHeader header, Memory<byte> payloadBuffer, CancellationToken cancellationToken)
         {
             await ReadToFillAsync(this.stream, payloadBuffer, throwOnEmpty: true, cancellationToken).ConfigureAwait(false);
-            var acceptanceParameters = Channel.AcceptanceParameters.Deserialize(payloadBuffer);
+            var acceptanceParameters = Channel.AcceptanceParameters.Deserialize(payloadBuffer, this.protocolMajorVersion);
             int channelId = header.ChannelId;
             Channel channel;
             lock (this.syncObject)
@@ -902,7 +925,7 @@ namespace Nerdbank.Streams
         private async ValueTask OnOfferAsync(int channelId, Memory<byte> payloadBuffer, CancellationToken cancellationToken)
         {
             await ReadToFillAsync(this.stream, payloadBuffer, throwOnEmpty: true, cancellationToken).ConfigureAwait(false);
-            var offerParameters = Channel.OfferParameters.Deserialize(payloadBuffer);
+            var offerParameters = Channel.OfferParameters.Deserialize(payloadBuffer, this.protocolMajorVersion);
 
             var channel = new Channel(this, offeredLocally: false, channelId, offerParameters);
             bool acceptingChannelAlreadyPresent = false;

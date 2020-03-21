@@ -66,6 +66,16 @@ namespace Nerdbank.Streams
             }
 
             /// <summary>
+            /// Gets or sets the protocol version to be used.
+            /// </summary>
+            /// <value>The default is 1.</value>
+            /// <remarks>
+            /// 1 is the original and default version.
+            /// 2 is a protocol breaking change and adds backpressure support.
+            /// </remarks>
+            public int MajorProtocolVersion { get; set; } = 1;
+
+            /// <summary>
             /// Gets or sets a factory for <see cref="TraceSource"/> instances to attach to a newly opened <see cref="Channel"/>
             /// when its <see cref="ChannelOptions.TraceSource"/> is <c>null</c>.
             /// </summary>
