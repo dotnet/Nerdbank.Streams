@@ -3,8 +3,8 @@
  */
 export class Deferred<T> {
     public readonly promise: Promise<T>;
-    private resolvePromise: (value?: T | PromiseLike<T>) => void;
-    private rejectPromise: (reason?: any) => void;
+    private resolvePromise!: (value?: T | PromiseLike<T>) => void;
+    private rejectPromise!: (reason?: any) => void;
     private _isResolved: boolean = false;
     private _isRejected: boolean = false;
     private _error: any;

@@ -4,6 +4,7 @@
 namespace Nerdbank.Streams.Interop.Tests
 {
     using System;
+    using System.Diagnostics;
     using System.IO;
     using System.Text;
     using System.Threading.Tasks;
@@ -25,7 +26,16 @@ namespace Nerdbank.Streams.Interop.Tests
         private static async Task Main(string[] args)
         {
             ////System.Diagnostics.Debugger.Launch();
-            var mx = await MultiplexingStream.CreateAsync(FullDuplexStream.Splice(Console.OpenStandardInput(), Console.OpenStandardOutput()));
+            int protocolMajorVersion = int.Parse(args[0]);
+            var mx = await MultiplexingStream.CreateAsync(
+                FullDuplexStream.Splice(Console.OpenStandardInput(), Console.OpenStandardOutput()),
+                new MultiplexingStream.Options
+                {
+                    TraceSource = { Switch = { Level = SourceLevels.Verbose } },
+                    ProtocolMajorVersion = protocolMajorVersion,
+                    DefaultChannelReceivingWindowSize = 64,
+                    DefaultChannelTraceSourceFactory = (id, name) => new TraceSource($"Channel {id}") { Switch = { Level = SourceLevels.Verbose } },
+                });
             var program = new Program(mx);
             await program.RunAsync();
         }

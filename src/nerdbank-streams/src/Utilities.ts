@@ -5,7 +5,7 @@ import { IDisposableObservable } from "./IDisposableObservable";
 
 export async function writeAsync(stream: NodeJS.WritableStream, chunk: Buffer) {
     const deferred = new Deferred<void>();
-    stream.write(chunk, (err?: Error) => {
+    stream.write(chunk, (err: Error | null | undefined) => {
         if (err) {
             deferred.reject(err);
         } else {
@@ -17,7 +17,7 @@ export async function writeAsync(stream: NodeJS.WritableStream, chunk: Buffer) {
 
 export function writeSubstream(stream: NodeJS.WritableStream): NodeJS.WritableStream {
     return new Writable({
-        async write(chunk: Buffer, encoding: string, callback: (error?: Error | null) => void) {
+        async write(chunk: Buffer, _: string, callback: (error?: Error | null) => void) {
             try {
                 const dv = new DataView(new ArrayBuffer(4));
                 dv.setUint32(0, chunk.length, false);
@@ -37,7 +37,7 @@ export function writeSubstream(stream: NodeJS.WritableStream): NodeJS.WritableSt
 
 export function readSubstream(stream: NodeJS.ReadableStream): NodeJS.ReadableStream {
     return new Readable({
-        async read(size: number) {
+        async read(_: number) {
             const lenBuffer = await getBufferFrom(stream, 4);
             const dv = new DataView(lenBuffer.buffer, lenBuffer.byteOffset, lenBuffer.length);
             const chunkSize = dv.getUint32(0, false);
@@ -56,8 +56,20 @@ export function readSubstream(stream: NodeJS.ReadableStream): NodeJS.ReadableStr
 export async function getBufferFrom(
     readable: NodeJS.ReadableStream,
     size: number,
+    allowEndOfStream?: false,
+    cancellationToken?: CancellationToken): Promise<Buffer>;
+
+export async function getBufferFrom(
+    readable: NodeJS.ReadableStream,
+    size: number,
+    allowEndOfStream: true,
+    cancellationToken?: CancellationToken): Promise<Buffer | null>;
+
+export async function getBufferFrom(
+    readable: NodeJS.ReadableStream,
+    size: number,
     allowEndOfStream: boolean = false,
-    cancellationToken?: CancellationToken): Promise<Buffer> {
+    cancellationToken?: CancellationToken): Promise<Buffer | null> {
 
     const streamEnded = new Deferred<void>();
     while (size > 0) {
@@ -80,8 +92,10 @@ export async function getBufferFrom(
             }
         }
 
-        return readBuffer || Buffer.from([]);
+        return readBuffer;
     }
+
+    return new Buffer([]);
 }
 
 export function throwIfDisposed(value: IDisposableObservable) {

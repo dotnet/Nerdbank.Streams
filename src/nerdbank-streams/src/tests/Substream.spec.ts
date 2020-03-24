@@ -199,7 +199,7 @@ describe("Substream", () => {
         const finished = new Deferred<void>();
         stream.once("end", () => finished.resolve());
         while (!finished.isCompleted) {
-            expect(stream.read()).toBe(null);
+            expect(stream.read()).toBeNull();
             await tick();
         }
     }

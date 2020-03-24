@@ -65,6 +65,9 @@ namespace Nerdbank.Streams
             /// Must be a positive value.
             /// </value>
             /// <exception cref="ArgumentOutOfRangeException">Thrown if set to a non-positive value.</exception>
+            /// <remarks>
+            /// This value is ignored when <see cref="ProtocolMajorVersion"/> is set to 1.
+            /// </remarks>
             public long DefaultChannelReceivingWindowSize
             {
                 get => this.defaultChannelReceivingWindowSize;

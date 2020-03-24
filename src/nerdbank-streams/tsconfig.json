@@ -1,13 +1,23 @@
 {
-    "compilerOptions": {
-        "target": "es6",
-        "sourceMap": true,
-        "outDir": "out",
-        "declaration": true,
-        "module": "commonjs"
-    },
-    "include": [
-        "src/index.ts",
-        "src/tests/*.ts"
-    ]
+  "compilerOptions": {
+    "alwaysStrict": true,
+    "target": "ES2018",
+    "sourceMap": true,
+    "outDir": "out",
+    "declaration": true,
+    "module": "commonjs",
+		"noImplicitAny": false,
+		"noImplicitReturns": true,
+		"noImplicitThis": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"strict": true,
+		"strictFunctionTypes": true,
+		"strictNullChecks": true,
+		"strictPropertyInitialization": true
+  },
+  "include": [
+    "src/index.ts",
+    "src/tests/*.ts"
+  ]
 }

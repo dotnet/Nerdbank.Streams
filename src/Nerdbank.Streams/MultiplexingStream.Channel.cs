@@ -794,6 +794,11 @@ namespace Nerdbank.Streams
 
             private void LocalContentExamined(long bytesExamined)
             {
+                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Acknowledging processing of {0} bytes.", bytesExamined);
+                }
+
                 Memory<byte> memory = new byte[4];
                 Utilities.Write(memory.Span, (int)bytesExamined);
                 this.MultiplexingStream.SendFrame(
@@ -982,14 +987,16 @@ namespace Nerdbank.Streams
 
                 public override void AdvanceTo(SequencePosition consumed)
                 {
-                    this.Consumed(consumed, consumed);
+                    long consumedBytes = this.Consumed(consumed, consumed);
                     this.inner.AdvanceTo(consumed);
+                    this.owner.LocalContentExamined(consumedBytes);
                 }
 
                 public override void AdvanceTo(SequencePosition consumed, SequencePosition examined)
                 {
-                    this.Consumed(consumed, examined);
+                    long consumedBytes = this.Consumed(consumed, examined);
                     this.inner.AdvanceTo(consumed, examined);
+                    this.owner.LocalContentExamined(consumedBytes);
                 }
 
                 public override void CancelPendingRead() => this.inner.CancelPendingRead();
@@ -1008,7 +1015,11 @@ namespace Nerdbank.Streams
                     return result;
                 }
 
-                public override Stream AsStream(bool leaveOpen = false) => this.inner.AsStream();
+                public override Stream AsStream(bool leaveOpen = false)
+                {
+                    // Do NOT forward the call to this.inner or else we'll lose the ability to track how many bytes are read.
+                    return new PipeStream(this, ownsPipe: !leaveOpen);
+                }
 
                 public override ValueTask CompleteAsync(Exception? exception = null) => this.inner.CompleteAsync(exception);
 
@@ -1019,7 +1030,7 @@ namespace Nerdbank.Streams
                 [Obsolete]
                 public override void OnWriterCompleted(Action<Exception, object> callback, object state) => this.inner.OnWriterCompleted(callback, state);
 
-                private void Consumed(SequencePosition consumed, SequencePosition examined)
+                private long Consumed(SequencePosition consumed, SequencePosition examined)
                 {
                     var lastExamined = this.lastExaminedPosition;
                     if (lastExamined.Equals(default))
@@ -1037,15 +1048,19 @@ namespace Nerdbank.Streams
 
                     // Only send the 'more bytes please' message if we've consumed at least a max frame's worth of data
                     // or if our reader indicates that more data is required before it will examine any more.
-                    if (this.bytesProcessed >= FramePayloadMaxLength)
+                    // Or in some cases of very small receiving windows, when the entire window is empty.
+                    long result = 0;
+                    if (this.bytesProcessed >= FramePayloadMaxLength || this.bytesProcessed == this.owner.localWindowSize)
                     {
-                        this.owner.LocalContentExamined(this.bytesProcessed); // this accumulates too much. Also: when it throws, the test hangs.
+                        result = this.bytesProcessed;
                         this.bytesProcessed = 0;
                     }
 
                     // Only store the examined position if it is ahead of the consumed position.
                     // Otherwise we'd store a position in an array that may be recycled.
                     this.lastExaminedPosition = consumed.Equals(examined) ? default : examined;
+
+                    return result;
                 }
             }
         }
