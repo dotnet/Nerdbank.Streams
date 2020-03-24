@@ -794,6 +794,12 @@ namespace Nerdbank.Streams
 
             private void LocalContentExamined(long bytesExamined)
             {
+                Requires.Range(bytesExamined >= 0, nameof(bytesExamined));
+                if (bytesExamined == 0 || this.IsDisposed)
+                {
+                    return;
+                }
+
                 if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
                 {
                     this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Acknowledging processing of {0} bytes.", bytesExamined);

@@ -1093,12 +1093,12 @@ namespace Nerdbank.Streams
                         {
                             // We're sending the first termination message. Record this so we can be sure to NOT
                             // send any more frames regarding this channel.
-                            Assumes.True(this.channelsPendingTermination.Add(header.ChannelId), "Sending ChannelTerminated more than once for the same channel.");
+                            Assumes.True(this.channelsPendingTermination.Add(header.ChannelId), "Sending ChannelTerminated more than once for channel {0}.", header.ChannelId);
                         }
                     }
                     else
                     {
-                        Assumes.False(this.channelsPendingTermination.Contains(header.ChannelId), "Sending a frame for a channel we've already sent termination for.");
+                        Assumes.False(this.channelsPendingTermination.Contains(header.ChannelId), "Sending a frame for channel {0}, which we've already sent termination for.", header.ChannelId);
                     }
                 }
 
