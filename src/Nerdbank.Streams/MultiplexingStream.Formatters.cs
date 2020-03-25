@@ -253,7 +253,6 @@ namespace Nerdbank.Streams
                 }
 
                 await base.DisposeAsync().ConfigureAwait(false);
-                this.readingSemaphore.Dispose();
                 this.isDisposed = true;
             }
 
