@@ -18,6 +18,7 @@ using Xunit;
 using Xunit.Abstractions;
 
 #pragma warning disable SA1401 // Fields should be private
+#pragma warning disable SA1414 // Tuple types in signatures should have element names
 
 public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 {
@@ -60,17 +61,15 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         this.mx2 = await mx2;
     }
 
-    public Task DisposeAsync()
+    public async Task DisposeAsync()
     {
-        this.mx1?.Dispose();
-        this.mx2?.Dispose();
+        await (this.mx1?.DisposeAsync() ?? default);
+        await (this.mx2?.DisposeAsync() ?? default);
         AssertNoFault(this.mx1);
         AssertNoFault(this.mx2);
 
         this.mx1?.TraceSource.Listeners.OfType<XunitTraceListener>().SingleOrDefault()?.Dispose();
         this.mx2?.TraceSource.Listeners.OfType<XunitTraceListener>().SingleOrDefault()?.Dispose();
-
-        return Task.CompletedTask;
     }
 
     [Fact]
@@ -180,16 +179,16 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     {
         Task offer = this.mx1.OfferChannelAsync("offer");
         Task accept = this.mx1.AcceptChannelAsync("accept");
-        this.mx1.Dispose();
+        await this.mx1.DisposeAsync();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Task.WhenAll(offer, accept)).WithCancellation(this.TimeoutToken);
         Assert.True(offer.IsCanceled);
         Assert.True(accept.IsCanceled);
     }
 
     [Fact]
-    public void Disposal_DisposesTransportStream()
+    public async Task Disposal_DisposesTransportStream()
     {
-        this.mx1.Dispose();
+        await this.mx1.DisposeAsync();
         Assert.Throws<ObjectDisposedException>(() => this.transport1.Position);
     }
 
@@ -197,7 +196,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     public async Task Dispose_DisposesChannels()
     {
         var (channel1, channel2) = await this.EstablishChannelsAsync("A");
-        this.mx1.Dispose();
+        await this.mx1.DisposeAsync();
         Assert.True(channel1.IsDisposed);
         await channel1.Completion.WithCancellation(this.TimeoutToken);
 #pragma warning disable CS0618 // Type or member is obsolete
@@ -209,21 +208,21 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task CreateChannelAsync_ThrowsAfterDisposal()
     {
-        this.mx1.Dispose();
+        await this.mx1.DisposeAsync();
         await Assert.ThrowsAsync<ObjectDisposedException>(() => this.mx1.OfferChannelAsync(string.Empty, this.TimeoutToken)).WithCancellation(this.TimeoutToken);
     }
 
     [Fact]
     public async Task AcceptChannelAsync_ThrowsAfterDisposal()
     {
-        this.mx1.Dispose();
+        await this.mx1.DisposeAsync();
         await Assert.ThrowsAsync<ObjectDisposedException>(() => this.mx1.AcceptChannelAsync(string.Empty, this.TimeoutToken)).WithCancellation(this.TimeoutToken);
     }
 
     [Fact]
-    public void Completion_CompletedAfterDisposal()
+    public async Task Completion_CompletedAfterDisposal()
     {
-        this.mx1.Dispose();
+        await this.mx1.DisposeAsync();
         Assert.Equal(TaskStatus.RanToCompletion, this.mx1.Completion.Status);
     }
 

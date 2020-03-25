@@ -16,7 +16,7 @@ namespace Nerdbank.Streams
     /// Created with <see cref="StreamExtensions.WriteSubstream(System.IO.Stream, int)"/>
     /// and later read with <see cref="StreamExtensions.ReadSubstream(System.IO.Stream)"/>.
     /// </summary>
-    public class Substream : Stream, IDisposableObservable, IAsyncDisposable
+    public class Substream : Stream, IDisposableObservable, Microsoft.VisualStudio.Threading.IAsyncDisposable, System.IAsyncDisposable
     {
         internal const int DefaultBufferSize = 4096;
 
@@ -66,6 +66,8 @@ namespace Nerdbank.Streams
 
         /// <inheritdoc/>
         public Task DisposeAsync() => this.DisposeAsync(CancellationToken.None).AsTask();
+
+        ValueTask System.IAsyncDisposable.DisposeAsync() => new ValueTask(this.DisposeAsync());
 
         /// <summary>
         /// Flushes any buffers, and writes the bytes required to indicate that this substream is at its end.

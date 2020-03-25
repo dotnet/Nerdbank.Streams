@@ -97,7 +97,7 @@ namespace Nerdbank.Streams
         /// <summary>
         /// Enables writing to a stream using <see cref="PipeWriter"/>.
         /// </summary>
-        /// <param name="stream">The stream to write to using a pipe.</param>
+        /// <param name="stream">The stream to write to using a pipe. This stream is *not* closed automatically.</param>
         /// <param name="pipeOptions">Optional pipe options to use.</param>
         /// <param name="cancellationToken">A cancellation token that aborts writing to the <paramref name="stream"/>.</param>
         /// <returns>A <see cref="PipeWriter"/>.</returns>
@@ -121,7 +121,7 @@ namespace Nerdbank.Streams
                                 await stream.WriteAsync(segment, cancellationToken).ConfigureAwait(false);
                             }
 
-                            await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+                            await stream.FlushIfNecessaryAsync(cancellationToken).ConfigureAwait(false);
                         }
 
                         pipe.Reader.AdvanceTo(readResult.Buffer.End);

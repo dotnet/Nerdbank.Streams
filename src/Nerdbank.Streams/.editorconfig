@@ -1,0 +1,4 @@
+# This file should not be required, but it works around https://github.com/dotnet/roslyn/issues/42762
+
+[../../ext/**/*.cs]
+dotnet_analyzer_diagnostic.severity = none

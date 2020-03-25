@@ -21,6 +21,8 @@ using Nerdbank.Streams;
 using Xunit;
 using Xunit.Abstractions;
 
+#pragma warning disable SA1414 // Tuple types in signatures should have element names
+
 public partial class WebSocketStreamTests : TestBase
 {
     private static readonly byte[] CloseRequestMessage = new byte[] { 0x1, 0x0, 0x1 };

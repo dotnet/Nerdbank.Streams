@@ -3,7 +3,7 @@ import { Readable, Writable } from "stream";
 import { Deferred } from "./Deferred";
 import { IDisposableObservable } from "./IDisposableObservable";
 
-export async function writeAsync(stream: NodeJS.WritableStream, chunk: Buffer) {
+export async function writeAsync(stream: NodeJS.WritableStream, chunk: any) {
     const deferred = new Deferred<void>();
     stream.write(chunk, (err: Error | null | undefined) => {
         if (err) {
