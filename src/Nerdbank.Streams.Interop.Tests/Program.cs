@@ -40,7 +40,7 @@ namespace Nerdbank.Streams.Interop.Tests
             await program.RunAsync();
         }
 
-        private static (StreamReader, StreamWriter) CreateStreamIO(MultiplexingStream.Channel channel)
+        private static (StreamReader Reader, StreamWriter Writer) CreateStreamIO(MultiplexingStream.Channel channel)
         {
             var encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
             var reader = new StreamReader(channel.Input.AsStream(), encoding);

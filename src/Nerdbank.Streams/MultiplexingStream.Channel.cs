@@ -369,40 +369,27 @@ namespace Nerdbank.Streams
                 }
             }
 
-            internal async ValueTask OnContentAsync(Stream stream, FrameHeader header, CancellationToken cancellationToken)
+            internal async ValueTask OnContentAsync(FrameHeader header, ReadOnlySequence<byte> payload, CancellationToken cancellationToken)
             {
-                // Read directly from the transport stream to memory that the targeted channel's reader will read from for 0 extra buffer copies.
                 PipeWriter writer = this.GetReceivedMessagePipeWriter();
-                Memory<byte> memory;
-                try
+                foreach (var segment in payload)
                 {
-                    memory = writer.GetMemory(header.FramePayloadLength);
+                    try
+                    {
+                        var memory = writer.GetMemory(segment.Length);
+                        segment.CopyTo(memory);
+                        writer.Advance(segment.Length);
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // Someone completed the writer.
+                        return;
+                    }
                 }
-                catch (InvalidOperationException)
-                {
-                    // Someone completed the writer.
-                    await this.MultiplexingStream.DiscardDataAsync(header, cancellationToken).ConfigureAwait(false);
-                    return;
-                }
-
-                var payload = memory.Slice(0, header.FramePayloadLength);
-                await ReadToFillAsync(stream, payload, throwOnEmpty: true, cancellationToken).ConfigureAwait(false);
 
                 if (!payload.IsEmpty && this.MultiplexingStream.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
                 {
                     this.MultiplexingStream.TraceSource.TraceData(TraceEventType.Verbose, (int)TraceEventId.FrameReceivedPayload, payload);
-                }
-
-                try
-                {
-                    writer.Advance(header.FramePayloadLength);
-                }
-                catch (InvalidOperationException)
-                {
-                    // Despite corefx source code suggesting otherwise, this API *does* sometimes throw InvalidOperationException when the writer is completed.
-                    // Maybe it's because there are alternative PipeWriter implementations out there, but this caused indeterministic failures
-                    // in our unit tests.
-                    return;
                 }
 
                 ValueTask<FlushResult> flushResult = writer.FlushAsync(cancellationToken);
@@ -481,14 +468,12 @@ namespace Nerdbank.Streams
                 var acceptanceParameters = new AcceptanceParameters(this.localWindowSize.Value);
                 if (this.acceptanceSource.TrySetResult(acceptanceParameters))
                 {
-                    var payload = new Sequence<byte>(); // don't dispose, since the buffer needs to live longer than this synchronous method.
-                    acceptanceParameters.Serialize(payload, this.MultiplexingStream.protocolMajorVersion);
+                    var payload = this.MultiplexingStream.formatter.Serialize(acceptanceParameters);
                     this.MultiplexingStream.SendFrame(
                         new FrameHeader
                         {
                             Code = ControlCode.OfferAccepted,
                             ChannelId = this.Id,
-                            FramePayloadLength = (int)payload.Length,
                         },
                         payload,
                         CancellationToken.None);
@@ -720,7 +705,6 @@ namespace Nerdbank.Streams
                             {
                                 Code = ControlCode.Content,
                                 ChannelId = this.Id,
-                                FramePayloadLength = (int)bufferToRelay.Length,
                             };
 
                             await this.MultiplexingStream.SendFrameAsync(header, bufferToRelay, CancellationToken.None).ConfigureAwait(false);
@@ -805,16 +789,13 @@ namespace Nerdbank.Streams
                     this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Acknowledging processing of {0} bytes.", bytesExamined);
                 }
 
-                Memory<byte> memory = new byte[4];
-                Utilities.Write(memory.Span, (int)bytesExamined);
                 this.MultiplexingStream.SendFrame(
                     new FrameHeader
                     {
                         Code = ControlCode.ContentProcessed,
                         ChannelId = this.Id,
-                        FramePayloadLength = memory.Length,
                     },
-                    new ReadOnlySequence<byte>(memory),
+                    this.MultiplexingStream.formatter.SerializeContentProcessed(bytesExamined),
                     CancellationToken.None);
             }
 
@@ -892,53 +873,6 @@ namespace Nerdbank.Streams
                 /// </summary>
                 [DataMember]
                 internal long? RemoteWindowSize { get; }
-
-                internal static unsafe OfferParameters Deserialize(ReadOnlyMemory<byte> buffer, int majorProtocolVersion)
-                {
-                    switch (majorProtocolVersion)
-                    {
-                        case 1:
-                            ReadOnlySpan<byte> nameSlice = buffer.Span;
-                            fixed (byte* pName = nameSlice)
-                            {
-                                return new OfferParameters(
-                                    pName != null ? ControlFrameEncoding.GetString(pName, nameSlice.Length) : string.Empty,
-                                    null);
-                            }
-
-                        case 2:
-                            nameSlice = buffer.Span.Slice(0, buffer.Length - 4);
-                            ReadOnlySpan<byte> remoteWindowSizeSpan = buffer.Span.Slice(buffer.Length - 4);
-                            fixed (byte* pName = nameSlice)
-                            {
-                                return new OfferParameters(
-                                    pName != null ? ControlFrameEncoding.GetString(pName, nameSlice.Length) : string.Empty,
-                                    Utilities.ReadInt(remoteWindowSizeSpan));
-                            }
-
-                        default:
-                            throw new NotSupportedException();
-                    }
-                }
-
-                internal unsafe void Serialize(IBufferWriter<byte> writer, int majorProtocolVersion)
-                {
-                    var buffer = writer.GetSpan(ControlFrameEncoding.GetMaxByteCount(this.Name.Length));
-                    fixed (byte* pBuffer = buffer)
-                    fixed (char* pName = this.Name)
-                    {
-                        int byteLength = ControlFrameEncoding.GetBytes(pName, this.Name.Length, pBuffer, buffer.Length);
-                        writer.Advance(byteLength);
-                    }
-
-                    if (majorProtocolVersion > 1)
-                    {
-                        Assumes.True(this.RemoteWindowSize.HasValue);
-                        buffer = writer.GetSpan(4);
-                        Utilities.Write(buffer, checked((int)this.RemoteWindowSize.Value));
-                        writer.Advance(4);
-                    }
-                }
             }
 
             [DataContract]
@@ -959,22 +893,6 @@ namespace Nerdbank.Streams
                 /// </summary>
                 [DataMember]
                 internal long? RemoteWindowSize { get; }
-
-                internal static AcceptanceParameters Deserialize(ReadOnlyMemory<byte> buffer, int majorProtocolVersion)
-                {
-                    return new AcceptanceParameters(majorProtocolVersion > 1 ? (long?)Utilities.ReadInt(buffer.Span) : null);
-                }
-
-                internal void Serialize(IBufferWriter<byte> writer, int majorProtocolVersion)
-                {
-                    if (majorProtocolVersion > 1)
-                    {
-                        Assumes.True(this.RemoteWindowSize.HasValue);
-                        var buffer = writer.GetSpan(4);
-                        Utilities.Write(buffer, checked((int)this.RemoteWindowSize));
-                        writer.Advance(4);
-                    }
-                }
             }
 
             private class WindowPipeReader : PipeReader

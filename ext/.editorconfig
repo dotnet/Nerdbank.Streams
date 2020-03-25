@@ -1,0 +1,4 @@
+# For imported git submodules, don't apply style analyzers
+
+[*.{cs,csx,vb,vbx,h,cpp,idl}]
+dotnet_analyzer_diagnostic.severity = none

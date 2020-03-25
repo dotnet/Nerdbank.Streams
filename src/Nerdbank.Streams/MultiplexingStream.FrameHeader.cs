@@ -12,11 +12,9 @@ namespace Nerdbank.Streams
     /// </content>
     public partial class MultiplexingStream
     {
-        [DebuggerDisplay("{" + nameof(DebuggerDisplay) + "}")]
+        [DebuggerDisplay("{" + nameof(DebuggerDisplay) + ",nq}")]
         internal struct FrameHeader
         {
-            internal static int HeaderLength => sizeof(ControlCode) + sizeof(int) + sizeof(short);
-
             /// <summary>
             /// Gets or sets the kind of frame this is.
             /// </summary>
@@ -25,39 +23,18 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Gets or sets the channel that this frame refers to or carries a payload for.
             /// </summary>
-            internal int ChannelId { get; set; }
+            internal int? ChannelId { get; set; }
 
             /// <summary>
-            /// Gets or sets the length of the frame content (excluding the header).
+            /// Gets the ID of the channel that this frame refers to or carries a payload for.
             /// </summary>
-            /// <remarks>
-            /// Must be no greater than <see cref="ushort.MaxValue"/>.
-            /// </remarks>
-            internal int FramePayloadLength { get; set; }
+            /// <exception cref="MultiplexingProtocolException">Thrown if <see cref="ChannelId"/> is null.</exception>
+            internal int RequiredChannelId => this.ChannelId ?? throw new MultiplexingProtocolException("Expected ChannelId not present in frame header.");
 
             /// <summary>
             /// Gets the text to display in the debugger when an instance of this struct is displayed.
             /// </summary>
-            private string DebuggerDisplay => $"{this.Code} {this.ChannelId} (payload size: {this.FramePayloadLength})";
-
-            internal static FrameHeader Deserialize(ReadOnlySpan<byte> buffer)
-            {
-                Requires.Argument(buffer.Length == HeaderLength, nameof(buffer), "Buffer must be header length.");
-                return new FrameHeader
-                {
-                    Code = (ControlCode)buffer[0],
-                    ChannelId = Utilities.ReadInt(buffer.Slice(1, 4)),
-                    FramePayloadLength = Utilities.ReadInt(buffer.Slice(5, 2)),
-                };
-            }
-
-            internal void Serialize(Span<byte> buffer)
-            {
-                Requires.Argument(buffer.Length == HeaderLength, nameof(buffer), "Buffer must be header length.");
-                buffer[0] = (byte)this.Code;
-                Utilities.Write(buffer.Slice(1, 4), this.ChannelId);
-                Utilities.Write(buffer.Slice(5, 2), (ushort)this.FramePayloadLength);
-            }
+            private string DebuggerDisplay => $"{this.Code} {this.ChannelId}";
         }
     }
 }

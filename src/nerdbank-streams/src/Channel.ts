@@ -113,7 +113,7 @@ export class ChannelClass extends Channel {
                         }
 
                         self.onTransmittingBytes(bytesTransmitted);
-                        const header = new FrameHeader(ControlCode.Content, id, bytesTransmitted);
+                        const header = new FrameHeader(ControlCode.Content, id);
                         await multiplexingStream.sendFrameAsync(header, payload.slice(0, bytesTransmitted));
                         payload = payload.slice(bytesTransmitted);
                     }
