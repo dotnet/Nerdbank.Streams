@@ -26,12 +26,23 @@ namespace Nerdbank.Streams
         private const int ControlChannelId = 0;
 
         /// <summary>
-        /// The magic number to send at the start of communication.
+        /// The maximum length of a frame's payload.
+        /// </summary>
+        private const int FramePayloadMaxLength = 20 * 1024;
+
+        /// <summary>
+        /// The magic number to send at the start of communication when using v1 of the protocol.
+        /// </summary>
+        private static readonly byte[] ProtocolMagicNumberV1 = new byte[] { 0x2f, 0xdf, 0x1d, 0x50 };
+
+        /// <summary>
+        /// The magic number to send at the start of communication when using v2 of the protocol.
         /// </summary>
         /// <remarks>
-        /// If the protocol ever changes, change this random number. It serves both as a way to recognize the other end actually supports multiplexing and ensure compatibility.
+        /// If the protocol ever changes, change this random number and define as a new private field.
+        /// It serves both as a way to recognize the other end actually supports multiplexing and ensure compatibility.
         /// </remarks>
-        private static readonly byte[] ProtocolMagicNumber = new byte[] { 0x2f, 0xdf, 0x1d, 0x50 };
+        private static readonly byte[] ProtocolMagicNumberV2 = new byte[] { 0x2f, 0xdf, 0x1d, 0x51 };
 
         /// <summary>
         /// The encoding used for characters in control frames.
@@ -45,11 +56,6 @@ namespace Nerdbank.Streams
         /// Whatever these settings are, they can be replaced when the channel is accepted.
         /// </remarks>
         private static readonly ChannelOptions DefaultChannelOptions = new ChannelOptions();
-
-        /// <summary>
-        /// The maximum length of a frame's payload.
-        /// </summary>
-        private readonly int framePayloadMaxLength = 20 * 1024;
 
         /// <summary>
         /// A value indicating whether this is the "odd" party in the conversation (where the other one would be "even").
@@ -112,6 +118,11 @@ namespace Nerdbank.Streams
         private readonly CancellationTokenSource disposalTokenSource = new CancellationTokenSource();
 
         /// <summary>
+        /// The major version of the protocol being used for this connection.
+        /// </summary>
+        private readonly int protocolMajorVersion;
+
+        /// <summary>
         /// The last number assigned to a channel.
         /// Each use of this should increment by two.
         /// </summary>
@@ -133,6 +144,8 @@ namespace Nerdbank.Streams
             this.lastOfferedChannelId = isOdd ? -1 : 0; // the first channel created should be 1 or 2
             this.TraceSource = options.TraceSource;
             this.DefaultChannelTraceSourceFactory = options.DefaultChannelTraceSourceFactory;
+            this.DefaultChannelReceivingWindowSize = options.DefaultChannelReceivingWindowSize;
+            this.protocolMajorVersion = options.ProtocolMajorVersion;
 
             // Initiate reading from the transport stream. This will not end until the stream does, or we're disposed.
             // If reading the stream fails, we'll dispose ourselves.
@@ -172,6 +185,11 @@ namespace Nerdbank.Streams
             /// Raised when we are about to read (or wait for) the next frame.
             /// </summary>
             WaitingForNextFrame,
+
+            /// <summary>
+            /// Raised when we receive a <see cref="ControlCode.ContentProcessed"/> message for an unknown or closed channel.
+            /// </summary>
+            UnexpectedContentProcessed,
         }
 
         /// <summary>
@@ -184,6 +202,14 @@ namespace Nerdbank.Streams
         /// </summary>
         /// <value>Never null.</value>
         public TraceSource TraceSource { get; }
+
+        /// <summary>
+        /// Gets the default window size used for new channels that do not specify a value for <see cref="ChannelOptions.ChannelReceivingWindowSize"/>.
+        /// </summary>
+        /// <remarks>
+        /// This value can be set at the time of creation of the <see cref="MultiplexingStream"/> via <see cref="Options.DefaultChannelReceivingWindowSize"/>.
+        /// </remarks>
+        public long DefaultChannelReceivingWindowSize { get; }
 
         /// <inheritdoc />
         bool IDisposableObservable.IsDisposed => this.Completion.IsCompleted;
@@ -224,11 +250,22 @@ namespace Nerdbank.Streams
 
             options = options ?? new Options();
 
+            if (options.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+            {
+                options.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.HandshakeSuccessful, $"Multiplexing protocol handshake beginning with major version {options.ProtocolMajorVersion}.");
+            }
+
             // Send the protocol magic number, and a random GUID to establish even/odd assignments.
+            var protocolMagicNumber = options.ProtocolMajorVersion switch
+            {
+                1 => ProtocolMagicNumberV1,
+                2 => ProtocolMagicNumberV2,
+                _ => throw new NotSupportedException($"Protocol major version {options.ProtocolMajorVersion} is not supported."),
+            };
             var randomSendBuffer = Guid.NewGuid().ToByteArray();
-            var sendBuffer = new byte[ProtocolMagicNumber.Length + randomSendBuffer.Length];
-            Array.Copy(ProtocolMagicNumber, sendBuffer, ProtocolMagicNumber.Length);
-            Array.Copy(randomSendBuffer, 0, sendBuffer, ProtocolMagicNumber.Length, randomSendBuffer.Length);
+            var sendBuffer = new byte[protocolMagicNumber.Length + randomSendBuffer.Length];
+            Array.Copy(protocolMagicNumber, sendBuffer, protocolMagicNumber.Length);
+            Array.Copy(randomSendBuffer, 0, sendBuffer, protocolMagicNumber.Length, randomSendBuffer.Length);
             Task writeTask = WriteAndFlushAsync(stream, new ArraySegment<byte>(sendBuffer), cancellationToken);
 
             var recvBuffer = new byte[sendBuffer.Length];
@@ -237,9 +274,9 @@ namespace Nerdbank.Streams
             // Realize any exceptions from writing to the stream.
             await writeTask.ConfigureAwait(false);
 
-            for (int i = 0; i < ProtocolMagicNumber.Length; i++)
+            for (int i = 0; i < protocolMagicNumber.Length; i++)
             {
-                if (recvBuffer[i] != ProtocolMagicNumber[i])
+                if (recvBuffer[i] != protocolMagicNumber[i])
                 {
                     string message = "Protocol handshake mismatch.";
                     if (options.TraceSource.Switch.ShouldTrace(TraceEventType.Critical))
@@ -255,7 +292,7 @@ namespace Nerdbank.Streams
             for (int i = 0; i < randomSendBuffer.Length; i++)
             {
                 byte sent = randomSendBuffer[i];
-                byte recv = recvBuffer[ProtocolMagicNumber.Length + i];
+                byte recv = recvBuffer[protocolMagicNumber.Length + i];
                 if (sent > recv)
                 {
                     isOdd = true;
@@ -299,14 +336,29 @@ namespace Nerdbank.Streams
         /// </remarks>
         public Channel CreateChannel(ChannelOptions? options = default)
         {
-            Channel channel = new Channel(this, offeredLocally: true, this.GetUnusedChannelId(), string.Empty, options ?? DefaultChannelOptions);
-            lock (this.syncObject)
-            {
-                this.openChannels.Add(channel.Id, channel);
-            }
+            Verify.NotDisposed(this);
 
-            this.SendFrame(ControlCode.Offer, channel.Id);
-            return channel;
+            var offerParameters = new Channel.OfferParameters(string.Empty, options?.ChannelReceivingWindowSize ?? this.DefaultChannelReceivingWindowSize);
+            using (var payload = new Sequence<byte>(ArrayPool<byte>.Shared))
+            {
+                offerParameters.Serialize(payload, this.protocolMajorVersion);
+
+                Channel channel = new Channel(this, offeredLocally: true, this.GetUnusedChannelId(), offerParameters, options ?? DefaultChannelOptions);
+                lock (this.syncObject)
+                {
+                    this.openChannels.Add(channel.Id, channel);
+                }
+
+                var header = new FrameHeader
+                {
+                    Code = ControlCode.Offer,
+                    FramePayloadLength = (int)payload.Length,
+                    ChannelId = channel.Id,
+                };
+
+                this.SendFrame(header, payload, this.DisposalToken);
+                return channel;
+            }
         }
 
         /// <summary>
@@ -397,26 +449,30 @@ namespace Nerdbank.Streams
             cancellationToken.ThrowIfCancellationRequested();
             Verify.NotDisposed(this);
 
-            Memory<byte> payload = ControlFrameEncoding.GetBytes(name);
-            Requires.Argument(payload.Length <= this.framePayloadMaxLength, nameof(name), "{0} encoding of value exceeds maximum frame payload length.", ControlFrameEncoding.EncodingName);
-            Channel channel = new Channel(this, offeredLocally: true, this.GetUnusedChannelId(), name, options ?? DefaultChannelOptions);
-            lock (this.syncObject)
+            var offerParameters = new Channel.OfferParameters(name, options?.ChannelReceivingWindowSize ?? this.DefaultChannelReceivingWindowSize);
+            using (var payload = new Sequence<byte>(ArrayPool<byte>.Shared))
             {
-                this.openChannels.Add(channel.Id, channel);
-            }
+                offerParameters.Serialize(payload, this.protocolMajorVersion);
+                Requires.Argument(payload.Length <= FramePayloadMaxLength, nameof(name), "{0} encoding of value exceeds maximum frame payload length.", ControlFrameEncoding.EncodingName);
+                Channel channel = new Channel(this, offeredLocally: true, this.GetUnusedChannelId(), offerParameters, options ?? DefaultChannelOptions);
+                lock (this.syncObject)
+                {
+                    this.openChannels.Add(channel.Id, channel);
+                }
 
-            var header = new FrameHeader
-            {
-                Code = ControlCode.Offer,
-                FramePayloadLength = payload.Length,
-                ChannelId = channel.Id,
-            };
+                var header = new FrameHeader
+                {
+                    Code = ControlCode.Offer,
+                    FramePayloadLength = (int)payload.Length,
+                    ChannelId = channel.Id,
+                };
 
-            using (cancellationToken.Register(this.OfferChannelCanceled, channel))
-            {
-                await this.SendFrameAsync(header, new ReadOnlySequence<byte>(payload), cancellationToken).ConfigureAwait(false);
-                await channel.Acceptance.ConfigureAwait(false);
-                return channel;
+                using (cancellationToken.Register(this.OfferChannelCanceled, channel))
+                {
+                    await this.SendFrameAsync(header, payload, cancellationToken).ConfigureAwait(false);
+                    await channel.Acceptance.ConfigureAwait(false);
+                    return channel;
+                }
             }
         }
 
@@ -646,14 +702,6 @@ namespace Nerdbank.Streams
             }
         }
 
-        private static unsafe string DecodeString(ReadOnlyMemory<byte> buffer)
-        {
-            using (var pinnedBuffer = buffer.Pin())
-            {
-                return ControlFrameEncoding.GetString((byte*)pinnedBuffer.Pointer, buffer.Length);
-            }
-        }
-
         private static async Task WriteAndFlushAsync(Stream stream, ArraySegment<byte> buffer, CancellationToken cancellationToken)
         {
             Requires.NotNull(stream, nameof(stream));
@@ -664,7 +712,7 @@ namespace Nerdbank.Streams
 
         private async Task ReadStreamAsync()
         {
-            Memory<byte> buffer = new byte[FrameHeader.HeaderLength + this.framePayloadMaxLength];
+            Memory<byte> buffer = new byte[FrameHeader.HeaderLength + FramePayloadMaxLength];
             Memory<byte> headerBuffer = buffer.Slice(0, FrameHeader.HeaderLength);
             Memory<byte> payloadBuffer = buffer.Slice(FrameHeader.HeaderLength);
             try
@@ -693,10 +741,13 @@ namespace Nerdbank.Streams
                             await this.OnOfferAsync(header.ChannelId, payloadBuffer.Slice(0, header.FramePayloadLength), this.DisposalToken).ConfigureAwait(false);
                             break;
                         case ControlCode.OfferAccepted:
-                            this.OnOfferAccepted(header.ChannelId);
+                            await this.OnOfferAcceptedAsync(header, payloadBuffer.Slice(0, header.FramePayloadLength), this.DisposalToken).ConfigureAwait(false);
                             break;
                         case ControlCode.Content:
                             await this.OnContentAsync(header, this.DisposalToken).ConfigureAwait(false);
+                            break;
+                        case ControlCode.ContentProcessed:
+                            await this.OnContentProcessedAsync(header, payloadBuffer.Slice(0, header.FramePayloadLength), this.DisposalToken).ConfigureAwait(false);
                             break;
                         case ControlCode.ContentWritingCompleted:
                             this.OnContentWritingCompleted(header.ChannelId);
@@ -750,22 +801,12 @@ namespace Nerdbank.Streams
                 }
             }
 
-            // We Complete the writer because only the writing (logical) thread should complete it
-            // to avoid race conditions, and Channel.Dispose can be called from any thread.
-            if (channel?.IsDisposed ?? false)
+            if (channel is Channel)
             {
-                try
-                {
-                    var writer = await channel!.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
-                    await writer.CompleteAsync().ConfigureAwait(false);
-                }
-                catch (ObjectDisposedException)
-                {
-                    // We fell victim to a race condition. It's OK to just swallow it because the writer was never created, so it needn't be completed.
-                }
+                await channel.OnChannelTerminatedAsync().ConfigureAwait(false);
+                channel.IsRemotelyTerminated = true;
+                channel.Dispose();
             }
-
-            channel?.Dispose();
         }
 
         private void OnContentWritingCompleted(int channelId)
@@ -804,46 +845,9 @@ namespace Nerdbank.Streams
                 return;
             }
 
-            // Read directly from the transport stream to memory that the targeted channel's reader will read from for 0 extra buffer copies.
-            PipeWriter writer = await channel.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
-            Memory<byte> memory;
-            try
+            if (header.FramePayloadLength > 0)
             {
-                memory = writer.GetMemory(header.FramePayloadLength);
-            }
-            catch (InvalidOperationException)
-            {
-                // Someone completed the writer.
-                await this.DiscardDataAsync(header, cancellationToken).ConfigureAwait(false);
-                return;
-            }
-
-            var payload = memory.Slice(0, header.FramePayloadLength);
-            await ReadToFillAsync(this.stream, payload, throwOnEmpty: true, cancellationToken).ConfigureAwait(false);
-
-            if (!payload.IsEmpty && this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
-            {
-                this.TraceSource.TraceData(TraceEventType.Verbose, (int)TraceEventId.FrameReceivedPayload, payload);
-            }
-
-            try
-            {
-                writer.Advance(header.FramePayloadLength);
-            }
-            catch (InvalidOperationException)
-            {
-                // Despite corefx source code suggesting otherwise, this API *does* sometimes throw InvalidOperationException when the writer is completed.
-                // Maybe it's because there are alternative PipeWriter implementations out there, but this caused indeterministic failures
-                // in our unit tests.
-                return;
-            }
-
-            var flushResult = await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
-            if (flushResult.IsCanceled)
-            {
-                // This happens when the channel is disposed (while or before flushing).
-                Assumes.True(channel.IsDisposed);
-                writer.Complete();
+                await channel.OnContentAsync(this.stream, header, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -858,8 +862,11 @@ namespace Nerdbank.Streams
             await ReadAndDiscardAsync(this.stream, header.FramePayloadLength, cancellationToken).ConfigureAwait(false);
         }
 
-        private void OnOfferAccepted(int channelId)
+        private async Task OnOfferAcceptedAsync(FrameHeader header, Memory<byte> payloadBuffer, CancellationToken cancellationToken)
         {
+            await ReadToFillAsync(this.stream, payloadBuffer, throwOnEmpty: true, cancellationToken).ConfigureAwait(false);
+            var acceptanceParameters = Channel.AcceptanceParameters.Deserialize(payloadBuffer, this.protocolMajorVersion);
+            int channelId = header.ChannelId;
             Channel channel;
             lock (this.syncObject)
             {
@@ -869,7 +876,7 @@ namespace Nerdbank.Streams
                 }
             }
 
-            if (!channel.OnAccepted())
+            if (!channel.OnAccepted(acceptanceParameters))
             {
                 // This may be an acceptance of a channel that we canceled an offer for, and a race condition
                 // led to our cancellation notification crossing in transit with their acceptance notification.
@@ -882,17 +889,40 @@ namespace Nerdbank.Streams
             }
         }
 
+        private async Task OnContentProcessedAsync(FrameHeader header, Memory<byte> payloadBuffer, CancellationToken cancellationToken)
+        {
+            Channel? channel;
+            lock (this.syncObject)
+            {
+                this.openChannels.TryGetValue(header.ChannelId, out channel);
+            }
+
+            if (channel is null)
+            {
+                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Warning))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Warning, (int)TraceEventId.UnexpectedContentProcessed, "Ignoring " + nameof(ControlCode.ContentProcessed) + " message for channel {0} that does not exist.", header.ChannelId);
+                }
+
+                return;
+            }
+
+            await ReadToFillAsync(this.stream, payloadBuffer, throwOnEmpty: true, cancellationToken).ConfigureAwait(false);
+            int bytesProcessed = Utilities.ReadInt(payloadBuffer.Span);
+            channel.OnContentProcessed(bytesProcessed);
+        }
+
         private async ValueTask OnOfferAsync(int channelId, Memory<byte> payloadBuffer, CancellationToken cancellationToken)
         {
             await ReadToFillAsync(this.stream, payloadBuffer, throwOnEmpty: true, cancellationToken).ConfigureAwait(false);
-            string name = DecodeString(payloadBuffer);
+            var offerParameters = Channel.OfferParameters.Deserialize(payloadBuffer, this.protocolMajorVersion);
 
-            var channel = new Channel(this, offeredLocally: false, channelId, name);
+            var channel = new Channel(this, offeredLocally: false, channelId, offerParameters);
             bool acceptingChannelAlreadyPresent = false;
             ChannelOptions options = DefaultChannelOptions;
             lock (this.syncObject)
             {
-                if (name != null && this.acceptingChannels.TryGetValue(name, out var acceptingChannels))
+                if (this.acceptingChannels.TryGetValue(offerParameters.Name, out var acceptingChannels))
                 {
                     while (acceptingChannels.Count > 0)
                     {
@@ -901,7 +931,7 @@ namespace Nerdbank.Streams
                         {
                             if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
                             {
-                                this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelOfferReceived, "Remote party offers channel {1} \"{0}\" which matches up with a pending " + nameof(this.AcceptChannelAsync), name, channelId);
+                                this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelOfferReceived, "Remote party offers channel {1} \"{0}\" which matches up with a pending " + nameof(this.AcceptChannelAsync), offerParameters.Name, channelId);
                             }
 
                             acceptingChannelAlreadyPresent = true;
@@ -914,27 +944,17 @@ namespace Nerdbank.Streams
 
                 if (!acceptingChannelAlreadyPresent)
                 {
-                    if (name != null)
+                    if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
                     {
-                        if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
-                        {
-                            this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelOfferReceived, "Remote party offers channel {1} \"{0}\" which has no pending " + nameof(this.AcceptChannelAsync), name, channelId);
-                        }
-
-                        if (!this.channelsOfferedByThemByName.TryGetValue(name, out var offeredChannels))
-                        {
-                            this.channelsOfferedByThemByName.Add(name, offeredChannels = new Queue<Channel>());
-                        }
-
-                        offeredChannels.Enqueue(channel);
+                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelOfferReceived, "Remote party offers channel {1} \"{0}\" which has no pending " + nameof(this.AcceptChannelAsync), offerParameters.Name, channelId);
                     }
-                    else
+
+                    if (!this.channelsOfferedByThemByName.TryGetValue(offerParameters.Name, out var offeredChannels))
                     {
-                        if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
-                        {
-                            this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelOfferReceived, "Remote party offers anonymous channel {0}", channelId);
-                        }
+                        this.channelsOfferedByThemByName.Add(offerParameters.Name, offeredChannels = new Queue<Channel>());
                     }
+
+                    offeredChannels.Enqueue(channel);
                 }
 
                 this.openChannels.Add(channelId, channel);
@@ -1023,6 +1043,17 @@ namespace Nerdbank.Streams
 
         private void SendFrame(ControlCode code, int channelId)
         {
+            var header = new FrameHeader
+            {
+                Code = code,
+                ChannelId = channelId,
+                FramePayloadLength = 0,
+            };
+            this.SendFrame(header, payload: default, CancellationToken.None);
+        }
+
+        private void SendFrame(FrameHeader header, ReadOnlySequence<byte> payload, CancellationToken cancellationToken)
+        {
             if (this.Completion.IsCompleted)
             {
                 // Any frames that come in after we're done are most likely frames just informing that channels are being terminated,
@@ -1030,13 +1061,7 @@ namespace Nerdbank.Streams
                 return;
             }
 
-            var header = new FrameHeader
-            {
-                Code = code,
-                ChannelId = channelId,
-                FramePayloadLength = 0,
-            };
-            this.DisposeSelfOnFailure(this.SendFrameAsync(header, payload: default, CancellationToken.None));
+            this.DisposeSelfOnFailure(this.SendFrameAsync(header, payload: payload, cancellationToken));
         }
 
         private async Task FlushAsync(CancellationToken cancellationToken)
@@ -1054,7 +1079,7 @@ namespace Nerdbank.Streams
 
         private async Task SendFrameAsync(FrameHeader header, ReadOnlySequence<byte> payload, CancellationToken cancellationToken)
         {
-            Assumes.True(payload.Length <= this.framePayloadMaxLength, nameof(payload), "Frame content exceeds max limit.");
+            Assumes.True(payload.Length <= FramePayloadMaxLength, nameof(payload), "Frame content exceeds max limit.");
             Verify.NotDisposed(this);
 
             await this.sendingSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -1068,12 +1093,12 @@ namespace Nerdbank.Streams
                         {
                             // We're sending the first termination message. Record this so we can be sure to NOT
                             // send any more frames regarding this channel.
-                            Assumes.True(this.channelsPendingTermination.Add(header.ChannelId), "Sending ChannelTerminated more than once for the same channel.");
+                            Assumes.True(this.channelsPendingTermination.Add(header.ChannelId), "Sending ChannelTerminated more than once for channel {0}.", header.ChannelId);
                         }
                     }
                     else
                     {
-                        Assumes.False(this.channelsPendingTermination.Contains(header.ChannelId), "Sending a frame for a channel we've already sent termination for.");
+                        Assumes.False(this.channelsPendingTermination.Contains(header.ChannelId), "Sending a frame for channel {0}, which we've already sent termination for.", header.ChannelId);
                     }
                 }
 

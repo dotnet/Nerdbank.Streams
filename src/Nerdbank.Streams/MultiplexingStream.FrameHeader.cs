@@ -13,7 +13,7 @@ namespace Nerdbank.Streams
     public partial class MultiplexingStream
     {
         [DebuggerDisplay("{" + nameof(DebuggerDisplay) + "}")]
-        private struct FrameHeader
+        internal struct FrameHeader
         {
             internal static int HeaderLength => sizeof(ControlCode) + sizeof(int) + sizeof(short);
 

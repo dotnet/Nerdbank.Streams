@@ -83,7 +83,7 @@ public class MultiplexingStreamChannelOptionsTests : TestBase
         options.ExistingPipe = new MockDuplexPipe { Output = pipe.Writer };
     }
 
-    [Fact]
+    [Fact, Obsolete]
     public void ReaderPipeOptions()
     {
         PipeOptions expected = new PipeOptions();

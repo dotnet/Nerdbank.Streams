@@ -40,10 +40,16 @@ namespace Nerdbank.Streams
             /// </summary>
             /// <value>The default is <c>null</c>.</value>
             /// <remarks>
+            /// <para>
             /// This property supports high throughput scenarios where channel data ultimately goes to a <see cref="PipeWriter"/> and <see cref="PipeReader"/> that already exist.
-            /// This removes the need for a memory copy of all bytes transferred over the channel by directing the <see cref="MultiplexingStream"/> to read and write directly an existing reader/writer pair.
+            /// This may remove the need for a memory copy of all bytes transferred over the channel by directing the <see cref="MultiplexingStream"/> to read and write directly an existing reader/writer pair.
             /// When set, the <see cref="Channel.Input"/> and <see cref="Channel.Output"/> properties will throw <see cref="NotSupportedException"/>
             /// since their values are implementation details of the existing pipe set here.
+            /// </para>
+            /// <para>
+            /// The <see cref="PipeWriter"/> specified in <see cref="IDuplexPipe.Output"/> *must* be created with <see cref="PipeOptions.PauseWriterThreshold"/> that *exceeds*
+            /// the value of <see cref="ChannelReceivingWindowSize"/> and <see cref="Options.DefaultChannelReceivingWindowSize"/>.
+            /// </para>
             /// </remarks>
             /// <exception cref="ArgumentException">Thrown if set to an <see cref="IDuplexPipe"/> that returns <c>null</c> for either of its properties.</exception>
             public IDuplexPipe? ExistingPipe
@@ -65,9 +71,18 @@ namespace Nerdbank.Streams
 
             /// <summary>
             /// Gets or sets the options for the <see cref="Pipe"/> created to relay local reading from this channel.
-            /// May be null. Will be ignored if <see cref="ExistingPipe"/> is not <c>null</c>.
             /// </summary>
+            [Obsolete("This value is ignored.")]
             public PipeOptions? InputPipeOptions { get; set; }
+
+            /// <summary>
+            /// Gets or sets the number of received bytes that may be buffered locally per channel (transmitted from the remote party but not yet processed).
+            /// </summary>
+            /// <remarks>
+            /// This value should be at least the value of <see cref="Options.DefaultChannelReceivingWindowSize"/> when the <see cref="MultiplexingStream"/> was created.
+            /// When the value is null or less than <see cref="Options.DefaultChannelReceivingWindowSize"/>, the value from <see cref="Options.DefaultChannelReceivingWindowSize"/> is used.
+            /// </remarks>
+            public long? ChannelReceivingWindowSize { get; set; }
         }
     }
 }

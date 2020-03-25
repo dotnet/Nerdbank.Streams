@@ -61,6 +61,15 @@ namespace Nerdbank.Streams {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to ExistingPipe&apos;s PipeWriter created with PipeOptions.PauseWriterThreshold that does not exceed the channel&apos;s receiving window size..
+        /// </summary>
+        internal static string ExistingPipeOutputHasPauseThresholdSetTooLow {
+            get {
+                return ResourceManager.GetString("ExistingPipeOutputHasPauseThresholdSetTooLow", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to This operation is not supported when the Channel is created with ChannelOptions.ExistingPipe set..
         /// </summary>
         internal static string NotSupportedWhenExistingPipeSpecified {

@@ -17,8 +17,22 @@ import { IDisposableObservable } from "./IDisposableObservable";
 import "./MultiplexingStreamOptions";
 import { MultiplexingStreamOptions } from "./MultiplexingStreamOptions";
 import { getBufferFrom, removeFromQueue, throwIfDisposed } from "./Utilities";
+import { MultiplexingStreamFormatter, MultiplexingStreamV1Formatter, MultiplexingStreamV2Formatter } from "./MultiplexingStreamFormatters";
+import { OfferParameters } from "./OfferParameters";
 
 export abstract class MultiplexingStream implements IDisposableObservable {
+    /**
+     * The maximum length of a frame's payload.
+     */
+    static readonly framePayloadMaxLength = 20 * 1024;
+
+    private static readonly recommendedDefaultChannelReceivingWindowSize = 5 * MultiplexingStream.framePayloadMaxLength;
+
+    /** The default window size used for new channels that do not specify a value for ChannelOptions.ChannelReceivingWindowSize. */
+    readonly defaultChannelReceivingWindowSize: number;
+
+    protected readonly formatter: MultiplexingStreamFormatter;
+
     protected get disposalToken() {
         return this.disposalTokenSource.token;
     }
@@ -55,26 +69,36 @@ export abstract class MultiplexingStream implements IDisposableObservable {
         }
 
         options = options || new MultiplexingStreamOptions();
+        options.protocolMajorVersion = options.protocolMajorVersion || 1;
+        options.defaultChannelReceivingWindowSize = options.defaultChannelReceivingWindowSize || MultiplexingStream.recommendedDefaultChannelReceivingWindowSize;
 
         // Send the protocol magic number, and a random 16-byte number to establish even/odd assignments.
         const randomSendBuffer = randomBytes(16);
-        const sendBuffer = Buffer.concat([MultiplexingStream.protocolMagicNumber, randomSendBuffer]);
+        const protocolMagicNumber =
+            options.protocolMajorVersion == 1 ? MultiplexingStream.protocolMagicNumberV1 :
+                options.protocolMajorVersion == 2 ? MultiplexingStream.protocolMagicNumberV2 :
+                    undefined;
+        if (!protocolMagicNumber) {
+            throw new Error(`Protocol major version ${options.protocolMajorVersion} is not supported.`);
+        }
+
+        const sendBuffer = Buffer.concat([protocolMagicNumber, randomSendBuffer]);
         stream.write(sendBuffer);
 
         const recvBuffer = await getBufferFrom(stream, sendBuffer.length, false, cancellationToken);
 
-        for (let i = 0; i < MultiplexingStream.protocolMagicNumber.length; i++) {
-            const expected = MultiplexingStream.protocolMagicNumber[i];
+        for (let i = 0; i < protocolMagicNumber.length; i++) {
+            const expected = protocolMagicNumber[i];
             const actual = recvBuffer.readUInt8(i);
             if (expected !== actual) {
                 throw new Error(`Protocol magic number mismatch. Expected ${expected} but was ${actual}.`);
             }
         }
 
-        let isOdd: boolean;
+        let isOdd: boolean | undefined;
         for (let i = 0; i < randomSendBuffer.length; i++) {
             const sent = randomSendBuffer[i];
-            const recv = recvBuffer.readUInt8(MultiplexingStream.protocolMagicNumber.length + i);
+            const recv = recvBuffer.readUInt8(protocolMagicNumber.length + i);
             if (sent > recv) {
                 isOdd = true;
                 break;
@@ -95,23 +119,25 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      * The options to use for channels we create in response to incoming offers.
      * @description Whatever these settings are, they can be replaced when the channel is accepted.
      */
-    protected static readonly defaultChannelOptions = new ChannelOptions();
+    protected static readonly defaultChannelOptions: ChannelOptions = {};
 
     /**
      * The encoding used for characters in control frames.
      */
-    protected static readonly ControlFrameEncoding = "utf-8";
-    /**
-     * The maximum length of a frame's payload.
-     */
-    private static readonly framePayloadMaxLength = 20 * 1024;
+    static readonly ControlFrameEncoding = "utf-8";
 
     /**
-     * The magic number to send at the start of communication.
-     * If the protocol ever changes, change this random number. It serves both as a way to recognize the other end
-     * actually supports multiplexing and ensure compatibility.
+     * The magic number to send at the start of communication when using v1 of the protocol.
      */
-    private static readonly protocolMagicNumber = new Buffer([0x2f, 0xdf, 0x1d, 0x50]);
+    private static readonly protocolMagicNumberV1 = new Buffer([0x2f, 0xdf, 0x1d, 0x50]);
+
+    /**
+     * The magic number to send at the start of communication when using v2 of the protocol.
+     * @description If the protocol ever changes, change this random number and define as a new private field.
+     * It serves both as a way to recognize the other end actually supports multiplexing and ensure compatibility.
+     */
+    private static readonly protocolMagicNumberV2 = new Buffer([0x2f, 0xdf, 0x1d, 0x51]);
+
     protected readonly _completionSource = new Deferred<void>();
 
     /**
@@ -124,7 +150,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      * Each use of this should increment by two.
      * It should never exceed uint32.MaxValue
      */
-    protected lastOfferedChannelId: number;
+    protected abstract lastOfferedChannelId: number;
 
     /**
      * A map of channel names to queues of channels waiting for local acceptance.
@@ -136,11 +162,24 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      */
     protected readonly acceptingChannels: { [name: string]: Array<Deferred<ChannelClass>> } = {};
 
+    /** The major version of the protocol being used for this connection. */
+    protected readonly protocolMajorVersion: number;
+
     private readonly eventEmitter = new EventEmitter();
 
     private disposalTokenSource = CancellationToken.create();
 
-    protected constructor(protected stream: NodeJS.ReadWriteStream) {
+    protected constructor(protected stream: NodeJS.ReadWriteStream, options: MultiplexingStreamOptions) {
+        this.defaultChannelReceivingWindowSize = options.defaultChannelReceivingWindowSize ?? MultiplexingStream.recommendedDefaultChannelReceivingWindowSize;
+        this.protocolMajorVersion = options.protocolMajorVersion ?? 1;
+        const formatter =
+            options.protocolMajorVersion == 1 ? new MultiplexingStreamV1Formatter() :
+                options.protocolMajorVersion == 2 ? new MultiplexingStreamV2Formatter() :
+                    undefined;
+        if (formatter === undefined) {
+            throw new Error(`Unsupported major protocol version: ${options.protocolMajorVersion}`);
+        }
+        this.formatter = formatter;
     }
 
     /**
@@ -152,14 +191,19 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      * buffered locally until the remote party accepts the channel.
      */
     public createChannel(options?: ChannelOptions): Channel {
+        const offerParameters: OfferParameters = {
+            name: "",
+            remoteWindowSize: options?.channelReceivingWindowSize ?? this.defaultChannelReceivingWindowSize
+        };
+        const payload = this.formatter.serializeOfferParameters(offerParameters);
         const channel = new ChannelClass(
             this as any as MultiplexingStreamClass,
+            true,
             this.getUnusedChannelId(),
-            "",
-            options);
+            offerParameters);
         this.openChannels[channel.id] = channel;
 
-        this.rejectOnFailure(this.sendFrame(ControlCode.Offer, channel.id));
+        this.rejectOnFailure(this.sendFrameAsync(new FrameHeader(ControlCode.Offer, channel.id, payload.length), payload, this.disposalToken));
         return channel;
     }
 
@@ -228,16 +272,16 @@ export abstract class MultiplexingStream implements IDisposableObservable {
         cancellationToken.throwIfCancelled();
         throwIfDisposed(this);
 
-        const payload = new Buffer(name, MultiplexingStream.ControlFrameEncoding);
-        if (payload.length > MultiplexingStream.framePayloadMaxLength) {
-            throw new Error("Name is too long.");
-        }
-
+        const offerParameters: OfferParameters = {
+            name: name,
+            remoteWindowSize: options?.channelReceivingWindowSize ?? this.defaultChannelReceivingWindowSize,
+        };
+        const payload = this.formatter.serializeOfferParameters(offerParameters);
         const channel = new ChannelClass(
             this as any as MultiplexingStreamClass,
+            true,
             this.getUnusedChannelId(),
-            name,
-            options);
+            offerParameters);
         this.openChannels[channel.id] = channel;
 
         const header = new FrameHeader(ControlCode.Offer, channel.id, payload.length);
@@ -278,20 +322,20 @@ export abstract class MultiplexingStream implements IDisposableObservable {
         cancellationToken.throwIfCancelled();
         throwIfDisposed(this);
 
-        let channel: ChannelClass = null;
+        let channel: ChannelClass | undefined;
         let pendingAcceptChannel: Deferred<ChannelClass>;
         const channelsOfferedByThem = this.channelsOfferedByThemByName[name] as ChannelClass[];
         if (channelsOfferedByThem) {
-            while (channel === null && channelsOfferedByThem.length > 0) {
-                channel = channelsOfferedByThem.shift();
+            while (channel === undefined && channelsOfferedByThem.length > 0) {
+                channel = channelsOfferedByThem.shift()!;
                 if (channel.isAccepted || channel.isRejectedOrCanceled) {
-                    channel = null;
+                    channel = undefined;
                     continue;
                 }
             }
         }
 
-        if (channel === null) {
+        if (channel === undefined) {
             let acceptingChannels = this.acceptingChannels[name];
             if (!acceptingChannels) {
                 this.acceptingChannels[name] = acceptingChannels = [];
@@ -301,14 +345,14 @@ export abstract class MultiplexingStream implements IDisposableObservable {
             acceptingChannels.push(pendingAcceptChannel);
         }
 
-        if (channel != null) {
+        if (channel !== undefined) {
             this.acceptChannelOrThrow(channel, options);
             return channel;
         } else {
             const unsubscribeFromCT = cancellationToken.onCancelled(
                 (reason) => this.acceptChannelCanceled(pendingAcceptChannel, name, reason));
             try {
-                return await pendingAcceptChannel.promise;
+                return await pendingAcceptChannel!.promise;
             } finally {
                 unsubscribeFromCT();
             }
@@ -356,9 +400,17 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 
     protected abstract sendFrame(code: ControlCode, channelId: number): Promise<void>;
 
-    protected acceptChannelOrThrow(channel: ChannelClass, options: ChannelOptions) {
+    protected acceptChannelOrThrow(channel: ChannelClass, options?: ChannelOptions) {
         if (channel.tryAcceptOffer(options)) {
-            this.sendFrame(ControlCode.OfferAccepted, channel.id);
+            const acceptanceParameters = {
+                remoteWindowSize: options?.channelReceivingWindowSize ?? channel.localWindowSize ?? this.defaultChannelReceivingWindowSize,
+            };
+            if (acceptanceParameters.remoteWindowSize < this.defaultChannelReceivingWindowSize) {
+                acceptanceParameters.remoteWindowSize = this.defaultChannelReceivingWindowSize;
+            }
+
+            const payload = this.formatter.serializerAcceptanceParameters(acceptanceParameters);
+            this.rejectOnFailure(this.sendFrameAsync(new FrameHeader(ControlCode.OfferAccepted, channel.id, payload.length), payload, this.disposalToken));
         } else if (channel.isAccepted) {
             throw new Error("Channel is already accepted.");
         } else if (channel.isRejectedOrCanceled) {
@@ -418,14 +470,20 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 
 // tslint:disable-next-line:max-classes-per-file
 export class MultiplexingStreamClass extends MultiplexingStream {
-    constructor(stream: NodeJS.ReadWriteStream, private isOdd: boolean, private options: MultiplexingStreamOptions) {
-        super(stream);
+    protected lastOfferedChannelId: number;
+
+    constructor(stream: NodeJS.ReadWriteStream, isOdd: boolean, options: MultiplexingStreamOptions) {
+        super(stream, options);
 
         this.lastOfferedChannelId = isOdd ? -1 : 0; // the first channel created should be 1 or 2
 
         // Initiate reading from the transport stream. This will not end until the stream does, or we're disposed.
         // If reading the stream fails, we'll dispose ourselves.
         this.readFromStream(this.disposalToken).catch((err) => this._completionSource.reject(err));
+    }
+
+    get backpressureSupportEnabled(): boolean {
+        return this.protocolMajorVersion > 1;
     }
 
     public sendFrameAsync(
@@ -445,7 +503,13 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 
         const frame = payload && payload.length > 0 ? Buffer.concat([headerBuffer, payload]) : headerBuffer;
         const deferred = new Deferred<void>();
-        this.stream.write(frame, deferred.resolve.bind(deferred));
+        this.stream.write(frame, (err: Error | null | undefined) => {
+            if (err) {
+                deferred.reject(err);
+            } else {
+                deferred.resolve();
+            }
+        });
         return deferred.promise;
     }
 
@@ -485,10 +549,16 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         }
     }
 
+    public localContentExamined(channel: ChannelClass, bytesConsumed: number) {
+        const payload = new Buffer(4);
+        payload.writeInt32BE(bytesConsumed, 0);
+        this.rejectOnFailure(this.sendFrameAsync(new FrameHeader(ControlCode.ContentProcessed, channel.id, payload.length), payload));
+    }
+
     private async readFromStream(cancellationToken: CancellationToken) {
         while (!this.isDisposed) {
             const headerBuffer = await getBufferFrom(this.stream, FrameHeader.HeaderLength, true, cancellationToken);
-            if (headerBuffer.length === 0) {
+            if (!headerBuffer || headerBuffer.length === 0) {
                 break;
             }
 
@@ -498,10 +568,13 @@ export class MultiplexingStreamClass extends MultiplexingStream {
                     await this.onOffer(header.channelId, header.framePayloadLength, cancellationToken);
                     break;
                 case ControlCode.OfferAccepted:
-                    this.onOfferAccepted(header.channelId);
+                    await this.onOfferAccepted(header.channelId, header.framePayloadLength, cancellationToken);
                     break;
                 case ControlCode.Content:
                     await this.onContent(header, cancellationToken);
+                    break;
+                case ControlCode.ContentProcessed:
+                    await this.onContentProcessed(header, cancellationToken);
                     break;
                 case ControlCode.ContentWritingCompleted:
                     this.onContentWritingCompleted(header.channelId);
@@ -518,17 +591,17 @@ export class MultiplexingStreamClass extends MultiplexingStream {
     }
 
     private async onOffer(channelId: number, payloadSize: number, cancellationToken: CancellationToken) {
-        const payload = await getBufferFrom(this.stream, payloadSize, null, cancellationToken);
-        const name = payload != null ? payload.toString(MultiplexingStream.ControlFrameEncoding) : "";
+        const payload = await getBufferFrom(this.stream, payloadSize, undefined, cancellationToken);
 
-        const channel = new ChannelClass(this, channelId, name, MultiplexingStream.defaultChannelOptions);
+        const offerParameters = this.formatter.deserializeOfferParameters(payload);
+        const channel = new ChannelClass(this, false, channelId, offerParameters);
         let acceptingChannelAlreadyPresent = false;
-        let options: ChannelOptions = null;
+        let options: ChannelOptions | undefined;
 
-        let acceptingChannels: Array<Deferred<Channel>>;
-        if (name != null && (acceptingChannels = this.acceptingChannels[name]) != null) {
+        let acceptingChannels: Array<Deferred<ChannelClass>>;
+        if ((acceptingChannels = this.acceptingChannels[offerParameters.name]) !== undefined) {
             while (acceptingChannels.length > 0) {
-                const candidate = acceptingChannels.shift();
+                const candidate = acceptingChannels.shift()!;
                 if (candidate.resolve(channel)) {
                     acceptingChannelAlreadyPresent = true;
                     options = candidate.state as ChannelOptions;
@@ -538,10 +611,10 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         }
 
         if (!acceptingChannelAlreadyPresent) {
-            if (name != null) {
+            if (offerParameters.name != null) {
                 let offeredChannels: Channel[];
-                if (!(offeredChannels = this.channelsOfferedByThemByName[name])) {
-                    this.channelsOfferedByThemByName[name] = offeredChannels = [];
+                if (!(offeredChannels = this.channelsOfferedByThemByName[offerParameters.name])) {
+                    this.channelsOfferedByThemByName[offerParameters.name] = offeredChannels = [];
                 }
 
                 offeredChannels.push(channel);
@@ -557,13 +630,16 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         this.raiseChannelOffered(channel.id, channel.name, acceptingChannelAlreadyPresent);
     }
 
-    private onOfferAccepted(channelId: number) {
+    private async onOfferAccepted(channelId: number, payloadSize: number, cancellationToken: CancellationToken) {
+        const payload = await getBufferFrom(this.stream, payloadSize, undefined, cancellationToken);
+
+        const acceptanceParameter = this.formatter.deserializerAcceptanceParameters(payload);
         const channel = this.openChannels[channelId] as ChannelClass;
         if (!channel) {
             throw new Error("Unexpected channel created with ID " + channelId);
         }
 
-        if (!channel.onAccepted()) {
+        if (!channel.onAccepted(acceptanceParameter)) {
             // This may be an acceptance of a channel that we canceled an offer for, and a race condition
             // led to our cancellation notification crossing in transit with their acceptance notification.
             // In this case, do nothing since we already sent a channel termination message, and the remote side
@@ -576,6 +652,13 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 
         const buffer = await getBufferFrom(this.stream, header.framePayloadLength, false, cancellationToken);
         channel.onContent(buffer);
+    }
+
+    private async onContentProcessed(header: FrameHeader, cancellationToken: CancellationToken) {
+        const channel = this.openChannels[header.channelId] as ChannelClass;
+        const buffer = await getBufferFrom(this.stream, header.framePayloadLength, false, cancellationToken);
+        const bytesProcessed = buffer.readInt32BE(0);
+        channel.onContentProcessed(bytesProcessed);
     }
 
     private onContentWritingCompleted(channelId: number) {

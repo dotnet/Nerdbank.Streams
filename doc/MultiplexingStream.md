@@ -11,8 +11,16 @@ Given a bidirectional stream between two parties, both parties should start the 
 
 ```cs
 Stream transportStream;
-var multiplexor = MultiplexingStream.CreateAsync(transportStream, this.TimeoutToken);
+var multiplexor = MultiplexingStream.CreateAsync(
+    transportStream,
+    new MultiplexingStream.Options { ProtocolMajorVersion = 2 },
+    this.TimeoutToken);
 ```
+
+The `ProtocolMajorVersion = 2` option enables per-channel flow control.
+All new uses should enable this as it avoids one channel that isn't currently being read
+from causing all other channels from being paused.
+Pre-existing uses still on version 1 should upgrade when they can manage a protocol breaking change.
 
 ## Establishing named channels
 
