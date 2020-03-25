@@ -1,0 +1,3 @@
+[submodule "MessagePack"]
+	path = ext/MessagePack
+	url = https://github.com/AArnott/MessagePack-CSharp.git

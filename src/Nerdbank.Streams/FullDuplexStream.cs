@@ -1,7 +1,7 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-#pragma warning disable AvoidAsyncSuffix // Avoid Async suffix (malfunctions on ValueTask)
+#pragma warning disable SA1414 // Tuple types in signatures should have element names
 
 namespace Nerdbank.Streams
 {

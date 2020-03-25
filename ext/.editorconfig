@@ -1,0 +1,13 @@
+# For imported git submodules, don't apply style analyzers
+
+# Code files
+[*.{cs,csx,vb,vbx,h,cpp,idl}]
+
+# Default severity for analyzer diagnostics with category 'Style'
+dotnet_analyzer_diagnostic.category-Style.severity = none
+
+# Default severity for analyzer diagnostics with category 'StyleCop.CSharp.ReadabilityRules'
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.ReadabilityRules.severity = none
+
+# Default severity for all analyzer diagnostics
+dotnet_analyzer_diagnostic.severity = none
