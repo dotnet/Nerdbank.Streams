@@ -190,6 +190,11 @@ namespace Nerdbank.Streams
             /// Raised when we receive a <see cref="ControlCode.ContentProcessed"/> message for an unknown or closed channel.
             /// </summary>
             UnexpectedContentProcessed,
+
+            /// <summary>
+            /// Raised when the protocol handshake is starting, to annouce the major version being used.
+            /// </summary>
+            HandshakeStarted,
         }
 
         /// <summary>
@@ -252,7 +257,7 @@ namespace Nerdbank.Streams
 
             if (options.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
             {
-                options.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.HandshakeSuccessful, $"Multiplexing protocol handshake beginning with major version {options.ProtocolMajorVersion}.");
+                options.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.HandshakeStarted, $"Multiplexing protocol handshake beginning with major version {options.ProtocolMajorVersion}.");
             }
 
             // Send the protocol magic number, and a random GUID to establish even/odd assignments.
