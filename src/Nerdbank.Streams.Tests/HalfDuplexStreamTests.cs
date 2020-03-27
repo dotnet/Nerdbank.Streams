@@ -31,6 +31,12 @@ public class HalfDuplexStreamTests : TestBase
     }
 
     [Fact]
+    public async Task HungTest()
+    {
+        await Task.Delay(60000);
+    }
+
+    [Fact]
     public void DefaultCtor()
     {
         var stream = new HalfDuplexStream();
