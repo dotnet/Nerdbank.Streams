@@ -291,7 +291,9 @@ namespace Nerdbank.Streams
                 this.charBufferLength = 0;
             }
 
-            while (this.charBufferLength < this.charBuffer.Length)
+            // Continue to decode characters for as long as we have room for TWO chars, since Decoder.Convert throws
+            // if we provide a char[1] for output when it encounters a surrogate pair.
+            while (this.charBuffer.Length - this.charBufferLength >= 2)
             {
                 Assumes.True(this.sequence.TryGet(ref this.sequencePosition, out ReadOnlyMemory<byte> memory, advance: false));
                 if (memory.IsEmpty)
