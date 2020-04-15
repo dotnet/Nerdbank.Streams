@@ -221,4 +221,42 @@ public class SequenceTextReaderTests : TestBase
         }
         while (charsRead > 0);
     }
+
+    [Theory]
+    [CombinatorialData]
+    public void SurrogatePairsAtBufferBoundary(bool surrogatePairsStartOnOddIndex)
+    {
+        // Fill a buffer large enough that it surely exceeds the internal char[] size inside the SequenceTextReader.
+        var surrogateCharsBuffer = new char[5 * 1024];
+
+        // Now initialize it with surrogate character pairs.
+        // Each pair will align at the even or odd indexes (based on test method argument) to ensure that
+        // if there's a vulnerability in SequenceTextReader, we'll find it.
+        int i = surrogatePairsStartOnOddIndex ? 1 : 0;
+        for (; i < surrogateCharsBuffer.Length - 1; i += 2)
+        {
+            // Compose a treble clef (𝄞).
+            surrogateCharsBuffer[i] = '\uD834';
+            surrogateCharsBuffer[i + 1] = '\uDD1E';
+        }
+
+        byte[] bytes = DefaultEncoding.GetBytes(surrogateCharsBuffer);
+
+        this.sequenceTextReader.Initialize(new ReadOnlySequence<byte>(bytes), DefaultEncoding);
+        char[] actualBlock = new char[49];
+        int totalCharsRead = 0;
+        int charsRead;
+        do
+        {
+            charsRead = this.sequenceTextReader.Read(actualBlock, 0, actualBlock.Length);
+            for (int j = 0; j < charsRead; j++)
+            {
+                Assert.Equal(surrogateCharsBuffer[totalCharsRead + j], actualBlock[j]);
+            }
+
+            totalCharsRead += charsRead;
+        }
+        while (charsRead > 0);
+        Assert.Equal(surrogateCharsBuffer.Length, totalCharsRead);
+    }
 }
