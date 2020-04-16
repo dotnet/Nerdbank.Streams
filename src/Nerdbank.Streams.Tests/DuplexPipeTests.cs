@@ -51,8 +51,10 @@ public class DuplexPipeTests
         pipe.Writer.CancelPendingFlush();
         duplex.Output.CancelPendingFlush();
 
+#pragma warning disable CS0618 // Type or member is obsolete
         pipe.Writer.OnReaderCompleted((ex, s) => { }, null);
         duplex.Output.OnReaderCompleted((ex, s) => { }, null);
+#pragma warning restore CS0618 // Type or member is obsolete
 
         pipe.Writer.Complete();
         duplex.Output.Complete();
@@ -78,8 +80,10 @@ public class DuplexPipeTests
         pipe.Reader.CancelPendingRead();
         duplex.Input.CancelPendingRead();
 
+#pragma warning disable CS0618 // Type or member is obsolete
         pipe.Reader.OnWriterCompleted((ex, s) => { }, null);
         duplex.Input.OnWriterCompleted((ex, s) => { }, null);
+#pragma warning restore CS0618 // Type or member is obsolete
 
         pipe.Reader.Complete();
         duplex.Input.Complete();

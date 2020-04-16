@@ -43,7 +43,7 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
     {
         this.serverPipe.Dispose();
         this.clientPipe.Dispose();
-        return TplExtensions.CompletedTask;
+        return Task.CompletedTask;
     }
 
     [SkippableFact]
