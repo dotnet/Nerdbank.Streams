@@ -52,8 +52,11 @@ namespace Nerdbank.Streams
         /// <inheritdoc />
         public override void Advance(int bytes)
         {
-            Verify.Operation(!this.isWriterCompleted, "Writing is already completed.");
-            this.buffer.Advance(bytes);
+            if (bytes > 0)
+            {
+                Verify.Operation(!this.isWriterCompleted, "Writing is already completed.");
+                this.buffer.Advance(bytes);
+            }
         }
 
         /// <inheritdoc />
