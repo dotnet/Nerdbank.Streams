@@ -40,7 +40,9 @@ public class DuplexPipeTests
         Assert.Throws<InvalidOperationException>(() => pipe.Writer.GetSpan());
         Assert.Throws<InvalidOperationException>(() => duplex.Output.GetSpan());
 
-        Assert.Throws<InvalidOperationException>(() => pipe.Writer.Advance(0));
+        // System.IO.Pipelines stopped throwing when Advance(0) is called after completion,
+        // But we still feel it's useful to throw since it's a read-only pipe.
+        pipe.Writer.Advance(0);
         Assert.Throws<InvalidOperationException>(() => duplex.Output.Advance(0));
 
         var flushResult = await pipe.Writer.FlushAsync();
@@ -51,8 +53,10 @@ public class DuplexPipeTests
         pipe.Writer.CancelPendingFlush();
         duplex.Output.CancelPendingFlush();
 
+#pragma warning disable CS0618 // Type or member is obsolete
         pipe.Writer.OnReaderCompleted((ex, s) => { }, null);
         duplex.Output.OnReaderCompleted((ex, s) => { }, null);
+#pragma warning restore CS0618 // Type or member is obsolete
 
         pipe.Writer.Complete();
         duplex.Output.Complete();
@@ -78,8 +82,10 @@ public class DuplexPipeTests
         pipe.Reader.CancelPendingRead();
         duplex.Input.CancelPendingRead();
 
+#pragma warning disable CS0618 // Type or member is obsolete
         pipe.Reader.OnWriterCompleted((ex, s) => { }, null);
         duplex.Input.OnWriterCompleted((ex, s) => { }, null);
+#pragma warning restore CS0618 // Type or member is obsolete
 
         pipe.Reader.Complete();
         duplex.Input.Complete();

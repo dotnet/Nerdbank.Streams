@@ -64,7 +64,7 @@ public abstract class StreamPipeWriterTestBase : TestBase
         writer.Complete();
         Assert.Throws<InvalidOperationException>(() => writer.GetMemory());
         Assert.Throws<InvalidOperationException>(() => writer.GetSpan());
-        Assert.Throws<InvalidOperationException>(() => writer.Advance(0));
+        writer.Advance(0);
     }
 
     [Fact]
