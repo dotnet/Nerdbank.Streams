@@ -46,6 +46,15 @@ public class SequenceTests : TestBase
     }
 
     [Fact]
+    public void Reset_AfterPartialAdvance()
+    {
+        var seq = new Sequence<object>(new MockMemoryPool<object> { Contents = { new object[4] } });
+        seq.Write(new object[3]);
+        seq.AdvanceTo(seq.AsReadOnlySequence.GetPosition(2));
+        seq.Reset();
+    }
+
+    [Fact]
     public void MemoryPool_ReleasesReferenceOnRecycle()
     {
         var seq = new Sequence<object>(new MockMemoryPool<object>());
