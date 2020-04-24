@@ -353,9 +353,9 @@ namespace Nerdbank.Streams
             internal static readonly SequenceSegment Empty = new SequenceSegment();
 
             /// <summary>
-            /// A value indicating whether the element is a value type.
+            /// A value indicating whether the element may contain references (and thus must be cleared).
             /// </summary>
-            private static readonly bool IsValueTypeElement = typeof(T).GetTypeInfo().IsValueType;
+            private static readonly bool MayContainReferences = !typeof(T).GetTypeInfo().IsPrimitive;
 
 #pragma warning disable SA1011 // Closing square brackets should be spaced correctly
             /// <summary>
@@ -456,7 +456,7 @@ namespace Nerdbank.Streams
             /// </summary>
             internal void ResetMemory(ArrayPool<T>? arrayPool)
             {
-                this.ClearReferences(this.Start, this.End);
+                this.ClearReferences(this.Start, this.End - this.Start);
                 this.Memory = default;
                 this.Next = null;
                 this.RunningIndex = 0;
@@ -516,10 +516,11 @@ namespace Nerdbank.Streams
 
             private void ClearReferences(int startIndex, int length)
             {
-                // If we store references, clear them to allow the objects to be GC'd.
-                if (!IsValueTypeElement)
+                // Clear the array to allow the objects to be GC'd.
+                // Reference types need to be cleared. Value types can be structs with reference type members too, so clear everything.
+                if (MayContainReferences)
                 {
-                    this.AvailableMemory.Span.Slice(startIndex, length).Fill(default!);
+                    this.AvailableMemory.Span.Slice(startIndex, length).Clear();
                 }
             }
         }

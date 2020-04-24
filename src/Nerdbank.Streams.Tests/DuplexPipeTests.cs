@@ -40,8 +40,10 @@ public class DuplexPipeTests
         Assert.Throws<InvalidOperationException>(() => pipe.Writer.GetSpan());
         Assert.Throws<InvalidOperationException>(() => duplex.Output.GetSpan());
 
+        // System.IO.Pipelines stopped throwing when Advance(0) is called after completion,
+        // But we still feel it's useful to throw since it's a read-only pipe.
         pipe.Writer.Advance(0);
-        duplex.Output.Advance(0);
+        Assert.Throws<InvalidOperationException>(() => duplex.Output.Advance(0));
 
         var flushResult = await pipe.Writer.FlushAsync();
         Assert.False(flushResult.IsCompleted);

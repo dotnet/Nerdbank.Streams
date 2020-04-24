@@ -83,6 +83,7 @@ namespace Nerdbank.Streams
             Requires.NotNull(writer, nameof(writer));
 
             var readerDone = new TaskCompletionSource<object?>();
+#pragma warning disable CS0618 // Type or member is obsolete
             writer.OnReaderCompleted(
                 (ex, tcsObject) =>
                 {
@@ -97,6 +98,7 @@ namespace Nerdbank.Streams
                     }
                 },
                 readerDone);
+#pragma warning restore CS0618 // Type or member is obsolete
             return readerDone.Task;
         }
 
@@ -106,6 +108,7 @@ namespace Nerdbank.Streams
             Requires.NotNull(reader, nameof(reader));
 
             var writerDone = new TaskCompletionSource<object?>();
+#pragma warning disable CS0618 // Type or member is obsolete
             reader.OnWriterCompleted(
                 (ex, wdObject) =>
                 {
@@ -120,6 +123,7 @@ namespace Nerdbank.Streams
                     }
                 },
                 writerDone);
+#pragma warning restore CS0618 // Type or member is obsolete
             return writerDone.Task;
         }
 

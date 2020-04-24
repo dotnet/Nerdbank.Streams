@@ -58,13 +58,7 @@ namespace Nerdbank.Streams
             {
             }
 
-            public override void Advance(int bytes)
-            {
-                if (bytes > 0)
-                {
-                    ThrowInvalidOperationException();
-                }
-            }
+            public override void Advance(int bytes) => ThrowInvalidOperationException();
 
             public override void CancelPendingFlush()
             {

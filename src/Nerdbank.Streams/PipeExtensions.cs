@@ -111,8 +111,9 @@ namespace Nerdbank.Streams
             {
                 try
                 {
-                    while (!cancellationToken.IsCancellationRequested)
+                    while (true)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         ReadResult readResult = await pipe.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
                         if (readResult.Buffer.Length > 0)
                         {
@@ -237,11 +238,12 @@ namespace Nerdbank.Streams
             var pipe = new Pipe(pipeOptions ?? PipeOptions.Default);
             Task.Run(async delegate
             {
-                while (!cancellationToken.IsCancellationRequested)
+                while (true)
                 {
                     Memory<byte> memory = pipe.Writer.GetMemory(sizeHint);
                     try
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         var readResult = await webSocket.ReceiveAsync(memory, cancellationToken).ConfigureAwait(false);
                         if (readResult.Count == 0)
                         {
@@ -287,8 +289,9 @@ namespace Nerdbank.Streams
             {
                 try
                 {
-                    while (!cancellationToken.IsCancellationRequested)
+                    while (true)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         ReadResult readResult = await pipe.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
                         if (readResult.Buffer.Length > 0)
                         {
@@ -393,8 +396,9 @@ namespace Nerdbank.Streams
             {
                 try
                 {
-                    while (!cancellationToken.IsCancellationRequested)
+                    while (true)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         var result = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
                         writer.Write(result.Buffer);
                         reader.AdvanceTo(result.Buffer.End);

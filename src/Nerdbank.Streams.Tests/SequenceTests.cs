@@ -46,6 +46,15 @@ public class SequenceTests : TestBase
     }
 
     [Fact]
+    public void Reset_AfterPartialAdvance()
+    {
+        var seq = new Sequence<object>(new MockMemoryPool<object> { Contents = { new object[4] } });
+        seq.Write(new object[3]);
+        seq.AdvanceTo(seq.AsReadOnlySequence.GetPosition(2));
+        seq.Reset();
+    }
+
+    [Fact]
     public void MemoryPool_ReleasesReferenceOnRecycle()
     {
         var seq = new Sequence<object>(new MockMemoryPool<object>());
@@ -59,6 +68,16 @@ public class SequenceTests : TestBase
     public void ArrayPool_ReleasesReferenceOnRecycle()
     {
         var seq = new Sequence<object>(new MockArrayPool<object>());
+        var weakReference = StoreReferenceInSequence(seq);
+        seq.Reset();
+        GC.Collect();
+        Assert.False(weakReference.IsAlive);
+    }
+
+    [Fact]
+    public void ArrayPool_ReleasesReferenceInStructsOnRecycle()
+    {
+        var seq = new Sequence<ValueTuple<object>>(new MockArrayPool<ValueTuple<object>>());
         var weakReference = StoreReferenceInSequence(seq);
         seq.Reset();
         GC.Collect();
@@ -687,6 +706,24 @@ public class SequenceTests : TestBase
         var tracker = new WeakReference(o);
         var span = seq.GetSpan(5);
         span[0] = o;
+        seq.Advance(1);
+        return tracker;
+    }
+
+    /// <summary>
+    /// Adds a reference to an object in the sequence and returns a weak reference to it.
+    /// </summary>
+    /// <remarks>
+    /// Don't inline this because we need to guarantee the local disappears.
+    /// </remarks>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference StoreReferenceInSequence<T>(Sequence<ValueTuple<T>> seq)
+        where T : class, new()
+    {
+        var o = new T();
+        var tracker = new WeakReference(o);
+        var span = seq.GetSpan(5);
+        span[0] = new ValueTuple<T>(o);
         seq.Advance(1);
         return tracker;
     }
