@@ -396,7 +396,7 @@ namespace Nerdbank.Streams
             /// </summary>
             internal void ResetMemory(ArrayPool<T>? arrayPool)
             {
-                this.ClearReferences(this.Start, this.End);
+                this.ClearReferences(this.Start, this.End - this.Start);
                 this.Memory = default;
                 this.Next = null;
                 this.RunningIndex = 0;
