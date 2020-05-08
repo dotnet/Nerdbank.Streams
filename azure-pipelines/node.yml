@@ -1,28 +1,27 @@
-parameters:
-  projectdirectory: ''
-
 steps:
-- task: NodeTool@0
+- task: UseNode@1
   displayName: Use Node 10.x
   inputs:
-    versionSpec: 10.x
+    version: 10.x
 
-- task: geeklearningio.gl-vsts-tasks-yarn.yarn-installer-task.YarnInstaller@2
-  displayName: Use Yarn 1.x
+- task: YarnInstaller@3
+  displayName: Use yarn 1.x
+  inputs:
+    versionSpec: 1.x
 
-- task: geeklearningio.gl-vsts-tasks-yarn.yarn-task.Yarn@2
+- task: Yarn@3
   displayName: Yarn install
   inputs:
-    ProjectDirectory: src/nerdbank-streams
+    projectDirectory: src/nerdbank-streams
 
-- task: geeklearningio.gl-vsts-tasks-yarn.yarn-task.Yarn@2
+- task: Yarn@3
   displayName: Yarn build
   inputs:
-    ProjectDirectory: src/nerdbank-streams
-    Arguments: build
+    projectDirectory: src/nerdbank-streams
+    arguments: build
 
-- task: geeklearningio.gl-vsts-tasks-yarn.yarn-task.Yarn@2
+- task: Yarn@3
   displayName: Yarn test
   inputs:
-    ProjectDirectory: src/nerdbank-streams
-    Arguments: test
+    projectDirectory: src/nerdbank-streams
+    arguments: test
