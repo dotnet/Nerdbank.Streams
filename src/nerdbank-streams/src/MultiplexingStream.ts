@@ -326,6 +326,14 @@ export abstract class MultiplexingStream implements IDisposableObservable {
         this.disposalTokenSource.cancel();
         this._completionSource.resolve();
         this.formatter.end();
+        for (const channelId in this.openChannels) {
+            const channel = this.openChannels[channelId];
+
+            // Acceptance gets rejected when a channel is disposed.
+            // Avoid a node.js crash or test failure for unobserved channels (e.g. offers for channels from the other party that no one cared to receive on this side).
+            caught(channel.acceptance);
+            channel.dispose();
+        }
     }
 
     public on(event: "channelOffered", listener: (args: IChannelOfferEventArgs) => void) {
