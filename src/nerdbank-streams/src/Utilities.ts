@@ -73,6 +73,8 @@ export async function getBufferFrom(
 
     const streamEnded = new Deferred<void>();
     while (size > 0) {
+        cancellationToken?.throwIfCancelled();
+
         const readBuffer = readable.read(size) as Buffer;
         if (readBuffer === null) {
             const bytesAvailable = new Deferred<void>();
