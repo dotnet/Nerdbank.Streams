@@ -221,6 +221,24 @@ import { Channel } from "../Channel";
             await channels[1].completion;
         });
 
+        it("channels complete when mxstream is disposed", async () => {
+            const channels = await Promise.all([
+                mx1.offerChannelAsync("test"),
+                mx2.acceptChannelAsync("test"),
+            ]);
+            mx1.dispose();
+
+            // Verify that both mxstream's complete when one does.
+            await mx1.completion;
+            await mx2.completion;
+
+            // Verify that the disposed mxstream completes its own channels.
+            await channels[0].completion;
+
+            // Verify that the mxstream that closes because its counterpart closed also completes its own channels.
+            await channels[1].completion;
+        });
+
         it("offered channels must have names", async () => {
             await expectThrow(mx1.offerChannelAsync(null!));
             await expectThrow(mx1.offerChannelAsync(undefined!));

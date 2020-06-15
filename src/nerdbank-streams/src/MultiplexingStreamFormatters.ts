@@ -206,7 +206,11 @@ export class MultiplexingStreamV2Formatter extends MultiplexingStreamFormatter {
     }
 
     async readFrameAsync(cancellationToken: CancellationToken): Promise<{ header: FrameHeader; payload: Buffer; } | null> {
-        const msgpackObject = <any[]>await this.readMessagePackAsync(cancellationToken);
+        const msgpackObject = <any[] | null>await this.readMessagePackAsync(cancellationToken);
+        if (msgpackObject === null) {
+            return null;
+        }
+
         const header = new FrameHeader(msgpackObject[0], msgpackObject.length > 1 ? msgpackObject[1] : undefined);
         return {
             header: header,
