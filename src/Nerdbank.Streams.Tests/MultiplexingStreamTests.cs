@@ -47,6 +47,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         Func<string, MultiplexingStream.QualifiedChannelId, string, TraceSource> traceSourceFactory = (string mxInstanceName, MultiplexingStream.QualifiedChannelId id, string name) =>
         {
             var traceSource = new TraceSource(mxInstanceName + " channel " + id, SourceLevels.All);
+            traceSource.Listeners.Clear(); // remove DefaultTraceListener
             traceSource.Listeners.Add(new XunitTraceListener(this.Logger));
             return traceSource;
         };
