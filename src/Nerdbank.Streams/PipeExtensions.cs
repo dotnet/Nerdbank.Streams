@@ -219,7 +219,7 @@ namespace Nerdbank.Streams
             }
 #pragma warning restore CS0618 // Type or member is obsolete
 
-            closeStreamAntecedent?.ContinueWith((_, state) => ((Stream)state).Dispose(), stream, cancellationToken, TaskContinuationOptions.None, TaskScheduler.Default).Forget();
+            closeStreamAntecedent?.ContinueWith((_, state) => ((Stream)state!).Dispose(), stream, cancellationToken, TaskContinuationOptions.None, TaskScheduler.Default).Forget();
             return new DuplexPipe(input, output);
         }
 
@@ -480,7 +480,7 @@ namespace Nerdbank.Streams
                 disposeWhenReaderCompleted.ContinueWith(
                     (_, s1) =>
                     {
-                        var tuple = (Tuple<Pipe, Stream>)s1;
+                        var tuple = (Tuple<Pipe, Stream>)s1!;
                         tuple.Item1.Writer.OnReaderCompleted((ex, s2) => ((Stream)s2).Dispose(), tuple.Item2);
                     },
                     Tuple.Create(pipe, stream),

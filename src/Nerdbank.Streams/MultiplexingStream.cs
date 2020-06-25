@@ -323,7 +323,7 @@ namespace Nerdbank.Streams
         public Channel AcceptChannel(int id, ChannelOptions? options = default)
         {
             options = options ?? DefaultChannelOptions;
-            Channel channel;
+            Channel? channel;
             lock (this.syncObject)
             {
                 Verify.Operation(this.openChannels.TryGetValue(id, out channel), "No channel with that ID found.");
@@ -344,7 +344,7 @@ namespace Nerdbank.Streams
         /// <exception cref="InvalidOperationException">Thrown if the channel was already accepted.</exception>
         public void RejectChannel(int id)
         {
-            Channel channel;
+            Channel? channel;
             lock (this.syncObject)
             {
                 Verify.Operation(this.openChannels.TryGetValue(id, out channel), "No channel with that ID found.");
@@ -409,7 +409,7 @@ namespace Nerdbank.Streams
                 ChannelId = channel.Id,
             };
 
-            using (cancellationToken.Register(this.OfferChannelCanceled, channel))
+            using (cancellationToken.Register(this.OfferChannelCanceled!, channel))
             {
                 await this.SendFrameAsync(header, payload, cancellationToken).ConfigureAwait(false);
                 await channel.Acceptance.ConfigureAwait(false);
@@ -500,7 +500,7 @@ namespace Nerdbank.Streams
                 }
                 else
                 {
-                    using (cancellationToken.Register(this.AcceptChannelCanceled, Tuple.Create(pendingAcceptChannel, name), false))
+                    using (cancellationToken.Register(this.AcceptChannelCanceled!, Tuple.Create(pendingAcceptChannel, name), false))
                     {
                         channel = await pendingAcceptChannel!.Task.ConfigureAwait(false);
 
@@ -783,7 +783,7 @@ namespace Nerdbank.Streams
         {
             Channel.AcceptanceParameters acceptanceParameters = this.formatter.DeserializeAcceptanceParameters(payloadBuffer);
             int channelId = header.RequiredChannelId;
-            Channel channel;
+            Channel? channel;
             lock (this.syncObject)
             {
                 if (!this.openChannels.TryGetValue(channelId, out channel))
@@ -833,7 +833,7 @@ namespace Nerdbank.Streams
 
             var channel = new Channel(this, offeredLocally: false, channelId, offerParameters);
             bool acceptingChannelAlreadyPresent = false;
-            ChannelOptions options = DefaultChannelOptions;
+            ChannelOptions? options = DefaultChannelOptions;
             lock (this.syncObject)
             {
                 if (this.acceptingChannels.TryGetValue(offerParameters.Name, out var acceptingChannels))
@@ -849,7 +849,7 @@ namespace Nerdbank.Streams
                             }
 
                             acceptingChannelAlreadyPresent = true;
-                            options = (ChannelOptions)candidate.Task.AsyncState;
+                            options = (ChannelOptions?)candidate.Task.AsyncState;
                             Assumes.NotNull(options);
                             break;
                         }
@@ -1078,13 +1078,13 @@ namespace Nerdbank.Streams
             {
                 if (task.IsFaulted)
                 {
-                    this.Fault(task.Exception.InnerException ?? task.Exception);
+                    this.Fault(task.Exception!.InnerException ?? task.Exception);
                 }
             }
             else
             {
                 task.ContinueWith(
-                    (t, s) => ((MultiplexingStream)s).Fault(t.Exception.InnerException ?? t.Exception),
+                    (t, s) => ((MultiplexingStream)s!).Fault(t.Exception!.InnerException ?? t.Exception),
                     this,
                     CancellationToken.None,
                     TaskContinuationOptions.OnlyOnFaulted,

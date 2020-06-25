@@ -194,7 +194,7 @@ override Nerdbank.Streams.SequenceTextReader.ReadAsync(System.Memory<char> buffe
 override Nerdbank.Streams.SequenceTextReader.ReadAsync(char[]! buffer, int index, int count) -> System.Threading.Tasks.Task<int>!
 override Nerdbank.Streams.SequenceTextReader.ReadBlockAsync(System.Memory<char> buffer, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<int>
 override Nerdbank.Streams.SequenceTextReader.ReadBlockAsync(char[]! buffer, int index, int count) -> System.Threading.Tasks.Task<int>!
-override Nerdbank.Streams.SequenceTextReader.ReadLineAsync() -> System.Threading.Tasks.Task<string!>!
+override Nerdbank.Streams.SequenceTextReader.ReadLineAsync() -> System.Threading.Tasks.Task<string?>!
 override Nerdbank.Streams.SequenceTextReader.ReadToEndAsync() -> System.Threading.Tasks.Task<string!>!
 override Nerdbank.Streams.SimplexStream.CanRead.get -> bool
 override Nerdbank.Streams.SimplexStream.CanSeek.get -> bool

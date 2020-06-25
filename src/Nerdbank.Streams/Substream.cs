@@ -22,9 +22,7 @@ namespace Nerdbank.Streams
 
         private readonly Stream underlyingStream;
 
-#pragma warning disable SA1011 // Closing square brackets should be spaced correctly
-        private byte[]? buffer;
-#pragma warning restore SA1011 // Closing square brackets should be spaced correctly
+        private readonly byte[] buffer;
 
         private int count;
 
@@ -38,7 +36,7 @@ namespace Nerdbank.Streams
         }
 
         /// <inheritdoc/>
-        public bool IsDisposed => this.buffer == null;
+        public bool IsDisposed { get; private set; }
 
         /// <inheritdoc/>
         public override bool CanRead => false;
@@ -85,7 +83,7 @@ namespace Nerdbank.Streams
             await this.underlyingStream.FlushAsync(cancellationToken).ConfigureAwait(false);
 
             ArrayPool<byte>.Shared.Return(this.buffer);
-            this.buffer = null;
+            this.IsDisposed = true;
 
             this.Dispose();
         }
@@ -177,7 +175,7 @@ namespace Nerdbank.Streams
                     this.underlyingStream.Flush();
 
                     ArrayPool<byte>.Shared.Return(this.buffer);
-                    this.buffer = null;
+                    this.IsDisposed = true;
                 }
             }
 

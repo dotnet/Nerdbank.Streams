@@ -93,7 +93,7 @@ namespace Nerdbank.Streams
         }
 
         /// <inheritdoc />
-        public override Encoding? Encoding => this.encoding;
+        public override Encoding? Encoding => this.encoding!;
 
         /// <summary>
         /// Gets the number of uninitialized characters remaining in <see cref="charBuffer"/>.
@@ -279,7 +279,7 @@ namespace Nerdbank.Streams
 
                 if (MemoryMarshal.TryGetArray(this.memory, out ArraySegment<byte> segment))
                 {
-                    this.memoryPosition += this.encoder!.GetBytes(this.charBuffer, 0, this.charBufferPosition, segment.Array, segment.Offset + this.memoryPosition, flush: flushEncoder);
+                    this.memoryPosition += this.encoder!.GetBytes(this.charBuffer, 0, this.charBufferPosition, segment.Array!, segment.Offset + this.memoryPosition, flush: flushEncoder);
                 }
                 else
                 {

@@ -124,8 +124,8 @@ namespace Nerdbank.Streams
         /// <param name="sequence">The sequence to convert.</param>
         public static implicit operator ReadOnlySequence<T>(Sequence<T> sequence)
         {
-            return sequence.first != null
-                ? new ReadOnlySequence<T>(sequence.first, sequence.first.Start, sequence.last, sequence.last!.End)
+            return sequence.first is { } first && sequence.last is { } last
+                ? new ReadOnlySequence<T>(first, first.Start, last, last!.End)
                 : Empty;
         }
 
@@ -139,7 +139,7 @@ namespace Nerdbank.Streams
         /// </param>
         public void AdvanceTo(SequencePosition position)
         {
-            var firstSegment = (SequenceSegment)position.GetObject();
+            var firstSegment = (SequenceSegment?)position.GetObject();
             if (firstSegment == null)
             {
                 // Emulate PipeReader behavior which is to just return for default(SequencePosition)
