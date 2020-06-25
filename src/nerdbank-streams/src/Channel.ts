@@ -8,12 +8,21 @@ import { IDisposableObservable } from "./IDisposableObservable";
 import { MultiplexingStreamClass, MultiplexingStream } from "./MultiplexingStream";
 import { OfferParameters } from "./OfferParameters";
 import { AcceptanceParameters } from "./AcceptanceParameters";
+import { QualifiedChannelId } from "./QualifiedChannelId";
 
 export abstract class Channel implements IDisposableObservable {
     /**
      * The id of the channel.
+     * @obsolete Use qualifiedId instead.
      */
-    public readonly id: number;
+    public get id(): number {
+        return this.qualifiedId.id;
+    }
+
+    /**
+     * The party-qualified ID of the channel.
+     */
+    public readonly qualifiedId: QualifiedChannelId;
 
     /**
      * A read/write stream used to communicate over this channel.
@@ -32,8 +41,8 @@ export abstract class Channel implements IDisposableObservable {
 
     private _isDisposed: boolean = false;
 
-    constructor(id: number) {
-        this.id = id;
+    constructor(id: QualifiedChannelId) {
+        this.qualifiedId = id;
     }
 
     /**
@@ -73,14 +82,13 @@ export class ChannelClass extends Channel {
 
     constructor(
         multiplexingStream: MultiplexingStreamClass,
-        offeredLocally: boolean,
-        id: number,
+        id: QualifiedChannelId,
         offerParameters: OfferParameters) {
 
         super(id);
         const self = this;
         this.name = offerParameters.name;
-        if (offeredLocally) {
+        if (id.offeredLocally) {
             this.localWindowSize = offerParameters.remoteWindowSize;
         } else {
             this.remoteWindowSize = offerParameters.remoteWindowSize;
@@ -113,7 +121,7 @@ export class ChannelClass extends Channel {
                         }
 
                         self.onTransmittingBytes(bytesTransmitted);
-                        const header = new FrameHeader(ControlCode.Content, id);
+                        const header = FrameHeader.createToSend(ControlCode.Content, id);
                         await multiplexingStream.sendFrameAsync(header, payload.slice(0, bytesTransmitted));
                         payload = payload.slice(bytesTransmitted);
                     }

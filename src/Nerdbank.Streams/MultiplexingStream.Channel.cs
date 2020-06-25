@@ -44,11 +44,6 @@ namespace Nerdbank.Streams
             private readonly TaskCompletionSource<object?>? optionsAppliedTaskSource;
 
             /// <summary>
-            /// A value indicating whether this channel originated locally (as opposed to remotely).
-            /// </summary>
-            private readonly bool offeredLocally;
-
-            /// <summary>
             /// Tracks the end of any copying from the mxstream to this channel.
             /// </summary>
             private readonly AsyncManualResetEvent mxStreamIOWriterCompleted = new AsyncManualResetEvent();
@@ -57,6 +52,11 @@ namespace Nerdbank.Streams
             /// Gets a signal which indicates when the <see cref="RemoteWindowRemaining"/> is non-zero.
             /// </summary>
             private readonly AsyncManualResetEvent remoteWindowHasCapacity = new AsyncManualResetEvent(initialState: true);
+
+            /// <summary>
+            /// The party-qualified id of the channel.
+            /// </summary>
+            private readonly QualifiedChannelId channelId;
 
             /// <summary>
             /// The number of bytes transmitted from here but not yet acknowledged as processed from there,
@@ -121,21 +121,19 @@ namespace Nerdbank.Streams
             /// Initializes a new instance of the <see cref="Channel"/> class.
             /// </summary>
             /// <param name="multiplexingStream">The owning <see cref="Streams.MultiplexingStream"/>.</param>
-            /// <param name="offeredLocally">A value indicating whether this channel originated locally (as opposed to remotely).</param>
-            /// <param name="id">The ID of the channel.</param>
+            /// <param name="channelId">The party-qualified ID of the channel.</param>
             /// <param name="offerParameters">The parameters of the channel from the offering party.</param>
             /// <param name="channelOptions">The channel options. Should only be null if the channel is created in response to an offer that is not immediately accepted.</param>
-            internal Channel(MultiplexingStream multiplexingStream, bool offeredLocally, int id, OfferParameters offerParameters, ChannelOptions? channelOptions = null)
+            internal Channel(MultiplexingStream multiplexingStream, QualifiedChannelId channelId, OfferParameters offerParameters, ChannelOptions? channelOptions = null)
             {
                 Requires.NotNull(multiplexingStream, nameof(multiplexingStream));
                 Requires.NotNull(offerParameters, nameof(offerParameters));
 
                 this.MultiplexingStream = multiplexingStream;
-                this.offeredLocally = offeredLocally;
-                this.Id = id;
+                this.channelId = channelId;
                 this.OfferParams = offerParameters;
 
-                if (offeredLocally)
+                if (channelId.OfferedLocally)
                 {
                     this.localWindowSize = offerParameters.RemoteWindowSize;
                 }
@@ -162,7 +160,18 @@ namespace Nerdbank.Streams
             /// can accept it with <see cref="AcceptChannel(int, ChannelOptions)"/> or
             /// reject it with <see cref="RejectChannel(int)"/>.
             /// </remarks>
-            public int Id { get; }
+            [Obsolete("Use " + nameof(QualifiedId) + " instead.")]
+            public int Id => this.channelId.Id;
+
+            /// <summary>
+            /// Gets the unique ID for this channel.
+            /// </summary>
+            /// <remarks>
+            /// This value is usually shared for an anonymous channel so the remote party
+            /// can accept it with <see cref="AcceptChannel(int, ChannelOptions)"/> or
+            /// reject it with <see cref="RejectChannel(int)"/>.
+            /// </remarks>
+            public QualifiedChannelId QualifiedId => this.channelId;
 
             /// <summary>
             /// Gets the mechanism used for tracing activity related to this channel.
@@ -244,12 +253,7 @@ namespace Nerdbank.Streams
             /// </summary>
             internal Task OptionsApplied => this.optionsAppliedTaskSource?.Task ?? Task.CompletedTask;
 
-            /// <summary>
-            /// Gets a value indicating whether this channel originated locally (as opposed to remotely).
-            /// </summary>
-            internal bool OfferedLocally => this.offeredLocally;
-
-            private string DebuggerDisplay => $"{this.Id} {this.Name ?? "(anonymous)"}";
+            private string DebuggerDisplay => $"{this.QualifiedId.DebuggerDisplay} {this.Name ?? "(anonymous)"}";
 
             /// <summary>
             /// Gets an object that can be locked to make critical changes to this instance's fields.
@@ -473,7 +477,8 @@ namespace Nerdbank.Streams
                         new FrameHeader
                         {
                             Code = ControlCode.OfferAccepted,
-                            ChannelId = this.Id,
+                            ChannelId = this.QualifiedId.Id,
+                            ChannelOfferedBySender = false,
                         },
                         payload,
                         CancellationToken.None);
@@ -564,8 +569,8 @@ namespace Nerdbank.Streams
                 try
                 {
                     this.TraceSource = channelOptions.TraceSource
-                        ?? this.MultiplexingStream.DefaultChannelTraceSourceFactory?.Invoke(this.Id, this.Name)
-                        ?? new TraceSource($"{nameof(Streams.MultiplexingStream)}.{nameof(Channel)} {this.Id} ({this.Name})", SourceLevels.Critical);
+                        ?? this.MultiplexingStream.DefaultChannelTraceSourceFactory?.Invoke(this.QualifiedId, this.Name)
+                        ?? new TraceSource($"{nameof(Streams.MultiplexingStream)}.{nameof(Channel)} {this.QualifiedId} ({this.Name})", SourceLevels.Critical);
 
                     lock (this.SyncObject)
                     {
@@ -650,7 +655,7 @@ namespace Nerdbank.Streams
                         {
                             if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
                             {
-                                this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Transmission on channel {0} \"{1}\" terminated the remote party terminated the channel.", this.Id, this.Name);
+                                this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Transmission on channel {0} \"{1}\" terminated the remote party terminated the channel.", this.QualifiedId, this.Name);
                             }
 
                             break;
@@ -704,7 +709,8 @@ namespace Nerdbank.Streams
                             FrameHeader header = new FrameHeader
                             {
                                 Code = ControlCode.Content,
-                                ChannelId = this.Id,
+                                ChannelId = this.QualifiedId.Id,
+                                ChannelOfferedBySender = this.QualifiedId.OfferedLocally,
                             };
 
                             await this.MultiplexingStream.SendFrameAsync(header, bufferToRelay, CancellationToken.None).ConfigureAwait(false);
@@ -793,7 +799,8 @@ namespace Nerdbank.Streams
                     new FrameHeader
                     {
                         Code = ControlCode.ContentProcessed,
-                        ChannelId = this.Id,
+                        ChannelId = this.QualifiedId.Id,
+                        ChannelOfferedBySender = this.QualifiedId.OfferedLocally,
                     },
                     this.MultiplexingStream.formatter.SerializeContentProcessed(bytesExamined),
                     CancellationToken.None);
@@ -806,7 +813,7 @@ namespace Nerdbank.Streams
 
                 if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                 {
-                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelAutoClosing, "Channel {0} \"{1}\" self-closing because both reader and writer are complete.", this.Id, this.Name);
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelAutoClosing, "Channel {0} \"{1}\" self-closing because both reader and writer are complete.", this.QualifiedId, this.Name);
                 }
 
                 this.Dispose();

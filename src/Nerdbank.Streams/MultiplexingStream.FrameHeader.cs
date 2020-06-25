@@ -26,6 +26,14 @@ namespace Nerdbank.Streams
             internal int? ChannelId { get; set; }
 
             /// <summary>
+            /// Gets or sets a value indicating whether <see cref="ChannelId"/> is referring to a channel that was originally offered by the sender of this frame.
+            /// </summary>
+            /// <remarks>
+            /// This property is not used before protocol version 3.
+            /// </remarks>
+            internal bool? ChannelOfferedBySender { get; set; }
+
+            /// <summary>
             /// Gets the ID of the channel that this frame refers to or carries a payload for.
             /// </summary>
             /// <exception cref="MultiplexingProtocolException">Thrown if <see cref="ChannelId"/> is null.</exception>

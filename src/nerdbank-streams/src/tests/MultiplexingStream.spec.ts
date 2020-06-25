@@ -7,7 +7,7 @@ import { startJsonRpc } from "./jsonRpcStreams";
 import { timeout } from "./Timeout";
 import { Channel } from "../Channel";
 
-[ 1, 2 ].forEach(protocolMajorVersion => {
+[ 1, 2, 3 ].forEach(protocolMajorVersion => {
     describe(`MultiplexingStream v${protocolMajorVersion}`, () => {
         let mx1: MultiplexingStream;
         let mx2: MultiplexingStream;

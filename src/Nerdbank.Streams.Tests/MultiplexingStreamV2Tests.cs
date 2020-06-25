@@ -1,17 +1,10 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
 using System.Buffers;
-using System.Diagnostics;
-using System.IO;
 using System.IO.Pipelines;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Runtime.ExceptionServices;
-using System.Threading;
 using System.Threading.Tasks;
-using Microsoft;
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;

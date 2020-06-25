@@ -4,7 +4,7 @@ import { Deferred } from "../Deferred";
 import { FullDuplexStream } from "../FullDuplexStream";
 import { MultiplexingStream } from "../MultiplexingStream";
 
-[1, 2].forEach(protocolMajorVersion => {
+[1, 2, 3].forEach(protocolMajorVersion => {
     describe(`MultiplexingStream v${protocolMajorVersion} (interop) `, () => {
         const projectPath = `${__dirname}/../../../Nerdbank.Streams.Interop.Tests`;
         let mx: MultiplexingStream;
