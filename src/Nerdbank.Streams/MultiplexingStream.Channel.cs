@@ -344,7 +344,7 @@ namespace Nerdbank.Streams
                     }
                     else
                     {
-                        this.mxStreamIOReaderCompleted!.ContinueWith(finalDisposalAction, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Forget();
+                        this.mxStreamIOReaderCompleted!.ContinueWith(finalDisposalAction!, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Forget();
                     }
                 }
             }
@@ -801,6 +801,7 @@ namespace Nerdbank.Streams
 
             private async Task AutoCloseOnPipesClosureAsync()
             {
+                Assumes.NotNull(this.mxStreamIOReaderCompleted);
                 await Task.WhenAll(this.mxStreamIOWriterCompleted.WaitAsync(), this.mxStreamIOReaderCompleted).ConfigureAwait(false);
 
                 if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
@@ -830,13 +831,13 @@ namespace Nerdbank.Streams
                 {
                     if (task.IsFaulted)
                     {
-                        this.Fault(task.Exception.InnerException ?? task.Exception);
+                        this.Fault(task.Exception!.InnerException ?? task.Exception);
                     }
                 }
                 else
                 {
                     task.ContinueWith(
-                        (t, s) => ((Channel)s).Fault(t.Exception.InnerException ?? t.Exception),
+                        (t, s) => ((Channel)s!).Fault(t.Exception!.InnerException ?? t.Exception),
                         this,
                         CancellationToken.None,
                         TaskContinuationOptions.OnlyOnFaulted,

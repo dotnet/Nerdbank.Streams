@@ -220,16 +220,16 @@ namespace Nerdbank.Streams
         }
 
         /// <inheritdoc />
-        public override Task<string> ReadLineAsync()
+        public override Task<string?> ReadLineAsync()
         {
             try
             {
-                string result = this.ReadLine();
-                return Task.FromResult(result);
+                string? result = this.ReadLine();
+                return Task.FromResult<string?>(result);
             }
             catch (Exception ex)
             {
-                return Task.FromException<string>(ex);
+                return Task.FromException<string?>(ex);
             }
         }
 
@@ -304,7 +304,7 @@ namespace Nerdbank.Streams
 
                 if (MemoryMarshal.TryGetArray(memory, out ArraySegment<byte> segment))
                 {
-                    this.decoder!.Convert(segment.Array, segment.Offset, segment.Count, this.charBuffer, this.charBufferLength, this.charBuffer.Length - this.charBufferLength, flush: false, out int bytesUsed, out int charsUsed, out bool completed);
+                    this.decoder!.Convert(segment.Array!, segment.Offset, segment.Count, this.charBuffer, this.charBufferLength, this.charBuffer.Length - this.charBufferLength, flush: false, out int bytesUsed, out int charsUsed, out bool completed);
                     this.charBufferLength += charsUsed;
                     this.sequencePosition = this.sequence.GetPosition(bytesUsed, this.sequencePosition);
                 }
