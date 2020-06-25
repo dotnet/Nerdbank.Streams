@@ -10,18 +10,24 @@ steps:
     versionSpec: 1.x
 
 - task: Yarn@3
-  displayName: Yarn install
+  displayName: yarn install
   inputs:
     projectDirectory: src/nerdbank-streams
 
 - task: Yarn@3
-  displayName: Yarn build
+  displayName: yarn build
   inputs:
     projectDirectory: src/nerdbank-streams
     arguments: build
 
 - task: Yarn@3
-  displayName: Yarn test
+  displayName: yarn test
   inputs:
     projectDirectory: src/nerdbank-streams
     arguments: test
+
+- task: Yarn@3
+  displayName: yarn tslint
+  inputs:
+    projectDirectory: src/nerdbank-streams
+    arguments: tslint --project .

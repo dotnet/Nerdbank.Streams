@@ -62,6 +62,7 @@ export abstract class MultiplexingStreamFormatter {
     }
 }
 
+// tslint:disable-next-line: max-classes-per-file
 export class MultiplexingStreamV1Formatter extends MultiplexingStreamFormatter {
     /**
      * The magic number to send at the start of communication when using v1 of the protocol.
@@ -84,7 +85,7 @@ export class MultiplexingStreamV1Formatter extends MultiplexingStreamFormatter {
     }
 
     async readHandshakeAsync(writeHandshakeResult: Buffer, cancellationToken: CancellationToken): Promise<HandshakeResult> {
-        const localRandomBuffer = <Buffer>writeHandshakeResult;
+        const localRandomBuffer = writeHandshakeResult as Buffer;
         const recvBuffer = await getBufferFrom(this.stream, MultiplexingStreamV1Formatter.protocolMagicNumber.length + 16, false, cancellationToken);
 
         for (let i = 0; i < MultiplexingStreamV1Formatter.protocolMagicNumber.length; i++) {
@@ -97,7 +98,7 @@ export class MultiplexingStreamV1Formatter extends MultiplexingStreamFormatter {
 
         const isOdd = MultiplexingStreamFormatter.isOdd(localRandomBuffer, recvBuffer.slice(MultiplexingStreamV1Formatter.protocolMagicNumber.length));
 
-        return { isOdd: isOdd, protocolVersion: { major: 1, minor: 0 } };
+        return { isOdd, protocolVersion: { major: 1, minor: 0 } };
     }
 
     async writeFrameAsync(header: FrameHeader, payload?: Buffer): Promise<void> {
@@ -122,7 +123,7 @@ export class MultiplexingStreamV1Formatter extends MultiplexingStreamFormatter {
             headerBuffer.readUInt32BE(1));
         const payloadLength = headerBuffer.readUInt16BE(5);
         const payload = await getBufferFrom(this.stream, payloadLength);
-        return { header: header, payload: payload };
+        return { header, payload };
     }
 
     serializeOfferParameters(offer: OfferParameters): Buffer {
@@ -157,6 +158,7 @@ export class MultiplexingStreamV1Formatter extends MultiplexingStreamFormatter {
     }
 }
 
+// tslint:disable-next-line: max-classes-per-file
 export class MultiplexingStreamV2Formatter extends MultiplexingStreamFormatter {
     private static readonly ProtocolVersion: Version = { major: 2, minor: 0 };
     private readonly reader: msgpack.DecodeStream;
@@ -206,14 +208,14 @@ export class MultiplexingStreamV2Formatter extends MultiplexingStreamFormatter {
     }
 
     async readFrameAsync(cancellationToken: CancellationToken): Promise<{ header: FrameHeader; payload: Buffer; } | null> {
-        const msgpackObject = <any[] | null>await this.readMessagePackAsync(cancellationToken);
+        const msgpackObject = await this.readMessagePackAsync(cancellationToken) as any[] | null;
         if (msgpackObject === null) {
             return null;
         }
 
         const header = new FrameHeader(msgpackObject[0], msgpackObject.length > 1 ? msgpackObject[1] : undefined);
         return {
-            header: header,
+            header,
             payload: msgpackObject[2] || Buffer.from([]),
         }
     }

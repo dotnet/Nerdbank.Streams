@@ -13,8 +13,8 @@ export class FrameHeader {
     public readonly channelId?: number;
 
     /**
-    * Gets the channel that this frame refers to or carries a payload for.
-    */
+     * Gets the channel that this frame refers to or carries a payload for.
+     */
     public get requiredChannelId(): number {
         if (this.channelId) {
             return this.channelId;

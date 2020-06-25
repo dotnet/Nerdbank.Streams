@@ -74,8 +74,8 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 
         // Send the protocol magic number, and a random 16-byte number to establish even/odd assignments.
         const formatter =
-            options.protocolMajorVersion == 1 ? new MultiplexingStreamV1Formatter(stream) :
-                options.protocolMajorVersion == 2 ? new MultiplexingStreamV2Formatter(stream) :
+            options.protocolMajorVersion === 1 ? new MultiplexingStreamV1Formatter(stream) :
+                options.protocolMajorVersion === 2 ? new MultiplexingStreamV2Formatter(stream) :
                     undefined;
         if (!formatter) {
             throw new Error(`Protocol major version ${options.protocolMajorVersion} is not supported.`);
@@ -120,7 +120,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
     /**
      * A map of channel names to queues of Deferred<Channel> from waiting accepters.
      */
-    protected readonly acceptingChannels: { [name: string]: Array<Deferred<ChannelClass>> } = {};
+    protected readonly acceptingChannels: { [name: string]: Deferred<ChannelClass>[] } = {};
 
     /** The major version of the protocol being used for this connection. */
     protected readonly protocolMajorVersion: number;
@@ -133,8 +133,8 @@ export abstract class MultiplexingStream implements IDisposableObservable {
         this.defaultChannelReceivingWindowSize = options.defaultChannelReceivingWindowSize ?? MultiplexingStream.recommendedDefaultChannelReceivingWindowSize;
         this.protocolMajorVersion = options.protocolMajorVersion ?? 1;
         const formatter =
-            options.protocolMajorVersion == 1 ? new MultiplexingStreamV1Formatter(stream) :
-                options.protocolMajorVersion == 2 ? new MultiplexingStreamV2Formatter(stream) :
+            options.protocolMajorVersion === 1 ? new MultiplexingStreamV1Formatter(stream) :
+                options.protocolMajorVersion === 2 ? new MultiplexingStreamV2Formatter(stream) :
                     undefined;
         if (formatter === undefined) {
             throw new Error(`Unsupported major protocol version: ${options.protocolMajorVersion}`);
@@ -233,7 +233,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
         throwIfDisposed(this);
 
         const offerParameters: OfferParameters = {
-            name: name,
+            name,
             remoteWindowSize: options?.channelReceivingWindowSize ?? this.defaultChannelReceivingWindowSize,
         };
         const payload = this.formatter.serializeOfferParameters(offerParameters);
@@ -327,12 +327,14 @@ export abstract class MultiplexingStream implements IDisposableObservable {
         this._completionSource.resolve();
         this.formatter.end();
         for (const channelId in this.openChannels) {
-            const channel = this.openChannels[channelId];
+            if (this.openChannels.hasOwnProperty(channelId)) {
+                const channel = this.openChannels[channelId];
 
-            // Acceptance gets rejected when a channel is disposed.
-            // Avoid a node.js crash or test failure for unobserved channels (e.g. offers for channels from the other party that no one cared to receive on this side).
-            caught(channel.acceptance);
-            channel.dispose();
+                // Acceptance gets rejected when a channel is disposed.
+                // Avoid a node.js crash or test failure for unobserved channels (e.g. offers for channels from the other party that no one cared to receive on this side).
+                caught(channel.acceptance);
+                channel.dispose();
+            }
         }
     }
 
@@ -553,7 +555,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         let acceptingChannelAlreadyPresent = false;
         let options: ChannelOptions | undefined;
 
-        let acceptingChannels: Array<Deferred<ChannelClass>>;
+        let acceptingChannels: Deferred<ChannelClass>[];
         if ((acceptingChannels = this.acceptingChannels[offerParameters.name]) !== undefined) {
             while (acceptingChannels.length > 0) {
                 const candidate = acceptingChannels.shift()!;

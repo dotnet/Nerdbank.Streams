@@ -42,7 +42,7 @@ import { MultiplexingStream } from "../MultiplexingStream";
                 proc.once("error", (err) => procExited.resolve(err));
                 proc.once("exit", (code) => procExited.resolve(code));
                 proc.stderr!.pipe(process.stderr);
-                mx = await MultiplexingStream.CreateAsync(FullDuplexStream.Splice(proc.stdout!, proc.stdin!), { protocolMajorVersion: protocolMajorVersion });
+                mx = await MultiplexingStream.CreateAsync(FullDuplexStream.Splice(proc.stdout!, proc.stdin!), { protocolMajorVersion });
             } catch (e) {
                 proc.kill();
                 proc = null;
@@ -110,7 +110,7 @@ import { MultiplexingStream } from "../MultiplexingStream";
         }
 
         async function readLineAsync(readable: NodeJS.ReadableStream): Promise<string | null> {
-            let buffers: Buffer[] = [];
+            const buffers: Buffer[] = [];
 
             while (true) {
                 const segment = await readAsync(readable);
@@ -129,7 +129,7 @@ import { MultiplexingStream } from "../MultiplexingStream";
                 buffers.push(segment);
             }
 
-            if (buffers.length == 0) {
+            if (buffers.length === 0) {
                 return null;
             }
 
