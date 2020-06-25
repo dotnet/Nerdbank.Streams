@@ -137,7 +137,7 @@ Nerdbank.Streams.Substream.DisposeAsync() -> System.Threading.Tasks.Task!
 Nerdbank.Streams.Substream.DisposeAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 Nerdbank.Streams.Substream.IsDisposed.get -> bool
 override Nerdbank.Streams.BufferTextWriter.Dispose(bool disposing) -> void
-override Nerdbank.Streams.BufferTextWriter.Encoding.get -> System.Text.Encoding?
+override Nerdbank.Streams.BufferTextWriter.Encoding.get -> System.Text.Encoding!
 override Nerdbank.Streams.BufferTextWriter.Flush() -> void
 override Nerdbank.Streams.BufferTextWriter.FlushAsync() -> System.Threading.Tasks.Task!
 override Nerdbank.Streams.BufferTextWriter.Write(System.ReadOnlySpan<char> buffer) -> void

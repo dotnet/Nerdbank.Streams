@@ -93,7 +93,7 @@ namespace Nerdbank.Streams
         }
 
         /// <inheritdoc />
-        public override Encoding? Encoding => this.encoding!;
+        public override Encoding Encoding => this.encoding ?? throw new InvalidOperationException("Call " + nameof(this.Initialize) + " first.");
 
         /// <summary>
         /// Gets the number of uninitialized characters remaining in <see cref="charBuffer"/>.

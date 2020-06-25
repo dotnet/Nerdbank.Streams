@@ -21,7 +21,7 @@ public class BufferTextWriterTests : TestBase
     public BufferTextWriterTests(ITestOutputHelper logger)
         : base(logger)
     {
-        Assert.Null(this.bufferTextWriter.Encoding);
+        Assert.Throws<InvalidOperationException>(() => this.bufferTextWriter.Encoding);
         this.bufferTextWriter.Initialize(this.sequence, DefaultEncoding);
     }
 
