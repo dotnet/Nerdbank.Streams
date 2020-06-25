@@ -1,0 +1,258 @@
+﻿#nullable enable
+Nerdbank.Streams.BufferTextWriter
+Nerdbank.Streams.BufferTextWriter.BufferTextWriter() -> void
+Nerdbank.Streams.BufferTextWriter.BufferTextWriter(System.Buffers.IBufferWriter<byte>! bufferWriter, System.Text.Encoding! encoding) -> void
+Nerdbank.Streams.BufferTextWriter.Initialize(System.Buffers.IBufferWriter<byte>! bufferWriter, System.Text.Encoding! encoding) -> void
+Nerdbank.Streams.BufferTextWriter.Reset() -> void
+Nerdbank.Streams.DuplexPipe
+Nerdbank.Streams.DuplexPipe.DuplexPipe(System.IO.Pipelines.PipeReader! input) -> void
+Nerdbank.Streams.DuplexPipe.DuplexPipe(System.IO.Pipelines.PipeReader? input, System.IO.Pipelines.PipeWriter? output) -> void
+Nerdbank.Streams.DuplexPipe.DuplexPipe(System.IO.Pipelines.PipeWriter! output) -> void
+Nerdbank.Streams.DuplexPipe.Input.get -> System.IO.Pipelines.PipeReader!
+Nerdbank.Streams.DuplexPipe.Output.get -> System.IO.Pipelines.PipeWriter!
+Nerdbank.Streams.FullDuplexStream
+Nerdbank.Streams.HalfDuplexStream
+Nerdbank.Streams.HalfDuplexStream.CompleteWriting() -> void
+Nerdbank.Streams.HalfDuplexStream.HalfDuplexStream() -> void
+Nerdbank.Streams.HalfDuplexStream.HalfDuplexStream(int resumeWriterThreshold, int pauseWriterThreshold) -> void
+Nerdbank.Streams.HalfDuplexStream.IsDisposed.get -> bool
+Nerdbank.Streams.MonitoringStream
+Nerdbank.Streams.MonitoringStream.DidFlush -> System.EventHandler?
+Nerdbank.Streams.MonitoringStream.DidRead -> System.EventHandler<System.ArraySegment<byte>>?
+Nerdbank.Streams.MonitoringStream.DidReadByte -> System.EventHandler<int>?
+Nerdbank.Streams.MonitoringStream.DidReadMemory -> System.EventHandler<System.Memory<byte>>?
+Nerdbank.Streams.MonitoringStream.DidReadSpan -> Nerdbank.Streams.MonitoringStream.SpanEventHandler?
+Nerdbank.Streams.MonitoringStream.DidSeek -> System.EventHandler<long>?
+Nerdbank.Streams.MonitoringStream.DidSetLength -> System.EventHandler<long>?
+Nerdbank.Streams.MonitoringStream.DidWrite -> System.EventHandler<System.ArraySegment<byte>>?
+Nerdbank.Streams.MonitoringStream.DidWriteByte -> System.EventHandler<byte>?
+Nerdbank.Streams.MonitoringStream.DidWriteMemory -> System.EventHandler<System.ReadOnlyMemory<byte>>?
+Nerdbank.Streams.MonitoringStream.DidWriteSpan -> Nerdbank.Streams.MonitoringStream.ReadOnlySpanEventHandler?
+Nerdbank.Streams.MonitoringStream.Disposed -> System.EventHandler?
+Nerdbank.Streams.MonitoringStream.EndOfStream -> System.EventHandler?
+Nerdbank.Streams.MonitoringStream.MonitoringStream(System.IO.Stream! inner) -> void
+Nerdbank.Streams.MonitoringStream.ReadOnlySpanEventHandler
+Nerdbank.Streams.MonitoringStream.SpanEventHandler
+Nerdbank.Streams.MonitoringStream.WillRead -> System.EventHandler<System.ArraySegment<byte>>?
+Nerdbank.Streams.MonitoringStream.WillReadByte -> System.EventHandler?
+Nerdbank.Streams.MonitoringStream.WillReadMemory -> System.EventHandler<System.Memory<byte>>?
+Nerdbank.Streams.MonitoringStream.WillReadSpan -> Nerdbank.Streams.MonitoringStream.SpanEventHandler?
+Nerdbank.Streams.MonitoringStream.WillSetLength -> System.EventHandler<long>?
+Nerdbank.Streams.MonitoringStream.WillWrite -> System.EventHandler<System.ArraySegment<byte>>?
+Nerdbank.Streams.MonitoringStream.WillWriteByte -> System.EventHandler<byte>?
+Nerdbank.Streams.MonitoringStream.WillWriteMemory -> System.EventHandler<System.ReadOnlyMemory<byte>>?
+Nerdbank.Streams.MonitoringStream.WillWriteSpan -> Nerdbank.Streams.MonitoringStream.ReadOnlySpanEventHandler?
+Nerdbank.Streams.MultiplexingProtocolException
+Nerdbank.Streams.MultiplexingProtocolException.MultiplexingProtocolException() -> void
+Nerdbank.Streams.MultiplexingProtocolException.MultiplexingProtocolException(System.Runtime.Serialization.SerializationInfo! info, System.Runtime.Serialization.StreamingContext context) -> void
+Nerdbank.Streams.MultiplexingProtocolException.MultiplexingProtocolException(string? message) -> void
+Nerdbank.Streams.MultiplexingProtocolException.MultiplexingProtocolException(string? message, System.Exception? inner) -> void
+Nerdbank.Streams.MultiplexingStream
+Nerdbank.Streams.MultiplexingStream.AcceptChannel(int id, Nerdbank.Streams.MultiplexingStream.ChannelOptions? options = null) -> Nerdbank.Streams.MultiplexingStream.Channel!
+Nerdbank.Streams.MultiplexingStream.AcceptChannelAsync(string! name, Nerdbank.Streams.MultiplexingStream.ChannelOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Nerdbank.Streams.MultiplexingStream.Channel!>!
+Nerdbank.Streams.MultiplexingStream.AcceptChannelAsync(string! name, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Nerdbank.Streams.MultiplexingStream.Channel!>!
+Nerdbank.Streams.MultiplexingStream.Channel
+Nerdbank.Streams.MultiplexingStream.Channel.Acceptance.get -> System.Threading.Tasks.Task!
+Nerdbank.Streams.MultiplexingStream.Channel.Completion.get -> System.Threading.Tasks.Task!
+Nerdbank.Streams.MultiplexingStream.Channel.Dispose() -> void
+Nerdbank.Streams.MultiplexingStream.Channel.Id.get -> int
+Nerdbank.Streams.MultiplexingStream.Channel.Input.get -> System.IO.Pipelines.PipeReader!
+Nerdbank.Streams.MultiplexingStream.Channel.IsDisposed.get -> bool
+Nerdbank.Streams.MultiplexingStream.Channel.MultiplexingStream.get -> Nerdbank.Streams.MultiplexingStream!
+Nerdbank.Streams.MultiplexingStream.Channel.Output.get -> System.IO.Pipelines.PipeWriter!
+Nerdbank.Streams.MultiplexingStream.Channel.TraceSource.get -> System.Diagnostics.TraceSource?
+Nerdbank.Streams.MultiplexingStream.ChannelOfferEventArgs
+Nerdbank.Streams.MultiplexingStream.ChannelOfferEventArgs.Id.get -> int
+Nerdbank.Streams.MultiplexingStream.ChannelOfferEventArgs.IsAccepted.get -> bool
+Nerdbank.Streams.MultiplexingStream.ChannelOfferEventArgs.Name.get -> string!
+Nerdbank.Streams.MultiplexingStream.ChannelOffered -> System.EventHandler<Nerdbank.Streams.MultiplexingStream.ChannelOfferEventArgs!>?
+Nerdbank.Streams.MultiplexingStream.ChannelOptions
+Nerdbank.Streams.MultiplexingStream.ChannelOptions.ChannelOptions() -> void
+Nerdbank.Streams.MultiplexingStream.ChannelOptions.ChannelReceivingWindowSize.get -> long?
+Nerdbank.Streams.MultiplexingStream.ChannelOptions.ChannelReceivingWindowSize.set -> void
+Nerdbank.Streams.MultiplexingStream.ChannelOptions.ExistingPipe.get -> System.IO.Pipelines.IDuplexPipe?
+Nerdbank.Streams.MultiplexingStream.ChannelOptions.ExistingPipe.set -> void
+Nerdbank.Streams.MultiplexingStream.ChannelOptions.InputPipeOptions.get -> System.IO.Pipelines.PipeOptions?
+Nerdbank.Streams.MultiplexingStream.ChannelOptions.InputPipeOptions.set -> void
+Nerdbank.Streams.MultiplexingStream.ChannelOptions.TraceSource.get -> System.Diagnostics.TraceSource?
+Nerdbank.Streams.MultiplexingStream.ChannelOptions.TraceSource.set -> void
+Nerdbank.Streams.MultiplexingStream.Completion.get -> System.Threading.Tasks.Task!
+Nerdbank.Streams.MultiplexingStream.CreateChannel(Nerdbank.Streams.MultiplexingStream.ChannelOptions? options = null) -> Nerdbank.Streams.MultiplexingStream.Channel!
+Nerdbank.Streams.MultiplexingStream.DefaultChannelReceivingWindowSize.get -> long
+Nerdbank.Streams.MultiplexingStream.Dispose() -> void
+Nerdbank.Streams.MultiplexingStream.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Nerdbank.Streams.MultiplexingStream.OfferChannelAsync(string! name, Nerdbank.Streams.MultiplexingStream.ChannelOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Nerdbank.Streams.MultiplexingStream.Channel!>!
+Nerdbank.Streams.MultiplexingStream.OfferChannelAsync(string! name, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Nerdbank.Streams.MultiplexingStream.Channel!>!
+Nerdbank.Streams.MultiplexingStream.Options
+Nerdbank.Streams.MultiplexingStream.Options.DefaultChannelReceivingWindowSize.get -> long
+Nerdbank.Streams.MultiplexingStream.Options.DefaultChannelReceivingWindowSize.set -> void
+Nerdbank.Streams.MultiplexingStream.Options.DefaultChannelTraceSourceFactory.get -> System.Func<int, string!, System.Diagnostics.TraceSource?>?
+Nerdbank.Streams.MultiplexingStream.Options.DefaultChannelTraceSourceFactory.set -> void
+Nerdbank.Streams.MultiplexingStream.Options.Options() -> void
+Nerdbank.Streams.MultiplexingStream.Options.ProtocolMajorVersion.get -> int
+Nerdbank.Streams.MultiplexingStream.Options.ProtocolMajorVersion.set -> void
+Nerdbank.Streams.MultiplexingStream.Options.TraceSource.get -> System.Diagnostics.TraceSource!
+Nerdbank.Streams.MultiplexingStream.Options.TraceSource.set -> void
+Nerdbank.Streams.MultiplexingStream.RejectChannel(int id) -> void
+Nerdbank.Streams.MultiplexingStream.TraceSource.get -> System.Diagnostics.TraceSource!
+Nerdbank.Streams.PipeExtensions
+Nerdbank.Streams.PrefixingBufferWriter<T>
+Nerdbank.Streams.PrefixingBufferWriter<T>.Advance(int count) -> void
+Nerdbank.Streams.PrefixingBufferWriter<T>.Commit() -> void
+Nerdbank.Streams.PrefixingBufferWriter<T>.GetMemory(int sizeHint = 0) -> System.Memory<T>
+Nerdbank.Streams.PrefixingBufferWriter<T>.GetSpan(int sizeHint = 0) -> System.Span<T>
+Nerdbank.Streams.PrefixingBufferWriter<T>.Length.get -> long
+Nerdbank.Streams.PrefixingBufferWriter<T>.Prefix.get -> System.Memory<T>
+Nerdbank.Streams.PrefixingBufferWriter<T>.PrefixingBufferWriter(System.Buffers.IBufferWriter<T>! innerWriter, int prefixSize, int payloadSizeHint = 0, System.Buffers.MemoryPool<T>? memoryPool = null) -> void
+Nerdbank.Streams.Sequence<T>
+Nerdbank.Streams.Sequence<T>.Advance(int count) -> void
+Nerdbank.Streams.Sequence<T>.AdvanceTo(System.SequencePosition position) -> void
+Nerdbank.Streams.Sequence<T>.Append(System.ReadOnlyMemory<T> memory) -> void
+Nerdbank.Streams.Sequence<T>.AsReadOnlySequence.get -> System.Buffers.ReadOnlySequence<T>
+Nerdbank.Streams.Sequence<T>.AutoIncreaseMinimumSpanLength.get -> bool
+Nerdbank.Streams.Sequence<T>.AutoIncreaseMinimumSpanLength.set -> void
+Nerdbank.Streams.Sequence<T>.Dispose() -> void
+Nerdbank.Streams.Sequence<T>.GetMemory(int sizeHint) -> System.Memory<T>
+Nerdbank.Streams.Sequence<T>.GetSpan(int sizeHint) -> System.Span<T>
+Nerdbank.Streams.Sequence<T>.Length.get -> long
+Nerdbank.Streams.Sequence<T>.MinimumSpanLength.get -> int
+Nerdbank.Streams.Sequence<T>.MinimumSpanLength.set -> void
+Nerdbank.Streams.Sequence<T>.Reset() -> void
+Nerdbank.Streams.Sequence<T>.Sequence() -> void
+Nerdbank.Streams.Sequence<T>.Sequence(System.Buffers.ArrayPool<T>! arrayPool) -> void
+Nerdbank.Streams.Sequence<T>.Sequence(System.Buffers.MemoryPool<T>! memoryPool) -> void
+Nerdbank.Streams.SequenceTextReader
+Nerdbank.Streams.SequenceTextReader.Initialize(System.Buffers.ReadOnlySequence<byte> sequence, System.Text.Encoding! encoding) -> void
+Nerdbank.Streams.SequenceTextReader.Reset() -> void
+Nerdbank.Streams.SequenceTextReader.SequenceTextReader() -> void
+Nerdbank.Streams.SequenceTextReader.SequenceTextReader(System.Buffers.ReadOnlySequence<byte> sequence, System.Text.Encoding! encoding) -> void
+Nerdbank.Streams.SimplexStream
+Nerdbank.Streams.SimplexStream.CompleteWriting() -> void
+Nerdbank.Streams.SimplexStream.IsDisposed.get -> bool
+Nerdbank.Streams.SimplexStream.SimplexStream() -> void
+Nerdbank.Streams.SimplexStream.SimplexStream(int resumeWriterThreshold, int pauseWriterThreshold) -> void
+Nerdbank.Streams.StreamExtensions
+Nerdbank.Streams.Substream
+Nerdbank.Streams.Substream.DisposeAsync() -> System.Threading.Tasks.Task!
+Nerdbank.Streams.Substream.DisposeAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Nerdbank.Streams.Substream.IsDisposed.get -> bool
+override Nerdbank.Streams.BufferTextWriter.Dispose(bool disposing) -> void
+override Nerdbank.Streams.BufferTextWriter.Encoding.get -> System.Text.Encoding?
+override Nerdbank.Streams.BufferTextWriter.Flush() -> void
+override Nerdbank.Streams.BufferTextWriter.FlushAsync() -> System.Threading.Tasks.Task!
+override Nerdbank.Streams.BufferTextWriter.Write(System.ReadOnlySpan<char> buffer) -> void
+override Nerdbank.Streams.BufferTextWriter.Write(char value) -> void
+override Nerdbank.Streams.BufferTextWriter.Write(char[]! buffer, int index, int count) -> void
+override Nerdbank.Streams.BufferTextWriter.Write(string? value) -> void
+override Nerdbank.Streams.BufferTextWriter.WriteLine(System.ReadOnlySpan<char> buffer) -> void
+override Nerdbank.Streams.HalfDuplexStream.CanRead.get -> bool
+override Nerdbank.Streams.HalfDuplexStream.CanSeek.get -> bool
+override Nerdbank.Streams.HalfDuplexStream.CanWrite.get -> bool
+override Nerdbank.Streams.HalfDuplexStream.Dispose(bool disposing) -> void
+override Nerdbank.Streams.HalfDuplexStream.Flush() -> void
+override Nerdbank.Streams.HalfDuplexStream.FlushAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+override Nerdbank.Streams.HalfDuplexStream.Length.get -> long
+override Nerdbank.Streams.HalfDuplexStream.Position.get -> long
+override Nerdbank.Streams.HalfDuplexStream.Position.set -> void
+override Nerdbank.Streams.HalfDuplexStream.Read(byte[]! buffer, int offset, int count) -> int
+override Nerdbank.Streams.HalfDuplexStream.ReadAsync(byte[]! buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<int>!
+override Nerdbank.Streams.HalfDuplexStream.Seek(long offset, System.IO.SeekOrigin origin) -> long
+override Nerdbank.Streams.HalfDuplexStream.SetLength(long value) -> void
+override Nerdbank.Streams.HalfDuplexStream.Write(byte[]! buffer, int offset, int count) -> void
+override Nerdbank.Streams.HalfDuplexStream.WriteAsync(byte[]! buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+override Nerdbank.Streams.MonitoringStream.CanRead.get -> bool
+override Nerdbank.Streams.MonitoringStream.CanSeek.get -> bool
+override Nerdbank.Streams.MonitoringStream.CanTimeout.get -> bool
+override Nerdbank.Streams.MonitoringStream.CanWrite.get -> bool
+override Nerdbank.Streams.MonitoringStream.Dispose(bool disposing) -> void
+override Nerdbank.Streams.MonitoringStream.Flush() -> void
+override Nerdbank.Streams.MonitoringStream.FlushAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+override Nerdbank.Streams.MonitoringStream.Length.get -> long
+override Nerdbank.Streams.MonitoringStream.Position.get -> long
+override Nerdbank.Streams.MonitoringStream.Position.set -> void
+override Nerdbank.Streams.MonitoringStream.Read(System.Span<byte> buffer) -> int
+override Nerdbank.Streams.MonitoringStream.Read(byte[]! buffer, int offset, int count) -> int
+override Nerdbank.Streams.MonitoringStream.ReadAsync(System.Memory<byte> buffer, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<int>
+override Nerdbank.Streams.MonitoringStream.ReadAsync(byte[]! buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<int>!
+override Nerdbank.Streams.MonitoringStream.ReadByte() -> int
+override Nerdbank.Streams.MonitoringStream.ReadTimeout.get -> int
+override Nerdbank.Streams.MonitoringStream.ReadTimeout.set -> void
+override Nerdbank.Streams.MonitoringStream.Seek(long offset, System.IO.SeekOrigin origin) -> long
+override Nerdbank.Streams.MonitoringStream.SetLength(long value) -> void
+override Nerdbank.Streams.MonitoringStream.Write(System.ReadOnlySpan<byte> buffer) -> void
+override Nerdbank.Streams.MonitoringStream.Write(byte[]! buffer, int offset, int count) -> void
+override Nerdbank.Streams.MonitoringStream.WriteAsync(System.ReadOnlyMemory<byte> buffer, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+override Nerdbank.Streams.MonitoringStream.WriteAsync(byte[]! buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+override Nerdbank.Streams.MonitoringStream.WriteByte(byte value) -> void
+override Nerdbank.Streams.MonitoringStream.WriteTimeout.get -> int
+override Nerdbank.Streams.MonitoringStream.WriteTimeout.set -> void
+override Nerdbank.Streams.SequenceTextReader.Peek() -> int
+override Nerdbank.Streams.SequenceTextReader.Read() -> int
+override Nerdbank.Streams.SequenceTextReader.Read(System.Span<char> buffer) -> int
+override Nerdbank.Streams.SequenceTextReader.Read(char[]! buffer, int index, int count) -> int
+override Nerdbank.Streams.SequenceTextReader.ReadAsync(System.Memory<char> buffer, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<int>
+override Nerdbank.Streams.SequenceTextReader.ReadAsync(char[]! buffer, int index, int count) -> System.Threading.Tasks.Task<int>!
+override Nerdbank.Streams.SequenceTextReader.ReadBlockAsync(System.Memory<char> buffer, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<int>
+override Nerdbank.Streams.SequenceTextReader.ReadBlockAsync(char[]! buffer, int index, int count) -> System.Threading.Tasks.Task<int>!
+override Nerdbank.Streams.SequenceTextReader.ReadLineAsync() -> System.Threading.Tasks.Task<string!>!
+override Nerdbank.Streams.SequenceTextReader.ReadToEndAsync() -> System.Threading.Tasks.Task<string!>!
+override Nerdbank.Streams.SimplexStream.CanRead.get -> bool
+override Nerdbank.Streams.SimplexStream.CanSeek.get -> bool
+override Nerdbank.Streams.SimplexStream.CanWrite.get -> bool
+override Nerdbank.Streams.SimplexStream.Dispose(bool disposing) -> void
+override Nerdbank.Streams.SimplexStream.Flush() -> void
+override Nerdbank.Streams.SimplexStream.FlushAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+override Nerdbank.Streams.SimplexStream.Length.get -> long
+override Nerdbank.Streams.SimplexStream.Position.get -> long
+override Nerdbank.Streams.SimplexStream.Position.set -> void
+override Nerdbank.Streams.SimplexStream.Read(byte[]! buffer, int offset, int count) -> int
+override Nerdbank.Streams.SimplexStream.ReadAsync(byte[]! buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<int>!
+override Nerdbank.Streams.SimplexStream.Seek(long offset, System.IO.SeekOrigin origin) -> long
+override Nerdbank.Streams.SimplexStream.SetLength(long value) -> void
+override Nerdbank.Streams.SimplexStream.Write(byte[]! buffer, int offset, int count) -> void
+override Nerdbank.Streams.SimplexStream.WriteAsync(byte[]! buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+override Nerdbank.Streams.Substream.CanRead.get -> bool
+override Nerdbank.Streams.Substream.CanSeek.get -> bool
+override Nerdbank.Streams.Substream.CanTimeout.get -> bool
+override Nerdbank.Streams.Substream.CanWrite.get -> bool
+override Nerdbank.Streams.Substream.Flush() -> void
+override Nerdbank.Streams.Substream.FlushAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+override Nerdbank.Streams.Substream.Length.get -> long
+override Nerdbank.Streams.Substream.Position.get -> long
+override Nerdbank.Streams.Substream.Position.set -> void
+override Nerdbank.Streams.Substream.Read(byte[]! buffer, int offset, int count) -> int
+override Nerdbank.Streams.Substream.ReadAsync(byte[]! buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<int>!
+override Nerdbank.Streams.Substream.Seek(long offset, System.IO.SeekOrigin origin) -> long
+override Nerdbank.Streams.Substream.SetLength(long value) -> void
+override Nerdbank.Streams.Substream.Write(byte[]! buffer, int offset, int count) -> void
+override Nerdbank.Streams.Substream.WriteAsync(byte[]! buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+static Nerdbank.Streams.FullDuplexStream.CreatePair(System.IO.Pipelines.PipeOptions? pipeOptions = null) -> (System.IO.Stream!, System.IO.Stream!)
+static Nerdbank.Streams.FullDuplexStream.CreatePipePair(System.IO.Pipelines.PipeOptions? pipeOptions = null) -> (System.IO.Pipelines.IDuplexPipe!, System.IO.Pipelines.IDuplexPipe!)
+static Nerdbank.Streams.FullDuplexStream.Splice(System.IO.Stream! readableStream, System.IO.Stream! writableStream) -> System.IO.Stream!
+static Nerdbank.Streams.MultiplexingStream.CreateAsync(System.IO.Stream! stream, Nerdbank.Streams.MultiplexingStream.Options? options, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Nerdbank.Streams.MultiplexingStream!>!
+static Nerdbank.Streams.MultiplexingStream.CreateAsync(System.IO.Stream! stream, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Nerdbank.Streams.MultiplexingStream!>!
+static Nerdbank.Streams.PipeExtensions.AsStream(this System.IO.Pipelines.IDuplexPipe! pipe) -> System.IO.Stream!
+static Nerdbank.Streams.PipeExtensions.AsStream(this System.IO.Pipelines.IDuplexPipe! pipe, bool ownsPipe) -> System.IO.Stream!
+static Nerdbank.Streams.PipeExtensions.AsStream(this System.IO.Pipelines.PipeReader! pipeReader) -> System.IO.Stream!
+static Nerdbank.Streams.PipeExtensions.AsStream(this System.IO.Pipelines.PipeWriter! pipeWriter) -> System.IO.Stream!
+static Nerdbank.Streams.PipeExtensions.OnCompleted(this System.IO.Pipelines.PipeReader! reader, System.Action<System.Exception?, object?>! callback, object? state = null) -> System.IO.Pipelines.PipeReader!
+static Nerdbank.Streams.PipeExtensions.OnCompleted(this System.IO.Pipelines.PipeWriter! reader, System.Action<System.Exception?, object?>! callback, object? state = null) -> System.IO.Pipelines.PipeWriter!
+static Nerdbank.Streams.PipeExtensions.ReadSlice(this System.IO.Pipelines.PipeReader! reader, long length) -> System.IO.Pipelines.PipeReader!
+static Nerdbank.Streams.PipeExtensions.UsePipe(this System.IO.Stream! stream, bool allowUnwrap, int sizeHint = 0, System.IO.Pipelines.PipeOptions? pipeOptions = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.IO.Pipelines.IDuplexPipe!
+static Nerdbank.Streams.PipeExtensions.UsePipe(this System.IO.Stream! stream, int sizeHint = 0, System.IO.Pipelines.PipeOptions? pipeOptions = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.IO.Pipelines.IDuplexPipe!
+static Nerdbank.Streams.PipeExtensions.UsePipe(this System.Net.WebSockets.WebSocket! webSocket, int sizeHint = 0, System.IO.Pipelines.PipeOptions? pipeOptions = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.IO.Pipelines.IDuplexPipe!
+static Nerdbank.Streams.PipeExtensions.UsePipeReader(this System.IO.Stream! stream, int sizeHint = 0, System.IO.Pipelines.PipeOptions? pipeOptions = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.IO.Pipelines.PipeReader!
+static Nerdbank.Streams.PipeExtensions.UsePipeReader(this System.Net.WebSockets.WebSocket! webSocket, int sizeHint = 0, System.IO.Pipelines.PipeOptions? pipeOptions = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.IO.Pipelines.PipeReader!
+static Nerdbank.Streams.PipeExtensions.UsePipeWriter(this System.IO.Stream! stream, System.IO.Pipelines.PipeOptions? pipeOptions = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.IO.Pipelines.PipeWriter!
+static Nerdbank.Streams.PipeExtensions.UsePipeWriter(this System.Net.WebSockets.WebSocket! webSocket, System.IO.Pipelines.PipeOptions? pipeOptions = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.IO.Pipelines.PipeWriter!
+static Nerdbank.Streams.PipeExtensions.UseStrictPipeReader(this System.IO.Stream! stream, int sizeHint = 4096) -> System.IO.Pipelines.PipeReader!
+static Nerdbank.Streams.PipeExtensions.UseStrictPipeWriter(this System.IO.Stream! stream) -> System.IO.Pipelines.PipeWriter!
+static Nerdbank.Streams.Sequence<T>.implicit operator System.Buffers.ReadOnlySequence<T>(Nerdbank.Streams.Sequence<T>! sequence) -> System.Buffers.ReadOnlySequence<T>
+static Nerdbank.Streams.StreamExtensions.AsStream(this System.Buffers.IBufferWriter<byte>! writer) -> System.IO.Stream!
+static Nerdbank.Streams.StreamExtensions.AsStream(this System.Buffers.ReadOnlySequence<byte> readOnlySequence) -> System.IO.Stream!
+static Nerdbank.Streams.StreamExtensions.AsStream(this System.Net.WebSockets.WebSocket! webSocket) -> System.IO.Stream!
+static Nerdbank.Streams.StreamExtensions.ReadBlockAsync(this System.IO.Stream! stream, System.Memory<byte> buffer, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<int>
+static Nerdbank.Streams.StreamExtensions.ReadBlockOrThrowAsync(this System.IO.Stream! stream, System.Memory<byte> buffer, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+static Nerdbank.Streams.StreamExtensions.ReadSlice(this System.IO.Stream! stream, long length) -> System.IO.Stream!
+static Nerdbank.Streams.StreamExtensions.ReadSubstream(this System.IO.Stream! stream) -> System.IO.Stream!
+static Nerdbank.Streams.StreamExtensions.WriteSubstream(this System.IO.Stream! stream, int minimumBufferSize = 4096) -> Nerdbank.Streams.Substream!
