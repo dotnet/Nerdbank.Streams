@@ -346,7 +346,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         this.mx2.TraceSource.Switch.Level = SourceLevels.Error;
 
         const int channels = 10;
-        const int iterations = 1000;
+        const int iterations = 500;
         await Task.WhenAll(Enumerable.Range(1, channels).Select(i => CoordinateChatAsync()));
 
         async Task CoordinateChatAsync()
