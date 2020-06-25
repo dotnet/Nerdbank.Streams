@@ -161,7 +161,7 @@ namespace Nerdbank.Streams
             /// reject it with <see cref="RejectChannel(int)"/>.
             /// </remarks>
             [Obsolete("Use " + nameof(QualifiedId) + " instead.")]
-            public int Id => this.channelId.Id;
+            public int Id => checked((int)this.channelId.Id);
 
             /// <summary>
             /// Gets the unique ID for this channel.

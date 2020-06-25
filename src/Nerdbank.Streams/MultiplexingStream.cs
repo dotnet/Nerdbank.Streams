@@ -108,7 +108,7 @@ namespace Nerdbank.Streams
         /// The last number assigned to a channel.
         /// Each use of this should increment by two, if <see cref="isOdd"/> has a value.
         /// </summary>
-        private int lastOfferedChannelId;
+        private long lastOfferedChannelId;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MultiplexingStream"/> class.
@@ -130,7 +130,7 @@ namespace Nerdbank.Streams
             this.DefaultChannelTraceSourceFactory =
                 options.DefaultChannelTraceSourceFactoryWithQualifier
 #pragma warning disable CS0618 // Type or member is obsolete
-                ?? (options.DefaultChannelTraceSourceFactory is { } fac ? new Func<QualifiedChannelId, string, TraceSource?>((id, name) => fac(id.Id, name)) : null);
+                ?? (options.DefaultChannelTraceSourceFactory is { } fac ? new Func<QualifiedChannelId, string, TraceSource?>((id, name) => fac(checked((int)id.Id), name)) : null);
 #pragma warning restore CS0618 // Type or member is obsolete
 
             this.DefaultChannelReceivingWindowSize = options.DefaultChannelReceivingWindowSize;
@@ -320,6 +320,9 @@ namespace Nerdbank.Streams
             return channel;
         }
 
+        /// <inheritdoc cref="AcceptChannel(long, ChannelOptions?)"/>
+        public Channel AcceptChannel(int id, ChannelOptions? options = default) => this.AcceptChannel((long)id, options);
+
         /// <summary>
         /// Accepts a channel with a specific ID.
         /// </summary>
@@ -333,7 +336,9 @@ namespace Nerdbank.Streams
         /// for a channel offer if a matching one has not been made yet, this method only accepts an offer
         /// for a channel that has already been made.
         /// </remarks>
-        public Channel AcceptChannel(int id, ChannelOptions? options = default)
+#pragma warning disable RS0026 // Do not add multiple public overloads with optional parameters
+        public Channel AcceptChannel(long id, ChannelOptions? options = default)
+#pragma warning restore RS0026 // Do not add multiple public overloads with optional parameters
         {
             options = options ?? DefaultChannelOptions;
             Channel? channel;
@@ -351,12 +356,15 @@ namespace Nerdbank.Streams
             return channel;
         }
 
+        /// <inheritdoc cref="RejectChannel(long)"/>
+        public void RejectChannel(int id) => this.RejectChannel((long)id);
+
         /// <summary>
         /// Rejects an offer for the channel with a specified ID.
         /// </summary>
         /// <param name="id">The ID of the channel whose offer should be rejected.</param>
         /// <exception cref="InvalidOperationException">Thrown if the channel was already accepted.</exception>
-        public void RejectChannel(int id)
+        public void RejectChannel(long id)
         {
             Channel? channel;
             var qualifiedId = new QualifiedChannelId(id, offeredLocally: false);
@@ -915,7 +923,7 @@ namespace Nerdbank.Streams
                 this.AcceptChannelOrThrow(channel, options);
             }
 
-            var args = new ChannelOfferEventArgs(channelId.Id, channel.Name, acceptingChannelAlreadyPresent);
+            var args = new ChannelOfferEventArgs(channelId, channel.Name, acceptingChannelAlreadyPresent);
             this.OnChannelOffered(args);
         }
 
@@ -1067,7 +1075,7 @@ namespace Nerdbank.Streams
         /// <remarks>
         /// In protocol major versions 1-2, the channel numbers increase by two in order to maintain odd or even numbers, since each party is allowed to create only one or the other.
         /// </remarks>
-        private int GetUnusedChannelId() => Interlocked.Add(ref this.lastOfferedChannelId, this.isOdd.HasValue ? 2 : 1);
+        private long GetUnusedChannelId() => Interlocked.Add(ref this.lastOfferedChannelId, this.isOdd.HasValue ? 2 : 1);
 
         private void OfferChannelCanceled(object state)
         {

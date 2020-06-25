@@ -740,7 +740,8 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
         var channel = this.mx1.CreateChannel();
         var mx2EventArgs = await mx2EventArgsSource.Task.WithCancellation(this.TimeoutToken);
-        Assert.Equal(channel.QualifiedId.Id, mx2EventArgs.Id);
+        Assert.Equal(channel.QualifiedId.Id, mx2EventArgs.QualifiedId.Id);
+        Assert.False(mx2EventArgs.QualifiedId.OfferedLocally);
         Assert.Equal(string.Empty, mx2EventArgs.Name);
         Assert.False(mx2EventArgs.IsAccepted);
 
@@ -778,7 +779,8 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         }
 
         var offeredChannel = await channelOfferTask;
-        Assert.Equal(offeredChannel.QualifiedId.Id, mx2EventArgs.Id);
+        Assert.Equal(offeredChannel.QualifiedId.Id, mx2EventArgs.QualifiedId.Id);
+        Assert.False(mx2EventArgs.QualifiedId.OfferedLocally);
         Assert.Equal(channelName, mx2EventArgs.Name);
         Assert.Equal(alreadyAccepted, mx2EventArgs.IsAccepted);
 

@@ -22,7 +22,7 @@ namespace Nerdbank.Streams
             /// </summary>
             /// <param name="id">The channel id.</param>
             /// <param name="offeredLocally">a value indicating whether <see cref="Id"/> is referring to a channel that was originally offered by the local party.</param>
-            public QualifiedChannelId(int id, bool offeredLocally)
+            public QualifiedChannelId(long id, bool offeredLocally)
             {
                 this.Id = id;
                 this.OfferedLocally = offeredLocally;
@@ -31,7 +31,7 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Gets the channel ID.
             /// </summary>
-            public int Id { get; }
+            public long Id { get; }
 
             /// <summary>
             /// Gets a value indicating whether <see cref="Id"/> is referring to a channel that was originally offered by the local party.
@@ -47,7 +47,7 @@ namespace Nerdbank.Streams
             public override bool Equals(object? obj) => obj is QualifiedChannelId other && this.Equals(other);
 
             /// <inheritdoc/>
-            public override int GetHashCode() => this.Id * (this.OfferedLocally ? 1 : -1);
+            public override int GetHashCode() => unchecked((int)this.Id) * (this.OfferedLocally ? 1 : -1);
 
             /// <inheritdoc/>
             public override string ToString() => $"{this.Id} ({(this.OfferedLocally ? "local" : "remote")})";

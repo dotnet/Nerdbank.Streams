@@ -1,11 +1,14 @@
-﻿Nerdbank.Streams.MultiplexingStream.Channel.QualifiedId.get -> Nerdbank.Streams.MultiplexingStream.QualifiedChannelId
+﻿Nerdbank.Streams.MultiplexingStream.AcceptChannel(long id, Nerdbank.Streams.MultiplexingStream.ChannelOptions? options = null) -> Nerdbank.Streams.MultiplexingStream.Channel!
+Nerdbank.Streams.MultiplexingStream.Channel.QualifiedId.get -> Nerdbank.Streams.MultiplexingStream.QualifiedChannelId
+Nerdbank.Streams.MultiplexingStream.ChannelOfferEventArgs.QualifiedId.get -> Nerdbank.Streams.MultiplexingStream.QualifiedChannelId
 Nerdbank.Streams.MultiplexingStream.Options.DefaultChannelTraceSourceFactoryWithQualifier.get -> System.Func<Nerdbank.Streams.MultiplexingStream.QualifiedChannelId, string!, System.Diagnostics.TraceSource?>?
 Nerdbank.Streams.MultiplexingStream.Options.DefaultChannelTraceSourceFactoryWithQualifier.set -> void
 Nerdbank.Streams.MultiplexingStream.QualifiedChannelId
 Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.Equals(Nerdbank.Streams.MultiplexingStream.QualifiedChannelId other) -> bool
-Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.Id.get -> int
+Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.Id.get -> long
 Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.OfferedLocally.get -> bool
-Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.QualifiedChannelId(int id, bool offeredLocally) -> void
+Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.QualifiedChannelId(long id, bool offeredLocally) -> void
+Nerdbank.Streams.MultiplexingStream.RejectChannel(long id) -> void
 override Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.Equals(object? obj) -> bool
 override Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.GetHashCode() -> int
 override Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.ToString() -> string!

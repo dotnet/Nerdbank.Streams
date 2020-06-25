@@ -156,7 +156,7 @@ namespace Nerdbank.Streams
             {
                 var span = this.PipeWriter.GetSpan(checked(HeaderLength + (int)payload.Length));
                 span[0] = (byte)header.Code;
-                Utilities.Write(span.Slice(1, 4), header.ChannelId ?? 0);
+                Utilities.Write(span.Slice(1, 4), checked((int)(header.ChannelId ?? 0)));
                 Utilities.Write(span.Slice(5, 2), (ushort)payload.Length);
 
                 span = span.Slice(HeaderLength);
@@ -314,7 +314,7 @@ namespace Nerdbank.Streams
                 writer.Write((int)header.Code);
                 if (elementCount > 1)
                 {
-                    if (header.ChannelId is int channelId)
+                    if (header.ChannelId is long channelId)
                     {
                         writer.Write(channelId);
                     }
@@ -450,7 +450,7 @@ namespace Nerdbank.Streams
                     }
                     else
                     {
-                        header.ChannelId = reader.ReadInt32();
+                        header.ChannelId = reader.ReadInt64();
                     }
 
                     if (headerElementCount > 2)
@@ -537,7 +537,7 @@ namespace Nerdbank.Streams
                 writer.Write((int)header.Code);
                 if (elementCount > 1)
                 {
-                    if (header.ChannelId is int channelId)
+                    if (header.ChannelId is long channelId)
                     {
                         writer.Write(channelId);
                         Assumes.True(header.ChannelOfferedBySender.HasValue);
@@ -577,7 +577,7 @@ namespace Nerdbank.Streams
                             throw new MultiplexingProtocolException("Not enough elements in frame header.");
                         }
 
-                        header.ChannelId = reader.ReadInt32();
+                        header.ChannelId = reader.ReadInt64();
                         header.ChannelOfferedBySender = reader.ReadBoolean();
                     }
 
