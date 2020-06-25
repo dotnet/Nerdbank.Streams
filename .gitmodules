@@ -1,5 +1,5 @@
 [submodule "MessagePack"]
 	path = ext/MessagePack
 	url = https://github.com/AArnott/MessagePack-CSharp.git
-	branch = nerdbank.streams
+	branch = NerdbankStreamsConsumption
 	shallow = true
