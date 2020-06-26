@@ -34,7 +34,7 @@ namespace Nerdbank.Streams.Interop.Tests
                     TraceSource = { Switch = { Level = SourceLevels.Verbose } },
                     ProtocolMajorVersion = protocolMajorVersion,
                     DefaultChannelReceivingWindowSize = 64,
-                    DefaultChannelTraceSourceFactory = (id, name) => new TraceSource($"Channel {id}") { Switch = { Level = SourceLevels.Verbose } },
+                    DefaultChannelTraceSourceFactoryWithQualifier = (id, name) => new TraceSource($"Channel {id}") { Switch = { Level = SourceLevels.Verbose } },
                 });
             var program = new Program(mx);
             await program.RunAsync();

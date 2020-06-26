@@ -31,9 +31,20 @@ namespace Nerdbank.Streams
 
             public virtual ValueTask DisposeAsync() => this.PipeWriter.CompleteAsync();
 
-            internal abstract object WriteHandshake();
+            /// <summary>
+            /// Writes the initial handshake.
+            /// </summary>
+            /// <returns>An object that is passed to <see cref="ReadHandshakeAsync(object, Options, CancellationToken)"/> as the first parameter.</returns>
+            internal abstract object? WriteHandshake();
 
-            internal abstract Task<(bool IsOdd, Version ProtocolVersion)> ReadHandshakeAsync(object writeHandshakeResult, Options options, CancellationToken cancellationToken);
+            /// <summary>
+            /// Reads the initial handshake.
+            /// </summary>
+            /// <param name="writeHandshakeResult">The result of the <see cref="WriteHandshake"/> call.</param>
+            /// <param name="options">Configuration settings that should be shared with the remote party.</param>
+            /// <param name="cancellationToken">A cancellation token.</param>
+            /// <returns>The result of the handshake.</returns>
+            internal abstract Task<(bool? IsOdd, Version ProtocolVersion)> ReadHandshakeAsync(object? writeHandshakeResult, Options options, CancellationToken cancellationToken);
 
             internal abstract void WriteFrame(FrameHeader header, ReadOnlySequence<byte> payload);
 
@@ -121,9 +132,9 @@ namespace Nerdbank.Streams
                 return randomSendBuffer;
             }
 
-            internal override async Task<(bool IsOdd, Version ProtocolVersion)> ReadHandshakeAsync(object writeHandshakeResult, Options options, CancellationToken cancellationToken)
+            internal override async Task<(bool? IsOdd, Version ProtocolVersion)> ReadHandshakeAsync(object? writeHandshakeResult, Options options, CancellationToken cancellationToken)
             {
-                var randomSendBuffer = (byte[])writeHandshakeResult;
+                var randomSendBuffer = writeHandshakeResult as byte[] ?? throw new ArgumentException("This should be the result of a prior call to " + nameof(this.WriteHandshake), nameof(writeHandshakeResult));
 
                 var handshakeBytes = new byte[ProtocolMagicNumber.Length + 16];
                 await this.stream.ReadBlockOrThrowAsync(handshakeBytes, cancellationToken).ConfigureAwait(false);
@@ -145,7 +156,7 @@ namespace Nerdbank.Streams
             {
                 var span = this.PipeWriter.GetSpan(checked(HeaderLength + (int)payload.Length));
                 span[0] = (byte)header.Code;
-                Utilities.Write(span.Slice(1, 4), header.ChannelId ?? 0);
+                Utilities.Write(span.Slice(1, 4), checked((int)(header.ChannelId ?? 0)));
                 Utilities.Write(span.Slice(5, 2), (ushort)payload.Length);
 
                 span = span.Slice(HeaderLength);
@@ -256,7 +267,7 @@ namespace Nerdbank.Streams
                 this.isDisposed = true;
             }
 
-            internal override object WriteHandshake()
+            internal override object? WriteHandshake()
             {
                 var writer = new MessagePackWriter(this.PipeWriter);
 
@@ -277,11 +288,11 @@ namespace Nerdbank.Streams
                 return randomSendBuffer;
             }
 
-            internal override async Task<(bool IsOdd, Version ProtocolVersion)> ReadHandshakeAsync(object writeHandshakeResult, Options options, CancellationToken cancellationToken)
+            internal override async Task<(bool? IsOdd, Version ProtocolVersion)> ReadHandshakeAsync(object? writeHandshakeResult, Options options, CancellationToken cancellationToken)
             {
                 using (await this.readingSemaphore.EnterAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    var randomSendBuffer = (byte[])writeHandshakeResult;
+                    var randomSendBuffer = writeHandshakeResult as byte[] ?? throw new ArgumentException("This should be the result of a prior call to " + nameof(this.WriteHandshake), nameof(writeHandshakeResult));
 
                     var msgpackSequence = await this.reader.ReadAsync(cancellationToken).ConfigureAwait(false);
                     if (msgpackSequence is null)
@@ -303,7 +314,7 @@ namespace Nerdbank.Streams
                 writer.Write((int)header.Code);
                 if (elementCount > 1)
                 {
-                    if (header.ChannelId is int channelId)
+                    if (header.ChannelId is long channelId)
                     {
                         writer.Write(channelId);
                     }
@@ -331,7 +342,7 @@ namespace Nerdbank.Streams
                         return null;
                     }
 
-                    return DeserializeFrame(frameSequence.Value);
+                    return this.DeserializeFrame(frameSequence.Value);
                 }
             }
 
@@ -420,6 +431,38 @@ namespace Nerdbank.Streams
                 return new Channel.AcceptanceParameters(remoteWindowSize);
             }
 
+            protected virtual (FrameHeader Header, ReadOnlySequence<byte> Payload) DeserializeFrame(ReadOnlySequence<byte> frameSequence)
+            {
+                var reader = new MessagePackReader(frameSequence);
+                int headerElementCount = reader.ReadArrayHeader();
+                var header = default(FrameHeader);
+                if (headerElementCount < 1)
+                {
+                    throw new MultiplexingProtocolException("Not enough elements in frame header.");
+                }
+
+                header.Code = (ControlCode)reader.ReadInt32();
+                if (headerElementCount > 1)
+                {
+                    if (reader.IsNil)
+                    {
+                        reader.ReadNil();
+                    }
+                    else
+                    {
+                        header.ChannelId = reader.ReadInt64();
+                    }
+
+                    if (headerElementCount > 2)
+                    {
+                        var payload = reader.ReadBytes() ?? default;
+                        return (header, payload);
+                    }
+                }
+
+                return (header, default);
+            }
+
             private static void Discard(ref MessagePackReader reader, int elementsToDiscard)
             {
                 for (int i = 0; i < elementsToDiscard; i++)
@@ -439,6 +482,11 @@ namespace Nerdbank.Streams
                 }
 
                 int versionElementCount = reader.ReadArrayHeader();
+                if (versionElementCount < 2)
+                {
+                    throw new MultiplexingProtocolException("Too few elements in handshake.");
+                }
+
                 int versionMajor = reader.ReadInt32();
                 int versionMinor = reader.ReadInt32();
                 var remoteVersion = new Version(versionMajor, versionMinor);
@@ -460,8 +508,56 @@ namespace Nerdbank.Streams
 
                 return (isOdd, remoteVersion);
             }
+        }
 
-            private static (FrameHeader Header, ReadOnlySequence<byte> Payload) DeserializeFrame(ReadOnlySequence<byte> frameSequence)
+        internal class V3Formatter : V2Formatter
+        {
+            private static readonly Version ProtocolVersion = new Version(3, 0);
+            private static readonly Task<(bool?, Version)> ReadHandshakeResult = Task.FromResult<(bool?, Version)>((null, ProtocolVersion));
+
+            internal V3Formatter(PipeWriter writer, Stream readingStream)
+                : base(writer, readingStream)
+            {
+            }
+
+            internal override object? WriteHandshake() => null;
+
+            internal override Task<(bool? IsOdd, Version ProtocolVersion)> ReadHandshakeAsync(object? writeHandshakeResult, Options options, CancellationToken cancellationToken)
+            {
+                return ReadHandshakeResult;
+            }
+
+            internal override void WriteFrame(FrameHeader header, ReadOnlySequence<byte> payload)
+            {
+                var writer = new MessagePackWriter(this.PipeWriter);
+
+                int elementCount = !payload.IsEmpty ? 4 : header.ChannelId.HasValue ? 3 : 1;
+                writer.WriteArrayHeader(elementCount);
+
+                writer.Write((int)header.Code);
+                if (elementCount > 1)
+                {
+                    if (header.ChannelId is long channelId)
+                    {
+                        writer.Write(channelId);
+                        Assumes.True(header.ChannelOfferedBySender.HasValue);
+                        writer.Write(header.ChannelOfferedBySender.Value);
+                    }
+                    else
+                    {
+                        throw new NotSupportedException("A frame may not contain payload without a channel ID.");
+                    }
+
+                    if (!payload.IsEmpty)
+                    {
+                        writer.Write(payload);
+                    }
+                }
+
+                writer.Flush();
+            }
+
+            protected override (FrameHeader Header, ReadOnlySequence<byte> Payload) DeserializeFrame(ReadOnlySequence<byte> frameSequence)
             {
                 var reader = new MessagePackReader(frameSequence);
                 int headerElementCount = reader.ReadArrayHeader();
@@ -474,16 +570,18 @@ namespace Nerdbank.Streams
                 header.Code = (ControlCode)reader.ReadInt32();
                 if (headerElementCount > 1)
                 {
-                    if (reader.IsNil)
+                    if (!reader.TryReadNil())
                     {
-                        reader.ReadNil();
-                    }
-                    else
-                    {
-                        header.ChannelId = reader.ReadInt32();
+                        if (headerElementCount < 3)
+                        {
+                            throw new MultiplexingProtocolException("Not enough elements in frame header.");
+                        }
+
+                        header.ChannelId = reader.ReadInt64();
+                        header.ChannelOfferedBySender = reader.ReadBoolean();
                     }
 
-                    if (headerElementCount > 2)
+                    if (headerElementCount > 3)
                     {
                         var payload = reader.ReadBytes() ?? default;
                         return (header, payload);

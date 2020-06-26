@@ -1,39 +1,43 @@
 import { ControlCode } from "./ControlCode";
 import { requireInteger } from "./Utilities";
+import { QualifiedChannelId } from "./QualifiedChannelId";
 
 export class FrameHeader {
     /**
-     * Gets the kind of frame this is.
-     */
-    public readonly code: ControlCode;
-
-    /**
      * Gets the channel that this frame refers to or carries a payload for.
      */
-    public readonly channelId?: number;
-
-    /**
-     * Gets the channel that this frame refers to or carries a payload for.
-     */
-    public get requiredChannelId(): number {
-        if (this.channelId) {
-            return this.channelId;
+    public get requiredChannel(): QualifiedChannelId {
+        if (this.channel) {
+            return this.channel;
         }
 
-        throw new Error("Expected ChannelId not present in frame header.");
+        throw new Error("Expected channel not present in frame header.");
+    }
+
+    public static createToSend(code: ControlCode, channelId?: QualifiedChannelId): FrameHeader {
+        return new FrameHeader(code, channelId);
+    }
+
+    public static createFromReceived(code: ControlCode, localIsOdd: boolean | null, channel: { id: number, offeredBySender: boolean | null } | undefined): FrameHeader {
+        if (!channel) {
+            return new FrameHeader(code);
+        }
+
+        const channelIsOdd = channel.id % 2 === 1;
+        const offeredBySender = channel.offeredBySender !== null ? channel.offeredBySender : (channelIsOdd !== localIsOdd);
+        return new FrameHeader(code, { id: channel.id, offeredLocally: !offeredBySender });
     }
 
     /**
      * Initializes a new instance of the `FrameHeader` class.
-     * @param code the kind of frame this is.
-     * @param channelId the channel that this frame refers to or carries a payload for.
+     * @param code The kind of frame this is.
+     * @param channel The channel that this frame refers to or carries a payload for.
      */
-    constructor(code: ControlCode, channelId?: number) {
-        if (channelId) {
-            requireInteger("channelId", channelId, 4, "signed");
+    private constructor(public readonly code: ControlCode, public readonly channel?: QualifiedChannelId) {
+        if (channel) {
+            requireInteger("channelId", channel.id, 4, "signed");
         }
 
         this.code = code;
-        this.channelId = channelId;
     }
 }
