@@ -70,6 +70,15 @@ namespace Nerdbank.Streams {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to This instance has been frozen. No mutations are allowed..
+        /// </summary>
+        internal static string Frozen {
+            get {
+                return ResourceManager.GetString("Frozen", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to This operation is not supported when the Channel is created with ChannelOptions.ExistingPipe set..
         /// </summary>
         internal static string NotSupportedWhenExistingPipeSpecified {

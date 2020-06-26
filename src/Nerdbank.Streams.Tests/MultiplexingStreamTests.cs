@@ -1020,17 +1020,6 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         }
     }
 
-    [Fact]
-    public void Options_DefaultChannelReceivingWindowSize()
-    {
-        var options = new MultiplexingStream.Options();
-        Assert.True(options.DefaultChannelReceivingWindowSize > 0);
-        options.DefaultChannelReceivingWindowSize = 5;
-        Assert.Equal(5, options.DefaultChannelReceivingWindowSize);
-        Assert.Throws<ArgumentOutOfRangeException>(() => options.DefaultChannelReceivingWindowSize = 0);
-        Assert.Throws<ArgumentOutOfRangeException>(() => options.DefaultChannelReceivingWindowSize = -1);
-    }
-
     protected static async Task<int> ReadAtLeastAsync(Stream stream, ArraySegment<byte> buffer, int requiredLength, CancellationToken cancellationToken)
     {
         Requires.NotNull(stream, nameof(stream));

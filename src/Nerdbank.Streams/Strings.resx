@@ -120,6 +120,9 @@
   <data name="ExistingPipeOutputHasPauseThresholdSetTooLow" xml:space="preserve">
     <value>ExistingPipe's PipeWriter created with PipeOptions.PauseWriterThreshold that does not exceed the channel's receiving window size.</value>
   </data>
+  <data name="Frozen" xml:space="preserve">
+    <value>This instance has been frozen. No mutations are allowed.</value>
+  </data>
   <data name="NotSupportedWhenExistingPipeSpecified" xml:space="preserve">
     <value>This operation is not supported when the Channel is created with ChannelOptions.ExistingPipe set.</value>
   </data>
