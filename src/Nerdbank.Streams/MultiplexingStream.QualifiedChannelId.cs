@@ -22,7 +22,7 @@ namespace Nerdbank.Streams
             /// </summary>
             /// <param name="id">The channel id.</param>
             /// <param name="offeredLocally">a value indicating whether <see cref="Id"/> is referring to a channel that was originally offered by the local party.</param>
-            public QualifiedChannelId(long id, bool offeredLocally)
+            public QualifiedChannelId(ulong id, bool offeredLocally)
             {
                 this.Id = id;
                 this.OfferedLocally = offeredLocally;
@@ -31,7 +31,7 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Gets the channel ID.
             /// </summary>
-            public long Id { get; }
+            public ulong Id { get; }
 
             /// <summary>
             /// Gets a value indicating whether <see cref="Id"/> is referring to a channel that was originally offered by the local party.

@@ -179,7 +179,7 @@ namespace Nerdbank.Streams
                 var header = new FrameHeader
                 {
                     Code = (ControlCode)this.headerBuffer.Span[0],
-                    ChannelId = Utilities.ReadInt(this.headerBuffer.Span.Slice(1, 4)),
+                    ChannelId = checked((ulong)Utilities.ReadInt(this.headerBuffer.Span.Slice(1, 4))),
                 };
 
                 int framePayloadLength = Utilities.ReadInt(this.headerBuffer.Span.Slice(5, 2));
@@ -314,7 +314,7 @@ namespace Nerdbank.Streams
                 writer.Write((int)header.Code);
                 if (elementCount > 1)
                 {
-                    if (header.ChannelId is long channelId)
+                    if (header.ChannelId is ulong channelId)
                     {
                         writer.Write(channelId);
                     }
@@ -450,7 +450,7 @@ namespace Nerdbank.Streams
                     }
                     else
                     {
-                        header.ChannelId = reader.ReadInt64();
+                        header.ChannelId = reader.ReadUInt64();
                     }
 
                     if (headerElementCount > 2)
@@ -537,7 +537,7 @@ namespace Nerdbank.Streams
                 writer.Write((int)header.Code);
                 if (elementCount > 1)
                 {
-                    if (header.ChannelId is long channelId)
+                    if (header.ChannelId is ulong channelId)
                     {
                         writer.Write(channelId);
                         Assumes.True(header.ChannelOfferedBySender.HasValue);
@@ -577,7 +577,7 @@ namespace Nerdbank.Streams
                             throw new MultiplexingProtocolException("Not enough elements in frame header.");
                         }
 
-                        header.ChannelId = reader.ReadInt64();
+                        header.ChannelId = reader.ReadUInt64();
                         header.ChannelOfferedBySender = reader.ReadBoolean();
                     }
 

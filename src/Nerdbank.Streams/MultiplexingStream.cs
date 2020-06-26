@@ -347,8 +347,8 @@ namespace Nerdbank.Streams
             return channel;
         }
 
-        /// <inheritdoc cref="AcceptChannel(long, ChannelOptions?)"/>
-        public Channel AcceptChannel(int id, ChannelOptions? options = default) => this.AcceptChannel((long)id, options);
+        /// <inheritdoc cref="AcceptChannel(ulong, ChannelOptions?)"/>
+        public Channel AcceptChannel(int id, ChannelOptions? options = default) => this.AcceptChannel((ulong)id, options);
 
         /// <summary>
         /// Accepts a channel with a specific ID.
@@ -364,7 +364,7 @@ namespace Nerdbank.Streams
         /// for a channel that has already been made.
         /// </remarks>
 #pragma warning disable RS0026 // Do not add multiple public overloads with optional parameters
-        public Channel AcceptChannel(long id, ChannelOptions? options = default)
+        public Channel AcceptChannel(ulong id, ChannelOptions? options = default)
 #pragma warning restore RS0026 // Do not add multiple public overloads with optional parameters
         {
             options = options ?? DefaultChannelOptions;
@@ -383,15 +383,15 @@ namespace Nerdbank.Streams
             return channel;
         }
 
-        /// <inheritdoc cref="RejectChannel(long)"/>
-        public void RejectChannel(int id) => this.RejectChannel((long)id);
+        /// <inheritdoc cref="RejectChannel(ulong)"/>
+        public void RejectChannel(int id) => this.RejectChannel((ulong)id);
 
         /// <summary>
         /// Rejects an offer for the channel with a specified ID.
         /// </summary>
         /// <param name="id">The ID of the channel whose offer should be rejected.</param>
         /// <exception cref="InvalidOperationException">Thrown if the channel was already accepted.</exception>
-        public void RejectChannel(long id)
+        public void RejectChannel(ulong id)
         {
             Channel? channel;
             var qualifiedId = new QualifiedChannelId(id, offeredLocally: false);
@@ -1102,7 +1102,7 @@ namespace Nerdbank.Streams
         /// <remarks>
         /// In protocol major versions 1-2, the channel numbers increase by two in order to maintain odd or even numbers, since each party is allowed to create only one or the other.
         /// </remarks>
-        private long GetUnusedChannelId() => Interlocked.Add(ref this.lastOfferedChannelId, this.isOdd.HasValue ? 2 : 1);
+        private ulong GetUnusedChannelId() => (ulong)Interlocked.Add(ref this.lastOfferedChannelId, this.isOdd.HasValue ? 2 : 1);
 
         private void OfferChannelCanceled(object state)
         {

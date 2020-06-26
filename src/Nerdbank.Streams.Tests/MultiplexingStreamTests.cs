@@ -90,7 +90,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
         var ch = await Task.WhenAll(mx1.OfferChannelAsync("myname"), mx2.AcceptChannelAsync("myname"));
         var args = await factoryArgs.Task;
-        Assert.Equal(ch[0].QualifiedId.Id, args.Item1);
+        Assert.Equal(ch[0].QualifiedId.Id, (ulong)args.Item1);
         Assert.Equal("myname", args.Item2);
     }
 
