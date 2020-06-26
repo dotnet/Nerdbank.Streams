@@ -11,4 +11,4 @@ steps:
     nuGetFeedType: internal
     publishVstsFeed: $(ci_feed)
     allowPackageConflicts: true
-  condition: and(succeeded(), ne(variables['ci_feed'], ''), ne(variables['Build.Reason'], 'PullRequest'))
+  condition: and(succeeded(), ne(variables['ci_feed'], ''), ne(variables['System.PullRequest.IsFork'], 'true'))
