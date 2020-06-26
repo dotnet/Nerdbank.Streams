@@ -33,16 +33,47 @@ namespace Nerdbank.Streams
             private TraceSource traceSource = new TraceSource(nameof(MultiplexingStream), SourceLevels.Critical);
 
             /// <summary>
+            /// Backing field for the <see cref="ProtocolMajorVersion"/> property.
+            /// </summary>
+            private int protocolMajorVersion = 1;
+
+            /// <summary>
             /// Backing field for the <see cref="DefaultChannelReceivingWindowSize"/> property.
             /// </summary>
             private long defaultChannelReceivingWindowSize = RecommendedDefaultChannelReceivingWindowSize;
 
-            /////// <summary>
-            /////// Gets or sets the maximum number of channel offers from the remote party that are allowed before the
-            /////// connection is terminated for abuse.
-            /////// </summary>
-            /////// <value>The default value is 100.</value>
-            ////public int MaximumAllowedChannelOffers { get; set; } = 100;
+            /// <summary>
+            /// Backing field for the <see cref="DefaultChannelTraceSourceFactory"/> property.
+            /// </summary>
+            private Func<int, string, TraceSource?>? defaultChannelTraceSourceFactory;
+
+            /// <summary>
+            /// Backing field for the <see cref="DefaultChannelTraceSourceFactoryWithQualifier"/> property.
+            /// </summary>
+            private Func<QualifiedChannelId, string, TraceSource?>? defaultChannelTraceSourceFactoryWithQualifier;
+
+            /// <summary>
+            /// Initializes a new instance of the <see cref="Options"/> class.
+            /// </summary>
+            public Options()
+            {
+            }
+
+            /// <summary>
+            /// Initializes a new instance of the <see cref="Options"/> class
+            /// and copies the values from another instance into this one.
+            /// </summary>
+            /// <param name="copyFrom">The instance to copy values from.</param>
+            public Options(Options copyFrom)
+            {
+                Requires.NotNull(copyFrom, nameof(copyFrom));
+
+                this.defaultChannelReceivingWindowSize = copyFrom.defaultChannelReceivingWindowSize;
+                this.traceSource = copyFrom.traceSource;
+                this.protocolMajorVersion = copyFrom.protocolMajorVersion;
+                this.defaultChannelTraceSourceFactory = copyFrom.defaultChannelTraceSourceFactory;
+                this.defaultChannelTraceSourceFactoryWithQualifier = copyFrom.defaultChannelTraceSourceFactoryWithQualifier;
+            }
 
             /// <summary>
             /// Gets or sets the logger used by this instance.
@@ -54,6 +85,7 @@ namespace Nerdbank.Streams
                 set
                 {
                     Requires.NotNull(value, nameof(value));
+                    this.ThrowIfFrozen();
                     this.traceSource = value;
                 }
             }
@@ -74,6 +106,7 @@ namespace Nerdbank.Streams
                 set
                 {
                     Requires.Range(value > 0, nameof(value));
+                    this.ThrowIfFrozen();
                     this.defaultChannelReceivingWindowSize = value;
                 }
             }
@@ -87,7 +120,16 @@ namespace Nerdbank.Streams
             /// 2 is a protocol breaking change and adds backpressure support.
             /// 3 is a protocol breaking change that removes the initial handshake so no round-trip to establish the connection is necessary.
             /// </remarks>
-            public int ProtocolMajorVersion { get; set; } = 1;
+            public int ProtocolMajorVersion
+            {
+                get => this.protocolMajorVersion;
+                set
+                {
+                    Requires.Range(value > 0, nameof(value));
+                    this.ThrowIfFrozen();
+                    this.protocolMajorVersion = value;
+                }
+            }
 
             /// <summary>
             /// Gets or sets a factory for <see cref="TraceSource"/> instances to attach to a newly opened <see cref="Channel"/>
@@ -98,7 +140,15 @@ namespace Nerdbank.Streams
             /// <para>This delegate will not be invoked if <see cref="DefaultChannelTraceSourceFactoryWithQualifier"/> has been set to a non-null value.</para>
             /// </remarks>
             [Obsolete("Use " + nameof(DefaultChannelTraceSourceFactoryWithQualifier) + " instead.")]
-            public Func<int, string, TraceSource?>? DefaultChannelTraceSourceFactory { get; set; }
+            public Func<int, string, TraceSource?>? DefaultChannelTraceSourceFactory
+            {
+                get => this.defaultChannelTraceSourceFactory;
+                set
+                {
+                    this.ThrowIfFrozen();
+                    this.defaultChannelTraceSourceFactory = value;
+                }
+            }
 
             /// <summary>
             /// Gets or sets a factory for <see cref="TraceSource"/> instances to attach to a newly opened <see cref="Channel"/>
@@ -108,7 +158,28 @@ namespace Nerdbank.Streams
             /// <para>The delegate receives a channel ID and name, and may return a <see cref="TraceSource"/> or <c>null</c>.</para>
             /// <para>This delegate supersedes the obsolete <see cref="DefaultChannelTraceSourceFactory"/> as this one provides detail about whether the channel was offered locally or remotely.</para>
             /// </remarks>
-            public Func<QualifiedChannelId, string, TraceSource?>? DefaultChannelTraceSourceFactoryWithQualifier { get; set; }
+            public Func<QualifiedChannelId, string, TraceSource?>? DefaultChannelTraceSourceFactoryWithQualifier
+            {
+                get => this.defaultChannelTraceSourceFactoryWithQualifier;
+                set
+                {
+                    this.ThrowIfFrozen();
+                    this.defaultChannelTraceSourceFactoryWithQualifier = value;
+                }
+            }
+
+            /// <summary>
+            /// Gets a value indicating whether this instance is frozen.
+            /// </summary>
+            public bool IsFrozen { get; private set; }
+
+            /// <summary>
+            /// Returns a frozen instance of this object.
+            /// </summary>
+            /// <returns>This instance if already frozen, otherwise a frozen copy.</returns>
+            public Options GetFrozenCopy() => this.IsFrozen ? this : new Options(this) { IsFrozen = true };
+
+            private void ThrowIfFrozen() => Verify.Operation(!this.IsFrozen, Strings.Frozen);
         }
     }
 }

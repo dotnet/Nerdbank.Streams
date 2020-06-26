@@ -3,6 +3,9 @@ Nerdbank.Streams.MultiplexingStream.Channel.QualifiedId.get -> Nerdbank.Streams.
 Nerdbank.Streams.MultiplexingStream.ChannelOfferEventArgs.QualifiedId.get -> Nerdbank.Streams.MultiplexingStream.QualifiedChannelId
 Nerdbank.Streams.MultiplexingStream.Options.DefaultChannelTraceSourceFactoryWithQualifier.get -> System.Func<Nerdbank.Streams.MultiplexingStream.QualifiedChannelId, string!, System.Diagnostics.TraceSource?>?
 Nerdbank.Streams.MultiplexingStream.Options.DefaultChannelTraceSourceFactoryWithQualifier.set -> void
+Nerdbank.Streams.MultiplexingStream.Options.GetFrozenCopy() -> Nerdbank.Streams.MultiplexingStream.Options!
+Nerdbank.Streams.MultiplexingStream.Options.IsFrozen.get -> bool
+Nerdbank.Streams.MultiplexingStream.Options.Options(Nerdbank.Streams.MultiplexingStream.Options! copyFrom) -> void
 Nerdbank.Streams.MultiplexingStream.QualifiedChannelId
 Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.Equals(Nerdbank.Streams.MultiplexingStream.QualifiedChannelId other) -> bool
 Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.Id.get -> long
