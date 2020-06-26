@@ -220,6 +220,33 @@ namespace Nerdbank.Streams
         private Func<QualifiedChannelId, string, TraceSource?>? DefaultChannelTraceSourceFactory { get; }
 
         /// <summary>
+        /// Initializes a new instance of the <see cref="MultiplexingStream"/> class
+        /// with <see cref="Options.ProtocolMajorVersion"/> set to 3.
+        /// </summary>
+        /// <param name="stream">The stream to multiplex multiple channels over. Use <see cref="FullDuplexStream.Splice(Stream, Stream)"/> if you have distinct input/output streams.</param>
+        /// <param name="options">Options to define behavior for the multiplexing stream.</param>
+        /// <returns>The multiplexing stream.</returns>
+        public static MultiplexingStream Create(Stream stream, Options? options = null)
+        {
+            Requires.NotNull(stream, nameof(stream));
+            Requires.Argument(stream.CanRead, nameof(stream), "Stream must be readable.");
+            Requires.Argument(stream.CanWrite, nameof(stream), "Stream must be writable.");
+
+            options = options ?? new Options { ProtocolMajorVersion = 3 };
+
+            var streamWriter = stream.UsePipeWriter();
+
+            var formatter = options.ProtocolMajorVersion switch
+            {
+                // We do NOT support 1-2 here because they require an asynchronous handshake.
+                3 => new V3Formatter(streamWriter, stream),
+                _ => throw new NotSupportedException($"Protocol major version {options.ProtocolMajorVersion} is not supported."),
+            };
+
+            return new MultiplexingStream(formatter, isOdd: null, options);
+        }
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="MultiplexingStream"/> class.
         /// </summary>
         /// <param name="stream">The stream to multiplex multiple channels over. Use <see cref="FullDuplexStream.Splice(Stream, Stream)"/> if you have distinct input/output streams.</param>
@@ -232,7 +259,7 @@ namespace Nerdbank.Streams
         /// Initializes a new instance of the <see cref="MultiplexingStream"/> class.
         /// </summary>
         /// <param name="stream">The stream to multiplex multiple channels over. Use <see cref="FullDuplexStream.Splice(Stream, Stream)"/> if you have distinct input/output streams.</param>
-        /// <param name="options">Options to define behavior for the multiplexing stream.</param>
+        /// <param name="options">Options to define behavior for the multiplexing stream. If unspecified, the default options will include <see cref="Options.ProtocolMajorVersion"/> set to 1.</param>
         /// <param name="cancellationToken">A cancellation token.</param>
         /// <returns>The multiplexing stream, once the handshake is complete.</returns>
         /// <exception cref="EndOfStreamException">Thrown if the remote end disconnects before the handshake is complete.</exception>
