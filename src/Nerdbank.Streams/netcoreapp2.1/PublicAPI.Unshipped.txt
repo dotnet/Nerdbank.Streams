@@ -12,3 +12,4 @@ Nerdbank.Streams.MultiplexingStream.RejectChannel(long id) -> void
 override Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.Equals(object? obj) -> bool
 override Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.GetHashCode() -> int
 override Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.ToString() -> string!
+static Nerdbank.Streams.MultiplexingStream.Create(System.IO.Stream! stream, Nerdbank.Streams.MultiplexingStream.Options? options = null) -> Nerdbank.Streams.MultiplexingStream!
