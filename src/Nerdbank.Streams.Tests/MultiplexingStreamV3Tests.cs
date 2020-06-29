@@ -3,6 +3,7 @@
 
 using System;
 using System.Threading.Tasks;
+using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
 using Xunit.Abstractions;
@@ -33,10 +34,27 @@ public class MultiplexingStreamV3Tests : MultiplexingStreamV2Tests
     }
 
     [Fact]
-    public void Create_VersionsWithHandshakes()
+    public override async Task SeededChannels()
     {
         var pair = FullDuplexStream.CreatePair();
-        Assert.Throws<NotSupportedException>(() => MultiplexingStream.Create(pair.Item1, new MultiplexingStream.Options { ProtocolMajorVersion = 1 }));
-        Assert.Throws<NotSupportedException>(() => MultiplexingStream.Create(pair.Item1, new MultiplexingStream.Options { ProtocolMajorVersion = 2 }));
+        var options = new MultiplexingStream.Options
+        {
+            ProtocolMajorVersion = this.ProtocolMajorVersion,
+            SeededChannels =
+            {
+               new MultiplexingStream.ChannelOptions { },
+               new MultiplexingStream.ChannelOptions { },
+            },
+        };
+        var mx1 = MultiplexingStream.Create(pair.Item1, options);
+        var mx2 = MultiplexingStream.Create(pair.Item2, options);
+
+        var channel1_0 = mx1.AcceptChannel(0);
+        var channel1_1 = mx1.AcceptChannel(1);
+        var channel2_0 = mx2.AcceptChannel(0);
+        var channel2_1 = mx2.AcceptChannel(1);
+
+        await this.TransmitAndVerifyAsync(channel1_0.AsStream(), channel2_0.AsStream(), new byte[] { 1, 2, 3 });
+        await this.TransmitAndVerifyAsync(channel1_1.AsStream(), channel2_1.AsStream(), new byte[] { 4, 5, 6 });
     }
 }

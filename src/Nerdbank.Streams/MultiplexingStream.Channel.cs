@@ -6,6 +6,7 @@ namespace Nerdbank.Streams
     using System;
     using System.Buffers;
     using System.CodeDom.Compiler;
+    using System.Data;
     using System.Diagnostics;
     using System.IO;
     using System.IO.Pipelines;
@@ -133,13 +134,20 @@ namespace Nerdbank.Streams
                 this.channelId = channelId;
                 this.OfferParams = offerParameters;
 
-                if (channelId.OfferedLocally)
+                switch (channelId.Source)
                 {
-                    this.localWindowSize = offerParameters.RemoteWindowSize;
-                }
-                else
-                {
-                    this.remoteWindowSize = offerParameters.RemoteWindowSize;
+                    case ChannelSource.Local:
+                        this.localWindowSize = offerParameters.RemoteWindowSize;
+                        break;
+                    case ChannelSource.Remote:
+                        this.remoteWindowSize = offerParameters.RemoteWindowSize;
+                        break;
+                    case ChannelSource.Seeded:
+                        this.remoteWindowSize = offerParameters.RemoteWindowSize;
+                        this.localWindowSize = offerParameters.RemoteWindowSize;
+                        break;
+                    default:
+                        throw new NotSupportedException();
                 }
 
                 if (channelOptions == null)
@@ -472,16 +480,19 @@ namespace Nerdbank.Streams
                 var acceptanceParameters = new AcceptanceParameters(this.localWindowSize.Value);
                 if (this.acceptanceSource.TrySetResult(acceptanceParameters))
                 {
-                    var payload = this.MultiplexingStream.formatter.Serialize(acceptanceParameters);
-                    this.MultiplexingStream.SendFrame(
-                        new FrameHeader
-                        {
-                            Code = ControlCode.OfferAccepted,
-                            ChannelId = this.QualifiedId.Id,
-                            ChannelOfferedBySender = false,
-                        },
-                        payload,
-                        CancellationToken.None);
+                    if (this.QualifiedId.Source != ChannelSource.Seeded)
+                    {
+                        var payload = this.MultiplexingStream.formatter.Serialize(acceptanceParameters);
+                        this.MultiplexingStream.SendFrame(
+                            new FrameHeader
+                            {
+                                Code = ControlCode.OfferAccepted,
+                                ChannelId = this.QualifiedId,
+                            },
+                            payload,
+                            CancellationToken.None);
+                    }
+
                     try
                     {
                         this.ApplyChannelOptions(channelOptions);
@@ -709,8 +720,7 @@ namespace Nerdbank.Streams
                             FrameHeader header = new FrameHeader
                             {
                                 Code = ControlCode.Content,
-                                ChannelId = this.QualifiedId.Id,
-                                ChannelOfferedBySender = this.QualifiedId.OfferedLocally,
+                                ChannelId = this.QualifiedId,
                             };
 
                             await this.MultiplexingStream.SendFrameAsync(header, bufferToRelay, CancellationToken.None).ConfigureAwait(false);
@@ -799,8 +809,7 @@ namespace Nerdbank.Streams
                     new FrameHeader
                     {
                         Code = ControlCode.ContentProcessed,
-                        ChannelId = this.QualifiedId.Id,
-                        ChannelOfferedBySender = this.QualifiedId.OfferedLocally,
+                        ChannelId = this.QualifiedId,
                     },
                     this.MultiplexingStream.formatter.SerializeContentProcessed(bytesExamined),
                     CancellationToken.None);

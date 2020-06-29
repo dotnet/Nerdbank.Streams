@@ -136,6 +136,15 @@ namespace Nerdbank.Streams
             this.DefaultChannelReceivingWindowSize = options.DefaultChannelReceivingWindowSize;
             this.protocolMajorVersion = options.ProtocolMajorVersion;
 
+            // Set up seed channels
+            for (int i = 0; i < options.SeededChannels.Count; i++)
+            {
+                var id = new QualifiedChannelId((ulong)i, ChannelSource.Seeded);
+                this.openChannels.Add(id, new Channel(this, id, new Channel.OfferParameters(string.Empty, options.SeededChannels[i]?.ChannelReceivingWindowSize ?? this.DefaultChannelReceivingWindowSize)));
+            }
+
+            this.lastOfferedChannelId += options.SeededChannels.Count;
+
             // Initiate reading from the transport stream. This will not end until the stream does, or we're disposed.
             // If reading the stream fails, we'll dispose ourselves.
             this.DisposeSelfOnFailure(this.ReadStreamAsync());
@@ -270,6 +279,10 @@ namespace Nerdbank.Streams
             Requires.Argument(stream.CanWrite, nameof(stream), "Stream must be writable.");
 
             options = options ?? new Options();
+            if (options.ProtocolMajorVersion < 3 && options.SeededChannels.Count > 0)
+            {
+                throw new NotSupportedException(Strings.SeededChannelsRequireV3Protocol);
+            }
 
             var streamWriter = stream.UsePipeWriter(cancellationToken: cancellationToken);
 
@@ -329,7 +342,7 @@ namespace Nerdbank.Streams
             var offerParameters = new Channel.OfferParameters(string.Empty, options?.ChannelReceivingWindowSize ?? this.DefaultChannelReceivingWindowSize);
             var payload = this.formatter.Serialize(offerParameters);
 
-            var qualifiedId = new QualifiedChannelId(this.GetUnusedChannelId(), offeredLocally: true);
+            var qualifiedId = new QualifiedChannelId(this.GetUnusedChannelId(), ChannelSource.Local);
             Channel channel = new Channel(this, qualifiedId, offerParameters, options ?? DefaultChannelOptions);
             lock (this.syncObject)
             {
@@ -339,8 +352,7 @@ namespace Nerdbank.Streams
             var header = new FrameHeader
             {
                 Code = ControlCode.Offer,
-                ChannelId = qualifiedId.Id,
-                ChannelOfferedBySender = qualifiedId.OfferedLocally,
+                ChannelId = qualifiedId,
             };
 
             this.SendFrame(header, payload, this.DisposalToken);
@@ -363,19 +375,25 @@ namespace Nerdbank.Streams
         /// for a channel offer if a matching one has not been made yet, this method only accepts an offer
         /// for a channel that has already been made.
         /// </remarks>
+        /// <exception cref="InvalidOperationException">Thrown when no channel with the specified <paramref name="id"/> exists.</exception>
 #pragma warning disable RS0026 // Do not add multiple public overloads with optional parameters
         public Channel AcceptChannel(ulong id, ChannelOptions? options = default)
 #pragma warning restore RS0026 // Do not add multiple public overloads with optional parameters
         {
             options = options ?? DefaultChannelOptions;
             Channel? channel;
-            var qualifiedId = new QualifiedChannelId(id, offeredLocally: false);
             lock (this.syncObject)
             {
-                Verify.Operation(this.openChannels.TryGetValue(qualifiedId, out channel), "No channel with that ID found.");
-                if (channel.Name != null && this.channelsOfferedByThemByName.TryGetValue(channel.Name, out var queue))
+                if (this.openChannels.TryGetValue(new QualifiedChannelId(id, ChannelSource.Remote), out channel))
                 {
-                    queue.RemoveMidQueue(channel);
+                    if (channel.Name is object && this.channelsOfferedByThemByName.TryGetValue(channel.Name, out var queue))
+                    {
+                        queue.RemoveMidQueue(channel);
+                    }
+                }
+                else if (!this.openChannels.TryGetValue(new QualifiedChannelId(id, ChannelSource.Seeded), out channel))
+                {
+                    throw new InvalidOperationException(Strings.NoChannelFoundById);
                 }
             }
 
@@ -394,13 +412,22 @@ namespace Nerdbank.Streams
         public void RejectChannel(ulong id)
         {
             Channel? channel;
-            var qualifiedId = new QualifiedChannelId(id, offeredLocally: false);
             lock (this.syncObject)
             {
-                Verify.Operation(this.openChannels.TryGetValue(qualifiedId, out channel), "No channel with that ID found.");
-                if (channel.Name != null && this.channelsOfferedByThemByName.TryGetValue(channel.Name, out var queue))
+                if (this.openChannels.TryGetValue(new QualifiedChannelId(id, ChannelSource.Remote), out channel))
                 {
-                    queue.RemoveMidQueue(channel);
+                    if (channel.Name != null && this.channelsOfferedByThemByName.TryGetValue(channel.Name, out var queue))
+                    {
+                        queue.RemoveMidQueue(channel);
+                    }
+                }
+                else if (this.openChannels.ContainsKey(new QualifiedChannelId(id, ChannelSource.Seeded)))
+                {
+                    throw new InvalidOperationException(Strings.NotAllowedOnSeededChannel);
+                }
+                else
+                {
+                    throw new InvalidOperationException(Strings.NoChannelFoundById);
                 }
             }
 
@@ -447,7 +474,7 @@ namespace Nerdbank.Streams
 
             var offerParameters = new Channel.OfferParameters(name, options?.ChannelReceivingWindowSize ?? this.DefaultChannelReceivingWindowSize);
             var payload = this.formatter.Serialize(offerParameters);
-            var qualifiedId = new QualifiedChannelId(this.GetUnusedChannelId(), offeredLocally: true);
+            var qualifiedId = new QualifiedChannelId(this.GetUnusedChannelId(), ChannelSource.Local);
             Channel channel = new Channel(this, qualifiedId, offerParameters, options ?? DefaultChannelOptions);
             lock (this.syncObject)
             {
@@ -457,8 +484,7 @@ namespace Nerdbank.Streams
             var header = new FrameHeader
             {
                 Code = ControlCode.Offer,
-                ChannelId = qualifiedId.Id,
-                ChannelOfferedBySender = qualifiedId.OfferedLocally,
+                ChannelId = qualifiedId,
             };
 
             using (cancellationToken.Register(this.OfferChannelCanceled!, channel))
@@ -711,6 +737,7 @@ namespace Nerdbank.Streams
                     }
 
                     var header = frame.Value.Header;
+                    header.FlipChannelPerspective();
                     if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
                     {
                         this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.FrameReceived, "Received {0} frame for channel {1} with {2} bytes of content.", header.Code, header.ChannelId, frame.Value.Payload.Length);
@@ -719,7 +746,7 @@ namespace Nerdbank.Streams
                     switch (header.Code)
                     {
                         case ControlCode.Offer:
-                            this.OnOffer(this.GetQualifiedChannelId(header), frame.Value.Payload);
+                            this.OnOffer(header.RequiredChannelId, frame.Value.Payload);
                             break;
                         case ControlCode.OfferAccepted:
                             this.OnOfferAccepted(header, frame.Value.Payload);
@@ -731,10 +758,10 @@ namespace Nerdbank.Streams
                             this.OnContentProcessed(header, frame.Value.Payload);
                             break;
                         case ControlCode.ContentWritingCompleted:
-                            this.OnContentWritingCompleted(this.GetQualifiedChannelId(header));
+                            this.OnContentWritingCompleted(header.RequiredChannelId);
                             break;
                         case ControlCode.ChannelTerminated:
-                            await this.OnChannelTerminatedAsync(this.GetQualifiedChannelId(header)).ConfigureAwait(false);
+                            await this.OnChannelTerminatedAsync(header.RequiredChannelId).ConfigureAwait(false);
                             break;
                         default:
                             break;
@@ -757,24 +784,6 @@ namespace Nerdbank.Streams
             }
 
             await this.DisposeAsync().ConfigureAwait(false);
-        }
-
-        private QualifiedChannelId GetQualifiedChannelId(FrameHeader receivedFrameHeader)
-        {
-            bool offeredLocally;
-            if (receivedFrameHeader.ChannelOfferedBySender.HasValue)
-            {
-                offeredLocally = !receivedFrameHeader.ChannelOfferedBySender.Value;
-            }
-            else
-            {
-                Assumes.True(this.isOdd.HasValue);
-                bool channelIdIsOdd = receivedFrameHeader.RequiredChannelId % 2 == 1;
-                offeredLocally = this.isOdd.Value == channelIdIsOdd;
-                receivedFrameHeader.ChannelOfferedBySender = !offeredLocally;
-            }
-
-            return new QualifiedChannelId(receivedFrameHeader.RequiredChannelId, offeredLocally);
         }
 
         /// <summary>
@@ -816,7 +825,7 @@ namespace Nerdbank.Streams
                 channel = this.openChannels[channelId];
             }
 
-            if (channelId.OfferedLocally && !channel.IsAccepted)
+            if (channelId.Source == ChannelSource.Local && !channel.IsAccepted)
             {
                 throw new MultiplexingProtocolException($"Remote party indicated they're done writing to channel {channelId} before accepting it.");
             }
@@ -827,7 +836,7 @@ namespace Nerdbank.Streams
         private async ValueTask OnContentAsync(FrameHeader header, ReadOnlySequence<byte> payload, CancellationToken cancellationToken)
         {
             Channel channel;
-            var channelId = this.GetQualifiedChannelId(header);
+            var channelId = header.RequiredChannelId;
             lock (this.syncObject)
             {
                 channel = this.openChannels[channelId];
@@ -835,7 +844,7 @@ namespace Nerdbank.Streams
 
             try
             {
-                if (channelId.OfferedLocally && !channel.IsAccepted)
+                if (channelId.Source == ChannelSource.Local && !channel.IsAccepted)
                 {
                     throw new MultiplexingProtocolException($"Remote party sent content for channel {channelId} before accepting it.");
                 }
@@ -853,7 +862,7 @@ namespace Nerdbank.Streams
         private void OnOfferAccepted(FrameHeader header, ReadOnlySequence<byte> payloadBuffer)
         {
             Channel.AcceptanceParameters acceptanceParameters = this.formatter.DeserializeAcceptanceParameters(payloadBuffer);
-            var channelId = this.GetQualifiedChannelId(header);
+            var channelId = header.RequiredChannelId;
             Channel? channel;
             lock (this.syncObject)
             {
@@ -881,7 +890,7 @@ namespace Nerdbank.Streams
             Channel? channel;
             lock (this.syncObject)
             {
-                this.openChannels.TryGetValue(this.GetQualifiedChannelId(header), out channel);
+                this.openChannels.TryGetValue(header.RequiredChannelId, out channel);
             }
 
             if (channel is null)
@@ -1031,8 +1040,7 @@ namespace Nerdbank.Streams
             var header = new FrameHeader
             {
                 Code = code,
-                ChannelId = channelId.Id,
-                ChannelOfferedBySender = channelId.OfferedLocally,
+                ChannelId = channelId,
             };
             this.SendFrame(header, payload: default, CancellationToken.None);
         }
@@ -1051,14 +1059,13 @@ namespace Nerdbank.Streams
 
         private async Task SendFrameAsync(FrameHeader header, ReadOnlySequence<byte> payload, CancellationToken cancellationToken)
         {
-            Assumes.True(header.ChannelOfferedBySender.HasValue);
             Assumes.True(payload.Length <= FramePayloadMaxLength, nameof(payload), "Frame content exceeds max limit.");
             Verify.NotDisposed(this);
 
             await this.sendingSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                var qualifiedChannelId = new QualifiedChannelId(header.RequiredChannelId, offeredLocally: header.ChannelOfferedBySender.Value);
+                var qualifiedChannelId = header.RequiredChannelId;
                 lock (this.syncObject)
                 {
                     if (header.Code == ControlCode.ChannelTerminated)

@@ -742,7 +742,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         var channel = this.mx1.CreateChannel();
         var mx2EventArgs = await mx2EventArgsSource.Task.WithCancellation(this.TimeoutToken);
         Assert.Equal(channel.QualifiedId.Id, mx2EventArgs.QualifiedId.Id);
-        Assert.False(mx2EventArgs.QualifiedId.OfferedLocally);
+        Assert.Equal(MultiplexingStream.ChannelSource.Remote, mx2EventArgs.QualifiedId.Source);
         Assert.Equal(string.Empty, mx2EventArgs.Name);
         Assert.False(mx2EventArgs.IsAccepted);
 
@@ -781,7 +781,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
         var offeredChannel = await channelOfferTask;
         Assert.Equal(offeredChannel.QualifiedId.Id, mx2EventArgs.QualifiedId.Id);
-        Assert.False(mx2EventArgs.QualifiedId.OfferedLocally);
+        Assert.Equal(MultiplexingStream.ChannelSource.Remote, mx2EventArgs.QualifiedId.Source);
         Assert.Equal(channelName, mx2EventArgs.Name);
         Assert.Equal(alreadyAccepted, mx2EventArgs.IsAccepted);
 
@@ -1020,30 +1020,22 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         }
     }
 
-    protected static async Task<int> ReadAtLeastAsync(Stream stream, ArraySegment<byte> buffer, int requiredLength, CancellationToken cancellationToken)
+    [Fact]
+    public virtual async Task SeededChannels()
     {
-        Requires.NotNull(stream, nameof(stream));
-        Requires.NotNull(buffer.Array!, nameof(buffer));
-        Requires.Range(requiredLength >= 0, nameof(requiredLength));
-
-        int bytesRead = 0;
-        while (bytesRead < requiredLength)
+        var pair = FullDuplexStream.CreatePair();
+        var options = new MultiplexingStream.Options
         {
-            int bytesReadJustNow = await stream.ReadAsync(buffer.Array, buffer.Offset + bytesRead, buffer.Count - bytesRead, cancellationToken).ConfigureAwait(false);
-            Assert.NotEqual(0, bytesReadJustNow);
-            bytesRead += bytesReadJustNow;
-        }
-
-        return bytesRead;
-    }
-
-    protected static void AssertNoFault(MultiplexingStream? stream)
-    {
-        Exception? fault = stream?.Completion.Exception?.InnerException;
-        if (fault != null)
-        {
-            ExceptionDispatchInfo.Capture(fault).Throw();
-        }
+            ProtocolMajorVersion = this.ProtocolMajorVersion,
+            SeededChannels =
+            {
+               new MultiplexingStream.ChannelOptions { },
+               new MultiplexingStream.ChannelOptions { },
+            },
+        };
+        await Assert.ThrowsAsync<NotSupportedException>(() => Task.WhenAll(
+            MultiplexingStream.CreateAsync(pair.Item1, options, this.TimeoutToken),
+            MultiplexingStream.CreateAsync(pair.Item2, options, this.TimeoutToken)));
     }
 
     protected static Task CompleteChannelsAsync(params MultiplexingStream.Channel[] channels)
@@ -1068,31 +1060,6 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
             this.mx2.AcceptChannelAsync(ChannelName, this.TimeoutToken)).WithCancellation(this.TimeoutToken);
         channels[0].Dispose();
         channels[1].Dispose();
-    }
-
-    protected async Task TransmitAndVerifyAsync(Stream writeTo, Stream readFrom, byte[] data)
-    {
-        Requires.NotNull(writeTo, nameof(writeTo));
-        Requires.NotNull(readFrom, nameof(readFrom));
-        Requires.NotNull(data, nameof(data));
-
-        await writeTo.WriteAsync(data, 0, data.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken);
-        await writeTo.FlushAsync().WithCancellation(this.TimeoutToken);
-        await this.VerifyReceivedDataAsync(readFrom, data);
-    }
-
-    protected async Task VerifyReceivedDataAsync(Stream readFrom, byte[] data)
-    {
-        Requires.NotNull(readFrom, nameof(readFrom));
-        Requires.NotNull(data, nameof(data));
-
-        var readBuffer = new byte[data.Length * 2];
-        int readBytes = await ReadAtLeastAsync(readFrom, new ArraySegment<byte>(readBuffer), data.Length, this.TimeoutToken);
-        Assert.Equal(data.Length, readBytes);
-        for (int i = 0; i < data.Length; i++)
-        {
-            Assert.Equal(data[i], readBuffer[i]);
-        }
     }
 
     protected async Task<(MultiplexingStream.Channel, MultiplexingStream.Channel)> EstablishChannelsAsync(string identifier, long? receivingWindowSize = null)

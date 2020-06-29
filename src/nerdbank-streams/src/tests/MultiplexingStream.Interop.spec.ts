@@ -3,6 +3,7 @@ import "jasmine";
 import { Deferred } from "../Deferred";
 import { FullDuplexStream } from "../FullDuplexStream";
 import { MultiplexingStream } from "../MultiplexingStream";
+import { ChannelOptions } from "../ChannelOptions";
 
 [1, 2, 3].forEach(protocolMajorVersion => {
     describe(`MultiplexingStream v${protocolMajorVersion} (interop) `, () => {
@@ -42,7 +43,8 @@ import { MultiplexingStream } from "../MultiplexingStream";
                 proc.once("error", (err) => procExited.resolve(err));
                 proc.once("exit", (code) => procExited.resolve(code));
                 proc.stderr!.pipe(process.stderr);
-                mx = await MultiplexingStream.CreateAsync(FullDuplexStream.Splice(proc.stdout!, proc.stdin!), { protocolMajorVersion });
+                const seededChannels: ChannelOptions[] | undefined = protocolMajorVersion >= 3 ? [{}] : undefined;
+                mx = await MultiplexingStream.CreateAsync(FullDuplexStream.Splice(proc.stdout!, proc.stdin!), { protocolMajorVersion, seededChannels });
             } catch (e) {
                 proc.kill();
                 proc = null;
@@ -83,6 +85,15 @@ import { MultiplexingStream } from "../MultiplexingStream";
             const recv = await readLineAsync(channel.stream);
             expect(recv).toEqual(`recv: ${bigdata}`);
         });
+
+        if (protocolMajorVersion >= 3) {
+            it("Can communicate over seeded channel", async () => {
+                const channel = mx.acceptChannel(0);
+                await writeAsync(channel.stream, "theclient\n");
+                const recv = await readLineAsync(channel.stream);
+                expect(recv).toEqual("recv: theclient\n");
+            });
+        }
 
         function writeAsync(stream: NodeJS.WritableStream, text: string): Promise<void> {
             const deferred = new Deferred<void>();

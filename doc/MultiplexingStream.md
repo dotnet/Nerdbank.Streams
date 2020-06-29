@@ -11,16 +11,13 @@ Given a bidirectional stream between two parties, both parties should start the 
 
 ```cs
 Stream transportStream;
-var multiplexor = MultiplexingStream.CreateAsync(
+MultiplexingStream multiplexor = await MultiplexingStream.CreateAsync(
     transportStream,
-    new MultiplexingStream.Options { ProtocolMajorVersion = 2 },
+    new MultiplexingStream.Options { ProtocolMajorVersion = 3 },
     this.TimeoutToken);
 ```
 
-The `ProtocolMajorVersion = 2` option enables per-channel flow control.
-All new uses should enable this as it avoids one channel that isn't currently being read
-from causing all other channels from being paused.
-Pre-existing uses still on version 1 should upgrade when they can manage a protocol breaking change.
+Learn more about [protocol major versions](#MajorProtocolVersions).
 
 ## Establishing named channels
 
@@ -99,6 +96,45 @@ level using the multiplexing stream, since before that app-level message could
 have arrived, the channel offer would have already been transmitted by that
 same stream.
 
+### Seeded channels
+
+Anonymous channels may be "seeded" when creating the initial `MultiplexingStream` when using protocol version 3 or later.
+This allows two communicating endpoints to establish a multiplexing stream and as many channels as they initially require without ever exchanging a network packet.
+This is an optimization that increasing the coupling between two parties that should only be used when avoiding network traffic during the handshake of initial channels is required.
+Each party must specify exactly the same number of seeded channels and channel options or protocol failures may result.
+
+To establish a multiplexing stream connection that includes seeded channels, set up the stream like this:
+
+```cs
+Stream transportStream;
+MultiplexingStream multiplexor = MultiplexingStream.Create(
+    transportStream,
+    new MultiplexingStream.Options {
+        ProtocolMajorVersion = 3,
+        SeededChannels = {
+            new MultiplexingStream.ChannelOptions { },
+            new MultiplexingStream.ChannelOptions { },
+            new MultiplexingStream.ChannelOptions { },
+        },
+    },
+    this.TimeoutToken);
+```
+
+The above sample sets up 3 channels, each with a default set of options.
+Both sides must set up the same number of seeded channels with equivalent options.
+
+To use these channels within the multiplexing stream, *accept* them as anonymous channels,
+using the index into the seeded channels list as the channel ID:
+
+```cs
+Channel ch1 = multiplexor.AcceptChannel(0);
+Channel ch2 = multiplexor.AcceptChannel(1);
+Channel ch3 = multiplexor.AcceptChannel(2);
+```
+
+Note that *both* sides will *accept* these channels, as they are not offered by either party because they are seeded by both.
+These channels cannot be rejected with `RejectChannel` but they can be shutdown after being accepted.
+
 ## Shutting down
 
 ### Complete writing
@@ -130,3 +166,14 @@ Disposing a channel takes effect immediately for the local party. Any bytes tran
 that have not already been read become inaccessible.
 
 Disposing the `MultiplexingStream` instance itself will dispose all the open channels.
+
+## <a name="MajorProtocolVersions"></a>Major protocol versions
+
+Each major version of the multiplexing stream protocol represent wire-protocol breaking changes.
+Using the latest version is generally preferred but should only be made when all communicating parties can be updated simultaneously.
+
+Version | Unique capabilities
+--|--
+1 | Initial version
+2 | Adds per-channel flow control. This prevents one channel's full buffer from pausing all other channels.
+3 | Removes initial handshake. Adds seeded channels.

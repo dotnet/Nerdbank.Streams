@@ -27,6 +27,14 @@ namespace Nerdbank.Streams
                 this.PipeWriter = writer;
             }
 
+            /// <summary>
+            /// Gets or sets the result of the handshake regarding whether this endpoint is the "odd" one.
+            /// </summary>
+            /// <remarks>
+            /// Only applicable and set in v1 and v2 of the protocol.
+            /// </remarks>
+            protected bool? IsOddEndpoint { get; set; }
+
             protected PipeWriter PipeWriter { get; }
 
             public virtual ValueTask DisposeAsync() => this.PipeWriter.CompleteAsync();
@@ -93,6 +101,30 @@ namespace Nerdbank.Streams
 
                 return isOdd.Value;
             }
+
+            protected FrameHeader CreateFrameHeader(ControlCode code, ulong? channelId, ChannelSource? channelSource)
+            {
+                QualifiedChannelId? qualifiedId = null;
+                if (channelId.HasValue)
+                {
+                    if (!channelSource.HasValue)
+                    {
+                        Assumes.True(this.IsOddEndpoint.HasValue);
+                        bool channelIsOdd = channelId.Value % 2 == 1;
+
+                        // Remember that this is from the remote sender's point of view.
+                        channelSource = channelIsOdd == this.IsOddEndpoint.Value ? ChannelSource.Remote : ChannelSource.Local;
+                    }
+
+                    qualifiedId = new QualifiedChannelId(channelId.Value, channelSource.Value);
+                }
+
+                return new FrameHeader
+                {
+                    Code = code,
+                    ChannelId = qualifiedId,
+                };
+            }
         }
 
         internal class V1Formatter : Formatter
@@ -148,15 +180,15 @@ namespace Nerdbank.Streams
                     }
                 }
 
-                bool isOdd = IsOdd(randomSendBuffer, handshakeBytes.AsSpan(ProtocolMagicNumber.Length));
-                return (isOdd, ProtocolVersion);
+                this.IsOddEndpoint = IsOdd(randomSendBuffer, handshakeBytes.AsSpan(ProtocolMagicNumber.Length));
+                return (this.IsOddEndpoint, ProtocolVersion);
             }
 
             internal override void WriteFrame(FrameHeader header, ReadOnlySequence<byte> payload)
             {
                 var span = this.PipeWriter.GetSpan(checked(HeaderLength + (int)payload.Length));
                 span[0] = (byte)header.Code;
-                Utilities.Write(span.Slice(1, 4), checked((int)(header.ChannelId ?? 0)));
+                Utilities.Write(span.Slice(1, 4), checked((int)(header.ChannelId?.Id ?? 0)));
                 Utilities.Write(span.Slice(5, 2), (ushort)payload.Length);
 
                 span = span.Slice(HeaderLength);
@@ -176,11 +208,10 @@ namespace Nerdbank.Streams
                     return null;
                 }
 
-                var header = new FrameHeader
-                {
-                    Code = (ControlCode)this.headerBuffer.Span[0],
-                    ChannelId = checked((ulong)Utilities.ReadInt(this.headerBuffer.Span.Slice(1, 4))),
-                };
+                var header = this.CreateFrameHeader(
+                    (ControlCode)this.headerBuffer.Span[0],
+                    checked((ulong)Utilities.ReadInt(this.headerBuffer.Span.Slice(1, 4))),
+                    null);
 
                 int framePayloadLength = Utilities.ReadInt(this.headerBuffer.Span.Slice(5, 2));
                 var payloadBuffer = this.payloadBuffer.Slice(0, framePayloadLength);
@@ -300,7 +331,9 @@ namespace Nerdbank.Streams
                         throw new EndOfStreamException();
                     }
 
-                    return DeserializeHandshake(randomSendBuffer, msgpackSequence.Value, options);
+                    var result = DeserializeHandshake(randomSendBuffer, msgpackSequence.Value, options);
+                    this.IsOddEndpoint = result.IsOdd;
+                    return result;
                 }
             }
 
@@ -314,9 +347,9 @@ namespace Nerdbank.Streams
                 writer.Write((int)header.Code);
                 if (elementCount > 1)
                 {
-                    if (header.ChannelId is ulong channelId)
+                    if (header.ChannelId.HasValue)
                     {
-                        writer.Write(channelId);
+                        writer.Write(header.ChannelId.Value.Id);
                     }
                     else
                     {
@@ -435,13 +468,14 @@ namespace Nerdbank.Streams
             {
                 var reader = new MessagePackReader(frameSequence);
                 int headerElementCount = reader.ReadArrayHeader();
-                var header = default(FrameHeader);
                 if (headerElementCount < 1)
                 {
                     throw new MultiplexingProtocolException("Not enough elements in frame header.");
                 }
 
-                header.Code = (ControlCode)reader.ReadInt32();
+                FrameHeader header;
+                var code = (ControlCode)reader.ReadInt32();
+                ulong? channelId = null;
                 if (headerElementCount > 1)
                 {
                     if (reader.IsNil)
@@ -450,16 +484,18 @@ namespace Nerdbank.Streams
                     }
                     else
                     {
-                        header.ChannelId = reader.ReadUInt64();
+                        channelId = reader.ReadUInt64();
                     }
 
                     if (headerElementCount > 2)
                     {
                         var payload = reader.ReadBytes() ?? default;
+                        header = this.CreateFrameHeader(code, channelId, null);
                         return (header, payload);
                     }
                 }
 
+                header = this.CreateFrameHeader(code, channelId, null);
                 return (header, default);
             }
 
@@ -537,11 +573,10 @@ namespace Nerdbank.Streams
                 writer.Write((int)header.Code);
                 if (elementCount > 1)
                 {
-                    if (header.ChannelId is ulong channelId)
+                    if (header.ChannelId is { } channelId)
                     {
-                        writer.Write(channelId);
-                        Assumes.True(header.ChannelOfferedBySender.HasValue);
-                        writer.Write(header.ChannelOfferedBySender.Value);
+                        writer.Write(channelId.Id);
+                        writer.Write((sbyte)channelId.Source);
                     }
                     else
                     {
@@ -577,8 +612,9 @@ namespace Nerdbank.Streams
                             throw new MultiplexingProtocolException("Not enough elements in frame header.");
                         }
 
-                        header.ChannelId = reader.ReadUInt64();
-                        header.ChannelOfferedBySender = reader.ReadBoolean();
+                        header.ChannelId = new QualifiedChannelId(
+                            reader.ReadUInt64(),
+                            (ChannelSource)reader.ReadSByte());
                     }
 
                     if (headerElementCount > 3)
