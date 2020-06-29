@@ -32,8 +32,8 @@ export abstract class MultiplexingStreamFormatter {
     abstract serializeOfferParameters(offer: OfferParameters): Buffer;
     abstract deserializeOfferParameters(payload: Buffer): OfferParameters;
 
-    abstract serializerAcceptanceParameters(acceptance: AcceptanceParameters): Buffer;
-    abstract deserializerAcceptanceParameters(payload: Buffer): AcceptanceParameters;
+    abstract serializeAcceptanceParameters(acceptance: AcceptanceParameters): Buffer;
+    abstract deserializeAcceptanceParameters(payload: Buffer): AcceptanceParameters;
 
     abstract serializeContentProcessed(bytesProcessed: number): Buffer;
     abstract deserializeContentProcessed(payload: Buffer): number;
@@ -161,11 +161,11 @@ export class MultiplexingStreamV1Formatter extends MultiplexingStreamFormatter {
         };
     }
 
-    serializerAcceptanceParameters(_: AcceptanceParameters): Buffer {
+    serializeAcceptanceParameters(_: AcceptanceParameters): Buffer {
         return new Buffer([]);
     }
 
-    deserializerAcceptanceParameters(_: Buffer): AcceptanceParameters {
+    deserializeAcceptanceParameters(_: Buffer): AcceptanceParameters {
         return {};
     }
 
@@ -269,7 +269,7 @@ export class MultiplexingStreamV2Formatter extends MultiplexingStreamFormatter {
         };
     }
 
-    serializerAcceptanceParameters(acceptance: AcceptanceParameters): Buffer {
+    serializeAcceptanceParameters(acceptance: AcceptanceParameters): Buffer {
         const payload: any[] = [];
         if (acceptance.remoteWindowSize) {
             payload.push(acceptance.remoteWindowSize);
@@ -278,7 +278,7 @@ export class MultiplexingStreamV2Formatter extends MultiplexingStreamFormatter {
         return msgpack.encode(payload);
     }
 
-    deserializerAcceptanceParameters(payload: Buffer): AcceptanceParameters {
+    deserializeAcceptanceParameters(payload: Buffer): AcceptanceParameters {
         const msgpackObject = msgpack.decode(payload);
         return {
             remoteWindowSize: msgpackObject[0],

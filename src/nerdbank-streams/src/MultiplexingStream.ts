@@ -411,7 +411,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
             }
 
             if (channel.qualifiedId.source !== ChannelSource.Seeded) {
-                const payload = this.formatter.serializerAcceptanceParameters(acceptanceParameters);
+                const payload = this.formatter.serializeAcceptanceParameters(acceptanceParameters);
                 this.rejectOnFailure(this.sendFrameAsync(new FrameHeader(ControlCode.OfferAccepted, channel.qualifiedId), payload, this.disposalToken));
             }
         } else if (channel.isAccepted) {
@@ -650,7 +650,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
             throw new Error("Remote party tried to accept a channel that they offered.");
         }
 
-        const acceptanceParameter = this.formatter.deserializerAcceptanceParameters(payload);
+        const acceptanceParameter = this.formatter.deserializeAcceptanceParameters(payload);
         const channel = this.getOpenChannel(channelId);
         if (!channel) {
             throw new Error(`Unexpected channel created with ID ${QualifiedChannelId.toString(channelId)}`);
