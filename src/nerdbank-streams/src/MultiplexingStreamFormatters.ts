@@ -8,6 +8,7 @@ import * as msgpack from 'msgpack-lite';
 import { Deferred } from "./Deferred";
 import { FrameHeader } from "./FrameHeader";
 import { ControlCode } from "./ControlCode";
+import { ChannelSource } from "./QualifiedChannelId";
 
 export interface Version {
     major: number;
@@ -62,6 +63,18 @@ export abstract class MultiplexingStreamFormatter {
         }
 
         return isOdd;
+    }
+
+    protected createFrameHeader(code: ControlCode, id: number | undefined): FrameHeader {
+        if (!id) {
+            return new FrameHeader(code);
+        }
+
+        const channelIsOdd = id % 2 === 1;
+
+        // Remember that this is from the remote sender's point of view.
+        const source = channelIsOdd === this.isOdd ? ChannelSource.Remote : ChannelSource.Local;
+        return new FrameHeader(code, { id, source });
     }
 }
 
@@ -125,10 +138,9 @@ export class MultiplexingStreamV1Formatter extends MultiplexingStreamFormatter {
             return null;
         }
 
-        const header = FrameHeader.createFromReceived(
+        const header = this.createFrameHeader(
             headerBuffer.readInt8(0),
-            this.isOdd,
-            { id: headerBuffer.readUInt32BE(1), offeredBySender: null });
+            headerBuffer.readUInt32BE(1));
         const payloadLength = headerBuffer.readUInt16BE(5);
         const payload = await getBufferFrom(this.stream, payloadLength);
         return { header, payload };
@@ -231,10 +243,9 @@ export class MultiplexingStreamV2Formatter extends MultiplexingStreamFormatter {
             return null;
         }
 
-        const header = FrameHeader.createFromReceived(
+        const header = this.createFrameHeader(
             msgpackObject[0],
-            this.isOdd,
-            msgpackObject.length > 1 ? { id: msgpackObject[1], offeredBySender: null } : undefined);
+            msgpackObject[1]);
         return {
             header,
             payload: msgpackObject[2] || Buffer.from([]),
@@ -321,7 +332,7 @@ export class MultiplexingStreamV3Formatter extends MultiplexingStreamV2Formatter
         const msgpackObject: any[] = [header.code];
         if (header.channel) {
             msgpackObject.push(header.channel.id);
-            msgpackObject.push(header.channel.offeredLocally);
+            msgpackObject.push(header.channel.source);
             if (payload && payload.length > 0) {
                 msgpackObject.push(payload);
             }
@@ -333,15 +344,14 @@ export class MultiplexingStreamV3Formatter extends MultiplexingStreamV2Formatter
     }
 
     async readFrameAsync(cancellationToken: CancellationToken): Promise<{ header: FrameHeader; payload: Buffer; } | null> {
-        const msgpackObject = await this.readMessagePackAsync(cancellationToken) as [ControlCode, number, boolean, Buffer] | null;
+        const msgpackObject = await this.readMessagePackAsync(cancellationToken) as [ControlCode, number, ChannelSource, Buffer] | null;
         if (msgpackObject === null) {
             return null;
         }
 
-        const header = FrameHeader.createFromReceived(
+        const header = new FrameHeader(
             msgpackObject[0],
-            this.isOdd || null,
-            msgpackObject.length > 1 ? { id: msgpackObject[1], offeredBySender: msgpackObject[2] } : undefined);
+            msgpackObject.length > 1 ? { id: msgpackObject[1], source: msgpackObject[2] } : undefined);
         return {
             header,
             payload: msgpackObject[3] || Buffer.from([]),

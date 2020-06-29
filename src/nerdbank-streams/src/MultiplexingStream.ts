@@ -24,7 +24,7 @@ import {
 } from "./MultiplexingStreamFormatters";
 import { OfferParameters } from "./OfferParameters";
 import { Semaphore } from 'await-semaphore';
-import { QualifiedChannelId } from "./QualifiedChannelId";
+import { QualifiedChannelId, ChannelSource } from "./QualifiedChannelId";
 
 export abstract class MultiplexingStream implements IDisposableObservable {
     /**
@@ -74,9 +74,12 @@ export abstract class MultiplexingStream implements IDisposableObservable {
             throw new Error("stream must be specified.");
         }
 
-        options = options || new MultiplexingStreamOptions();
+        options = options || {};
         options.protocolMajorVersion = options.protocolMajorVersion || 1;
         options.defaultChannelReceivingWindowSize = options.defaultChannelReceivingWindowSize || MultiplexingStream.recommendedDefaultChannelReceivingWindowSize;
+        if (options.protocolMajorVersion < 3 && options.seededChannels && options.seededChannels.length > 0) {
+            throw new Error("Seeded channels require v3 of the protocol at least.");
+        }
 
         // Send the protocol magic number, and a random 16-byte number to establish even/odd assignments.
         const formatter: MultiplexingStreamFormatter | undefined =
@@ -107,6 +110,11 @@ export abstract class MultiplexingStream implements IDisposableObservable {
     static readonly ControlFrameEncoding = "utf-8";
 
     protected readonly _completionSource = new Deferred<void>();
+
+    /**
+     * A dictionary of channels that were seeded, keyed by their ID.
+     */
+    protected readonly seededOpenChannels: { [id: number]: ChannelClass } = {};
 
     /**
      * A dictionary of channels that were offered locally, keyed by their ID.
@@ -155,6 +163,14 @@ export abstract class MultiplexingStream implements IDisposableObservable {
         }
         formatter.isOdd = isOdd;
         this.formatter = formatter;
+
+        if (options.seededChannels) {
+            for (let i = 0; i < options.seededChannels.length; i++) {
+                const channelOptions = options.seededChannels[i];
+                const id = { id: i, source: ChannelSource.Seeded };
+                this.setOpenChannel(new ChannelClass(this as unknown as MultiplexingStreamClass, id, { name: '', remoteWindowSize: channelOptions.channelReceivingWindowSize ?? this.defaultChannelReceivingWindowSize }));
+            }
+        }
     }
 
     /**
@@ -173,11 +189,11 @@ export abstract class MultiplexingStream implements IDisposableObservable {
         const payload = this.formatter.serializeOfferParameters(offerParameters);
         const channel = new ChannelClass(
             this as any as MultiplexingStreamClass,
-            { id: this.getUnusedChannelId(), offeredLocally: true },
+            { id: this.getUnusedChannelId(), source: ChannelSource.Local },
             offerParameters);
         this.setOpenChannel(channel);
 
-        this.rejectOnFailure(this.sendFrameAsync(FrameHeader.createToSend(ControlCode.Offer, channel.qualifiedId), payload, this.disposalToken));
+        this.rejectOnFailure(this.sendFrameAsync(new FrameHeader(ControlCode.Offer, channel.qualifiedId), payload, this.disposalToken));
         return channel;
     }
 
@@ -191,7 +207,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      * for a channel that has already been made.
      */
     public acceptChannel(id: number, options?: ChannelOptions): Channel {
-        const channel = this.remotelyOfferedOpenChannels[id];
+        const channel = this.remotelyOfferedOpenChannels[id] || this.seededOpenChannels[id];
         if (!channel) {
             throw new Error("No channel with ID " + id);
         }
@@ -253,11 +269,11 @@ export abstract class MultiplexingStream implements IDisposableObservable {
         const payload = this.formatter.serializeOfferParameters(offerParameters);
         const channel = new ChannelClass(
             this as any as MultiplexingStreamClass,
-            { id: this.getUnusedChannelId(), offeredLocally: true },
+            { id: this.getUnusedChannelId(), source: ChannelSource.Local },
             offerParameters);
         this.setOpenChannel(channel);
 
-        const header = FrameHeader.createToSend(ControlCode.Offer, channel.qualifiedId);
+        const header = new FrameHeader(ControlCode.Offer, channel.qualifiedId);
 
         const unsubscribeFromCT = cancellationToken.onCancelled((reason) => this.offerChannelCanceled(channel, reason));
         try {
@@ -394,8 +410,10 @@ export abstract class MultiplexingStream implements IDisposableObservable {
                 acceptanceParameters.remoteWindowSize = this.defaultChannelReceivingWindowSize;
             }
 
-            const payload = this.formatter.serializerAcceptanceParameters(acceptanceParameters);
-            this.rejectOnFailure(this.sendFrameAsync(FrameHeader.createToSend(ControlCode.OfferAccepted, channel.qualifiedId), payload, this.disposalToken));
+            if (channel.qualifiedId.source !== ChannelSource.Seeded) {
+                const payload = this.formatter.serializerAcceptanceParameters(acceptanceParameters);
+                this.rejectOnFailure(this.sendFrameAsync(new FrameHeader(ControlCode.OfferAccepted, channel.qualifiedId), payload, this.disposalToken));
+            }
         } else if (channel.isAccepted) {
             throw new Error("Channel is already accepted.");
         } else if (channel.isRejectedOrCanceled) {
@@ -424,18 +442,26 @@ export abstract class MultiplexingStream implements IDisposableObservable {
     }
 
     protected getOpenChannel(qualifiedId: QualifiedChannelId): ChannelClass | undefined {
-        const collection = qualifiedId.offeredLocally ? this.locallyOfferedOpenChannels : this.remotelyOfferedOpenChannels;
-        return collection[qualifiedId.id];
+        return this.getChannelCollection(qualifiedId.source)[qualifiedId.id];
     }
 
     protected setOpenChannel(channel: ChannelClass) {
-        const collection = channel.qualifiedId.offeredLocally ? this.locallyOfferedOpenChannels : this.remotelyOfferedOpenChannels;
-        collection[channel.qualifiedId.id] = channel;
+        this.getChannelCollection(channel.qualifiedId.source)[channel.qualifiedId.id] = channel;
     }
 
     protected deleteOpenChannel(qualifiedId: QualifiedChannelId) {
-        const collection = qualifiedId.offeredLocally ? this.locallyOfferedOpenChannels : this.remotelyOfferedOpenChannels;
-        delete collection[qualifiedId.id];
+        delete this.getChannelCollection(qualifiedId.source)[qualifiedId.id];
+    }
+
+    private getChannelCollection(source: ChannelSource): { [id: number]: ChannelClass } {
+        switch (source) {
+            case ChannelSource.Local:
+                return this.locallyOfferedOpenChannels;
+            case ChannelSource.Remote:
+                return this.remotelyOfferedOpenChannels;
+            case ChannelSource.Seeded:
+                return this.seededOpenChannels;
+        }
     }
 
     /**
@@ -477,6 +503,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         super(stream, isOdd, options);
 
         this.lastOfferedChannelId = isOdd ? -1 : 0; // the first channel created should be 1 or 2
+        this.lastOfferedChannelId += options.seededChannels?.length ?? 0;
 
         // Initiate reading from the transport stream. This will not end until the stream does, or we're disposed.
         // If reading the stream fails, we'll dispose ourselves.
@@ -519,7 +546,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
                 return;
             }
 
-            const header = FrameHeader.createToSend(code, channelId);
+            const header = new FrameHeader(code, channelId);
             await this.sendFrameAsync(header);
         } catch (error) {
             // We mustn't throw back to our caller. So report the failure by disposing with failure.
@@ -542,7 +569,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 
     public localContentExamined(channel: ChannelClass, bytesConsumed: number) {
         const payload = this.formatter.serializeContentProcessed(bytesConsumed);
-        this.rejectOnFailure(this.sendFrameAsync(FrameHeader.createToSend(ControlCode.ContentProcessed, channel.qualifiedId), payload));
+        this.rejectOnFailure(this.sendFrameAsync(new FrameHeader(ControlCode.ContentProcessed, channel.qualifiedId), payload));
     }
 
     private async readFromStream(cancellationToken: CancellationToken) {
@@ -552,6 +579,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
                 break;
             }
 
+            frame.header.flipChannelPerspective();
             switch (frame.header.code) {
                 case ControlCode.Offer:
                     this.onOffer(frame.header.requiredChannel, frame.payload);
@@ -618,7 +646,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
     }
 
     private onOfferAccepted(channelId: QualifiedChannelId, payload: Buffer) {
-        if (!channelId.offeredLocally) {
+        if (channelId.source !== ChannelSource.Local) {
             throw new Error("Remote party tried to accept a channel that they offered.");
         }
 

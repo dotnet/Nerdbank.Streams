@@ -8,7 +8,7 @@ import { IDisposableObservable } from "./IDisposableObservable";
 import { MultiplexingStreamClass, MultiplexingStream } from "./MultiplexingStream";
 import { OfferParameters } from "./OfferParameters";
 import { AcceptanceParameters } from "./AcceptanceParameters";
-import { QualifiedChannelId } from "./QualifiedChannelId";
+import { QualifiedChannelId, ChannelSource } from "./QualifiedChannelId";
 
 export abstract class Channel implements IDisposableObservable {
     /**
@@ -88,10 +88,19 @@ export class ChannelClass extends Channel {
         super(id);
         const self = this;
         this.name = offerParameters.name;
-        if (id.offeredLocally) {
-            this.localWindowSize = offerParameters.remoteWindowSize;
-        } else {
-            this.remoteWindowSize = offerParameters.remoteWindowSize;
+        switch (id.source) {
+            case ChannelSource.Local:
+                this.localWindowSize = offerParameters.remoteWindowSize;
+                break;
+            case ChannelSource.Remote:
+                this.remoteWindowSize = offerParameters.remoteWindowSize;
+                break;
+            case ChannelSource.Seeded:
+                this.remoteWindowSize = offerParameters.remoteWindowSize;
+                this.localWindowSize = offerParameters.remoteWindowSize;
+                break;
+            default:
+                throw new Error("Channel source not recognized.");
         }
 
         this._multiplexingStream = multiplexingStream;
@@ -121,7 +130,7 @@ export class ChannelClass extends Channel {
                         }
 
                         self.onTransmittingBytes(bytesTransmitted);
-                        const header = FrameHeader.createToSend(ControlCode.Content, id);
+                        const header = new FrameHeader(ControlCode.Content, id);
                         await multiplexingStream.sendFrameAsync(header, payload.slice(0, bytesTransmitted));
                         payload = payload.slice(bytesTransmitted);
                     }

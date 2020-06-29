@@ -4,7 +4,10 @@
 namespace Nerdbank.Streams
 {
     using System;
+    using System.Collections.Generic;
+    using System.Collections.ObjectModel;
     using System.Diagnostics;
+    using System.Linq;
     using Microsoft;
 
     /// <content>
@@ -57,6 +60,7 @@ namespace Nerdbank.Streams
             /// </summary>
             public Options()
             {
+                this.SeededChannels = new List<ChannelOptions>();
             }
 
             /// <summary>
@@ -73,6 +77,23 @@ namespace Nerdbank.Streams
                 this.protocolMajorVersion = copyFrom.protocolMajorVersion;
                 this.defaultChannelTraceSourceFactory = copyFrom.defaultChannelTraceSourceFactory;
                 this.defaultChannelTraceSourceFactoryWithQualifier = copyFrom.defaultChannelTraceSourceFactoryWithQualifier;
+                this.SeededChannels = copyFrom.SeededChannels.ToList();
+            }
+
+            /// <summary>
+            /// Initializes a new instance of the <see cref="Options"/> class
+            /// and copies the values from another instance into this one.
+            /// </summary>
+            /// <param name="copyFrom">The instance to copy values from.</param>
+            /// <param name="frozen"><c>true</c> to freeze this copy.</param>
+            private Options(Options copyFrom, bool frozen)
+                : this(copyFrom)
+            {
+                this.IsFrozen = frozen;
+                if (frozen)
+                {
+                    this.SeededChannels = new ReadOnlyCollection<ChannelOptions>(this.SeededChannels);
+                }
             }
 
             /// <summary>
@@ -169,6 +190,17 @@ namespace Nerdbank.Streams
             }
 
             /// <summary>
+            /// Gets a list of options for channels that are to be "seeded" into a new <see cref="MultiplexingStream"/>.
+            /// </summary>
+            /// <remarks>
+            /// Seeded channels avoid the need for a round-trip for an offer/accept packet exchange.
+            /// Seeded channels are accessed within the <see cref="MultiplexingStream"/> instance by calling <see cref="AcceptChannel(ulong, ChannelOptions?)"/>
+            /// with the 0-based index into this list used as the channel ID.
+            /// They are only supported when <see cref="ProtocolMajorVersion"/> is at least 3.
+            /// </remarks>
+            public IList<ChannelOptions> SeededChannels { get; private set; }
+
+            /// <summary>
             /// Gets a value indicating whether this instance is frozen.
             /// </summary>
             public bool IsFrozen { get; private set; }
@@ -177,7 +209,7 @@ namespace Nerdbank.Streams
             /// Returns a frozen instance of this object.
             /// </summary>
             /// <returns>This instance if already frozen, otherwise a frozen copy.</returns>
-            public Options GetFrozenCopy() => this.IsFrozen ? this : new Options(this) { IsFrozen = true };
+            public Options GetFrozenCopy() => this.IsFrozen ? this : new Options(this, frozen: true);
 
             private void ThrowIfFrozen() => Verify.Operation(!this.IsFrozen, Strings.Frozen);
         }

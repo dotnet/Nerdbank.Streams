@@ -9,6 +9,7 @@ using System.IO.Pipelines;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft;
@@ -294,6 +295,32 @@ public abstract class TestBase : IDisposable
         return tcs.Task;
     }
 
+    protected static void AssertNoFault(MultiplexingStream? stream)
+    {
+        Exception? fault = stream?.Completion.Exception?.InnerException;
+        if (fault != null)
+        {
+            ExceptionDispatchInfo.Capture(fault).Throw();
+        }
+    }
+
+    protected static async Task<int> ReadAtLeastAsync(Stream stream, ArraySegment<byte> buffer, int requiredLength, CancellationToken cancellationToken)
+    {
+        Requires.NotNull(stream, nameof(stream));
+        Requires.NotNull(buffer.Array!, nameof(buffer));
+        Requires.Range(requiredLength >= 0, nameof(requiredLength));
+
+        int bytesRead = 0;
+        while (bytesRead < requiredLength)
+        {
+            int bytesReadJustNow = await stream.ReadAsync(buffer.Array, buffer.Offset + bytesRead, buffer.Count - bytesRead, cancellationToken).ConfigureAwait(false);
+            Assert.NotEqual(0, bytesReadJustNow);
+            bytesRead += bytesReadJustNow;
+        }
+
+        return bytesRead;
+    }
+
     /// <summary>
     /// Executes the specified test method in its own process, offering maximum isolation from ambient noise from other threads
     /// and GC.
@@ -362,6 +389,31 @@ public abstract class TestBase : IDisposable
         var buffer = new byte[length];
         this.random.NextBytes(buffer);
         return buffer;
+    }
+
+    protected async Task TransmitAndVerifyAsync(Stream writeTo, Stream readFrom, byte[] data)
+    {
+        Requires.NotNull(writeTo, nameof(writeTo));
+        Requires.NotNull(readFrom, nameof(readFrom));
+        Requires.NotNull(data, nameof(data));
+
+        await writeTo.WriteAsync(data, 0, data.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken);
+        await writeTo.FlushAsync().WithCancellation(this.TimeoutToken);
+        await this.VerifyReceivedDataAsync(readFrom, data);
+    }
+
+    protected async Task VerifyReceivedDataAsync(Stream readFrom, byte[] data)
+    {
+        Requires.NotNull(readFrom, nameof(readFrom));
+        Requires.NotNull(data, nameof(data));
+
+        var readBuffer = new byte[data.Length * 2];
+        int readBytes = await ReadAtLeastAsync(readFrom, new ArraySegment<byte>(readBuffer), data.Length, this.TimeoutToken);
+        Assert.Equal(data.Length, readBytes);
+        for (int i = 0; i < data.Length; i++)
+        {
+            Assert.Equal(data[i], readBuffer[i]);
+        }
     }
 
     private static Task MaybeShouldBeComplete(Task task, bool shouldBeSynchronous)

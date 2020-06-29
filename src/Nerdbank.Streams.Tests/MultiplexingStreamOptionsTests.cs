@@ -62,6 +62,18 @@ public class MultiplexingStreamOptionsTests
     }
 
     [Fact]
+    public void SeededChannels()
+    {
+        Assert.Empty(this.options.SeededChannels);
+        Assert.False(this.options.SeededChannels.IsReadOnly);
+
+        this.options.SeededChannels.Add(new MultiplexingStream.ChannelOptions());
+        this.options.SeededChannels.Add(new MultiplexingStream.ChannelOptions());
+
+        Assert.Equal(2, this.options.SeededChannels.Count);
+    }
+
+    [Fact]
     public void IsFrozen()
     {
         Assert.False(this.options.IsFrozen);
@@ -83,6 +95,11 @@ public class MultiplexingStreamOptionsTests
             DefaultChannelTraceSourceFactoryWithQualifier = (id, name) => null,
             ProtocolMajorVersion = 1024,
             TraceSource = new TraceSource("test"),
+            SeededChannels =
+            {
+                new MultiplexingStream.ChannelOptions(),
+                new MultiplexingStream.ChannelOptions(),
+            },
         };
 
         var copy = new MultiplexingStream.Options(original);
@@ -91,6 +108,8 @@ public class MultiplexingStreamOptionsTests
         Assert.Equal(original.DefaultChannelTraceSourceFactoryWithQualifier, copy.DefaultChannelTraceSourceFactoryWithQualifier);
         Assert.Equal(original.ProtocolMajorVersion, copy.ProtocolMajorVersion);
         Assert.Equal(original.TraceSource, copy.TraceSource);
+        Assert.NotSame(original.SeededChannels, copy.SeededChannels);
+        Assert.Equal<MultiplexingStream.ChannelOptions>(original.SeededChannels, copy.SeededChannels);
     }
 
     [Fact]
@@ -102,13 +121,22 @@ public class MultiplexingStreamOptionsTests
         Assert.Throws<InvalidOperationException>(() => frozen.DefaultChannelTraceSourceFactoryWithQualifier = (id, name) => null);
         Assert.Throws<InvalidOperationException>(() => frozen.ProtocolMajorVersion = 5);
         Assert.Throws<InvalidOperationException>(() => frozen.TraceSource = new TraceSource("test"));
+        Assert.Throws<NotSupportedException>(() => frozen.SeededChannels.Clear());
+        Assert.Throws<NotSupportedException>(() => frozen.SeededChannels.Add(new MultiplexingStream.ChannelOptions()));
     }
 
     [Fact]
     public void CopyOfFrozenIsNotFrozen()
     {
-        var thawedOptions = new MultiplexingStream.Options(this.options.GetFrozenCopy());
+        MultiplexingStream.Options frozen = this.options.GetFrozenCopy();
+        var thawedOptions = new MultiplexingStream.Options(frozen);
         Assert.False(thawedOptions.IsFrozen);
         thawedOptions.ProtocolMajorVersion = 500;
+
+        Assert.False(thawedOptions.SeededChannels.IsReadOnly);
+        thawedOptions.SeededChannels.Add(new MultiplexingStream.ChannelOptions());
+        Assert.NotEmpty(thawedOptions.SeededChannels);
+        Assert.Empty(frozen.SeededChannels);
+        Assert.Empty(this.options.SeededChannels);
     }
 }

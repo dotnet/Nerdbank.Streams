@@ -79,6 +79,24 @@ namespace Nerdbank.Streams {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to No channel with that ID found..
+        /// </summary>
+        internal static string NoChannelFoundById {
+            get {
+                return ResourceManager.GetString("NoChannelFoundById", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to This operation is not allowed on a seeded channel..
+        /// </summary>
+        internal static string NotAllowedOnSeededChannel {
+            get {
+                return ResourceManager.GetString("NotAllowedOnSeededChannel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to This operation is not supported when the Channel is created with ChannelOptions.ExistingPipe set..
         /// </summary>
         internal static string NotSupportedWhenExistingPipeSpecified {
@@ -111,6 +129,15 @@ namespace Nerdbank.Streams {
         internal static string ReadingMustBeFollowedByAdvance {
             get {
                 return ResourceManager.GetString("ReadingMustBeFollowedByAdvance", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Seeded channels must be empty unless the protocol version is 3 or later..
+        /// </summary>
+        internal static string SeededChannelsRequireV3Protocol {
+            get {
+                return ResourceManager.GetString("SeededChannelsRequireV3Protocol", resourceCulture);
             }
         }
     }

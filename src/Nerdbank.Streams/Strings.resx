@@ -123,6 +123,12 @@
   <data name="Frozen" xml:space="preserve">
     <value>This instance has been frozen. No mutations are allowed.</value>
   </data>
+  <data name="NoChannelFoundById" xml:space="preserve">
+    <value>No channel with that ID found.</value>
+  </data>
+  <data name="NotAllowedOnSeededChannel" xml:space="preserve">
+    <value>This operation is not allowed on a seeded channel.</value>
+  </data>
   <data name="NotSupportedWhenExistingPipeSpecified" xml:space="preserve">
     <value>This operation is not supported when the Channel is created with ChannelOptions.ExistingPipe set.</value>
   </data>
@@ -134,5 +140,8 @@
   </data>
   <data name="ReadingMustBeFollowedByAdvance" xml:space="preserve">
     <value>Reading has already begun. Call AdvanceTo before reading again.</value>
+  </data>
+  <data name="SeededChannelsRequireV3Protocol" xml:space="preserve">
+    <value>Seeded channels must be empty unless the protocol version is 3 or later.</value>
   </data>
 </root>
