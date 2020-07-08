@@ -414,10 +414,13 @@ namespace Nerdbank.Streams
                             break;
                         }
                     }
+
+                    await reader.CompleteAsync().ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
                     await writer.CompleteAsync(ex).ConfigureAwait(false);
+                    await reader.CompleteAsync(ex).ConfigureAwait(false);
                 }
             });
         }

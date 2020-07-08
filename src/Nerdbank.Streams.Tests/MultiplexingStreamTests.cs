@@ -206,6 +206,33 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
+    public async Task ChannelDispose_ClosesExistingStream()
+    {
+        var ms = new MonitoringStream(new MemoryStream());
+        var disposal = new AsyncManualResetEvent();
+        ms.Disposed += (s, e) => disposal.Set();
+
+        var channel = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = ms.UsePipe() });
+        channel.Dispose();
+        await disposal.WaitAsync(this.TimeoutToken);
+    }
+
+    [Fact]
+    public async Task RemoteChannelClose_ClosesExistingStream()
+    {
+        var ms = new MonitoringStream(new MemoryStream());
+        var disposal = new AsyncManualResetEvent();
+        ms.Disposed += (s, e) => disposal.Set();
+
+        var ch1 = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = ms.UsePipe() });
+        await this.WaitForEphemeralChannelOfferToPropagateAsync();
+        var ch2 = this.mx2.AcceptChannel(ch1.Id);
+
+        ch2.Dispose();
+        await disposal.WaitAsync(this.TimeoutToken);
+    }
+
+    [Fact]
     public async Task CreateChannelAsync_ThrowsAfterDisposal()
     {
         await this.mx1.DisposeAsync();
