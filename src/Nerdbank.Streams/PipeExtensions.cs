@@ -378,7 +378,6 @@ namespace Nerdbank.Streams
         /// </summary>
         /// <param name="reader">The reader to get bytes from.</param>
         /// <param name="writer">The writer to copy bytes to.</param>
-        /// <param name="propagateSuccessfulCompletion"><c>true</c> to complete the <paramref name="writer"/> when <paramref name="reader"/> completes.</param>
         /// <param name="cancellationToken">A cancellation token.</param>
         /// <returns>
         /// A <see cref="Task"/> that completes when the <paramref name="reader"/> has finished producing bytes, or an error occurs.
@@ -387,7 +386,7 @@ namespace Nerdbank.Streams
         /// <remarks>
         /// If an error occurs during reading or writing, the <paramref name="writer"/> is completed with the exception.
         /// </remarks>
-        internal static Task LinkToAsync(this PipeReader reader, PipeWriter writer, bool propagateSuccessfulCompletion, CancellationToken cancellationToken = default)
+        internal static Task LinkToAsync(this PipeReader reader, PipeWriter writer, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(reader, nameof(reader));
             Requires.NotNull(writer, nameof(writer));
@@ -406,11 +405,7 @@ namespace Nerdbank.Streams
                         await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
                         if (result.IsCompleted)
                         {
-                            if (propagateSuccessfulCompletion)
-                            {
-                                await writer.CompleteAsync().ConfigureAwait(false);
-                            }
-
+                            await writer.CompleteAsync().ConfigureAwait(false);
                             break;
                         }
                     }
@@ -430,7 +425,6 @@ namespace Nerdbank.Streams
         /// </summary>
         /// <param name="pipe1">The first duplex pipe.</param>
         /// <param name="pipe2">The second duplex pipe.</param>
-        /// <param name="propagateSuccessfulCompletion"><c>true</c> to complete an <see cref="IDuplexPipe.Output"/> when its connected <see cref="IDuplexPipe.Input"/> completes.</param>
         /// <param name="cancellationToken">A cancellation token.</param>
         /// <returns>
         /// A <see cref="Task"/> that completes when both <see cref="PipeReader"/> instances are finished producing bytes, or an error occurs.
@@ -439,14 +433,14 @@ namespace Nerdbank.Streams
         /// <remarks>
         /// If an error occurs during reading or writing, the <see cref="PipeWriter"/> is completed with the exception.
         /// </remarks>
-        internal static Task LinkToAsync(this IDuplexPipe pipe1, IDuplexPipe pipe2, bool propagateSuccessfulCompletion, CancellationToken cancellationToken = default)
+        internal static Task LinkToAsync(this IDuplexPipe pipe1, IDuplexPipe pipe2, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(pipe1, nameof(pipe1));
             Requires.NotNull(pipe2, nameof(pipe2));
 
             return Task.WhenAll(
-                pipe1.Input.LinkToAsync(pipe2.Output, propagateSuccessfulCompletion, cancellationToken),
-                pipe2.Input.LinkToAsync(pipe1.Output, propagateSuccessfulCompletion, cancellationToken));
+                pipe1.Input.LinkToAsync(pipe2.Output, cancellationToken),
+                pipe2.Input.LinkToAsync(pipe1.Output, cancellationToken));
         }
 
         /// <summary>
