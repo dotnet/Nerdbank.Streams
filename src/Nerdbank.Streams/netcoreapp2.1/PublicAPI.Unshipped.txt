@@ -1,4 +1,5 @@
-﻿Nerdbank.Streams.MultiplexingStream.AcceptChannel(ulong id, Nerdbank.Streams.MultiplexingStream.ChannelOptions? options = null) -> Nerdbank.Streams.MultiplexingStream.Channel!
+﻿Nerdbank.Streams.MonitoringStream.IsDisposed.get -> bool
+Nerdbank.Streams.MultiplexingStream.AcceptChannel(ulong id, Nerdbank.Streams.MultiplexingStream.ChannelOptions? options = null) -> Nerdbank.Streams.MultiplexingStream.Channel!
 Nerdbank.Streams.MultiplexingStream.Channel.QualifiedId.get -> Nerdbank.Streams.MultiplexingStream.QualifiedChannelId
 Nerdbank.Streams.MultiplexingStream.ChannelOfferEventArgs.QualifiedId.get -> Nerdbank.Streams.MultiplexingStream.QualifiedChannelId
 Nerdbank.Streams.MultiplexingStream.ChannelSource

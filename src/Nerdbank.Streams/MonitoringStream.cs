@@ -8,11 +8,12 @@ namespace Nerdbank.Streams
     using System.Runtime.InteropServices;
     using System.Threading;
     using System.Threading.Tasks;
+    using Microsoft;
 
     /// <summary>
     /// A <see cref="Stream"/> that wraps another and reports all I/O taking place by raising events.
     /// </summary>
-    public class MonitoringStream : Stream
+    public class MonitoringStream : Stream, IDisposableObservable
     {
         /// <summary>
         /// The underlying stream serving the I/O.
@@ -171,6 +172,9 @@ namespace Nerdbank.Streams
         /// Occurs when <see cref="Stream.Dispose()"/> is invoked.
         /// </summary>
         public event EventHandler? Disposed;
+
+        /// <inheritdoc/>
+        public bool IsDisposed { get; private set; }
 
         /// <inheritdoc/>
         public override bool CanRead => this.inner.CanRead;
@@ -337,6 +341,7 @@ namespace Nerdbank.Streams
         {
             if (disposing)
             {
+                this.IsDisposed = true;
                 this.inner.Dispose();
                 this.Disposed?.Invoke(this, EventArgs.Empty);
             }
