@@ -39,6 +39,11 @@ namespace Nerdbank.Streams
             private readonly TaskCompletionSource<object?> completionSource = new TaskCompletionSource<object?>();
 
             /// <summary>
+            /// The source for a token that will be canceled when this channel has completed.
+            /// </summary>
+            private readonly CancellationTokenSource disposalTokenSource = new CancellationTokenSource();
+
+            /// <summary>
             /// The source for the <see cref="OptionsApplied"/> property. May be null if options were provided in ctor.
             /// </summary>
             private readonly TaskCompletionSource<object?>? optionsAppliedTaskSource;
@@ -229,6 +234,11 @@ namespace Nerdbank.Streams
             /// </summary>
             public MultiplexingStream MultiplexingStream { get; }
 
+            /// <summary>
+            /// Gets a token that is canceled just before <see cref="Completion" /> has transitioned to its final state.
+            /// </summary>
+            internal CancellationToken DisposalToken => this.disposalTokenSource.Token;
+
             internal OfferParameters OfferParams { get; }
 
             internal string Name => this.OfferParams.Name;
@@ -297,6 +307,7 @@ namespace Nerdbank.Streams
                     Action<object?, object> finalDisposalAction = (exOrAntecedent, state) =>
                     {
                         var self = (Channel)state;
+                        self.disposalTokenSource.Cancel();
                         self.completionSource.TrySetResult(null);
                         self.MultiplexingStream.OnChannelDisposed(self);
                     };
@@ -574,7 +585,7 @@ namespace Nerdbank.Streams
                         if (channelOptions.ExistingPipe is object)
                         {
                             Assumes.NotNull(this.channelIO);
-                            this.DisposeSelfOnFailure(this.channelIO.LinkToAsync(channelOptions.ExistingPipe));
+                            this.DisposeSelfOnFailure(this.channelIO.LinkToAsync(channelOptions.ExistingPipe, this.DisposalToken));
                             this.existingPipeGiven = true;
                         }
                         else
