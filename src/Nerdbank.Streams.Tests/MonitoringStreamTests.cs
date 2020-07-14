@@ -427,6 +427,14 @@ public class MonitoringStreamTests : TestBase
         Assert.Equal(1, this.monitoringStream.Position);
     }
 
+    [Fact]
+    public void IsDisposed()
+    {
+        Assert.False(this.monitoringStream.IsDisposed);
+        this.monitoringStream.Dispose();
+        Assert.True(this.monitoringStream.IsDisposed);
+    }
+
 #if SPAN_BUILTIN
 
     [Fact]
