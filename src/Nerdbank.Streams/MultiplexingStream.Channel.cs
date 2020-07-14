@@ -574,7 +574,7 @@ namespace Nerdbank.Streams
                         if (channelOptions.ExistingPipe is object)
                         {
                             Assumes.NotNull(this.channelIO);
-                            this.DisposeSelfOnFailure(this.channelIO.LinkToAsync(channelOptions.ExistingPipe, propagateSuccessfulCompletion: true));
+                            this.DisposeSelfOnFailure(this.channelIO.LinkToAsync(channelOptions.ExistingPipe));
                             this.existingPipeGiven = true;
                         }
                         else
