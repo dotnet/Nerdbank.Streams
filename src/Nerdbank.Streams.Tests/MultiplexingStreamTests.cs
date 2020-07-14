@@ -932,7 +932,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         await channel1Stream.FlushAsync(this.TimeoutToken);
 
         // Allow the copying of the first packet to our ExistingPipe to complete.
-        slowWriter.UnblockGetMemory.Set();
+        slowWriter.UnblockFlushAsync.Set();
 
         // Wait for all bytes to be transmitted
         channel1.Output.Complete();
@@ -1134,7 +1134,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
         private CancellationTokenSource nextFlushToken = new CancellationTokenSource();
 
-        internal AsyncManualResetEvent UnblockGetMemory { get; } = new AsyncManualResetEvent();
+        internal AsyncManualResetEvent UnblockFlushAsync { get; } = new AsyncManualResetEvent();
 
         internal ReadOnlySequence<byte> WrittenBytes => this.writtenBytes.AsReadOnlySequence;
 
@@ -1164,7 +1164,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         {
             try
             {
-                await this.UnblockGetMemory.WaitAsync().WithCancellation(cancellationToken);
+                await this.UnblockFlushAsync.WaitAsync(cancellationToken);
                 return default;
             }
             finally
