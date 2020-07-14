@@ -208,7 +208,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task ChannelDispose_ClosesExistingStream()
     {
-        var ms = new MonitoringStream(new MemoryStream());
+        var ms = new MonitoringStream(FullDuplexStream.CreatePair().Item1);
         var disposal = new AsyncManualResetEvent();
         ms.Disposed += (s, e) => disposal.Set();
 
@@ -220,7 +220,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task RemoteChannelClose_ClosesExistingStream()
     {
-        var ms = new MonitoringStream(new MemoryStream());
+        var ms = new MonitoringStream(FullDuplexStream.CreatePair().Item1);
         var disposal = new AsyncManualResetEvent();
         ms.Disposed += (s, e) => disposal.Set();
 

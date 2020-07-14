@@ -39,6 +39,11 @@ namespace Nerdbank.Streams
             private readonly TaskCompletionSource<object?> completionSource = new TaskCompletionSource<object?>();
 
             /// <summary>
+            /// The source for a token that will be canceled when this channel has completed.
+            /// </summary>
+            private readonly CancellationTokenSource disposalTokenSource = new CancellationTokenSource();
+
+            /// <summary>
             /// The source for the <see cref="OptionsApplied"/> property. May be null if options were provided in ctor.
             /// </summary>
             private readonly TaskCompletionSource<object?>? optionsAppliedTaskSource;
@@ -107,10 +112,16 @@ namespace Nerdbank.Streams
             private PipeWriter? mxStreamIOWriter;
 
             /// <summary>
-            /// The I/O to expose on this channel. Will be <c>null</c> if <see cref="ChannelOptions.ExistingPipe"/>
-            /// was set to a non-null value when this channel was created.
+            /// The I/O to expose on this channel if <see cref="ChannelOptions.ExistingPipe"/> was not specified;
+            /// otherwise it is the buffering pipe we use as an intermediary with the specified <see cref="ChannelOptions.ExistingPipe"/>.
             /// </summary>
             private IDuplexPipe? channelIO;
+
+            /// <summary>
+            /// The value of <see cref="ChannelOptions.ExistingPipe"/> as it was when we received it.
+            /// We don't use this field, but we set it for diagnostic purposes later.
+            /// </summary>
+            private IDuplexPipe? existingPipe;
 
             /// <summary>
             /// A value indicating whether this <see cref="Channel"/> was created or accepted with a non-null value for <see cref="ChannelOptions.ExistingPipe"/>.
@@ -229,6 +240,11 @@ namespace Nerdbank.Streams
             /// </summary>
             public MultiplexingStream MultiplexingStream { get; }
 
+            /// <summary>
+            /// Gets a token that is canceled just before <see cref="Completion" /> has transitioned to its final state.
+            /// </summary>
+            internal CancellationToken DisposalToken => this.disposalTokenSource.Token;
+
             internal OfferParameters OfferParams { get; }
 
             internal string Name => this.OfferParams.Name;
@@ -297,6 +313,7 @@ namespace Nerdbank.Streams
                     Action<object?, object> finalDisposalAction = (exOrAntecedent, state) =>
                     {
                         var self = (Channel)state;
+                        self.disposalTokenSource.Cancel();
                         self.completionSource.TrySetResult(null);
                         self.MultiplexingStream.OnChannelDisposed(self);
                     };
@@ -574,8 +591,14 @@ namespace Nerdbank.Streams
                         if (channelOptions.ExistingPipe is object)
                         {
                             Assumes.NotNull(this.channelIO);
-                            this.DisposeSelfOnFailure(this.channelIO.LinkToAsync(channelOptions.ExistingPipe));
+                            this.existingPipe = channelOptions.ExistingPipe;
                             this.existingPipeGiven = true;
+
+                            // We always want to write ALL received data to the user's ExistingPipe, rather than truncating it on disposal, so don't use a cancellation token in that direction.
+                            this.DisposeSelfOnFailure(this.channelIO.Input.LinkToAsync(channelOptions.ExistingPipe.Output));
+
+                            // Upon disposal, we no longer want to continue reading from the user's ExistingPipe into our buffer since we won't be propagating it any further, so use our DisposalToken.
+                            this.DisposeSelfOnFailure(channelOptions.ExistingPipe.Input.LinkToAsync(this.channelIO.Output, this.DisposalToken));
                         }
                         else
                         {
