@@ -248,7 +248,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
         var ch1 = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = ms.UsePipe() });
         await this.WaitForEphemeralChannelOfferToPropagateAsync();
-        var ch2 = this.mx2.AcceptChannel(ch1.Id);
+        var ch2 = this.mx2.AcceptChannel(ch1.QualifiedId.Id);
 
         ch2.Dispose();
         await disposal.WaitAsync(this.TimeoutToken);
