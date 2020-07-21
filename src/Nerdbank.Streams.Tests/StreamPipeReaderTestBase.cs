@@ -52,7 +52,9 @@ public abstract class StreamPipeReaderTestBase : TestBase
         // This next assertion is only guaranteeed for the strict pipe reader.
         // For the normal one, its role of reading from the stream is concurrent with our code,
         // and thus may have already completed.
+#pragma warning disable CS0618 // Type or member is obsolete
         if (this is StreamUseStrictPipeReaderTests)
+#pragma warning restore CS0618 // Type or member is obsolete
         {
             Assert.False(writerCompletedTask.IsCompleted);
         }

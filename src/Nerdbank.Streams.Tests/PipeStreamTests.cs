@@ -104,23 +104,6 @@ public class PipeStreamTests : TestBase
     }
 
     [Fact]
-    public async Task EndOfStreamCompletesReader()
-    {
-#pragma warning disable CS0618 // Type or member is obsolete
-        var readerCompletionTask = this.pipe.Writer.WaitForReaderCompletionAsync();
-#pragma warning restore CS0618 // Type or member is obsolete
-        this.pipe.Writer.Complete();
-
-        // Test ReadAsync twice because in the realization that the end of the stream is reached,
-        // the state of the PipeReader changes, so we want to try it again to make sure it still works.
-        Assert.Equal(0, await this.stream.ReadAsync(new byte[1], 0, 1, this.TimeoutToken));
-        Assert.Equal(0, await this.stream.ReadAsync(new byte[1], 0, 1, this.TimeoutToken));
-        Assert.Equal(0, this.stream.Read(new byte[1], 0, 1));
-        Assert.Equal(-1, this.stream.ReadByte());
-        await readerCompletionTask.WithCancellation(this.TimeoutToken);
-    }
-
-    [Fact]
     public void Dispose_NoWriter()
     {
         // Verify that we don't throw when disposing a stream without a writer.
@@ -182,7 +165,7 @@ public class PipeStreamTests : TestBase
     [PairwiseData]
     public async Task Write_InputValidation(bool useAsync)
     {
-        await Assert.ThrowsAsync<ArgumentNullException>(() => this.WriteAsync(null!, 0, 0, isAsync: useAsync));
+        await this.WriteAsync(null!, 0, 0, isAsync: useAsync);
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.WriteAsync(new byte[5], 0, 6, isAsync: useAsync));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.WriteAsync(new byte[5], 5, 1, isAsync: useAsync));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.WriteAsync(new byte[5], 3, 3, isAsync: useAsync));
@@ -193,14 +176,14 @@ public class PipeStreamTests : TestBase
     }
 
     [Fact]
-    public async Task Write_ThrowsObjectDisposedException()
+    public async Task Write_ThrowsAfterDisposal()
     {
         this.stream.Dispose();
-        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream.WriteAsync(new byte[1], 0, 1));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => this.stream.WriteAsync(new byte[1], 0, 1));
 #if SPAN_BUILTIN
-        await Assert.ThrowsAsync<ObjectDisposedException>(async () => await this.stream.WriteAsync(new Memory<byte>(new byte[1])));
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await this.stream.WriteAsync(new Memory<byte>(new byte[1])));
 #endif
-        Assert.Throws<ObjectDisposedException>(() => this.stream.Write(new byte[1], 0, 1));
+        Assert.Throws<InvalidOperationException>(() => this.stream.Write(new byte[1], 0, 1));
     }
 
     [Fact]
@@ -215,14 +198,14 @@ public class PipeStreamTests : TestBase
     }
 
     [Fact]
-    public async Task Read_ThrowsObjectDisposedException()
+    public async Task Read_ThrowsAfterDisposal()
     {
         this.stream.Dispose();
-        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream.ReadAsync(new byte[1], 0, 1));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => this.stream.ReadAsync(new byte[1], 0, 1));
 #if SPAN_BUILTIN
-        await Assert.ThrowsAsync<ObjectDisposedException>(async () => await this.stream.ReadAsync(new Memory<byte>(new byte[1])));
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await this.stream.ReadAsync(new Memory<byte>(new byte[1])));
 #endif
-        Assert.Throws<ObjectDisposedException>(() => this.stream.Read(new byte[1], 0, 1));
+        Assert.Throws<InvalidOperationException>(() => this.stream.Read(new byte[1], 0, 1));
     }
 
     [Fact]
@@ -230,8 +213,7 @@ public class PipeStreamTests : TestBase
     {
         Task<int> readTask = this.stream.ReadAsync(new byte[1], 0, 1, this.TimeoutToken);
         this.stream.Dispose();
-        int readBytes = await readTask;
-        Assert.Equal(0, readBytes);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => readTask);
     }
 
     [Fact]
@@ -249,8 +231,7 @@ public class PipeStreamTests : TestBase
     {
         ValueTask<int> readTask = this.stream.ReadAsync(new byte[1], this.TimeoutToken);
         this.stream.Dispose();
-        int readBytes = await readTask;
-        Assert.Equal(0, readBytes);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => readTask.AsTask());
     }
 
     [Fact]

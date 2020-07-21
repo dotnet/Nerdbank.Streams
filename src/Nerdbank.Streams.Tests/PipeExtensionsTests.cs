@@ -277,14 +277,14 @@ public partial class PipeExtensionsTests : TestBase
         });
     }
 
-    [Fact]
-    public void UsePipe_CollapseAdapterStacks()
+    [Fact, Obsolete]
+    public void UsePipe_DoesNotCollapseAdapterStacks()
     {
         var pipes = FullDuplexStream.CreatePipePair();
         var stream = pipes.Item1.AsStream();
         var pipeAgain = stream.UsePipe(allowUnwrap: true);
-        Assert.Same(pipes.Item1.Input, pipeAgain.Input);
-        Assert.Same(pipes.Item1.Output, pipeAgain.Output);
+        Assert.NotSame(pipes.Item1.Input, pipeAgain.Input);
+        Assert.NotSame(pipes.Item1.Output, pipeAgain.Output);
     }
 
     private async Task AssertStreamClosesAsync(Stream stream)

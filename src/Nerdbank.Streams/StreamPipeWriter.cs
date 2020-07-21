@@ -16,6 +16,7 @@ namespace Nerdbank.Streams
     /// A <see cref="PipeWriter"/> that writes to an underlying <see cref="Stream"/>
     /// when <see cref="FlushAsync(CancellationToken)"/> is called rather than asynchronously sometime later.
     /// </summary>
+    [Obsolete("Use " + nameof(PipeWriter) + "." + nameof(PipeWriter.Create) + " instead.")]
     internal class StreamPipeWriter : PipeWriter
     {
         private readonly object syncObject = new object();

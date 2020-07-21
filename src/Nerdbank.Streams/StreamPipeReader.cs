@@ -15,6 +15,7 @@ namespace Nerdbank.Streams
     /// A <see cref="PipeReader"/> that reads from an underlying <see cref="Stream"/> exactly when told to do so
     /// rather than constantly reading from the stream and buffering up the results.
     /// </summary>
+    [Obsolete("Use " + nameof(PipeReader) + "." + nameof(PipeReader.Create) + " instead.")]
     internal class StreamPipeReader : PipeReader
     {
         private readonly object syncObject = new object();
