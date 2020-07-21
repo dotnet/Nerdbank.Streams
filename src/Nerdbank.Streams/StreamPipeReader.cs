@@ -4,6 +4,7 @@
 namespace Nerdbank.Streams
 {
     using System;
+    using System.Buffers;
     using System.Collections.Generic;
     using System.IO;
     using System.IO.Pipelines;
@@ -19,9 +20,16 @@ namespace Nerdbank.Streams
     {
         private readonly object syncObject = new object();
 
+        /// <summary><inheritdoc cref="StreamPipeReader(Stream, int, bool)" path="/param[@name='stream']"/></summary>
         private readonly Stream stream;
 
+        /// <summary>
+        /// May be 0 for a reasonable default as determined by the <see cref="IBufferWriter{T}.GetMemory"/> method.
+        /// </summary>
         private readonly int bufferSize;
+
+        /// <summary><inheritdoc cref="StreamPipeReader(Stream, int, bool)" path="/param[@name='leaveOpen']"/></summary>
+        private readonly bool leaveOpen;
 
         private readonly Sequence<byte> buffer = new Sequence<byte>();
 
@@ -39,12 +47,19 @@ namespace Nerdbank.Streams
 
         private List<(Action<Exception?, object?>, object?)>? writerCompletedCallbacks;
 
-        internal StreamPipeReader(Stream stream, int bufferSize)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StreamPipeReader"/> class.
+        /// </summary>
+        /// <param name="stream">The stream to read from.</param>
+        /// <param name="bufferSize">A hint at the size of messages that are commonly transferred. Use 0 for a commonly reasonable default.</param>
+        /// <param name="leaveOpen"><c>true</c> to leave the underlying <paramref name="stream"/> open after calling <see cref="PipeReader.Complete(Exception)"/>; <c>false</c> to close the stream.</param>
+        internal StreamPipeReader(Stream stream, int bufferSize, bool leaveOpen)
         {
             Requires.NotNull(stream, nameof(stream));
             Requires.Argument(stream.CanRead, nameof(stream), "Stream must be readable.");
             this.stream = stream;
             this.bufferSize = bufferSize;
+            this.leaveOpen = leaveOpen;
         }
 
         /// <inheritdoc />
@@ -71,6 +86,10 @@ namespace Nerdbank.Streams
                 this.isReaderCompleted = true;
                 this.readerException = exception;
                 this.buffer.Reset();
+                if (!this.leaveOpen)
+                {
+                    this.stream.Dispose();
+                }
             }
         }
 

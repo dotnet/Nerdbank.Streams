@@ -41,33 +41,5 @@ public class StreamUseStrictPipeReaderTests : StreamPipeReaderTestBase
         Assert.Same(expectedException, actualException);
     }
 
-    [Fact] // Bizarre behavior when using the built-in Pipe class: https://github.com/dotnet/corefx/issues/31696
-    public async Task CancelPendingRead()
-    {
-        var stream = new HalfDuplexStream();
-        var reader = this.CreatePipeReader(stream, sizeHint: 50);
-
-        ValueTask<ReadResult> readTask = reader.ReadAsync(this.TimeoutToken);
-        reader.CancelPendingRead();
-        var readResult = await readTask.AsTask().WithCancellation(this.TimeoutToken);
-        Assert.True(readResult.IsCanceled);
-        ////reader.AdvanceTo(readResult.Buffer.End);
-
-        // Verify we can read after that without cancellation.
-        readTask = reader.ReadAsync(this.TimeoutToken);
-        stream.Write(new byte[] { 1, 2, 3 }, 0, 3);
-        await stream.FlushAsync(this.TimeoutToken);
-        readResult = await readTask;
-        Assert.False(readResult.IsCanceled);
-        Assert.Equal(3, readResult.Buffer.Length);
-        reader.AdvanceTo(readResult.Buffer.End);
-
-        // Now cancel again
-        readTask = reader.ReadAsync(this.TimeoutToken);
-        reader.CancelPendingRead();
-        readResult = await readTask;
-        Assert.True(readResult.IsCanceled);
-    }
-
     protected override PipeReader CreatePipeReader(Stream stream, int sizeHint = 0) => stream.UseStrictPipeReader(sizeHint);
 }
