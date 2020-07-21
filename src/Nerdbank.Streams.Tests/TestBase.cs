@@ -1,5 +1,5 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
-// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
 using System.Buffers;
@@ -21,7 +21,9 @@ public abstract class TestBase : IDisposable
 {
     protected static readonly TimeSpan ExpectedTimeout = TimeSpan.FromMilliseconds(200);
 
-    protected static readonly TimeSpan UnexpectedTimeout = Debugger.IsAttached ? Timeout.InfiniteTimeSpan : TimeSpan.FromSeconds(5);
+    protected static readonly TimeSpan UnexpectedTimeout = Debugger.IsAttached ? Timeout.InfiniteTimeSpan : TimeSpan.FromSeconds(10);
+
+    private const bool WriteTestOutputToFile = false;
 
 #if NETFRAMEWORK
     private readonly ProcessJobTracker processJobTracker = new ProcessJobTracker();
@@ -29,15 +31,18 @@ public abstract class TestBase : IDisposable
 
     private readonly CancellationTokenSource timeoutTokenSource;
 
+    private readonly Stopwatch testStopwatch;
+
     private readonly Random random = new Random();
 
     private CancellationTokenRegistration timeoutLoggerRegistration;
 
     protected TestBase(ITestOutputHelper logger)
     {
-        this.Logger = logger;
+        this.Logger = WriteTestOutputToFile ? new FileLogger($@"d:\temp\test.{DateTime.Now:HH-mm-ss.ff}.log", logger) : logger;
+        this.testStopwatch = Stopwatch.StartNew();
         this.timeoutTokenSource = new CancellationTokenSource(TestTimeout);
-        this.timeoutLoggerRegistration = this.timeoutTokenSource.Token.Register(() => logger.WriteLine("**Timeout token signaled**"));
+        this.timeoutLoggerRegistration = this.timeoutTokenSource.Token.Register(() => logger.WriteLine("**Timeout token signaled** (Time index: {0:HH:mm:ss.ff}, Elapsed: {1})", DateTime.Now, this.ElapsedTime));
     }
 
     public static CancellationToken ExpectedTimeoutToken => new CancellationTokenSource(ExpectedTimeout).Token;
@@ -46,14 +51,21 @@ public abstract class TestBase : IDisposable
 
     protected CancellationToken TimeoutToken => Debugger.IsAttached ? CancellationToken.None : this.timeoutTokenSource.Token;
 
+    /// <summary>
+    /// Gets the time the test has been running since its timeout timer started.
+    /// </summary>
+    protected TimeSpan ElapsedTime => this.testStopwatch.Elapsed;
+
     private static TimeSpan TestTimeout => UnexpectedTimeout;
 
     public void Dispose()
     {
+        this.testStopwatch.Stop();
         this.timeoutLoggerRegistration.Dispose();
 #if NETFRAMEWORK
         this.processJobTracker.Dispose();
 #endif
+        (this.Logger as IDisposable)?.Dispose();
     }
 
     public async Task ReadAsync(Stream stream, byte[] buffer, int? count = null, int offset = 0, bool isAsync = true)
@@ -108,6 +120,23 @@ public abstract class TestBase : IDisposable
         }
 
         return bytesReceived.AsReadOnlySequence;
+    }
+
+    public async Task DrainAsync(PipeReader reader, long requiredLength)
+    {
+        Requires.NotNull(reader, nameof(reader));
+
+        while (requiredLength > 0)
+        {
+            ReadResult readResult = await reader.ReadAsync(this.TimeoutToken);
+            long bytesToConsume = Math.Min(requiredLength, readResult.Buffer.Length);
+            reader.AdvanceTo(readResult.Buffer.GetPosition(bytesToConsume));
+            requiredLength -= bytesToConsume;
+            if (readResult.IsCompleted && requiredLength > 0)
+            {
+                throw new EndOfStreamException("End of stream encountered before we read all the expected bytes.");
+            }
+        }
     }
 
     public async Task DrainReaderTillCompletedAsync(PipeReader reader)
@@ -238,7 +267,7 @@ public abstract class TestBase : IDisposable
     internal Task<bool> ExecuteInIsolationAsync(object testClass, string testMethodName, ITestOutputHelper logger)
     {
         Requires.NotNull(testClass, nameof(testClass));
-        return this.ExecuteInIsolationAsync(testClass.GetType().FullName, testMethodName, logger);
+        return this.ExecuteInIsolationAsync(testClass.GetType().FullName!, testMethodName, logger);
     }
 
     protected static Task WhenAllSucceedOrAnyFail(params Task[] tasks)
@@ -352,4 +381,32 @@ public abstract class TestBase : IDisposable
     }
 
     private static string AssembleCommandLineArguments(params string[] args) => string.Join(" ", args.Select(a => $"\"{a}\""));
+
+    private class FileLogger : ITestOutputHelper, IDisposable
+    {
+        private readonly StreamWriter file;
+        private readonly ITestOutputHelper forwardTo;
+
+        internal FileLogger(string fileName, ITestOutputHelper forwardTo)
+        {
+            this.file = new StreamWriter(File.OpenWrite(fileName));
+            this.forwardTo = forwardTo;
+        }
+
+        public void WriteLine(string message)
+        {
+            this.file.WriteLine(message);
+            this.forwardTo.WriteLine(message);
+            Debug.WriteLine(message);
+        }
+
+        public void WriteLine(string format, params object[] args)
+        {
+            this.file.WriteLine(format, args);
+            this.forwardTo.WriteLine(format, args);
+            Debug.WriteLine(format, args);
+        }
+
+        public void Dispose() => this.file.Dispose();
+    }
 }

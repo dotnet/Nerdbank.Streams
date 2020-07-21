@@ -1,5 +1,5 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
-// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 /* This is a derivative from multiple answers on https://stackoverflow.com/questions/3342941/kill-child-process-when-parent-process-is-killed */
 

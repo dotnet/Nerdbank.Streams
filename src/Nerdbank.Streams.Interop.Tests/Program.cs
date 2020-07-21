@@ -1,9 +1,10 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
-// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 namespace Nerdbank.Streams.Interop.Tests
 {
     using System;
+    using System.Diagnostics;
     using System.IO;
     using System.Text;
     using System.Threading.Tasks;
@@ -25,12 +26,21 @@ namespace Nerdbank.Streams.Interop.Tests
         private static async Task Main(string[] args)
         {
             ////System.Diagnostics.Debugger.Launch();
-            var mx = await MultiplexingStream.CreateAsync(FullDuplexStream.Splice(Console.OpenStandardInput(), Console.OpenStandardOutput()));
+            int protocolMajorVersion = int.Parse(args[0]);
+            var mx = await MultiplexingStream.CreateAsync(
+                FullDuplexStream.Splice(Console.OpenStandardInput(), Console.OpenStandardOutput()),
+                new MultiplexingStream.Options
+                {
+                    TraceSource = { Switch = { Level = SourceLevels.Verbose } },
+                    ProtocolMajorVersion = protocolMajorVersion,
+                    DefaultChannelReceivingWindowSize = 64,
+                    DefaultChannelTraceSourceFactory = (id, name) => new TraceSource($"Channel {id}") { Switch = { Level = SourceLevels.Verbose } },
+                });
             var program = new Program(mx);
             await program.RunAsync();
         }
 
-        private static (StreamReader, StreamWriter) CreateStreamIO(MultiplexingStream.Channel channel)
+        private static (StreamReader Reader, StreamWriter Writer) CreateStreamIO(MultiplexingStream.Channel channel)
         {
             var encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
             var reader = new StreamReader(channel.Input.AsStream(), encoding);

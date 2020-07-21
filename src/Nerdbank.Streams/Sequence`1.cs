@@ -1,5 +1,5 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
-// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 namespace Nerdbank.Streams
 {
@@ -23,6 +23,8 @@ namespace Nerdbank.Streams
     [DebuggerDisplay("{" + nameof(DebuggerDisplay) + ",nq}")]
     public class Sequence<T> : IBufferWriter<T>, IDisposable
     {
+        private const int MaximumAutoGrowSize = 32 * 1024;
+
         private static readonly int DefaultLengthFromArrayPool = 1 + (4095 / Unsafe.SizeOf<T>());
 
         private static readonly ReadOnlySequence<T> Empty = new ReadOnlySequence<T>(SequenceSegment.Empty, 0, SequenceSegment.Empty, 0);
@@ -85,8 +87,20 @@ namespace Nerdbank.Streams
         /// The <see cref="MemoryPool{T}"/> in use may itself have a minimum array length as well,
         /// in which case the higher of the two minimums dictate the minimum array size that will be allocated.
         /// </para>
+        /// <para>
+        /// If <see cref="AutoIncreaseMinimumSpanLength"/> is <c>true</c>, this value may be automatically increased as the length of a sequence grows.
+        /// </para>
         /// </remarks>
         public int MinimumSpanLength { get; set; } = 0;
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the <see cref="MinimumSpanLength"/> should be
+        /// intelligently increased as the length of the sequence grows.
+        /// </summary>
+        /// <remarks>
+        /// This can help prevent long sequences made up of many very small arrays.
+        /// </remarks>
+        public bool AutoIncreaseMinimumSpanLength { get; set; } = true;
 
         /// <summary>
         /// Gets this sequence expressed as a <see cref="ReadOnlySequence{T}"/>.
@@ -110,8 +124,8 @@ namespace Nerdbank.Streams
         /// <param name="sequence">The sequence to convert.</param>
         public static implicit operator ReadOnlySequence<T>(Sequence<T> sequence)
         {
-            return sequence.first != null
-                ? new ReadOnlySequence<T>(sequence.first, sequence.first.Start, sequence.last, sequence.last!.End)
+            return sequence.first is { } first && sequence.last is { } last
+                ? new ReadOnlySequence<T>(first, first.Start, last, last!.End)
                 : Empty;
         }
 
@@ -125,7 +139,7 @@ namespace Nerdbank.Streams
         /// </param>
         public void AdvanceTo(SequencePosition position)
         {
-            var firstSegment = (SequenceSegment)position.GetObject();
+            var firstSegment = (SequenceSegment?)position.GetObject();
             if (firstSegment == null)
             {
                 // Emulate PipeReader behavior which is to just return for default(SequencePosition)
@@ -179,6 +193,7 @@ namespace Nerdbank.Streams
             SequenceSegment? last = this.last;
             Verify.Operation(last != null, "Cannot advance before acquiring memory.");
             last.Advance(count);
+            this.ConsiderMinimumSizeIncrease();
         }
 
         /// <summary>
@@ -194,6 +209,24 @@ namespace Nerdbank.Streams
         /// <param name="sizeHint">The size of the memory required, or 0 to just get a convenient (non-empty) buffer.</param>
         /// <returns>The requested memory.</returns>
         public Span<T> GetSpan(int sizeHint) => this.GetSegment(sizeHint).RemainingSpan;
+
+        /// <summary>
+        /// Adds an existing memory location to this sequence without copying.
+        /// </summary>
+        /// <param name="memory">The memory to add.</param>
+        /// <remarks>
+        /// This *may* leave significant slack space in a previously allocated block if calls to <see cref="Append(ReadOnlyMemory{T})"/>
+        /// follow calls to <see cref="GetMemory(int)"/> or <see cref="GetSpan(int)"/>.
+        /// </remarks>
+        public void Append(ReadOnlyMemory<T> memory)
+        {
+            if (memory.Length > 0)
+            {
+                var segment = this.segmentPool.Count > 0 ? this.segmentPool.Pop() : new SequenceSegment();
+                segment.AssignForeign(memory);
+                this.Append(segment);
+            }
+        }
 
         /// <summary>
         /// Clears the entire sequence, recycles associated memory into pools,
@@ -303,6 +336,18 @@ namespace Nerdbank.Streams
             return nextSegment;
         }
 
+        private void ConsiderMinimumSizeIncrease()
+        {
+            if (this.AutoIncreaseMinimumSpanLength && this.MinimumSpanLength < MaximumAutoGrowSize)
+            {
+                int autoSize = Math.Min(MaximumAutoGrowSize, (int)Math.Min(int.MaxValue, this.Length / 2));
+                if (this.MinimumSpanLength < autoSize)
+                {
+                    this.MinimumSpanLength = autoSize;
+                }
+            }
+        }
+
         private class SequenceSegment : ReadOnlySequenceSegment<T>
         {
             internal static readonly SequenceSegment Empty = new SequenceSegment();
@@ -372,6 +417,11 @@ namespace Nerdbank.Streams
             }
 
             /// <summary>
+            /// Gets a value indicating whether this segment refers to memory that came from outside and that we cannot write to nor recycle.
+            /// </summary>
+            internal bool IsForeignMemory => this.array == null && this.MemoryOwner == null;
+
+            /// <summary>
             /// Assigns this (recyclable) segment a new area in memory.
             /// </summary>
             /// <param name="memoryOwner">The memory and a means to recycle it.</param>
@@ -389,6 +439,16 @@ namespace Nerdbank.Streams
             {
                 this.array = array;
                 this.Memory = array;
+            }
+
+            /// <summary>
+            /// Assigns this (recyclable) segment a new area in memory.
+            /// </summary>
+            /// <param name="memory">A memory block obtained from outside, that we do not own and should not recycle.</param>
+            internal void AssignForeign(ReadOnlyMemory<T> memory)
+            {
+                this.Memory = memory;
+                this.End = memory.Length;
             }
 
             /// <summary>
@@ -423,10 +483,14 @@ namespace Nerdbank.Streams
                 this.Next = segment;
                 segment.RunningIndex = this.RunningIndex + this.Start + this.Length;
 
-                // When setting Memory, we start with index 0 instead of this.Start because
-                // the first segment has an explicit index set anyway,
-                // and we don't want to double-count it here.
-                this.Memory = this.AvailableMemory.Slice(0, this.Start + this.Length);
+                // Trim any slack on this segment.
+                if (!this.IsForeignMemory)
+                {
+                    // When setting Memory, we start with index 0 instead of this.Start because
+                    // the first segment has an explicit index set anyway,
+                    // and we don't want to double-count it here.
+                    this.Memory = this.AvailableMemory.Slice(0, this.Start + this.Length);
+                }
             }
 
             /// <summary>

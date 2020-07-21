@@ -1,5 +1,5 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
-// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
 using System.Buffers;
@@ -77,7 +77,7 @@ internal class MockWebSocket : WebSocket
         if (this.writingInProgress == null)
         {
             byte[] bufferCopy = new byte[input.Count];
-            Buffer.BlockCopy(input.Array, input.Offset, bufferCopy, 0, input.Count);
+            Buffer.BlockCopy(input.Array!, input.Offset, bufferCopy, 0, input.Count);
             this.writingInProgress = new Message { Buffer = new ArraySegment<byte>(bufferCopy) };
         }
         else

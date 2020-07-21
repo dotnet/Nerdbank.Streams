@@ -61,6 +61,15 @@ namespace Nerdbank.Streams {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to ExistingPipe&apos;s PipeWriter created with PipeOptions.PauseWriterThreshold that does not exceed the channel&apos;s receiving window size..
+        /// </summary>
+        internal static string ExistingPipeOutputHasPauseThresholdSetTooLow {
+            get {
+                return ResourceManager.GetString("ExistingPipeOutputHasPauseThresholdSetTooLow", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to This operation is not supported when the Channel is created with ChannelOptions.ExistingPipe set..
         /// </summary>
         internal static string NotSupportedWhenExistingPipeSpecified {
@@ -70,11 +79,29 @@ namespace Nerdbank.Streams {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to No reading operation to complete..
+        /// </summary>
+        internal static string ReadBeforeAdvanceTo {
+            get {
+                return ResourceManager.GetString("ReadBeforeAdvanceTo", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Reading not allowed after reader is completed..
         /// </summary>
         internal static string ReadingAfterCompletionNotAllowed {
             get {
                 return ResourceManager.GetString("ReadingAfterCompletionNotAllowed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Reading has already begun. Call AdvanceTo before reading again..
+        /// </summary>
+        internal static string ReadingMustBeFollowedByAdvance {
+            get {
+                return ResourceManager.GetString("ReadingMustBeFollowedByAdvance", resourceCulture);
             }
         }
     }

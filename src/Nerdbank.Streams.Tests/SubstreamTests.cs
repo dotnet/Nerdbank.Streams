@@ -1,5 +1,5 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
-// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
 using System.IO;
@@ -293,7 +293,7 @@ public class SubstreamTests : TestBase
     [PairwiseData]
     public async Task Dispose_FlushesFinalBytes(bool async)
     {
-        var monitoredStream = new InstrumentedStream(this.underlyingStream);
+        var monitoredStream = new MonitoringStream(this.underlyingStream);
         int lastOperation = 0;
         monitoredStream.DidWrite += (s, e) => lastOperation = 1;
         monitoredStream.DidWriteMemory += (s, e) => lastOperation = 1;
@@ -312,7 +312,7 @@ public class SubstreamTests : TestBase
     [PairwiseData]
     public async Task Flush_FlushesUnderlyingStream(bool async)
     {
-        var monitoredStream = new InstrumentedStream(this.underlyingStream);
+        var monitoredStream = new MonitoringStream(this.underlyingStream);
         int flushed = 0;
         monitoredStream.DidFlush += (s, e) => flushed++;
 
@@ -380,28 +380,6 @@ public class SubstreamTests : TestBase
         else
         {
             stream.Dispose();
-        }
-    }
-
-    private class InstrumentedStream : MonitoringStream
-    {
-        public InstrumentedStream(Stream inner)
-            : base(inner)
-        {
-        }
-
-        public event EventHandler? DidFlush;
-
-        public override void Flush()
-        {
-            base.Flush();
-            this.DidFlush?.Invoke(this, EventArgs.Empty);
-        }
-
-        public override async Task FlushAsync(CancellationToken cancellationToken)
-        {
-            await base.FlushAsync(cancellationToken);
-            this.DidFlush?.Invoke(this, EventArgs.Empty);
         }
     }
 }

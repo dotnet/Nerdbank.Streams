@@ -1,5 +1,5 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
-// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
 using System.Collections.Generic;
@@ -20,6 +20,8 @@ using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
 using Xunit.Abstractions;
+
+#pragma warning disable SA1414 // Tuple types in signatures should have element names
 
 public partial class WebSocketStreamTests : TestBase
 {
@@ -304,7 +306,7 @@ public partial class WebSocketStreamTests : TestBase
                             break;
                         }
 
-                        await webSocket.SendAsync(new ArraySegment<byte>(buffer.Array, 0, response.Count), WebSocketMessageType.Binary, true, context.RequestAborted);
+                        await webSocket.SendAsync(new ArraySegment<byte>(buffer.Array!, 0, response.Count), WebSocketMessageType.Binary, true, context.RequestAborted);
                     }
                 }
 

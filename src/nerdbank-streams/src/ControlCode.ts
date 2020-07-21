@@ -27,4 +27,9 @@ export enum ControlCode {
      * Sent when a channel is closed, an incoming offer is rejected, or an outgoing offer is canceled.
      */
     ChannelTerminated,
+
+    /**
+     * Sent when a channel has finished processing data received from the remote party, allowing them to send more data.
+     */
+    ContentProcessed,
 }

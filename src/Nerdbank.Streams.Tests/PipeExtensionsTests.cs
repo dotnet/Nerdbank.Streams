@@ -1,5 +1,5 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
-// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
 using System.Buffers;
@@ -40,7 +40,7 @@ public partial class PipeExtensionsTests : TestBase
     [Fact]
     public async Task UsePipe_Stream()
     {
-        var ms = new HalfDuplexStream();
+        var ms = new SimplexStream();
         IDuplexPipe pipe = ms.UsePipe(cancellationToken: this.TimeoutToken);
         await pipe.Output.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
         var readResult = await pipe.Input.ReadAsync(this.TimeoutToken);
@@ -51,7 +51,7 @@ public partial class PipeExtensionsTests : TestBase
     [Fact]
     public async Task UsePipe_Stream_Disposal()
     {
-        var ms = new HalfDuplexStream();
+        var ms = new SimplexStream();
         IDuplexPipe pipe = ms.UsePipe(cancellationToken: this.TimeoutToken);
         pipe.Output.Complete();
         pipe.Input.Complete();
@@ -110,7 +110,7 @@ public partial class PipeExtensionsTests : TestBase
     [PairwiseData]
     public async Task UsePipe_Stream_OneDirectionDoesNotDispose(bool completeOutput)
     {
-        var ms = new HalfDuplexStream();
+        var ms = new SimplexStream();
         IDuplexPipe pipe = ms.UsePipe(cancellationToken: this.TimeoutToken);
         if (completeOutput)
         {
@@ -226,7 +226,9 @@ public partial class PipeExtensionsTests : TestBase
         var pipeWriter = webSocket.UsePipeWriter(cancellationToken: this.TimeoutToken);
         await pipeWriter.WriteAsync(expectedBuffer, this.TimeoutToken);
         pipeWriter.Complete();
+#pragma warning disable CS0618 // Type or member is obsolete
         await pipeWriter.WaitForReaderCompletionAsync();
+#pragma warning restore CS0618 // Type or member is obsolete
         var message = webSocket.WrittenQueue.Dequeue();
         Assert.Equal(expectedBuffer, message.Buffer.ToArray());
     }
@@ -245,7 +247,9 @@ public partial class PipeExtensionsTests : TestBase
 
         await pipe.Output.WriteAsync(expectedBuffer, this.TimeoutToken);
         pipe.Output.Complete();
+#pragma warning disable CS0618 // Type or member is obsolete
         await pipe.Output.WaitForReaderCompletionAsync();
+#pragma warning restore CS0618 // Type or member is obsolete
         var message = webSocket.WrittenQueue.Dequeue();
         Assert.Equal(expectedBuffer, message.Buffer.ToArray());
     }

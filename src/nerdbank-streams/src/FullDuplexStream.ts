@@ -23,7 +23,7 @@ export class FullDuplexStream {
 
         // All reads and events come directly from the readable stream.
         duplex.read = readable.read.bind(readable);
-        duplex.on = readable.on.bind(readable);
+        duplex.on = <any>readable.on.bind(readable);
 
         return duplex;
     }

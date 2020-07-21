@@ -1,5 +1,5 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
-// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
 using System.Buffers;
@@ -9,8 +9,6 @@ using Xunit;
 
 internal class MockMemoryPool<T> : MemoryPool<T>
 {
-    internal const int DefaultLength = 16;
-
     public override int MaxBufferSize => throw new NotImplementedException();
 
     public List<Memory<T>> Contents { get; } = new List<Memory<T>>();
@@ -20,6 +18,8 @@ internal class MockMemoryPool<T> : MemoryPool<T>
     /// should be relative to the actual requested size.
     /// </summary>
     public double MinArraySizeFactor { get; set; } = 1.0;
+
+    internal int DefaultLength { get; set; } = 16;
 
     public override IMemoryOwner<T> Rent(int minBufferSize = -1)
     {
@@ -36,7 +36,7 @@ internal class MockMemoryPool<T> : MemoryPool<T>
 
         if (result.Length == 0)
         {
-            result = minBufferSize == 0 ? default : new T[minBufferSize == -1 ? DefaultLength : minBufferSize];
+            result = minBufferSize == 0 ? default : new T[minBufferSize == -1 ? this.DefaultLength : minBufferSize];
         }
         else
         {

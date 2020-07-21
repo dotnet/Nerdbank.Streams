@@ -1,5 +1,5 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
-// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 namespace Nerdbank.Streams
 {
@@ -16,15 +16,13 @@ namespace Nerdbank.Streams
     /// Created with <see cref="StreamExtensions.WriteSubstream(System.IO.Stream, int)"/>
     /// and later read with <see cref="StreamExtensions.ReadSubstream(System.IO.Stream)"/>.
     /// </summary>
-    public class Substream : Stream, IDisposableObservable, IAsyncDisposable
+    public class Substream : Stream, IDisposableObservable, Microsoft.VisualStudio.Threading.IAsyncDisposable, System.IAsyncDisposable
     {
         internal const int DefaultBufferSize = 4096;
 
         private readonly Stream underlyingStream;
 
-#pragma warning disable SA1011 // Closing square brackets should be spaced correctly
-        private byte[]? buffer;
-#pragma warning restore SA1011 // Closing square brackets should be spaced correctly
+        private readonly byte[] buffer;
 
         private int count;
 
@@ -38,7 +36,7 @@ namespace Nerdbank.Streams
         }
 
         /// <inheritdoc/>
-        public bool IsDisposed => this.buffer == null;
+        public bool IsDisposed { get; private set; }
 
         /// <inheritdoc/>
         public override bool CanRead => false;
@@ -67,6 +65,8 @@ namespace Nerdbank.Streams
         /// <inheritdoc/>
         public Task DisposeAsync() => this.DisposeAsync(CancellationToken.None).AsTask();
 
+        ValueTask System.IAsyncDisposable.DisposeAsync() => new ValueTask(this.DisposeAsync());
+
         /// <summary>
         /// Flushes any buffers, and writes the bytes required to indicate that this substream is at its end.
         /// </summary>
@@ -83,7 +83,7 @@ namespace Nerdbank.Streams
             await this.underlyingStream.FlushAsync(cancellationToken).ConfigureAwait(false);
 
             ArrayPool<byte>.Shared.Return(this.buffer);
-            this.buffer = null;
+            this.IsDisposed = true;
 
             this.Dispose();
         }
@@ -175,7 +175,7 @@ namespace Nerdbank.Streams
                     this.underlyingStream.Flush();
 
                     ArrayPool<byte>.Shared.Return(this.buffer);
-                    this.buffer = null;
+                    this.IsDisposed = true;
                 }
             }
 

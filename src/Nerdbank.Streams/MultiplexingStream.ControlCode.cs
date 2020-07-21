@@ -1,5 +1,5 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
-// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 namespace Nerdbank.Streams
 {
@@ -11,7 +11,7 @@ namespace Nerdbank.Streams
         /// <summary>
         /// Signals what kind of frame is being transmitted.
         /// </summary>
-        private enum ControlCode : byte
+        internal enum ControlCode : byte
         {
             /// <summary>
             /// A channel is proposed to the remote party.
@@ -38,6 +38,12 @@ namespace Nerdbank.Streams
             /// Sent when a channel is closed, an incoming offer is rejected, or an outgoing offer is canceled.
             /// </summary>
             ChannelTerminated,
+
+            /// <summary>
+            /// Sent when a channel has finished processing data received from the remote party,
+            /// allowing them to send more data.
+            /// </summary>
+            ContentProcessed,
         }
     }
 }

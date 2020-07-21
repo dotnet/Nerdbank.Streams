@@ -5,6 +5,8 @@
     <AssemblyOriginatorKeyFile>..\release.snk</AssemblyOriginatorKeyFile>
     <CodeAnalysisRuleSet>..\shipping.ruleset</CodeAnalysisRuleSet>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants>$(DefineConstants);MESSAGEPACK_INTERNAL;CSHARP8</DefineConstants>
+    <DefineConstants Condition=" '$(TargetFramework)' == 'netcoreapp2.1' ">$(DefineConstants);SPAN_BUILTIN</DefineConstants>
 
     <Summary>Streams for full duplex in-proc communication, wrap a WebSocket, split a stream into multiple channels, etc.</Summary>
     <Description>$(Summary)</Description>
@@ -17,11 +19,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.VisualStudio.Threading" Version="16.4.33" PrivateAssets="build;analyzers;compile" />
-    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="16.4.33" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="1.0.0" PrivateAssets="compile" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.3.0-beta1.final" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading" Version="16.5.132" PrivateAssets="build;analyzers;compile" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="16.5.132" PrivateAssets="all" />
     <PackageReference Include="Microsoft.VisualStudio.Validation" Version="15.5.31" />
     <PackageReference Include="System.Buffers" Version="4.5.0" />
-    <PackageReference Include="System.IO.Pipelines" Version="4.5.3" />
+    <PackageReference Include="System.IO.Pipelines" Version="4.7.0" />
     <PackageReference Include="System.Net.WebSockets" Version="4.3.0" />
     <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="4.6.0" />
     <PackageReference Include="System.ValueTuple" Version="4.5.0" />
@@ -32,11 +36,32 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Strings.resx</DependentUpon>
     </Compile>
+    <Compile Include="..\..\ext\MessagePack\src\MessagePack.UnityClient\Assets\Scripts\MessagePack\BufferWriter.cs" LinkBase="MessagePack" />
+    <Compile Include="..\..\ext\MessagePack\src\MessagePack.UnityClient\Assets\Scripts\MessagePack\ExtensionHeader.cs" LinkBase="MessagePack" />
+    <Compile Include="..\..\ext\MessagePack\src\MessagePack.UnityClient\Assets\Scripts\MessagePack\ExtensionResult.cs" LinkBase="MessagePack" />
+    <Compile Include="..\..\ext\MessagePack\src\MessagePack.UnityClient\Assets\Scripts\MessagePack\MessagePackCode.cs" LinkBase="MessagePack" />
+    <Compile Include="..\..\ext\MessagePack\src\MessagePack.UnityClient\Assets\Scripts\MessagePack\MessagePackReader.cs" LinkBase="MessagePack" />
+    <Compile Include="..\..\ext\MessagePack\src\MessagePack.UnityClient\Assets\Scripts\MessagePack\MessagePackSerializationException.cs" LinkBase="MessagePack" />
+    <Compile Include="..\..\ext\MessagePack\src\MessagePack.UnityClient\Assets\Scripts\MessagePack\T4\MessagePackReader.Integers.cs" LinkBase="MessagePack" />
+    <Compile Include="..\..\ext\MessagePack\src\MessagePack.UnityClient\Assets\Scripts\MessagePack\MessagePackWriter.cs" LinkBase="MessagePack" />
+    <Compile Include="..\..\ext\MessagePack\src\MessagePack.UnityClient\Assets\Scripts\MessagePack\Nil.cs" LinkBase="MessagePack" />
+    <Compile Include="..\..\ext\MessagePack\src\MessagePack.UnityClient\Assets\Scripts\MessagePack\SequencePool.cs" LinkBase="MessagePack" />
+    <Compile Include="..\..\ext\MessagePack\src\MessagePack.UnityClient\Assets\Scripts\MessagePack\SequenceReader.cs" LinkBase="MessagePack" />
+    <Compile Include="..\..\ext\MessagePack\src\MessagePack.UnityClient\Assets\Scripts\MessagePack\SequenceReaderExtensions.cs" LinkBase="MessagePack" />
+    <Compile Include="..\..\ext\MessagePack\src\MessagePack.UnityClient\Assets\Scripts\MessagePack\StringEncoding.cs" LinkBase="MessagePack" />
+    <Compile Include="..\..\ext\MessagePack\src\MessagePack.UnityClient\Assets\Scripts\MessagePack\Internal\DateTimeConstants.cs" LinkBase="MessagePack" />
+    <Compile Include="..\..\ext\MessagePack\src\MessagePack.UnityClient\Assets\Scripts\MessagePack\Internal\GuidBits.cs" LinkBase="MessagePack" />
+    <Compile Include="..\..\ext\MessagePack\src\MessagePack.UnityClient\Assets\Scripts\MessagePack\Utilities.cs" LinkBase="MessagePack" />
+    <Compile Include="..\..\ext\MessagePack\src\MessagePack.UnityClient\Assets\Scripts\MessagePack\MessagePackStreamReader.cs" LinkBase="MessagePack" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Update="Strings.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Strings.Designer.cs</LastGenOutput>
     </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="$(TargetFramework)\PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="$(TargetFramework)\PublicAPI.Unshipped.txt" />
   </ItemGroup>
 </Project>

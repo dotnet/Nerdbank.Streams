@@ -6,7 +6,6 @@ import * as path from "path";
 import { promisify } from "util";
 import * as ap from "./asyncprocess";
 
-const mkdirpAsync = promisify(mkdirp);
 const outDir = "dist";
 
 async function tsc() {
@@ -32,7 +31,7 @@ async function setPackageVersion() {
 async function pack() {
     const config = process.env.BUILDCONFIGURATION || "Debug";
     const binDir = path.join(__dirname, `../../bin/Packages/${config}/npm`);
-    await mkdirpAsync(binDir);
+    await mkdirp(binDir);
     await ap.execAsync(`npm pack "${path.join(__dirname, outDir)}"`, { cwd: binDir });
 }
 

@@ -1,5 +1,5 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
-// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
 using System.Diagnostics;
@@ -66,7 +66,9 @@ public class PipeStreamTests : TestBase
     {
         TaskCompletionSource<object> completion = new TaskCompletionSource<object>();
         this.stream.Dispose();
+#pragma warning disable CS0618 // Type or member is obsolete
         await this.pipe.Reader.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
+#pragma warning restore CS0618 // Type or member is obsolete
     }
 
     [Fact]
@@ -74,7 +76,9 @@ public class PipeStreamTests : TestBase
     {
         TaskCompletionSource<object> completion = new TaskCompletionSource<object>();
         this.stream.Dispose();
+#pragma warning disable CS0618 // Type or member is obsolete
         await this.pipe.Writer.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken);
+#pragma warning restore CS0618 // Type or member is obsolete
     }
 
     [Fact]
@@ -83,7 +87,9 @@ public class PipeStreamTests : TestBase
         this.stream = new LoopbackPipe(this.pipe).AsStream(ownsPipe: false);
         TaskCompletionSource<object> completion = new TaskCompletionSource<object>();
         this.stream.Dispose();
+#pragma warning disable CS0618 // Type or member is obsolete
         await Assert.ThrowsAsync<TimeoutException>(() => this.pipe.Reader.WaitForWriterCompletionAsync().WithTimeout(ExpectedTimeout));
+#pragma warning restore CS0618 // Type or member is obsolete
     }
 
     [Fact]
@@ -92,13 +98,17 @@ public class PipeStreamTests : TestBase
         this.stream = new LoopbackPipe(this.pipe).AsStream(ownsPipe: false);
         TaskCompletionSource<object> completion = new TaskCompletionSource<object>();
         this.stream.Dispose();
+#pragma warning disable CS0618 // Type or member is obsolete
         await Assert.ThrowsAsync<TimeoutException>(() => this.pipe.Writer.WaitForReaderCompletionAsync().WithTimeout(ExpectedTimeout));
+#pragma warning restore CS0618 // Type or member is obsolete
     }
 
     [Fact]
     public async Task EndOfStreamCompletesReader()
     {
+#pragma warning disable CS0618 // Type or member is obsolete
         var readerCompletionTask = this.pipe.Writer.WaitForReaderCompletionAsync();
+#pragma warning restore CS0618 // Type or member is obsolete
         this.pipe.Writer.Complete();
 
         // Test ReadAsync twice because in the realization that the end of the stream is reached,

@@ -1,5 +1,5 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
-// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
 using System.Buffers;
@@ -127,11 +127,11 @@ public class BufferWriterStreamTests : TestBase
     [Fact]
     public async Task Write_BadArgs()
     {
-        Assert.Throws<ArgumentNullException>(() => this.stream.Write(null, 0, 1));
+        Assert.Throws<ArgumentNullException>(() => this.stream.Write(null!, 0, 1));
         Assert.Throws<ArgumentOutOfRangeException>(() => this.stream.Write(new byte[1], 0, 2));
         Assert.Throws<ArgumentOutOfRangeException>(() => this.stream.Write(new byte[1], -1, 1));
 
-        await Assert.ThrowsAsync<ArgumentNullException>(() => this.stream.WriteAsync(null, 0, 1));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => this.stream.WriteAsync(null!, 0, 1));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.stream.WriteAsync(new byte[1], 0, 2));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.stream.WriteAsync(new byte[1], -1, 1));
     }

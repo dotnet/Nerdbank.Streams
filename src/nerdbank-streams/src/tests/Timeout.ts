@@ -20,7 +20,7 @@ export function timeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 export function delay(ms: number): Promise<void> {
     const deferred = new Deferred<void>();
-    const t = setTimeout(
+    setTimeout(
         () => {
             deferred.resolve();
         },

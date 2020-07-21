@@ -1,5 +1,5 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
-// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 namespace Nerdbank.Streams
 {
@@ -63,6 +63,7 @@ namespace Nerdbank.Streams
         }
 
         /// <inheritdoc/>
+        [Obsolete]
         public override void OnWriterCompleted(Action<Exception, object> callback, object? state)
         {
             // We will never call this back. The method is deprecated in .NET Core 3.0 anyway.

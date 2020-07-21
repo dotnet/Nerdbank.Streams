@@ -1,5 +1,5 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
-// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
 using System.Buffers;
@@ -40,7 +40,9 @@ public abstract class StreamPipeReaderTestBase : TestBase
         var stream = new MemoryStream(expectedBuffer);
         var reader = this.CreatePipeReader(stream, sizeHint: 50);
 
+#pragma warning disable CS0618 // Type or member is obsolete
         Task writerCompletedTask = reader.WaitForWriterCompletionAsync();
+#pragma warning restore CS0618 // Type or member is obsolete
 
         // This next assertion is only guaranteeed for the strict pipe reader.
         // For the normal one, its role of reading from the stream is concurrent with our code,
@@ -86,7 +88,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
     public async Task ReadAsyncAfterExamining()
     {
         byte[] expectedBuffer = this.GetRandomBuffer(2048);
-        var stream = new HalfDuplexStream();
+        var stream = new SimplexStream();
         stream.Write(expectedBuffer, 0, 50);
         await stream.FlushAsync(this.TimeoutToken);
         var reader = this.CreatePipeReader(stream, sizeHint: 50);
@@ -249,7 +251,9 @@ public abstract class StreamPipeReaderTestBase : TestBase
         // The exception throwing test is disabled due to https://github.com/dotnet/corefx/issues/31695
         ////// This will verify that a callback that throws doesn't stop subsequent callbacks from being invoked.
         ////reader.OnWriterCompleted((ex, s) => throw new InvalidOperationException(), null);
+#pragma warning disable CS0618 // Type or member is obsolete
         Task writerCompletedTask = reader.WaitForWriterCompletionAsync();
+#pragma warning restore CS0618 // Type or member is obsolete
 
         // Read everything.
         while (true)
@@ -266,13 +270,15 @@ public abstract class StreamPipeReaderTestBase : TestBase
         await writerCompletedTask.WithCancellation(this.TimeoutToken);
 
         // Verify that a callback only registered now gets invoked too:
+#pragma warning disable CS0618 // Type or member is obsolete
         await reader.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
+#pragma warning restore CS0618 // Type or member is obsolete
     }
 
     [Fact]
     public async Task CancelPendingRead_WithCancellationToken()
     {
-        var stream = new HalfDuplexStream();
+        var stream = new SimplexStream();
         var reader = this.CreatePipeReader(stream, sizeHint: 50);
 
         var cts = new CancellationTokenSource();
@@ -284,7 +290,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
     [Fact]
     public async Task Complete_MayCauseStreamDisposal()
     {
-        var stream = new HalfDuplexStream();
+        var stream = new SimplexStream();
         var ms = new MonitoringStream(stream);
         var disposal = new AsyncManualResetEvent();
         ms.Disposed += (s, e) => disposal.Set();
@@ -304,7 +310,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
     [Fact]
     public async Task CancelPendingRead()
     {
-        var stream = new HalfDuplexStream();
+        var stream = new SimplexStream();
         var reader = this.CreatePipeReader(stream, sizeHint: 50);
 
         ValueTask<ReadResult> readTask = reader.ReadAsync(this.TimeoutToken);

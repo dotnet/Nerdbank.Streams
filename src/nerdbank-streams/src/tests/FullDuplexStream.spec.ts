@@ -7,8 +7,8 @@ describe("FullDuplexStream.CreatePair", () => {
 
     it("should create", () => {
         const pair = FullDuplexStream.CreatePair();
-        expect(pair.first).not.toBe(null);
-        expect(pair.second).not.toBe(null);
+        expect(pair.first).toBeDefined();
+        expect(pair.second).toBeDefined();
     });
 
     it("stream1.write should pass to stream2.read", async () => {
@@ -81,9 +81,9 @@ describe("FullDuplexStream.Splice", () => {
 
     it("Terminating writing", async () => {
         duplex.end("the end");
-        let buffer = await getBufferFrom(writable, 7);
+        let buffer: Buffer | null = await getBufferFrom(writable, 7);
         expect(buffer).toEqual(new Buffer("the end"));
         buffer = await getBufferFrom(writable, 1, true);
-        expect(buffer).toEqual(new Buffer(""));
+        expect(buffer).toBeNull();
     });
 });

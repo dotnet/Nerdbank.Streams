@@ -1,5 +1,5 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
-// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 namespace Nerdbank.Streams
 {
@@ -17,7 +17,9 @@ namespace Nerdbank.Streams
     /// <summary>
     /// A <see cref="Stream"/> that acts as a queue for bytes, in that what gets written to it
     /// can then be read from it, in order.
+    /// This is actually a "simplex" stream -- not a half duplex stream. Naming bug.
     /// </summary>
+    [Obsolete("Use " + nameof(SimplexStream) + " instead.")]
     public class HalfDuplexStream : Stream, IBufferWriter<byte>, IDisposableObservable
     {
         /// <summary>

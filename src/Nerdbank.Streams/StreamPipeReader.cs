@@ -1,5 +1,5 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
-// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 namespace Nerdbank.Streams
 {
@@ -41,6 +41,9 @@ namespace Nerdbank.Streams
 
         private Exception? readerException;
 
+        /// <summary>
+        /// Indicates when we have drained the underlying stream of all bytes.
+        /// </summary>
         private bool isWriterCompleted;
 
         private Exception? writerException;
@@ -94,6 +97,7 @@ namespace Nerdbank.Streams
         }
 
         /// <inheritdoc />
+        [Obsolete]
         public override void OnWriterCompleted(Action<Exception?, object?> callback, object? state)
         {
             Requires.NotNull(callback, nameof(callback));

@@ -1,5 +1,5 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
-// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
 using System.IO;
@@ -35,7 +35,7 @@ public class FullDuplexStreamPairTests : TestBase
     [Fact]
     public void Write_InvalidArgs()
     {
-        Assert.Throws<ArgumentNullException>(() => this.stream1.Write(null, 0, 0));
+        Assert.Throws<ArgumentNullException>(() => this.stream1.Write(null!, 0, 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => this.stream1.Write(new byte[0], -1, 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => this.stream1.Write(new byte[0], 0, -1));
         Assert.Throws<ArgumentOutOfRangeException>(() => this.stream1.Write(new byte[0], 1, 0));
@@ -332,12 +332,15 @@ public class FullDuplexStreamPairTests : TestBase
 
         Assert.True(((IDisposableObservable)this.stream2).IsDisposed);
 
+#pragma warning disable CS0618 // Type or member is obsolete
+
         // Verify that the other end notices.
         await pipe1.Input.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
 
         // The other end then decides it is done writing.
         pipe1.Output.Complete();
         await pipe1.Output.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken);
+#pragma warning restore CS0618 // Type or member is obsolete
     }
 
     [Fact]
@@ -347,6 +350,8 @@ public class FullDuplexStreamPairTests : TestBase
 
         // First party indicates they're done sending messages (but might still be reading).
         party1.Output.Complete();
+
+#pragma warning disable CS0618 // Type or member is obsolete
 
         // Second party recognizes that the other's writing is done, and acknowledges that they're done reading.
         await party2.Input.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
@@ -360,6 +365,7 @@ public class FullDuplexStreamPairTests : TestBase
         await party1.Input.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
         party1.Input.Complete();
         await party2.Output.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken); // just to show propagation.
+#pragma warning restore RS0030 // Do not used banned APIs
     }
 
     private static MemoryStream GetDisposedMemoryStream()

@@ -1,5 +1,5 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
-// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
 using System.Diagnostics;
@@ -73,7 +73,7 @@ public class MultiplexingStreamChannelOptionsTests : TestBase
     }
 
     [Fact]
-    public void ExistingPipe_AcceptsHalfDuplex()
+    public void ExistingPipe_AcceptsSimplex()
     {
         var options = new MultiplexingStream.ChannelOptions();
 
@@ -83,7 +83,7 @@ public class MultiplexingStreamChannelOptionsTests : TestBase
         options.ExistingPipe = new MockDuplexPipe { Output = pipe.Writer };
     }
 
-    [Fact]
+    [Fact, Obsolete]
     public void ReaderPipeOptions()
     {
         PipeOptions expected = new PipeOptions();

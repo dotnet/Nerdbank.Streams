@@ -1,11 +1,17 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
-// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 namespace Nerdbank.Streams
 {
     using System;
+    using System.Buffers;
+    using System.CodeDom.Compiler;
     using System.Diagnostics;
+    using System.IO;
     using System.IO.Pipelines;
+    using System.Runtime.CompilerServices;
+    using System.Runtime.InteropServices;
+    using System.Runtime.Serialization;
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft;
@@ -19,18 +25,23 @@ namespace Nerdbank.Streams
         /// <summary>
         /// An individual channel within a <see cref="Streams.MultiplexingStream"/>.
         /// </summary>
-        [DebuggerDisplay("{" + nameof(DebuggerDisplay) + "}")]
+        [DebuggerDisplay("{" + nameof(DebuggerDisplay) + ",nq}")]
         public class Channel : IDisposableObservable, IDuplexPipe
         {
             /// <summary>
             /// This task source completes when the channel has been accepted, rejected, or the offer is canceled.
             /// </summary>
-            private readonly TaskCompletionSource<object?> acceptanceSource = new TaskCompletionSource<object?>();
+            private readonly TaskCompletionSource<AcceptanceParameters> acceptanceSource = new TaskCompletionSource<AcceptanceParameters>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             /// <summary>
             /// The source for the <see cref="Completion"/> property.
             /// </summary>
             private readonly TaskCompletionSource<object?> completionSource = new TaskCompletionSource<object?>();
+
+            /// <summary>
+            /// The source for a token that will be canceled when this channel has completed.
+            /// </summary>
+            private readonly CancellationTokenSource disposalTokenSource = new CancellationTokenSource();
 
             /// <summary>
             /// The source for the <see cref="OptionsApplied"/> property. May be null if options were provided in ctor.
@@ -48,12 +59,44 @@ namespace Nerdbank.Streams
             private readonly AsyncManualResetEvent mxStreamIOWriterCompleted = new AsyncManualResetEvent();
 
             /// <summary>
+            /// Gets a signal which indicates when the <see cref="RemoteWindowRemaining"/> is non-zero.
+            /// </summary>
+            private readonly AsyncManualResetEvent remoteWindowHasCapacity = new AsyncManualResetEvent(initialState: true);
+
+            /// <summary>
+            /// The number of bytes transmitted from here but not yet acknowledged as processed from there,
+            /// and thus occupying some portion of the full <see cref="AcceptanceParameters.RemoteWindowSize"/>.
+            /// </summary>
+            /// <remarks>
+            /// All access to this field should be made within a lock on the <see cref="SyncObject"/> object.
+            /// </remarks>
+            private long remoteWindowFilled = 0;
+
+            /// <summary>
+            /// The number of bytes that may be transmitted before receiving acknowledgment that those bytes have been processed.
+            /// </summary>
+            /// <remarks>
+            /// This field is set to the value of <see cref="OfferParameters.RemoteWindowSize"/> if we accepted the channel,
+            /// or the value of <see cref="AcceptanceParameters.RemoteWindowSize"/> if we offered the channel.
+            /// </remarks>
+            private long? remoteWindowSize;
+
+            /// <summary>
+            /// The number of bytes that may be received and buffered for processing.
+            /// </summary>
+            /// <remarks>
+            /// This field is set to the value of <see cref="OfferParameters.RemoteWindowSize"/> if we offered the channel,
+            /// or the value of <see cref="AcceptanceParameters.RemoteWindowSize"/> if we accepted the channel.
+            /// </remarks>
+            private long? localWindowSize;
+
+            /// <summary>
             /// Indicates whether the <see cref="Dispose"/> method has been called.
             /// </summary>
             private bool isDisposed;
 
             /// <summary>
-            /// The <see cref="PipeReader"/> the underlying <see cref="Streams.MultiplexingStream"/> should use.
+            /// The <see cref="PipeReader"/> to use to get data to be transmitted over the <see cref="Streams.MultiplexingStream"/>.
             /// </summary>
             private PipeReader? mxStreamIOReader;
 
@@ -69,16 +112,21 @@ namespace Nerdbank.Streams
             private PipeWriter? mxStreamIOWriter;
 
             /// <summary>
-            /// The I/O to expose on this channel. Will be <c>null</c> if <see cref="ChannelOptions.ExistingPipe"/>
-            /// was set to a non-null value when this channel was created.
+            /// The I/O to expose on this channel if <see cref="ChannelOptions.ExistingPipe"/> was not specified;
+            /// otherwise it is the buffering pipe we use as an intermediary with the specified <see cref="ChannelOptions.ExistingPipe"/>.
             /// </summary>
             private IDuplexPipe? channelIO;
 
             /// <summary>
-            /// A task that represents a transition from a <see cref="Pipe"/> to an owner-supplied <see cref="PipeWriter"/>
-            /// for use by the underlying <see cref="MultiplexingStream"/> to publish bytes received over the channel.
+            /// The value of <see cref="ChannelOptions.ExistingPipe"/> as it was when we received it.
+            /// We don't use this field, but we set it for diagnostic purposes later.
             /// </summary>
-            private Task<PipeWriter>? switchingToExistingPipe;
+            private IDuplexPipe? existingPipe;
+
+            /// <summary>
+            /// A value indicating whether this <see cref="Channel"/> was created or accepted with a non-null value for <see cref="ChannelOptions.ExistingPipe"/>.
+            /// </summary>
+            private bool? existingPipeGiven;
 
             /// <summary>
             /// Initializes a new instance of the <see cref="Channel"/> class.
@@ -86,17 +134,26 @@ namespace Nerdbank.Streams
             /// <param name="multiplexingStream">The owning <see cref="Streams.MultiplexingStream"/>.</param>
             /// <param name="offeredLocally">A value indicating whether this channel originated locally (as opposed to remotely).</param>
             /// <param name="id">The ID of the channel.</param>
-            /// <param name="name">The name of the channel.</param>
+            /// <param name="offerParameters">The parameters of the channel from the offering party.</param>
             /// <param name="channelOptions">The channel options. Should only be null if the channel is created in response to an offer that is not immediately accepted.</param>
-            internal Channel(MultiplexingStream multiplexingStream, bool offeredLocally, int id, string name, ChannelOptions? channelOptions = null)
+            internal Channel(MultiplexingStream multiplexingStream, bool offeredLocally, int id, OfferParameters offerParameters, ChannelOptions? channelOptions = null)
             {
                 Requires.NotNull(multiplexingStream, nameof(multiplexingStream));
-                Requires.NotNull(name, nameof(name));
+                Requires.NotNull(offerParameters, nameof(offerParameters));
 
                 this.MultiplexingStream = multiplexingStream;
                 this.offeredLocally = offeredLocally;
                 this.Id = id;
-                this.Name = name;
+                this.OfferParams = offerParameters;
+
+                if (offeredLocally)
+                {
+                    this.localWindowSize = offerParameters.RemoteWindowSize;
+                }
+                else
+                {
+                    this.remoteWindowSize = offerParameters.RemoteWindowSize;
+                }
 
                 if (channelOptions == null)
                 {
@@ -131,13 +188,35 @@ namespace Nerdbank.Streams
             /// Gets the reader used to receive data over the channel.
             /// </summary>
             /// <exception cref="NotSupportedException">Thrown if the channel was created with a non-null value in <see cref="ChannelOptions.ExistingPipe"/>.</exception>
-            public PipeReader Input => this.channelIO?.Input ?? throw new NotSupportedException(Strings.NotSupportedWhenExistingPipeSpecified);
+            public PipeReader Input
+            {
+                get
+                {
+                    // Before the user should ever have a chance to call this property (before we expose this Channel object)
+                    // we should have received a ChannelOptions object from them and initialized these fields.
+                    Assumes.True(this.existingPipeGiven.HasValue);
+                    Assumes.NotNull(this.channelIO);
+
+                    return this.existingPipeGiven.Value ? throw new NotSupportedException(Strings.NotSupportedWhenExistingPipeSpecified) : this.channelIO.Input;
+                }
+            }
 
             /// <summary>
             /// Gets the writer used to transmit data over the channel.
             /// </summary>
             /// <exception cref="NotSupportedException">Thrown if the channel was created with a non-null value in <see cref="ChannelOptions.ExistingPipe"/>.</exception>
-            public PipeWriter Output => this.channelIO?.Output ?? throw new NotSupportedException(Strings.NotSupportedWhenExistingPipeSpecified);
+            public PipeWriter Output
+            {
+                get
+                {
+                    // Before the user should ever have a chance to call this property (before we expose this Channel object)
+                    // we should have received a ChannelOptions object from them and initialized these fields.
+                    Assumes.True(this.existingPipeGiven.HasValue);
+                    Assumes.NotNull(this.channelIO);
+
+                    return this.existingPipeGiven.Value ? throw new NotSupportedException(Strings.NotSupportedWhenExistingPipeSpecified) : this.channelIO.Output;
+                }
+            }
 
             /// <summary>
             /// Gets a <see cref="Task"/> that completes when the channel is accepted, rejected, or canceled.
@@ -161,11 +240,20 @@ namespace Nerdbank.Streams
             /// </summary>
             public MultiplexingStream MultiplexingStream { get; }
 
-            internal string Name { get; set; }
+            /// <summary>
+            /// Gets a token that is canceled just before <see cref="Completion" /> has transitioned to its final state.
+            /// </summary>
+            internal CancellationToken DisposalToken => this.disposalTokenSource.Token;
+
+            internal OfferParameters OfferParams { get; }
+
+            internal string Name => this.OfferParams.Name;
 
             internal bool IsAccepted => this.Acceptance.Status == TaskStatus.RanToCompletion;
 
             internal bool IsRejectedOrCanceled => this.Acceptance.Status == TaskStatus.Canceled;
+
+            internal bool IsRemotelyTerminated { get; set; }
 
             /// <summary>
             /// Gets a <see cref="Task"/> that completes when options have been applied to this <see cref="Channel"/>.
@@ -188,8 +276,28 @@ namespace Nerdbank.Streams
             private object SyncObject => this.acceptanceSource;
 
             /// <summary>
+            /// Gets the number of bytes that may be transmitted over this channel given the
+            /// remaining space in the <see cref="remoteWindowSize"/>.
+            /// </summary>
+            private long RemoteWindowRemaining
+            {
+                get
+                {
+                    lock (this.SyncObject)
+                    {
+                        Assumes.True(this.remoteWindowSize > 0);
+                        return this.remoteWindowSize.Value - this.remoteWindowFilled;
+                    }
+                }
+            }
+
+            /// <summary>
+            /// Gets a value indicating whether backpressure support is enabled.
+            /// </summary>
+            private bool BackpressureSupportEnabled => this.MultiplexingStream.protocolMajorVersion > 1;
+
+            /// <summary>
             /// Closes this channel and releases all resources associated with it.
-            /// Pending reads and writes may be abandoned if the channel was created with an <see cref="ChannelOptions.ExistingPipe"/>.
             /// </summary>
             /// <remarks>
             /// Because this method may terminate the channel immediately and thus can cause previously queued content to not actually be received by the remote party,
@@ -205,6 +313,7 @@ namespace Nerdbank.Streams
                     Action<object?, object> finalDisposalAction = (exOrAntecedent, state) =>
                     {
                         var self = (Channel)state;
+                        self.disposalTokenSource.Cancel();
                         self.completionSource.TrySetResult(null);
                         self.MultiplexingStream.OnChannelDisposed(self);
                     };
@@ -242,6 +351,9 @@ namespace Nerdbank.Streams
                         this.mxStreamIOReader?.CancelPendingRead();
                     }
 
+                    // Unblock the reader that might be waiting on this.
+                    this.remoteWindowHasCapacity.Set();
+
                     // As a minor perf optimization, avoid allocating a continuation task if the antecedent is already completed.
                     if (this.mxStreamIOReaderCompleted?.IsCompleted ?? true)
                     {
@@ -249,51 +361,77 @@ namespace Nerdbank.Streams
                     }
                     else
                     {
-                        this.mxStreamIOReaderCompleted!.ContinueWith(finalDisposalAction, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Forget();
+                        this.mxStreamIOReaderCompleted!.ContinueWith(finalDisposalAction!, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Forget();
                     }
                 }
             }
 
-            /// <summary>
-            /// Gets the pipe writer to use when a message is received for this channel, so that the channel owner will notice and read it.
-            /// </summary>
-            /// <returns>A <see cref="PipeWriter"/>.</returns>
-            internal async ValueTask<PipeWriter> GetReceivedMessagePipeWriterAsync()
+            internal async Task OnChannelTerminatedAsync()
             {
-                lock (this.SyncObject)
+                if (this.IsDisposed)
                 {
-                    Verify.NotDisposed(this);
-                    if (this.switchingToExistingPipe == null)
-                    {
-                        PipeWriter? result = this.mxStreamIOWriter;
-                        if (result == null)
-                        {
-                            this.InitializeOwnPipes(PipeOptions.Default);
-                            result = this.mxStreamIOWriter!;
-                        }
+                    return;
+                }
 
-                        return result;
+                try
+                {
+                    // We Complete the writer because only the writing (logical) thread should complete it
+                    // to avoid race conditions, and Channel.Dispose can be called from any thread.
+                    var writer = this.GetReceivedMessagePipeWriter();
+                    await writer.CompleteAsync().ConfigureAwait(false);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // We fell victim to a race condition. It's OK to just swallow it because the writer was never created, so it needn't be completed.
+                }
+            }
+
+            internal async ValueTask OnContentAsync(FrameHeader header, ReadOnlySequence<byte> payload, CancellationToken cancellationToken)
+            {
+                PipeWriter writer = this.GetReceivedMessagePipeWriter();
+                foreach (var segment in payload)
+                {
+                    try
+                    {
+                        var memory = writer.GetMemory(segment.Length);
+                        segment.CopyTo(memory);
+                        writer.Advance(segment.Length);
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // Someone completed the writer.
+                        return;
                     }
                 }
 
-                // Our (non-current) writer must not be writing to the last result we may have given them,
-                // since they're asking for access right now. So whatever they may have written on the last result
-                // is the last they get to write on that result, so Complete that result.
-                this.mxStreamIOWriter!.Complete();
-
-                // Now wait for whatever they may have written previously to propagate to the ChannelOptions.ExistingPipe.Output writer,
-                // and then redirect all writing to that writer.
-                PipeWriter newWriter = await this.switchingToExistingPipe.ConfigureAwait(false);
-                lock (this.SyncObject)
+                if (!payload.IsEmpty && this.MultiplexingStream.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
                 {
-                    Verify.NotDisposed(this);
-                    this.mxStreamIOWriter = newWriter;
-
-                    // Skip all this next time.
-                    this.switchingToExistingPipe = null;
+                    this.MultiplexingStream.TraceSource.TraceData(TraceEventType.Verbose, (int)TraceEventId.FrameReceivedPayload, payload);
                 }
 
-                return this.mxStreamIOWriter;
+                ValueTask<FlushResult> flushResult = writer.FlushAsync(cancellationToken);
+                if (this.BackpressureSupportEnabled)
+                {
+                    if (!flushResult.IsCompleted)
+                    {
+                        // The incoming data has overrun the size of the write buffer inside the PipeWriter.
+                        // This should never happen if we created the Pipe because we specify the Pause threshold to exceed the window size.
+                        // If it happens, it should be because someone specified an ExistingPipe with an inappropriately sized buffer in its PipeWriter.
+                        Assumes.True(this.existingPipeGiven == true); // Make sure this isn't an internal error
+                        this.Fault(new InvalidOperationException(Strings.ExistingPipeOutputHasPauseThresholdSetTooLow));
+                    }
+                }
+                else
+                {
+                    await flushResult.ConfigureAwait(false);
+                }
+
+                if (flushResult.IsCanceled)
+                {
+                    // This happens when the channel is disposed (while or before flushing).
+                    Assumes.True(this.IsDisposed);
+                    writer.Complete();
+                }
             }
 
             /// <summary>
@@ -307,17 +445,23 @@ namespace Nerdbank.Streams
                     {
                         try
                         {
-                            var writer = await this.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
-                            writer.Complete();
+                            var writer = this.GetReceivedMessagePipeWriter();
+                            await writer.CompleteAsync().ConfigureAwait(false);
                         }
                         catch (ObjectDisposedException)
                         {
-                            this.mxStreamIOWriter?.Complete();
+                            if (this.mxStreamIOWriter != null)
+                            {
+                                await this.mxStreamIOWriter.CompleteAsync().ConfigureAwait(false);
+                            }
                         }
                     }
                     else
                     {
-                        this.mxStreamIOWriter?.Complete();
+                        if (this.mxStreamIOWriter != null)
+                        {
+                            await this.mxStreamIOWriter.CompleteAsync().ConfigureAwait(false);
+                        }
                     }
 
                     this.mxStreamIOWriterCompleted.Set();
@@ -331,9 +475,25 @@ namespace Nerdbank.Streams
             /// <returns>A value indicating whether the offer was accepted. It may fail if the channel was already closed or the offer rescinded.</returns>
             internal bool TryAcceptOffer(ChannelOptions channelOptions)
             {
-                if (this.acceptanceSource.TrySetResult(null))
+                lock (this.SyncObject)
                 {
-                    this.MultiplexingStream.SendFrame(ControlCode.OfferAccepted, this.Id);
+                    // If the local window size has already been determined, we have to keep that since it can't be expanded once the Pipe is created.
+                    // Otherwise use what the ChannelOptions asked for, so long as it is no smaller than the default channel size, since we can't make it smaller either.
+                    this.localWindowSize ??= channelOptions.ChannelReceivingWindowSize is long windowSize ? Math.Max(windowSize, this.MultiplexingStream.DefaultChannelReceivingWindowSize) : this.MultiplexingStream.DefaultChannelReceivingWindowSize;
+                }
+
+                var acceptanceParameters = new AcceptanceParameters(this.localWindowSize.Value);
+                if (this.acceptanceSource.TrySetResult(acceptanceParameters))
+                {
+                    var payload = this.MultiplexingStream.formatter.Serialize(acceptanceParameters);
+                    this.MultiplexingStream.SendFrame(
+                        new FrameHeader
+                        {
+                            Code = ControlCode.OfferAccepted,
+                            ChannelId = this.Id,
+                        },
+                        payload,
+                        CancellationToken.None);
                     try
                     {
                         this.ApplyChannelOptions(channelOptions);
@@ -352,11 +512,65 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Occurs when the remote party has accepted our offer of this channel.
             /// </summary>
+            /// <param name="acceptanceParameters">The channel parameters provided by the accepting party.</param>
             /// <returns>A value indicating whether the acceptance went through; <c>false</c> if the channel is already accepted, rejected or offer rescinded.</returns>
-            internal bool OnAccepted() => this.acceptanceSource.TrySetResult(null);
+            internal bool OnAccepted(AcceptanceParameters acceptanceParameters)
+            {
+                lock (this.SyncObject)
+                {
+                    if (this.acceptanceSource.TrySetResult(acceptanceParameters))
+                    {
+                        this.remoteWindowSize = acceptanceParameters.RemoteWindowSize;
+                        return true;
+                    }
+
+                    return false;
+                }
+            }
 
             /// <summary>
-            /// Apply channel options to this channel, including setting up or migrating to an user-supplied pipe writer/reader pair.
+            /// Invoked when the remote party acknowledges bytes we previously transmitted as processed,
+            /// thereby allowing us to consider that data removed from the remote party's "window"
+            /// and thus enables us to send more data to them.
+            /// </summary>
+            /// <param name="bytesProcessed">The number of bytes processed by the remote party.</param>
+            internal void OnContentProcessed(long bytesProcessed)
+            {
+                Requires.Range(bytesProcessed >= 0, nameof(bytesProcessed), "A non-negative number is required.");
+                lock (this.SyncObject)
+                {
+                    Assumes.True(bytesProcessed <= this.remoteWindowFilled);
+                    this.remoteWindowFilled -= bytesProcessed;
+                    if (this.remoteWindowFilled < this.remoteWindowSize)
+                    {
+                        this.remoteWindowHasCapacity.Set();
+                    }
+                }
+            }
+
+            /// <summary>
+            /// Gets the pipe writer to use when a message is received for this channel, so that the channel owner will notice and read it.
+            /// </summary>
+            /// <returns>A <see cref="PipeWriter"/>.</returns>
+            private PipeWriter GetReceivedMessagePipeWriter()
+            {
+                lock (this.SyncObject)
+                {
+                    Verify.NotDisposed(this);
+
+                    PipeWriter? result = this.mxStreamIOWriter;
+                    if (result == null)
+                    {
+                        this.InitializeOwnPipes();
+                        result = this.mxStreamIOWriter!;
+                    }
+
+                    return result;
+                }
+            }
+
+            /// <summary>
+            /// Apply channel options to this channel, including setting up or linking to an user-supplied pipe writer/reader pair.
             /// </summary>
             /// <param name="channelOptions">The channel options to apply.</param>
             private void ApplyChannelOptions(ChannelOptions channelOptions)
@@ -373,65 +587,22 @@ namespace Nerdbank.Streams
                     lock (this.SyncObject)
                     {
                         Verify.NotDisposed(this);
-                        if (channelOptions.ExistingPipe != null)
+                        this.InitializeOwnPipes();
+                        if (channelOptions.ExistingPipe is object)
                         {
-                            if (this.mxStreamIOWriter != null)
-                            {
-                                // A Pipe was already created (because data has been coming in for this channel even before it was accepted).
-                                // To be most efficient, we need to:
-                                // 1. Start forwarding all bytes written with this.mxStreamIOWriter to channelOptions.ExistingPipe.Output
-                                // 2. Arrange for the *next* call to GetReceivedMessagePipeWriterAsync to:
-                                //      call this.mxStreamIOWriter.Complete()
-                                //      wait for our forwarding code to finish (without propagating copmletion to channel.ExistingPipe.Output)
-                                //      return channel.ExistingPipe.Output
-                                //    From then on, GetReceivedMessagePipeWriterAsync should simply return channel.ExistingPipe.Output
-                                // Since this channel hasn't yet been exposed to the local owner, we can just replace the PipeWriter they use to transmit.
+                            Assumes.NotNull(this.channelIO);
+                            this.existingPipe = channelOptions.ExistingPipe;
+                            this.existingPipeGiven = true;
 
-                                // Take ownership of reading bytes that the MultiplexingStream may have already written to this channel.
-                                var mxStreamIncomingBytesReader = this.channelIO!.Input;
-                                this.channelIO = null;
+                            // We always want to write ALL received data to the user's ExistingPipe, rather than truncating it on disposal, so don't use a cancellation token in that direction.
+                            this.DisposeSelfOnFailure(this.channelIO.Input.LinkToAsync(channelOptions.ExistingPipe.Output));
 
-                                // Forward any bytes written by the MultiplexingStream to the ExistingPipe.Output writer,
-                                // and make that ExistingPipe.Output writer available only after the old Pipe-based writer has completed.
-                                // First, capture the ExistingPipe as a local since ChannelOptions is a mutable type, and we're going to need
-                                // its current value later on.
-                                var existingPipe = channelOptions.ExistingPipe;
-                                this.switchingToExistingPipe = Task.Run(async delegate
-                                {
-                                    // Await propagation of all bytes. Don't complete the ExistingPipe.Output when we're done because we still want to use it.
-                                    await mxStreamIncomingBytesReader.LinkToAsync(existingPipe.Output, propagateSuccessfulCompletion: false).ConfigureAwait(false);
-                                    return existingPipe.Output;
-                                });
-                            }
-                            else
-                            {
-                                // We haven't created a Pipe yet, so we can simply direct all writing to the ExistingPipe.Output immediately.
-                                this.mxStreamIOWriter = channelOptions.ExistingPipe.Output;
-                            }
-
-                            this.mxStreamIOReader = channelOptions.ExistingPipe.Input;
-                        }
-                        else if (channelOptions.InputPipeOptions != null && this.mxStreamIOWriter != null)
-                        {
-                            // Similar strategy to the situation above with ExistingPipe.
-                            // Take ownership of reading bytes that the MultiplexingStream may have already written to this channel.
-                            var mxStreamIncomingBytesReader = this.channelIO!.Input;
-
-                            var writerRelay = new Pipe();
-                            var readerRelay = new Pipe(channelOptions.InputPipeOptions);
-                            this.mxStreamIOReader = writerRelay.Reader;
-                            this.channelIO = new DuplexPipe(readerRelay.Reader, writerRelay.Writer);
-
-                            this.switchingToExistingPipe = Task.Run(async delegate
-                            {
-                                // Await propagation of all bytes. Don't complete the readerRelay.Writer when we're done because we still want to use it.
-                                await mxStreamIncomingBytesReader.LinkToAsync(readerRelay.Writer, propagateSuccessfulCompletion: false).ConfigureAwait(false);
-                                return readerRelay.Writer;
-                            });
+                            // Upon disposal, we no longer want to continue reading from the user's ExistingPipe into our buffer since we won't be propagating it any further, so use our DisposalToken.
+                            this.DisposeSelfOnFailure(channelOptions.ExistingPipe.Input.LinkToAsync(this.channelIO.Output, this.DisposalToken));
                         }
                         else
                         {
-                            this.InitializeOwnPipes(channelOptions.InputPipeOptions ?? PipeOptions.Default);
+                            this.existingPipeGiven = false;
                         }
                     }
 
@@ -453,21 +624,27 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Set up our own (buffering) Pipes if they have not been set up yet.
             /// </summary>
-            /// <param name="inputPipeOptions">The options for the reading relay <see cref="Pipe"/>. Must not be null.</param>
-            private void InitializeOwnPipes(PipeOptions inputPipeOptions)
+            private void InitializeOwnPipes()
             {
-                Requires.NotNull(inputPipeOptions, nameof(inputPipeOptions));
-
                 lock (this.SyncObject)
                 {
                     Verify.NotDisposed(this);
-                    if (this.mxStreamIOReader == null)
+                    if (this.mxStreamIOReader is null)
                     {
+                        if (this.localWindowSize is null)
+                        {
+                            // If an offer came in along with data before we accepted the channel, we have to set up the pipe
+                            // before we know what the preferred local window size is. We can't change it after the fact, so just use the default.
+                            this.localWindowSize = this.MultiplexingStream.DefaultChannelReceivingWindowSize;
+                        }
+
                         var writerRelay = new Pipe();
-                        var readerRelay = new Pipe(inputPipeOptions);
+                        var readerRelay = this.BackpressureSupportEnabled
+                            ? new Pipe(new PipeOptions(pauseWriterThreshold: this.localWindowSize.Value + 1)) // +1 prevents pause when remote window is exactly filled
+                            : new Pipe();
                         this.mxStreamIOReader = writerRelay.Reader;
                         this.mxStreamIOWriter = readerRelay.Writer;
-                        this.channelIO = new DuplexPipe(readerRelay.Reader, writerRelay.Writer);
+                        this.channelIO = new DuplexPipe(this.BackpressureSupportEnabled ? new WindowPipeReader(this, readerRelay.Reader) : readerRelay.Reader, writerRelay.Writer);
                     }
                 }
             }
@@ -486,6 +663,22 @@ namespace Nerdbank.Streams
 
                     while (!this.Completion.IsCompleted)
                     {
+                        if (!this.remoteWindowHasCapacity.IsSet && this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
+                        {
+                            this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Remote window is full. Waiting for remote party to process data before sending more.");
+                        }
+
+                        await this.remoteWindowHasCapacity.WaitAsync().ConfigureAwait(false);
+                        if (this.IsRemotelyTerminated)
+                        {
+                            if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
+                            {
+                                this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Transmission on channel {0} \"{1}\" terminated the remote party terminated the channel.", this.Id, this.Name);
+                            }
+
+                            break;
+                        }
+
                         ReadResult result;
                         try
                         {
@@ -513,9 +706,16 @@ namespace Nerdbank.Streams
                             break;
                         }
 
-                        // We'll send whatever we've got, up to the maximum size of the frame.
+                        // We'll send whatever we've got, up to the maximum size of the frame or available window size.
                         // Anything in excess of that we'll pick up next time the loop runs.
-                        var bufferToRelay = result.Buffer.Slice(0, Math.Min(result.Buffer.Length, this.MultiplexingStream.framePayloadMaxLength));
+                        long bytesToSend = Math.Min(result.Buffer.Length, FramePayloadMaxLength);
+                        if (this.BackpressureSupportEnabled)
+                        {
+                            bytesToSend = Math.Min(this.RemoteWindowRemaining, bytesToSend);
+                        }
+
+                        var bufferToRelay = result.Buffer.Slice(0, bytesToSend);
+                        this.OnTransmittingBytes(bufferToRelay.Length);
                         bool isCompleted = result.IsCompleted && result.Buffer.Length == bufferToRelay.Length;
                         if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
                         {
@@ -528,30 +728,29 @@ namespace Nerdbank.Streams
                             {
                                 Code = ControlCode.Content,
                                 ChannelId = this.Id,
-                                FramePayloadLength = (int)bufferToRelay.Length,
                             };
 
                             await this.MultiplexingStream.SendFrameAsync(header, bufferToRelay, CancellationToken.None).ConfigureAwait(false);
+                        }
 
-                            try
+                        try
+                        {
+                            // Let the pipe know exactly how much we read, which might be less than we were given.
+                            this.mxStreamIOReader.AdvanceTo(bufferToRelay.End);
+
+                            // We mustn't accidentally access the memory that may have been recycled now that we called AdvanceTo.
+                            bufferToRelay = default;
+                            result.ScrubAfterAdvanceTo();
+                        }
+                        catch (InvalidOperationException ex)
+                        {
+                            // Someone completed the reader. The channel was probably disposed.
+                            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
                             {
-                                // Let the pipe know exactly how much we read, which might be less than we were given.
-                                this.mxStreamIOReader.AdvanceTo(bufferToRelay.End);
-
-                                // We mustn't accidentally access the memory that may have been recycled now that we called AdvanceTo.
-                                bufferToRelay = default;
-                                result.ScrubAfterAdvanceTo();
+                                this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Transmission terminated because the reader threw: {0}", ex);
                             }
-                            catch (InvalidOperationException ex)
-                            {
-                                // Someone completed the reader. The channel was probably disposed.
-                                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
-                                {
-                                    this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Transmission terminated because the reader threw: {0}", ex);
-                                }
 
-                                break;
-                            }
+                            break;
                         }
 
                         if (isCompleted)
@@ -565,11 +764,11 @@ namespace Nerdbank.Streams
                         }
                     }
 
-                    this.mxStreamIOReader!.Complete();
+                    await this.mxStreamIOReader!.CompleteAsync().ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
-                    this.mxStreamIOReader!.Complete(ex);
+                    await this.mxStreamIOReader!.CompleteAsync(ex).ConfigureAwait(false);
                     throw;
                 }
                 finally
@@ -578,13 +777,59 @@ namespace Nerdbank.Streams
                 }
             }
 
+            /// <summary>
+            /// Invoked when we transmit data to the remote party
+            /// so we can track how much data we're sending them so we don't overrun their receiving buffer.
+            /// </summary>
+            /// <param name="transmittedBytes">The number of bytes being transmitted.</param>
+            private void OnTransmittingBytes(long transmittedBytes)
+            {
+                if (this.BackpressureSupportEnabled)
+                {
+                    Requires.Range(transmittedBytes >= 0, nameof(transmittedBytes), "A non-negative number is required.");
+                    lock (this.SyncObject)
+                    {
+                        Requires.Range(this.remoteWindowFilled + transmittedBytes <= this.remoteWindowSize, nameof(transmittedBytes), "The value exceeds the space remaining in the window size.");
+                        this.remoteWindowFilled += transmittedBytes;
+                        if (this.remoteWindowFilled == this.remoteWindowSize)
+                        {
+                            this.remoteWindowHasCapacity.Reset();
+                        }
+                    }
+                }
+            }
+
+            private void LocalContentExamined(long bytesExamined)
+            {
+                Requires.Range(bytesExamined >= 0, nameof(bytesExamined));
+                if (bytesExamined == 0 || this.IsDisposed)
+                {
+                    return;
+                }
+
+                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Acknowledging processing of {0} bytes.", bytesExamined);
+                }
+
+                this.MultiplexingStream.SendFrame(
+                    new FrameHeader
+                    {
+                        Code = ControlCode.ContentProcessed,
+                        ChannelId = this.Id,
+                    },
+                    this.MultiplexingStream.formatter.SerializeContentProcessed(bytesExamined),
+                    CancellationToken.None);
+            }
+
             private async Task AutoCloseOnPipesClosureAsync()
             {
+                Assumes.NotNull(this.mxStreamIOReaderCompleted);
                 await Task.WhenAll(this.mxStreamIOWriterCompleted.WaitAsync(), this.mxStreamIOReaderCompleted).ConfigureAwait(false);
 
                 if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                 {
-                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelAutoClosing, "Channel self-closing because both parties have completed transmission.");
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelAutoClosing, "Channel {0} \"{1}\" self-closing because both reader and writer are complete.", this.Id, this.Name);
                 }
 
                 this.Dispose();
@@ -609,17 +854,161 @@ namespace Nerdbank.Streams
                 {
                     if (task.IsFaulted)
                     {
-                        this.Fault(task.Exception.InnerException ?? task.Exception);
+                        this.Fault(task.Exception!.InnerException ?? task.Exception);
                     }
                 }
                 else
                 {
                     task.ContinueWith(
-                        (t, s) => ((Channel)s).Fault(t.Exception.InnerException ?? t.Exception),
+                        (t, s) => ((Channel)s!).Fault(t.Exception!.InnerException ?? t.Exception),
                         this,
                         CancellationToken.None,
                         TaskContinuationOptions.OnlyOnFaulted,
                         TaskScheduler.Default).Forget();
+                }
+            }
+
+            [DataContract]
+            internal class OfferParameters
+            {
+                /// <summary>
+                /// Initializes a new instance of the <see cref="OfferParameters"/> class.
+                /// </summary>
+                /// <param name="name">The name of the channel.</param>
+                /// <param name="remoteWindowSize">
+                /// The maximum number of bytes that may be transmitted and not yet acknowledged as processed by the remote party.
+                /// When based on <see cref="PipeOptions.PauseWriterThreshold"/>, this value should be -1 of that value in order
+                /// to avoid the actual pause that would be fatal to the read loop of the multiplexing stream.
+                /// </param>
+                internal OfferParameters(string name, long? remoteWindowSize)
+                {
+                    this.Name = name ?? throw new ArgumentNullException(nameof(name));
+                    this.RemoteWindowSize = remoteWindowSize;
+                }
+
+                /// <summary>
+                /// Gets the name of the channel.
+                /// </summary>
+                [DataMember]
+                internal string Name { get; }
+
+                /// <summary>
+                /// Gets the maximum number of bytes that may be transmitted and not yet acknowledged as processed by the remote party.
+                /// </summary>
+                [DataMember]
+                internal long? RemoteWindowSize { get; }
+            }
+
+            [DataContract]
+            internal class AcceptanceParameters
+            {
+                /// <summary>
+                /// Initializes a new instance of the <see cref="AcceptanceParameters"/> class.
+                /// </summary>
+                /// <param name="remoteWindowSize">
+                /// The maximum number of bytes that may be transmitted and not yet acknowledged as processed by the remote party.
+                /// When based on <see cref="PipeOptions.PauseWriterThreshold"/>, this value should be -1 of that value in order
+                /// to avoid the actual pause that would be fatal to the read loop of the multiplexing stream.
+                /// </param>
+                internal AcceptanceParameters(long? remoteWindowSize) => this.RemoteWindowSize = remoteWindowSize;
+
+                /// <summary>
+                /// Gets the maximum number of bytes that may be transmitted and not yet acknowledged as processed by the remote party.
+                /// </summary>
+                [DataMember]
+                internal long? RemoteWindowSize { get; }
+            }
+
+            private class WindowPipeReader : PipeReader
+            {
+                private readonly Channel owner;
+                private readonly PipeReader inner;
+                private ReadResult lastReadResult;
+                private long bytesProcessed;
+                private SequencePosition lastExaminedPosition;
+
+                internal WindowPipeReader(Channel owner, PipeReader inner)
+                {
+                    this.owner = owner;
+                    this.inner = inner;
+                }
+
+                public override void AdvanceTo(SequencePosition consumed)
+                {
+                    long consumedBytes = this.Consumed(consumed, consumed);
+                    this.inner.AdvanceTo(consumed);
+                    this.owner.LocalContentExamined(consumedBytes);
+                }
+
+                public override void AdvanceTo(SequencePosition consumed, SequencePosition examined)
+                {
+                    long consumedBytes = this.Consumed(consumed, examined);
+                    this.inner.AdvanceTo(consumed, examined);
+                    this.owner.LocalContentExamined(consumedBytes);
+                }
+
+                public override void CancelPendingRead() => this.inner.CancelPendingRead();
+
+                public override void Complete(Exception? exception = null) => this.inner.Complete(exception);
+
+                public override async ValueTask<ReadResult> ReadAsync(CancellationToken cancellationToken = default)
+                {
+                    return this.lastReadResult = await this.inner.ReadAsync(cancellationToken).ConfigureAwait(false);
+                }
+
+                public override bool TryRead(out ReadResult readResult)
+                {
+                    bool result = this.inner.TryRead(out readResult);
+                    this.lastReadResult = readResult;
+                    return result;
+                }
+
+                public override Stream AsStream(bool leaveOpen = false)
+                {
+                    // Do NOT forward the call to this.inner or else we'll lose the ability to track how many bytes are read.
+                    return new PipeStream(this, ownsPipe: !leaveOpen);
+                }
+
+                public override ValueTask CompleteAsync(Exception? exception = null) => this.inner.CompleteAsync(exception);
+
+                public override Task CopyToAsync(PipeWriter destination, CancellationToken cancellationToken = default) => this.inner.CopyToAsync(destination, cancellationToken);
+
+                public override Task CopyToAsync(Stream destination, CancellationToken cancellationToken = default) => this.inner.CopyToAsync(destination, cancellationToken);
+
+                [Obsolete]
+                public override void OnWriterCompleted(Action<Exception, object> callback, object state) => this.inner.OnWriterCompleted(callback, state);
+
+                private long Consumed(SequencePosition consumed, SequencePosition examined)
+                {
+                    var lastExamined = this.lastExaminedPosition;
+                    if (lastExamined.Equals(default))
+                    {
+                        lastExamined = this.lastReadResult.Buffer.Start;
+                    }
+
+                    // If the entirety of the buffer was examined for the first time, just use the buffer length as a perf optimization.
+                    // Otherwise, slice the buffer from last examined to new examined to get the number of freshly examined bytes.
+                    long bytesJustProcessed =
+                        lastExamined.Equals(this.lastReadResult.Buffer.Start) && this.lastReadResult.Buffer.End.Equals(examined) ? this.lastReadResult.Buffer.Length :
+                        this.lastReadResult.Buffer.Slice(lastExamined, examined).Length;
+
+                    this.bytesProcessed += bytesJustProcessed;
+
+                    // Only send the 'more bytes please' message if we've consumed at least a max frame's worth of data
+                    // or if our reader indicates that more data is required before it will examine any more.
+                    // Or in some cases of very small receiving windows, when the entire window is empty.
+                    long result = 0;
+                    if (this.bytesProcessed >= FramePayloadMaxLength || this.bytesProcessed == this.owner.localWindowSize)
+                    {
+                        result = this.bytesProcessed;
+                        this.bytesProcessed = 0;
+                    }
+
+                    // Only store the examined position if it is ahead of the consumed position.
+                    // Otherwise we'd store a position in an array that may be recycled.
+                    this.lastExaminedPosition = consumed.Equals(examined) ? default : examined;
+
+                    return result;
                 }
             }
         }

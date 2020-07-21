@@ -8,7 +8,7 @@
     <LangVersion>8.0</LangVersion>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <DefineConstants Condition=" '$(TargetFramework)' == 'netcoreapp2.1' or '$(TargetFramework)' == 'netcoreapp2.2' ">$(DefineConstants);SPAN_BUILTIN</DefineConstants>
+    <DefineConstants Condition=" '$(TargetFramework)' == 'netcoreapp2.1' or '$(TargetFramework)' == 'netcoreapp3.0' or '$(TargetFramework)' == 'netcoreapp3.1' ">$(DefineConstants);SPAN_BUILTIN</DefineConstants>
 
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
@@ -20,10 +20,10 @@
 
   <ItemGroup>
     <!-- <PackageReference Include="Microsoft.CodeAnalysis.FxCopAnalyzers" Version="2.9.4" PrivateAssets="all" /> -->
-    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.0-preview.2" PrivateAssets="All" />
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0-beta2-19367-01" PrivateAssets="All" />
-    <PackageReference Include="Nerdbank.GitVersioning" Version="3.0.26" PrivateAssets="all" />
-    <PackageReference Include="StyleCop.Analyzers" Version="1.1.118" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.0" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All" />
+    <PackageReference Include="Nerdbank.GitVersioning" Version="3.0.50" PrivateAssets="all" />
+    <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.164" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
