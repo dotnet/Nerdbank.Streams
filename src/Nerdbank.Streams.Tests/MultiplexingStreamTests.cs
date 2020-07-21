@@ -570,14 +570,17 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         var random = new Random();
         random.NextBytes(sendBuffer);
         var (a, b) = await this.EstablishChannelStreamsAsync("a");
-        await a.WriteAsync(sendBuffer, 0, sendBuffer.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken);
-        Task flushTask = a.FlushAsync(this.TimeoutToken).WithCancellation(this.TimeoutToken);
+        Task writeAndFlush = Task.Run(async delegate
+        {
+            await a.WriteAsync(sendBuffer, 0, sendBuffer.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken);
+            await a.FlushAsync(this.TimeoutToken).WithCancellation(this.TimeoutToken);
+        });
 
         var recvBuffer = new byte[sendBuffer.Length];
         await this.ReadAsync(b, recvBuffer);
         Assert.Equal(sendBuffer, recvBuffer);
 
-        await flushTask;
+        await writeAndFlush;
     }
 
     [Fact]
@@ -610,27 +613,14 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         Assert.Throws<ObjectDisposedException>(() => s1.Seek(0, SeekOrigin.Begin));
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task PartialFrameSentOnlyOnFlush(bool flushAsync)
+    [Fact]
+    public async Task PartialFrameSentWithoutExplicitFlush()
     {
         var (s1, s2) = await this.EstablishChannelStreamsAsync(string.Empty);
 
         byte[] smallData = new byte[] { 0x1, 0x2, 0x3 };
         await s1.WriteAsync(smallData, 0, smallData.Length).WithCancellation(this.TimeoutToken);
         byte[] recvBuffer = new byte[smallData.Length];
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => s2.ReadAsync(recvBuffer, 0, recvBuffer.Length, ExpectedTimeoutToken));
-
-        if (flushAsync)
-        {
-            await s1.FlushAsync();
-        }
-        else
-        {
-            s1.Flush();
-        }
-
         await ReadAtLeastAsync(s2, new ArraySegment<byte>(recvBuffer), recvBuffer.Length, this.TimeoutToken);
     }
 

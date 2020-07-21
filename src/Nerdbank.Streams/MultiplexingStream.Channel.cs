@@ -979,12 +979,6 @@ namespace Nerdbank.Streams
                     return result;
                 }
 
-                public override Stream AsStream(bool leaveOpen = false)
-                {
-                    // Do NOT forward the call to this.inner or else we'll lose the ability to track how many bytes are read.
-                    return new PipeStream(this, ownsPipe: !leaveOpen);
-                }
-
                 public override ValueTask CompleteAsync(Exception? exception = null) => this.inner.CompleteAsync(exception);
 
                 public override Task CopyToAsync(PipeWriter destination, CancellationToken cancellationToken = default) => this.inner.CopyToAsync(destination, cancellationToken);

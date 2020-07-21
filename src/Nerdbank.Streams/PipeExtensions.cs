@@ -29,7 +29,7 @@ namespace Nerdbank.Streams
         /// </summary>
         /// <param name="pipe">The pipe to wrap as a stream.</param>
         /// <returns>The wrapping stream.</returns>
-        public static Stream AsStream(this IDuplexPipe pipe) => new PipeStream(pipe, ownsPipe: true);
+        public static Stream AsStream(this IDuplexPipe pipe) => AsStream(pipe, ownsPipe: true);
 
         /// <summary>
         /// Exposes a full-duplex pipe as a <see cref="Stream"/>.
@@ -37,7 +37,7 @@ namespace Nerdbank.Streams
         /// <param name="pipe">The pipe to wrap as a stream.</param>
         /// <param name="ownsPipe"><c>true</c> to complete the underlying reader and writer when the <see cref="Stream"/> is disposed; <c>false</c> to keep them open.</param>
         /// <returns>The wrapping stream.</returns>
-        public static Stream AsStream(this IDuplexPipe pipe, bool ownsPipe) => new PipeStream(pipe, ownsPipe);
+        public static Stream AsStream(this IDuplexPipe pipe, bool ownsPipe) => FullDuplexStream.Splice(pipe.Input.AsStream(leaveOpen: !ownsPipe), pipe.Output.AsStream(leaveOpen: !ownsPipe));
 
         /// <summary>
         /// Exposes a pipe reader as a <see cref="Stream"/>.
@@ -47,7 +47,8 @@ namespace Nerdbank.Streams
         /// <remarks>
         /// The reader will be completed when the <see cref="Stream"/> is disposed.
         /// </remarks>
-        public static Stream AsStream(this PipeReader pipeReader) => new PipeStream(pipeReader, ownsPipe: true);
+        [Obsolete("Use " + nameof(PipeReader) + "." + nameof(PipeReader.AsStream) + " instead.")]
+        public static Stream AsStream(this PipeReader pipeReader) => pipeReader.AsStream(leaveOpen: false);
 
         /// <summary>
         /// Exposes a pipe writer as a <see cref="Stream"/>.
@@ -57,7 +58,8 @@ namespace Nerdbank.Streams
         /// <remarks>
         /// The writer will be completed when the <see cref="Stream"/> is disposed.
         /// </remarks>
-        public static Stream AsStream(this PipeWriter pipeWriter) => new PipeStream(pipeWriter, ownsPipe: true);
+        [Obsolete("Use " + nameof(PipeWriter) + "." + nameof(PipeWriter.AsStream) + " instead.")]
+        public static Stream AsStream(this PipeWriter pipeWriter) => pipeWriter.AsStream(leaveOpen: false);
 
         /// <summary>
         /// Enables efficiently reading a stream using <see cref="PipeReader"/>.
@@ -86,6 +88,7 @@ namespace Nerdbank.Streams
         /// This reader may not be as efficient as the <see cref="Pipe"/>-based <see cref="PipeReader"/> returned from <see cref="UsePipeReader(Stream, int, PipeOptions, CancellationToken)"/>,
         /// but its interaction with the underlying <see cref="Stream"/> is closer to how a <see cref="Stream"/> would typically be used which can ease migration from streams to pipes.
         /// </remarks>
+        [Obsolete("Use " + nameof(PipeReader) + "." + nameof(PipeReader.Create) + " instead.")]
         public static PipeReader UseStrictPipeReader(this Stream stream, int sizeHint = DefaultReadBufferSize)
         {
             Requires.NotNull(stream, nameof(stream));
@@ -156,6 +159,7 @@ namespace Nerdbank.Streams
         /// This writer may not be as efficient as the <see cref="Pipe"/>-based <see cref="PipeWriter"/> returned from <see cref="UsePipeWriter(Stream, PipeOptions, CancellationToken)"/>,
         /// but its interaction with the underlying <see cref="Stream"/> is closer to how a <see cref="Stream"/> would typically be used which can ease migration from streams to pipes.
         /// </remarks>
+        [Obsolete("Use " + nameof(PipeWriter) + "." + nameof(PipeWriter.Create) + " instead.")]
         public static PipeWriter UseStrictPipeWriter(this Stream stream)
         {
             Requires.NotNull(stream, nameof(stream));
@@ -174,27 +178,25 @@ namespace Nerdbank.Streams
         /// <returns>An <see cref="IDuplexPipe"/> instance.</returns>
         public static IDuplexPipe UsePipe(this Stream stream, int sizeHint = 0, PipeOptions? pipeOptions = null, CancellationToken cancellationToken = default)
         {
+#pragma warning disable CS0618 // Type or member is obsolete
             return UsePipe(stream, allowUnwrap: false, sizeHint: sizeHint, pipeOptions: pipeOptions, cancellationToken: cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
         }
 
         /// <summary>
         /// Enables reading and writing to a <see cref="Stream"/> using <see cref="PipeWriter"/> and <see cref="PipeReader"/>.
         /// </summary>
         /// <param name="stream">The stream to access using a pipe.</param>
-        /// <param name="allowUnwrap"><c>true</c> to allow returning a pipe that underlies the <paramref name="stream"/> instead of adding a pipe adapter on top, if possible; <c>false</c> to unconditionally add a pipe adapter on top.</param>
+        /// <param name="allowUnwrap">Obsolete. This value is ignored.</param>
         /// <param name="sizeHint">A hint at the size of messages that are commonly transferred. Use 0 for a commonly reasonable default.</param>
         /// <param name="pipeOptions">Optional pipe options to use.</param>
         /// <param name="cancellationToken">A token that may cancel async processes to read from and write to the <paramref name="stream"/>.</param>
         /// <returns>An <see cref="IDuplexPipe"/> instance.</returns>
+        [Obsolete("Use the UsePipe overload that doesn't take an allowUnwrap parameter instead.")]
         public static IDuplexPipe UsePipe(this Stream stream, bool allowUnwrap, int sizeHint = 0, PipeOptions? pipeOptions = null, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(stream, nameof(stream));
             Requires.Argument(stream.CanRead || stream.CanWrite, nameof(stream), "Stream is neither readable nor writable.");
-
-            if (allowUnwrap && stream is PipeStream pipeStream)
-            {
-                return new DuplexPipe(pipeStream.UnderlyingPipeReader, pipeStream.UnderlyingPipeWriter);
-            }
 
             // OBSOLETE API USAGE NOTICE: If at some point we need to stop relying on these obsolete callbacks,
             //                            we can return a decorated PipeReader/PipeWriter that calls us from its Complete method directly.

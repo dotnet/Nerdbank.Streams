@@ -35,7 +35,7 @@ public class FullDuplexStreamPairTests : TestBase
     [Fact]
     public void Write_InvalidArgs()
     {
-        Assert.Throws<ArgumentNullException>(() => this.stream1.Write(null!, 0, 0));
+        this.stream1.Write(null!, 0, 0);
         Assert.Throws<ArgumentOutOfRangeException>(() => this.stream1.Write(new byte[0], -1, 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => this.stream1.Write(new byte[0], 0, -1));
         Assert.Throws<ArgumentOutOfRangeException>(() => this.stream1.Write(new byte[0], 1, 0));
@@ -259,35 +259,35 @@ public class FullDuplexStreamPairTests : TestBase
     }
 
     [Fact]
-    public void Read_ThrowsObjectDisposedException()
+    public void Read_ThrowsInvalidOperationException()
     {
         this.stream1.Dispose();
         var buffer = new byte[1];
-        Assert.Throws<ObjectDisposedException>(() => this.stream1.Read(buffer, 0, buffer.Length));
+        Assert.Throws<InvalidOperationException>(() => this.stream1.Read(buffer, 0, buffer.Length));
     }
 
     [Fact]
-    public async Task ReadAsync_ThrowsObjectDisposedException()
+    public async Task ReadAsync_ThrowsAfterDisposal()
     {
         this.stream1.Dispose();
         var buffer = new byte[1];
-        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream1.ReadAsync(buffer, 0, buffer.Length).WithCancellation(this.TimeoutToken));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => this.stream1.ReadAsync(buffer, 0, buffer.Length).WithCancellation(this.TimeoutToken));
     }
 
     [Fact]
-    public void Write_ThrowsObjectDisposedException()
+    public void Write_ThrowsAfterDisposal()
     {
         this.stream1.Dispose();
         var buffer = new byte[1];
-        Assert.Throws<ObjectDisposedException>(() => this.stream1.Write(buffer, 0, buffer.Length));
+        Assert.Throws<InvalidOperationException>(() => this.stream1.Write(buffer, 0, buffer.Length));
     }
 
     [Fact]
-    public async Task WriteAsync_ThrowsObjectDisposedException()
+    public async Task WriteAsync_ThrowsAfterDisposal()
     {
         this.stream1.Dispose();
         var buffer = new byte[1];
-        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream1.WriteAsync(buffer, 0, buffer.Length).WithCancellation(this.TimeoutToken));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => this.stream1.WriteAsync(buffer, 0, buffer.Length).WithCancellation(this.TimeoutToken));
     }
 
     [Fact]
@@ -303,7 +303,7 @@ public class FullDuplexStreamPairTests : TestBase
     public void ReadByte_ThrowsAfterDisposal()
     {
         this.stream1.Dispose();
-        Assert.Throws<ObjectDisposedException>(() => this.stream1.ReadByte());
+        Assert.Throws<InvalidOperationException>(() => this.stream1.ReadByte());
     }
 
     [Fact]

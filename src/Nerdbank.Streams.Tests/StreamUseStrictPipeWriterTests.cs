@@ -14,6 +14,7 @@ using Nerdbank.Streams;
 using Xunit;
 using Xunit.Abstractions;
 
+[Obsolete("Tests functionality that .NET now exposes directly through PipeWriter.Create(Stream)")]
 public class StreamUseStrictPipeWriterTests : StreamPipeWriterTestBase
 {
     public StreamUseStrictPipeWriterTests(ITestOutputHelper logger)
