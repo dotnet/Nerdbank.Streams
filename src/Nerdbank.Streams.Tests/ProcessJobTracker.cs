@@ -3,8 +3,6 @@
 
 /* This is a derivative from multiple answers on https://stackoverflow.com/questions/3342941/kill-child-process-when-parent-process-is-killed */
 
-#if NETFRAMEWORK
-
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -32,13 +30,18 @@ internal class ProcessJobTracker : IDisposable
     /// Closing this handle would close all tracked processes. So we don't do it in this process
     /// so that it happens automatically when our process exits.
     /// </remarks>
-    private SafeObjectHandle jobHandle;
+    private SafeObjectHandle? jobHandle;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ProcessJobTracker"/> class.
     /// </summary>
     public ProcessJobTracker()
     {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return;
+        }
+
         // The job name is optional (and can be null) but it helps with diagnostics.
         //  If it's not null, it has to be unique. Use SysInternals' Handle command-line
         //  utility: handle -a ChildProcessTracker
@@ -86,6 +89,11 @@ internal class ProcessJobTracker : IDisposable
     {
         Requires.NotNull(process, nameof(process));
 
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return;
+        }
+
         bool success = AssignProcessToJobObject(this.jobHandle, new SafeObjectHandle(process.Handle, ownsHandle: false));
         if (!success && !process.HasExited)
         {
@@ -101,5 +109,3 @@ internal class ProcessJobTracker : IDisposable
         this.jobHandle?.Dispose();
     }
 }
-
-#endif

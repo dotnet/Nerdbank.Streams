@@ -26,9 +26,7 @@ public abstract class TestBase : IDisposable
 
     private const bool WriteTestOutputToFile = false;
 
-#if NETFRAMEWORK
     private readonly ProcessJobTracker processJobTracker = new ProcessJobTracker();
-#endif
 
     private readonly CancellationTokenSource timeoutTokenSource;
 
@@ -61,12 +59,8 @@ public abstract class TestBase : IDisposable
 
     public void Dispose()
     {
-        this.testStopwatch.Stop();
-        this.timeoutLoggerRegistration.Dispose();
-#if NETFRAMEWORK
-        this.processJobTracker.Dispose();
-#endif
-        (this.Logger as IDisposable)?.Dispose();
+        this.Dispose(true);
+        GC.SuppressFinalize(this);
     }
 
     public async Task ReadAsync(Stream stream, byte[] buffer, int? count = null, int offset = 0, bool isAsync = true)
@@ -379,9 +373,13 @@ public abstract class TestBase : IDisposable
 
     protected virtual void Dispose(bool disposing)
     {
-#if NETFRAMEWORK
-        this.processJobTracker.Dispose();
-#endif
+        if (disposing)
+        {
+            this.testStopwatch.Stop();
+            this.timeoutLoggerRegistration.Dispose();
+            this.processJobTracker.Dispose();
+            (this.Logger as IDisposable)?.Dispose();
+        }
     }
 
     protected byte[] GetRandomBuffer(int length)
