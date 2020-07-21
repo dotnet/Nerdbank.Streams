@@ -78,6 +78,7 @@ namespace Nerdbank.Streams
 
         /// <summary>
         /// Creates a <see cref="PipeReader"/> that reads from the specified <see cref="Stream"/> exactly as told to do so.
+        /// It does *not* close the <paramref name="stream"/> when completed.
         /// </summary>
         /// <param name="stream">The stream to read from using a pipe.</param>
         /// <param name="sizeHint">A hint at the size of messages that are commonly transferred. Use 0 for a commonly reasonable default.</param>
@@ -91,7 +92,7 @@ namespace Nerdbank.Streams
             Requires.NotNull(stream, nameof(stream));
             Requires.Argument(stream.CanRead, nameof(stream), "Stream must be readable.");
 
-            return new StreamPipeReader(stream, sizeHint);
+            return new StreamPipeReader(stream, sizeHint, leaveOpen: true);
         }
 
         /// <summary>

@@ -23,24 +23,19 @@ public abstract class StreamPipeReaderTestBase : TestBase
     {
     }
 
+    protected virtual bool EmulatePipelinesStreamPipeReader => true;
+
     [Fact]
     public void ThrowsOnNull()
     {
         Assert.Throws<ArgumentNullException>(() => this.CreatePipeReader((Stream)null!));
     }
 
-    [Fact]
-    public void NonReadableStream()
-    {
-        var unreadableStream = new Mock<Stream>(MockBehavior.Strict);
-        unreadableStream.SetupGet(s => s.CanRead).Returns(false);
-        Assert.Throws<ArgumentException>(() => this.CreatePipeReader(unreadableStream.Object));
-        unreadableStream.VerifyAll();
-    }
-
-    [Fact]
+    [SkippableFact]
     public async Task Stream()
     {
+        Skip.If(this is IOPipelinesStreamPipeReaderTests, "OnWriterCompleted isn't supported.");
+
         byte[] expectedBuffer = this.GetRandomBuffer(2048);
         var stream = new MemoryStream(expectedBuffer);
         var reader = this.CreatePipeReader(stream, sizeHint: 50);
@@ -143,13 +138,66 @@ public abstract class StreamPipeReaderTestBase : TestBase
         reader.AdvanceTo(result.Buffer.End);
     }
 
+    [Fact]
+    public void TryRead_FalseStillTurnsOnReadingMode()
+    {
+        var reader = this.CreatePipeReader(new MemoryStream(new byte[] { 1, 2, 3 }));
+
+        bool tryReadResult = reader.TryRead(out var readResult);
+
+        // The non-strict PipeReader is timing sensitive and may or may not be able to synchronously produce a read.
+        // So only assert the False result for the strict readers.
+        if (this.EmulatePipelinesStreamPipeReader)
+        {
+            Assert.False(tryReadResult);
+        }
+
+        reader.AdvanceTo(readResult.Buffer.End);
+    }
+
+    [Fact]
+    public void TryRead_FalseCanBeCalledRepeatedly()
+    {
+        var reader = this.CreatePipeReader(new MemoryStream(new byte[] { 1, 2, 3 }));
+
+        // Verify that it's safe to call TryRead repeatedly when it returns False.
+        Assert.False(reader.TryRead(out var readResult));
+        Assert.False(reader.TryRead(out readResult));
+    }
+
+    [Fact]
+    public async Task TryRead_AdvanceTo_AfterEndReached()
+    {
+        var reader = this.CreatePipeReader(new MemoryStream(new byte[] { 1, 2, 3 }));
+
+        var readResult = await reader.ReadAsync(this.TimeoutToken);
+        reader.AdvanceTo(readResult.Buffer.End);
+
+        reader.TryRead(out readResult);
+        reader.AdvanceTo(readResult.Buffer.End);
+    }
+
     [Theory, PairwiseData]
     public async Task ReadAsync_TwiceInARow(bool emptyStream)
     {
         var stream = new MemoryStream(emptyStream ? Array.Empty<byte>() : new byte[3]);
         var reader = this.CreatePipeReader(stream, sizeHint: 50);
-        await reader.ReadAsync(this.TimeoutToken);
-        await Assert.ThrowsAsync<InvalidOperationException>(async () => await reader.ReadAsync(this.TimeoutToken));
+        var result1 = await reader.ReadAsync(this.TimeoutToken);
+        if (emptyStream)
+        {
+            Assert.True(result1.IsCompleted);
+        }
+
+        if (this.EmulatePipelinesStreamPipeReader)
+        {
+            var result2 = await reader.ReadAsync(this.TimeoutToken);
+            Assert.Equal(result1.Buffer.Length, result2.Buffer.Length);
+            Assert.Equal(emptyStream, result2.IsCompleted);
+        }
+        else
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(async () => await reader.ReadAsync(this.TimeoutToken));
+        }
     }
 
     [Theory, PairwiseData]
@@ -162,8 +210,15 @@ public abstract class StreamPipeReaderTestBase : TestBase
         var readResult = await reader.ReadAsync(this.TimeoutToken);
         reader.AdvanceTo(readResult.Buffer.Start);
 
-        Assert.True(reader.TryRead(out _));
-        Assert.Throws<InvalidOperationException>(() => reader.TryRead(out _));
+        Assert.Equal(!emptyStream || !this.EmulatePipelinesStreamPipeReader, reader.TryRead(out _));
+        if (this.EmulatePipelinesStreamPipeReader)
+        {
+            Assert.Equal(!emptyStream, reader.TryRead(out _));
+        }
+        else
+        {
+            Assert.Throws<InvalidOperationException>(() => reader.TryRead(out _));
+        }
     }
 
     [Fact]
@@ -171,14 +226,23 @@ public abstract class StreamPipeReaderTestBase : TestBase
     {
         var stream = new MemoryStream();
         var reader = this.CreatePipeReader(stream, sizeHint: 50);
-        Assert.Throws<InvalidOperationException>(() => reader.AdvanceTo(default));
+        if (this.EmulatePipelinesStreamPipeReader)
+        {
+            reader.AdvanceTo(default);
+        }
+        else
+        {
+            Assert.Throws<InvalidOperationException>(() => reader.AdvanceTo(default));
+        }
+
         var ex = Assert.ThrowsAny<Exception>(() => reader.AdvanceTo(ReadOnlySequence<byte>.Empty.Start));
         Assert.True(ex is InvalidCastException || ex is InvalidOperationException);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task OnWriterCompleted()
     {
+        Skip.If(this is IOPipelinesStreamPipeReaderTests, "OnWriterCompleted isn't supported.");
         byte[] expectedBuffer = this.GetRandomBuffer(50);
         var stream = new MemoryStream(expectedBuffer);
         var reader = this.CreatePipeReader(stream, sizeHint: 50);
@@ -224,19 +288,50 @@ public abstract class StreamPipeReaderTestBase : TestBase
     }
 
     [Fact]
-    public async Task Complete_DoesNotCauseStreamDisposal()
+    public async Task Complete_MayCauseStreamDisposal()
     {
         var stream = new SimplexStream();
-        var reader = this.CreatePipeReader(stream);
+        var ms = new MonitoringStream(stream);
+        var disposal = new AsyncManualResetEvent();
+        ms.Disposed += (s, e) => disposal.Set();
+        var reader = this.CreatePipeReader(ms);
         reader.Complete();
 
-        var timeout = ExpectedTimeoutToken;
-        while (!stream.IsDisposed && !timeout.IsCancellationRequested)
+        if (this is IOPipelinesStreamPipeReaderTests)
         {
-            await Task.Yield();
+            await disposal.WaitAsync(this.TimeoutToken);
         }
+        else
+        {
+            await Assert.ThrowsAsync<OperationCanceledException>(() => disposal.WaitAsync(ExpectedTimeoutToken));
+        }
+    }
 
-        Assert.False(stream.IsDisposed);
+    [Fact]
+    public async Task CancelPendingRead()
+    {
+        var stream = new SimplexStream();
+        var reader = this.CreatePipeReader(stream, sizeHint: 50);
+
+        ValueTask<ReadResult> readTask = reader.ReadAsync(this.TimeoutToken);
+        reader.CancelPendingRead();
+        var readResult = await readTask.AsTask().WithCancellation(this.TimeoutToken);
+        Assert.True(readResult.IsCanceled);
+
+        // Verify we can read after that without cancellation.
+        readTask = reader.ReadAsync(this.TimeoutToken);
+        stream.Write(new byte[] { 1, 2, 3 }, 0, 3);
+        await stream.FlushAsync(this.TimeoutToken);
+        readResult = await readTask;
+        Assert.False(readResult.IsCanceled);
+        Assert.Equal(3, readResult.Buffer.Length);
+        reader.AdvanceTo(readResult.Buffer.End);
+
+        // Now cancel again
+        readTask = reader.ReadAsync(this.TimeoutToken);
+        reader.CancelPendingRead();
+        readResult = await readTask;
+        Assert.True(readResult.IsCanceled);
     }
 
     protected abstract PipeReader CreatePipeReader(Stream stream, int sizeHint = 0);
