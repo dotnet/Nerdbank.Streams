@@ -156,7 +156,13 @@ public abstract class StreamPipeReaderTestBase : TestBase
     [Fact]
     public void TryRead_FalseCanBeCalledRepeatedly()
     {
-        var reader = this.CreatePipeReader(new MemoryStream(new byte[] { 1, 2, 3 }));
+        // Arrange for the read stream to never respond so that the test doesn't randomly fail in the StreamUsePipeReaderTests derived test class.
+        var unblockReader = new ManualResetEventSlim();
+        var slowReadStream = new MonitoringStream(new MemoryStream(new byte[] { 1, 2, 3 }));
+        slowReadStream.WillReadMemory += (s, e) => unblockReader.Wait(this.TimeoutToken);
+        slowReadStream.WillRead += (s, e) => unblockReader.Wait(this.TimeoutToken);
+
+        var reader = this.CreatePipeReader(slowReadStream);
 
         // Verify that it's safe to call TryRead repeatedly when it returns False.
         Assert.False(reader.TryRead(out var readResult));
