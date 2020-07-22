@@ -339,10 +339,12 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task CreateChannelAsync_AcceptByAnotherId()
     {
-        var createTask = this.mx1.OfferChannelAsync("1st", ExpectedTimeoutToken);
-        var acceptTask = this.mx2.AcceptChannelAsync("2nd", ExpectedTimeoutToken);
+        var cts = new CancellationTokenSource();
+        var createTask = this.mx1.OfferChannelAsync("1st", cts.Token);
+        var acceptTask = this.mx2.AcceptChannelAsync("2nd", cts.Token);
         Assert.False(createTask.IsCompleted);
         Assert.False(acceptTask.IsCompleted);
+        cts.CancelAfter(ExpectedTimeout);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => createTask).WithCancellation(this.TimeoutToken);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => acceptTask).WithCancellation(this.TimeoutToken);
     }
