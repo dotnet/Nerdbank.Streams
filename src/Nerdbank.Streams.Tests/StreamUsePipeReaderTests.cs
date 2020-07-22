@@ -22,6 +22,8 @@ public class StreamUsePipeReaderTests : StreamPipeReaderTestBase
     {
     }
 
+    protected override bool EmulatePipelinesStreamPipeReader => false;
+
     [Fact]
     public async Task StreamFails()
     {
@@ -53,6 +55,15 @@ public class StreamUsePipeReaderTests : StreamPipeReaderTestBase
 #pragma warning restore CS0618 // Type or member is obsolete
         reader.Complete();
         await writerCompletion.WithCancellation(this.TimeoutToken);
+    }
+
+    [Fact]
+    public void NonReadableStream()
+    {
+        var unreadableStream = new Mock<Stream>(MockBehavior.Strict);
+        unreadableStream.SetupGet(s => s.CanRead).Returns(false);
+        Assert.Throws<ArgumentException>(() => this.CreatePipeReader(unreadableStream.Object));
+        unreadableStream.VerifyAll();
     }
 
     protected override PipeReader CreatePipeReader(Stream stream, int hintSize = 0) => stream.UsePipeReader(hintSize);

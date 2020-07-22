@@ -18,10 +18,8 @@ namespace Nerdbank.Streams
         private readonly PipeReader pipeReader;
         private long length;
         private long consumedLength;
-        private long examinedLength;
         private ReadResult resultOfPriorRead;
-        private bool nextReadCanceled;
-        private bool readerCompleted;
+        private bool completed;
 
         public NestedPipeReader(PipeReader pipeReader, long length)
         {
@@ -35,52 +33,33 @@ namespace Nerdbank.Streams
         private long RemainingLength => this.length - this.consumedLength;
 
         /// <inheritdoc/>
-        public override void AdvanceTo(SequencePosition consumed)
-        {
-            if (this.Consumed(consumed, consumed))
-            {
-                this.pipeReader.AdvanceTo(consumed);
-
-                // When we call AdvanceTo on the underlying reader, we're not allowed to reference their buffer any more, so clear it to be safe.
-                this.resultOfPriorRead = new ReadResult(default, isCanceled: false, isCompleted: this.resultOfPriorRead.IsCompleted);
-            }
-        }
+        public override void AdvanceTo(SequencePosition consumed) => this.AdvanceTo(consumed, consumed);
 
         /// <inheritdoc/>
         public override void AdvanceTo(SequencePosition consumed, SequencePosition examined)
         {
-            if (this.Consumed(consumed, examined))
-            {
-                this.pipeReader.AdvanceTo(consumed, examined);
+            this.consumedLength += this.resultOfPriorRead.Buffer.Slice(0, consumed).Length;
+            this.pipeReader.AdvanceTo(consumed, examined);
 
-                // When we call AdvanceTo on the underlying reader, we're not allowed to reference their buffer any more, so clear it to be safe.
-                this.resultOfPriorRead = new ReadResult(default, isCanceled: false, isCompleted: this.resultOfPriorRead.IsCompleted);
-            }
+            // When we call AdvanceTo on the underlying reader, we're not allowed to reference their buffer any more, so clear it to be safe.
+            this.resultOfPriorRead = new ReadResult(default, isCanceled: false, isCompleted: this.resultOfPriorRead.IsCompleted);
         }
 
         /// <inheritdoc/>
-        public override void CancelPendingRead()
-        {
-            if (this.resultOfPriorRead.IsCompleted)
-            {
-                this.nextReadCanceled = true;
-            }
-            else
-            {
-                this.pipeReader.CancelPendingRead();
-            }
-        }
+        public override void CancelPendingRead() => this.pipeReader.CancelPendingRead();
 
         /// <inheritdoc/>
+        /// <remarks>
+        /// If the slice has not been fully read or if <paramref name="exception"/> is non-null, this call propagates to the underlying <see cref="PipeReader"/>.
+        /// But if the slice is fully read without errors, the call is suppressed so the underlying <see cref="PipeReader"/> can continue to function.
+        /// </remarks>
         public override void Complete(Exception? exception = null)
         {
-            // We don't want a nested PipeReader to complete the underlying one unless there was an exception.
-            if (exception != null)
+            this.completed = true;
+            if (exception is object || this.RemainingLength > 0)
             {
                 this.pipeReader.Complete(exception);
             }
-
-            this.readerCompleted = true;
         }
 
         /// <inheritdoc/>
@@ -93,18 +72,25 @@ namespace Nerdbank.Streams
         /// <inheritdoc/>
         public override async ValueTask<ReadResult> ReadAsync(CancellationToken cancellationToken = default)
         {
-            Verify.Operation(!this.readerCompleted, Strings.ReadingAfterCompletionNotAllowed);
-            if (this.resultOfPriorRead.IsCompleted)
+            Verify.Operation(!this.completed, Strings.ReadingAfterCompletionNotAllowed);
+
+            ReadResult result;
+            if (this.RemainingLength == 0)
             {
-                var cachedResult = this.resultOfPriorRead = new ReadResult(this.resultOfPriorRead.Buffer, isCanceled: this.nextReadCanceled, isCompleted: true);
-                this.nextReadCanceled = false;
-                return cachedResult;
+                // We do NOT want to block on reading more bytes since we don't expect or want any.
+                // But we DO want to put the underlying reader back into a reading mode so we don't
+                // have to emulate that in our class.
+                this.pipeReader.TryRead(out result);
+            }
+            else
+            {
+                result = await this.pipeReader.ReadAsync(cancellationToken).ConfigureAwait(false);
             }
 
-            var result = await this.pipeReader.ReadAsync(cancellationToken).ConfigureAwait(false);
+            // Do not allow the reader to exceed the length of this slice.
             if (result.Buffer.Length >= this.RemainingLength)
             {
-                result = new ReadResult(result.Buffer.Slice(0, this.RemainingLength), isCanceled: false, isCompleted: true);
+                result = new ReadResult(result.Buffer.Slice(0, this.RemainingLength), isCanceled: result.IsCanceled, isCompleted: true);
             }
 
             return this.resultOfPriorRead = result;
@@ -113,19 +99,13 @@ namespace Nerdbank.Streams
         /// <inheritdoc/>
         public override bool TryRead(out ReadResult result)
         {
-            Verify.Operation(!this.readerCompleted, Strings.ReadingAfterCompletionNotAllowed);
-            if (this.resultOfPriorRead.IsCompleted)
-            {
-                result = this.resultOfPriorRead = new ReadResult(this.resultOfPriorRead.Buffer, isCanceled: this.nextReadCanceled, isCompleted: true);
-                this.nextReadCanceled = false;
-                return true;
-            }
-
+            Verify.Operation(!this.completed, Strings.ReadingAfterCompletionNotAllowed);
             if (this.pipeReader.TryRead(out result))
             {
+                // Do not allow the reader to exceed the length of this slice.
                 if (result.Buffer.Length > this.RemainingLength)
                 {
-                    result = new ReadResult(result.Buffer.Slice(0, this.RemainingLength), isCanceled: false, isCompleted: true);
+                    result = new ReadResult(result.Buffer.Slice(0, this.RemainingLength), isCanceled: result.IsCanceled, isCompleted: true);
                 }
 
                 this.resultOfPriorRead = result;
@@ -133,22 +113,6 @@ namespace Nerdbank.Streams
             }
 
             return false;
-        }
-
-        private bool Consumed(SequencePosition consumed, SequencePosition examined)
-        {
-            this.consumedLength += this.resultOfPriorRead.Buffer.Slice(0, consumed).Length;
-            this.examinedLength += this.resultOfPriorRead.Buffer.Slice(0, examined).Length;
-
-            if (this.resultOfPriorRead.IsCompleted)
-            {
-                // We have to keep our own ReadResult current since we can't call the inner read methods any more.
-                this.resultOfPriorRead = new ReadResult(this.resultOfPriorRead.Buffer.Slice(consumed), isCanceled: false, isCompleted: true);
-            }
-
-            // The caller is allowed to propagate the AdvanceTo call to the underlying reader iff
-            // we will be reading again from it, or our own final buffer is empty.
-            return !this.resultOfPriorRead.IsCompleted || this.resultOfPriorRead.Buffer.IsEmpty;
         }
     }
 }
