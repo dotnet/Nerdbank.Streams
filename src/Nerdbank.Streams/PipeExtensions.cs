@@ -469,7 +469,21 @@ namespace Nerdbank.Streams
             //                            we can return a decorated PipeReader that calls us from its Complete method directly.
             var combinedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 #pragma warning disable CS0618 // Type or member is obsolete
-            pipe.Writer.OnReaderCompleted((ex, state) => ((CancellationTokenSource)state).Cancel(), combinedTokenSource);
+            pipe.Writer.OnReaderCompleted(
+                (ex, state) =>
+                {
+                    try
+                    {
+                        ((CancellationTokenSource)state).Cancel();
+                    }
+                    catch (AggregateException cancelException)
+                    {
+                        // .NET Core may throw this when canceling async I/O (https://github.com/dotnet/runtime/issues/39902).
+                        // Just swallow it. We've canceled what we intended to.
+                        cancelException.Handle(x => x is ObjectDisposedException);
+                    }
+                },
+                combinedTokenSource);
 
             // When this argument is provided, it provides a means to ensure we don't hang while reading from an I/O pipe
             // that doesn't respect the CancellationToken. Disposing a Stream while reading is a means to terminate the ReadAsync operation.
