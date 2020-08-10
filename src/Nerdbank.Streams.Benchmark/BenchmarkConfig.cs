@@ -11,7 +11,7 @@ namespace Nerdbank.Streams.Benchmark
     {
         public BenchmarkConfig()
         {
-            this.Add(DefaultConfig.Instance.With(MemoryDiagnoser.Default));
+            this.Add(DefaultConfig.Instance.AddDiagnoser(MemoryDiagnoser.Default));
         }
     }
 }
