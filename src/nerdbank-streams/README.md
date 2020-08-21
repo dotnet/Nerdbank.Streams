@@ -19,4 +19,4 @@
 
 See our [project README][GitHubREADME] for more information.
 
-[GitHubREADME]: https://github.com/AArnott/Nerdbank.Streams/blob/master/README.md
+[GitHubREADME]: https://github.com/AArnott/Nerdbank.Streams/blob/main/README.md
