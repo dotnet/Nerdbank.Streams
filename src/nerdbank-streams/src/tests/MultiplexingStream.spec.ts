@@ -14,8 +14,8 @@ import { Channel } from "../Channel";
         beforeEach(async () => {
             const underlyingPair = FullDuplexStream.CreatePair();
             const mxs = await Promise.all([
-                MultiplexingStream.CreateAsync(underlyingPair.first, { protocolMajorVersion: protocolMajorVersion }),
-                MultiplexingStream.CreateAsync(underlyingPair.second, { protocolMajorVersion: protocolMajorVersion }),
+                MultiplexingStream.CreateAsync(underlyingPair.first, { protocolMajorVersion }),
+                MultiplexingStream.CreateAsync(underlyingPair.second, { protocolMajorVersion }),
             ]);
             mx1 = mxs.pop()!;
             mx2 = mxs.pop()!;

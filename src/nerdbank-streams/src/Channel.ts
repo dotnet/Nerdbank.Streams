@@ -244,7 +244,7 @@ export class ChannelClass extends Channel {
             }
 
             this.remoteWindowFilled += transmittedBytes;
-            if (this.remoteWindowFilled == this.remoteWindowSize) {
+            if (this.remoteWindowFilled === this.remoteWindowSize) {
                 // Suspend writing.
                 this.remoteWindowHasCapacity = new Deferred<void>();
             }
