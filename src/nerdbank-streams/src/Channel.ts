@@ -8,6 +8,7 @@ import { IDisposableObservable } from "./IDisposableObservable";
 import { MultiplexingStreamClass, MultiplexingStream } from "./MultiplexingStream";
 import { OfferParameters } from "./OfferParameters";
 import { AcceptanceParameters } from "./AcceptanceParameters";
+import caught = require("caught");
 
 export abstract class Channel implements IDisposableObservable {
     /**
@@ -180,6 +181,11 @@ export class ChannelClass extends Channel {
         const cancellationReason = new CancellationToken.CancellationError(reason);
         this._acceptance.reject(cancellationReason);
         this._completion.reject(cancellationReason);
+
+        // Also mark completion's promise rejections as 'caught' since we do not require
+        // or even expect it to be recognized by anyone else.
+        // The acceptance promise rejection is observed by the offer channel method.
+        caught(this._completion.promise);
     }
 
     public onAccepted(acceptanceParameter: AcceptanceParameters): boolean {
