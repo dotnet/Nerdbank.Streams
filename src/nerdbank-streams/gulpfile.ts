@@ -17,9 +17,14 @@ async function copyPackageContents() {
         .src([
             "package.json",
             "README.md",
-            "out/*",
         ])
         .pipe(gulp.dest(outDir));
+        await gulp
+        .src(["out/*"])
+        .pipe(gulp.dest(path.join(outDir, 'js')));
+        await gulp
+        .src(["src/*"])
+        .pipe(gulp.dest(path.join(outDir, 'src')));
 }
 
 async function setPackageVersion() {
