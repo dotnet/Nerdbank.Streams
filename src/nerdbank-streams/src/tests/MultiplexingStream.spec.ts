@@ -6,6 +6,8 @@ import { getBufferFrom } from "../Utilities";
 import { startJsonRpc } from "./jsonRpcStreams";
 import { timeout } from "./Timeout";
 import { Channel } from "../Channel";
+import CancellationToken from "cancellationtoken";
+import * as assert from "assert";
 
 [ 1, 2 ].forEach(protocolMajorVersion => {
     describe(`MultiplexingStream v${protocolMajorVersion}`, () => {
@@ -105,7 +107,14 @@ import { Channel } from "../Channel";
             await expectThrow(offer.acceptance);
         });
 
-        it("Channel offer is canceled by event handler", async () => {
+        it("Channel offer is canceled by sender", async () => {
+            const cts = CancellationToken.create();
+            const offer = mx1.offerChannelAsync('', undefined, cts.token);
+            cts.cancel();
+            await assert.rejects(offer);
+        });
+
+        it("Channel offer is rejected by event handler", async () => {
             const handler = new Deferred<void>();
             mx2.on("channelOffered", (args) => {
                 try {
