@@ -1,4 +1,3 @@
-import "jasmine";
 import { Deferred } from "../Deferred";
 import { FullDuplexStream } from "../FullDuplexStream";
 import { MultiplexingStream } from "../MultiplexingStream";
@@ -6,6 +5,7 @@ import { getBufferFrom } from "../Utilities";
 import { startJsonRpc } from "./jsonRpcStreams";
 import { timeout } from "./Timeout";
 import { Channel } from "../Channel";
+import * as assert from 'assert';
 
 [1, 2, 3].forEach(protocolMajorVersion => {
     describe(`MultiplexingStream v${protocolMajorVersion}`, () => {
@@ -34,8 +34,8 @@ import { Channel } from "../Channel";
         });
 
         it("rejects null stream", async () => {
-            expectThrow(MultiplexingStream.CreateAsync(null!));
-            expectThrow(MultiplexingStream.CreateAsync(undefined!));
+            await assert.rejects(MultiplexingStream.CreateAsync(null!));
+            await assert.rejects(MultiplexingStream.CreateAsync(undefined!));
         });
 
         it("isDisposed set upon disposal", async () => {
@@ -45,7 +45,7 @@ import { Channel } from "../Channel";
         });
 
         it("Completion should not complete before disposal", async () => {
-            await expectThrow(timeout(mx1.completion, 10));
+            await assert.rejects(timeout(mx1.completion, 10));
             mx1.dispose();
             await timeout(mx1.completion, 10);
         });
@@ -102,7 +102,7 @@ import { Channel } from "../Channel";
             mx2.rejectChannel(offer.id);
 
             // Confirm the original party recognizes rejection.
-            await expectThrow(offer.acceptance);
+            await assert.rejects(offer.acceptance);
         });
 
         it("Channel offer is canceled by event handler", async () => {
@@ -118,7 +118,7 @@ import { Channel } from "../Channel";
                 }
             });
 
-            await expectThrow(mx1.offerChannelAsync("myname"));
+            await assert.rejects(mx1.offerChannelAsync("myname"));
             await handler.promise; // rethrow any failures in the handler.
         });
 
@@ -240,8 +240,8 @@ import { Channel } from "../Channel";
         });
 
         it("offered channels must have names", async () => {
-            await expectThrow(mx1.offerChannelAsync(null!));
-            await expectThrow(mx1.offerChannelAsync(undefined!));
+            await assert.rejects(mx1.offerChannelAsync(null!));
+            await assert.rejects(mx1.offerChannelAsync(undefined!));
         });
 
         it("offered channel name may be blank", async () => {
@@ -252,24 +252,15 @@ import { Channel } from "../Channel";
         });
 
         it("accepted channels must have names", async () => {
-            await expectThrow(mx1.acceptChannelAsync(null!));
-            await expectThrow(mx1.acceptChannelAsync(undefined!));
+            await assert.rejects(mx1.acceptChannelAsync(null!));
+            await assert.rejects(mx1.acceptChannelAsync(undefined!));
         });
 
         if (protocolMajorVersion < 3) {
             it("Rejects seeded channels", async () => {
                 const underlyingPair = FullDuplexStream.CreatePair();
-                await expectThrow<MultiplexingStream>(MultiplexingStream.CreateAsync(underlyingPair.first, { protocolMajorVersion, seededChannels: [{}] }));
+                await assert.rejects(MultiplexingStream.CreateAsync(underlyingPair.first, { protocolMajorVersion, seededChannels: [{}] }));
             });
         }
     });
-
-    async function expectThrow<T>(promise: Promise<T>): Promise<any> {
-        try {
-            await promise;
-            fail("Expected error not thrown.");
-        } catch (error) {
-            return error;
-        }
-    }
 });

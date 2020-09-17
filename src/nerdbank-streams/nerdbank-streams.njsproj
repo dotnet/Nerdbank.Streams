@@ -60,7 +60,6 @@
     <TypeScriptCompile Include="out\tests\MultiplexingStream.spec.d.ts" />
     <TypeScriptCompile Include="out\tests\MultiplexingStreamTests.d.ts" />
     <TypeScriptCompile Include="out\tests\Timeout.d.ts" />
-    <Content Include="spec\support\jasmine.json" />
     <TypeScriptCompile Include="src\tests\Deferred.spec.ts" />
     <TypeScriptCompile Include="src\tests\FullDuplexStream.spec.ts" />
     <TypeScriptCompile Include="src\tests\MultiplexingStream.Interop.spec.ts" />

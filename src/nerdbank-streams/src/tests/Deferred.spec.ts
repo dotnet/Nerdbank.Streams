@@ -1,4 +1,4 @@
-import "jasmine";
+import caught = require("caught");
 import { Deferred } from "../Deferred";
 
 describe("Deferred", () => {
@@ -30,11 +30,7 @@ describe("Deferred", () => {
         expect(deferred.isRejected).toBe(true);
         expect(deferred.isResolved).toBe(false);
 
-        // We must observe the rejected promise or else Jasmine will fail at the command line anyway.
-        try {
-            await deferred.promise;
-        } catch {
-            // This block intentionally left blank.
-        }
+        // We must observe the rejected promise or else jest will fail at the command line anyway.
+        caught(deferred.promise);
     });
 });

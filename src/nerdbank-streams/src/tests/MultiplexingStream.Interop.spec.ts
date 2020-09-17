@@ -1,5 +1,4 @@
 import { ChildProcess, spawn } from "child_process";
-import "jasmine";
 import { Deferred } from "../Deferred";
 import { FullDuplexStream } from "../FullDuplexStream";
 import { MultiplexingStream } from "../MultiplexingStream";

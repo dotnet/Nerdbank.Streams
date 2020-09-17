@@ -1,4 +1,3 @@
-import "jasmine";
 import { PassThrough } from "stream";
 import { Deferred } from "../Deferred";
 import { getBufferFrom, readSubstream, writeAsync, writeSubstream } from "../Utilities";

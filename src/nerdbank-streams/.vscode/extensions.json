@@ -1,13 +1,20 @@
 {
-	// See http://go.microsoft.com/fwlink/?LinkId=827846 to learn about workspace recommendations.
+	// See https://go.microsoft.com/fwlink/?LinkId=827846 to learn about workspace recommendations.
 	// Extension identifier format: ${publisher}.${name}. Example: vscode.csharp
 
 	// List of extensions which should be recommended for users of this workspace.
 	"recommendations": [
 		"ms-azure-devops.azure-pipelines",
+		"orta.vscode-jest",
+		"firsttris.vscode-jest-runner",
 		"hbenl.vscode-jasmine-test-adapter",
 		"pflannery.vscode-versionlens",
-		"davidanson.vscode-markdownlint"
+		"davidanson.vscode-markdownlint",
+		"dbaeumer.vscode-eslint",
+		"editorconfig.editorconfig",
+		"davidanson.vscode-markdownlint",
+		"ms-vscode.vscode-typescript-tslint-plugin",
+		"kavod-io.vscode-jest-test-adapter"
 	],
 	// List of extensions recommended by VS Code that should not be recommended for users of this workspace.
 	"unwantedRecommendations": [

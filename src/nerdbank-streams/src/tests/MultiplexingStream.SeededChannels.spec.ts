@@ -1,4 +1,3 @@
-import "jasmine";
 import { Deferred } from "../Deferred";
 import { FullDuplexStream } from "../FullDuplexStream";
 import { MultiplexingStream } from "../MultiplexingStream";
