@@ -8,7 +8,7 @@
     "multiplexing",
     "duplex"
   ],
-  "main": "index.js",
+  "main": "js/index.js",
   "homepage": "https://github.com/AArnott/Nerdbank.Streams",
   "repository": {
     "type": "git",

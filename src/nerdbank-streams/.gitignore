@@ -1,4 +1,6 @@
 dist/
-*.js
+out/
+asyncprocess.js
+gulpfile.js
 *.d.ts
 *.js.map
