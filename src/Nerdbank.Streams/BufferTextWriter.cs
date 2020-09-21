@@ -233,7 +233,10 @@ namespace Nerdbank.Streams
         {
             if (disposing)
             {
-                this.Flush();
+                if (this.bufferWriter is object)
+                {
+                    this.Flush();
+                }
             }
 
             base.Dispose(disposing);
