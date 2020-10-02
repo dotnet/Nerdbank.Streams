@@ -1079,7 +1079,17 @@ namespace Nerdbank.Streams
                     }
                     else
                     {
-                        Assumes.False(this.channelsPendingTermination.Contains(qualifiedChannelId), "Sending {1} frame for channel {0}, which we've already sent termination for.", header.ChannelId, header.Code);
+                        if (this.channelsPendingTermination.Contains(qualifiedChannelId))
+                        {
+                            // We shouldn't ever send a frame about a channel after we've transmitted a ChannelTermination frame for it.
+                            // But backpressure frames *can* come in 'late' because even after both sides have finished writing, they may still be reading
+                            // what they've received.
+                            // In such cases, we should just suppress transmission of the frame because the other side does not care.
+                            if (header.Code != ControlCode.ContentProcessed)
+                            {
+                                Assumes.Fail($"Sending {header.Code} frame for channel {header.ChannelId}, which we've already sent termination for.");
+                            }
+                        }
                     }
                 }
 
