@@ -1079,7 +1079,7 @@ namespace Nerdbank.Streams
                     }
                     else
                     {
-                        Assumes.False(this.channelsPendingTermination.Contains(qualifiedChannelId), "Sending a frame for channel {0}, which we've already sent termination for.", header.ChannelId);
+                        Assumes.False(this.channelsPendingTermination.Contains(qualifiedChannelId), "Sending {1} frame for channel {0}, which we've already sent termination for.", header.ChannelId, header.Code);
                     }
                 }
 
