@@ -1175,6 +1175,12 @@ namespace Nerdbank.Streams
 
         private void Fault(Exception exception)
         {
+            if (exception is ObjectDisposedException && this.Completion.IsCompleted)
+            {
+                // We're already disposed. Nothing more to do.
+                return;
+            }
+
             if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Critical))
             {
                 this.TraceSource.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Disposing self due to exception: {0}", exception);
