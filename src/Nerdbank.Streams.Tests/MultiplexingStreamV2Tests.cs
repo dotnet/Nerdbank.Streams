@@ -135,4 +135,35 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
 
         await writeTask;
     }
+
+    /// <summary>
+    /// Regression test for <see href="https://github.com/AArnott/Nerdbank.Streams/issues/253">#253</see>.
+    /// </summary>
+    /// <devremarks>
+    /// This test requires very careful timing with the debugger to actually hit the bug it was designed to identify. Specifically:
+    /// * mx2 has to send the ChannelTerminated message before receiving it from mx1 (so that it puts the channel into its channelsPendingTermination collection).
+    /// * mx2 channel must be disposed AFTER Channel.LocalContentExamined's IsDisposed check
+    /// * mx2's ChannelTerminated frame must be sent BEFORE LocalContentExamined posts the ContentProcessed frame.
+    /// </devremarks>
+    [Fact]
+    public async Task CompleteReadingAfterChannelTerminated()
+    {
+        long backpressureThreshold = this.mx1.DefaultChannelReceivingWindowSize;
+        var (a, b) = await this.EstablishChannelsAsync("a");
+
+        await a.Output.WriteAsync(new byte[30 * 1024], this.TimeoutToken);
+        await a.Output.CompleteAsync();
+
+        this.Logger.WriteLine("Calling ReadAsync");
+        ReadResult readResult = await b.Input.ReadAsync(this.TimeoutToken);
+        this.Logger.WriteLine("ReadAsync returned");
+
+        await b.Output.CompleteAsync();
+
+        this.Logger.WriteLine("Calling AdvanceTo");
+        b.Input.AdvanceTo(readResult.Buffer.End);
+
+        await b.Input.CompleteAsync();
+        await a.Input.CompleteAsync();
+    }
 }
