@@ -390,6 +390,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
     [Fact]
     [Trait("SkipInCodeCoverage", "true")] // far too slow and times out
+    [Trait("Stress", "true")]
     public async Task ConcurrentChatOverManyChannels()
     {
         // Avoid tracing because it slows things down significantly for this test.
