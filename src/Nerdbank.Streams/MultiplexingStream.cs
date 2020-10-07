@@ -720,7 +720,6 @@ namespace Nerdbank.Streams
 
         private async Task ReadStreamAsync()
         {
-            Memory<byte> payloadBuffer = new byte[FramePayloadMaxLength];
             try
             {
                 while (!this.Completion.IsCompleted)
