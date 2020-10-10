@@ -1,6 +1,6 @@
-# Half-duplex Stream
+# Simplex Stream
 
-The `HalfDuplexStream` class is a .NET `Stream`-derived type that allows
+The `SimplexStream` class is a .NET `Stream`-derived type that allows
 one party to send messages to another party that shares the same instance.
 
 The communication is uni-directional. For bi-directional messaging, check
@@ -13,13 +13,14 @@ for one party to send messages to another, and how to indicate
 when communication is over.
 
 ```csharp
-var stream = new HalfDuplexStream();
+var stream = new SimplexStream();
 var writer = new StreamWriter(stream);
 var reader = new StreamReader(stream);
 
 var speaker = Task.Run(async delegate {
     await writer.WriteLineAsync("Hello, listener 1!");
     await writer.WriteLineAsync("Hello, listener 2!");
+    await writer.FlushAsync();
     stream.CompleteWriting();
 });
 
@@ -34,7 +35,7 @@ await Task.WhenAll(speaker, listener);
 Console.WriteLine("...and we're done!");
 ```
 
-Disposing of the `HalfDuplexStream` prevents any further writing to
+Disposing of the `SimplexStream` prevents any further writing to
 or reading from the stream. No native resources are held by this
 time so disposing is not strictly necessary.
 However calling `CompleteWriting()` is highly encouraged so any waiting readers will return, recognizing no more data will come.
