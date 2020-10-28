@@ -152,6 +152,14 @@ public class BufferTextWriterTests : TestBase
         Assert.Equal(DefaultEncodingNoPreamble.GetBytes("b"), this.sequence.AsReadOnlySequence.ToArray());
     }
 
+    [Fact]
+    public void Dispose_BeforeInitialize()
+    {
+        this.bufferTextWriter = new BufferTextWriter();
+        this.bufferTextWriter.Dispose();
+        this.bufferTextWriter.Dispose();
+    }
+
     private void AssertWritten(string expected, Encoding? encoding = null)
     {
         encoding = encoding ?? DefaultEncoding;

@@ -720,7 +720,6 @@ namespace Nerdbank.Streams
 
         private async Task ReadStreamAsync()
         {
-            Memory<byte> payloadBuffer = new byte[FramePayloadMaxLength];
             try
             {
                 while (!this.Completion.IsCompleted)
@@ -1079,7 +1078,17 @@ namespace Nerdbank.Streams
                     }
                     else
                     {
-                        Assumes.False(this.channelsPendingTermination.Contains(qualifiedChannelId), "Sending a frame for channel {0}, which we've already sent termination for.", header.ChannelId);
+                        if (this.channelsPendingTermination.Contains(qualifiedChannelId))
+                        {
+                            // We shouldn't ever send a frame about a channel after we've transmitted a ChannelTermination frame for it.
+                            // But backpressure frames *can* come in 'late' because even after both sides have finished writing, they may still be reading
+                            // what they've received.
+                            // In such cases, we should just suppress transmission of the frame because the other side does not care.
+                            if (header.Code != ControlCode.ContentProcessed)
+                            {
+                                Assumes.Fail($"Sending {header.Code} frame for channel {header.ChannelId}, which we've already sent termination for.");
+                            }
+                        }
                     }
                 }
 
@@ -1175,6 +1184,12 @@ namespace Nerdbank.Streams
 
         private void Fault(Exception exception)
         {
+            if (exception is ObjectDisposedException && this.Completion.IsCompleted)
+            {
+                // We're already disposed. Nothing more to do.
+                return;
+            }
+
             if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Critical))
             {
                 this.TraceSource.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Disposing self due to exception: {0}", exception);
