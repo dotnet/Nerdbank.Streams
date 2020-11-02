@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 Nerdbank.Streams.BufferTextWriter
 Nerdbank.Streams.BufferTextWriter.BufferTextWriter() -> void
 Nerdbank.Streams.BufferTextWriter.BufferTextWriter(System.Buffers.IBufferWriter<byte>! bufferWriter, System.Text.Encoding! encoding) -> void
@@ -249,3 +249,27 @@ static Nerdbank.Streams.StreamExtensions.ReadSubstream(this System.IO.Stream! st
 static Nerdbank.Streams.StreamExtensions.WriteSubstream(this System.IO.Stream! stream, int minimumBufferSize = 4096) -> Nerdbank.Streams.Substream!
 virtual Nerdbank.Streams.BufferTextWriter.Write(System.ReadOnlySpan<char> buffer) -> void
 virtual Nerdbank.Streams.BufferTextWriter.WriteLine(System.ReadOnlySpan<char> buffer) -> void
+Nerdbank.Streams.MonitoringStream.IsDisposed.get -> bool
+Nerdbank.Streams.MultiplexingStream.AcceptChannel(ulong id, Nerdbank.Streams.MultiplexingStream.ChannelOptions? options = null) -> Nerdbank.Streams.MultiplexingStream.Channel!
+Nerdbank.Streams.MultiplexingStream.Channel.QualifiedId.get -> Nerdbank.Streams.MultiplexingStream.QualifiedChannelId
+Nerdbank.Streams.MultiplexingStream.ChannelOfferEventArgs.QualifiedId.get -> Nerdbank.Streams.MultiplexingStream.QualifiedChannelId
+Nerdbank.Streams.MultiplexingStream.ChannelSource
+Nerdbank.Streams.MultiplexingStream.ChannelSource.Local = 1 -> Nerdbank.Streams.MultiplexingStream.ChannelSource
+Nerdbank.Streams.MultiplexingStream.ChannelSource.Remote = -1 -> Nerdbank.Streams.MultiplexingStream.ChannelSource
+Nerdbank.Streams.MultiplexingStream.ChannelSource.Seeded = 0 -> Nerdbank.Streams.MultiplexingStream.ChannelSource
+Nerdbank.Streams.MultiplexingStream.Options.DefaultChannelTraceSourceFactoryWithQualifier.get -> System.Func<Nerdbank.Streams.MultiplexingStream.QualifiedChannelId, string!, System.Diagnostics.TraceSource?>?
+Nerdbank.Streams.MultiplexingStream.Options.DefaultChannelTraceSourceFactoryWithQualifier.set -> void
+Nerdbank.Streams.MultiplexingStream.Options.GetFrozenCopy() -> Nerdbank.Streams.MultiplexingStream.Options!
+Nerdbank.Streams.MultiplexingStream.Options.IsFrozen.get -> bool
+Nerdbank.Streams.MultiplexingStream.Options.Options(Nerdbank.Streams.MultiplexingStream.Options! copyFrom) -> void
+Nerdbank.Streams.MultiplexingStream.Options.SeededChannels.get -> System.Collections.Generic.IList<Nerdbank.Streams.MultiplexingStream.ChannelOptions!>!
+Nerdbank.Streams.MultiplexingStream.QualifiedChannelId
+Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.Equals(Nerdbank.Streams.MultiplexingStream.QualifiedChannelId other) -> bool
+Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.Id.get -> ulong
+Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.QualifiedChannelId(ulong id, Nerdbank.Streams.MultiplexingStream.ChannelSource source) -> void
+Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.Source.get -> Nerdbank.Streams.MultiplexingStream.ChannelSource
+Nerdbank.Streams.MultiplexingStream.RejectChannel(ulong id) -> void
+override Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.Equals(object? obj) -> bool
+override Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.GetHashCode() -> int
+override Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.ToString() -> string!
+static Nerdbank.Streams.MultiplexingStream.Create(System.IO.Stream! stream, Nerdbank.Streams.MultiplexingStream.Options? options = null) -> Nerdbank.Streams.MultiplexingStream!
