@@ -1,0 +1,1 @@
+Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.QualifiedChannelId() -> void
