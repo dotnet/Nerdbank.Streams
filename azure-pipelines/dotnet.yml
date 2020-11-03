@@ -32,8 +32,3 @@ steps:
     arguments: --no-build -c $(BuildConfiguration) -f netcoreapp3.1 --filter "TestCategory!=FailsInCloudTest" -v n /p:CollectCoverage=true --settings "$(Build.Repository.LocalPath)/azure-pipelines/$(Agent.OS).runsettings" /bl:"$(Build.ArtifactStagingDirectory)/build_logs/test_netcoreapp3.1.binlog"
     testRunTitle: netcoreapp3.1-$(Agent.JobName)
     workingDirectory: src
-
-- publish: $(System.DefaultWorkingDirectory)/bin
-  artifact: bin-$(Agent.JobName)
-  condition: succeededOrFailed()
-  displayName: Publish bin artifact
