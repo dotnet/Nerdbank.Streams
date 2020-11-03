@@ -10,6 +10,9 @@ using Xunit;
 public class DuplexPipeTests
 {
     [Fact]
+    public void Fail() => Environment.FailFast("test");
+
+    [Fact]
     public void Ctor()
     {
         var pipe = new Pipe();
