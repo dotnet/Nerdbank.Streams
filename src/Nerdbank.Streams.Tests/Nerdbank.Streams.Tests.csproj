@@ -19,7 +19,7 @@
     <Compile Include="..\Nerdbank.Streams\Utilities.cs" Link="Utilities.cs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.VisualStudio.Threading" Version="16.8.51" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading" Version="16.8.55" />
     <PackageReference Include="PInvoke.Kernel32" Version="0.7.78" />
     <PackageReference Include="StreamJsonRpc" Version="2.6.121" />
     <PackageReference Include="xunit" Version="2.4.1" />
@@ -27,7 +27,7 @@
     <PackageReference Include="xunit.skippablefact" Version="1.4.13" />
     <PackageReference Include="xunit.runner.console" Version="2.4.1" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.3" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.7.1" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.8.3" />
     <PackageReference Include="Moq" Version="4.15.2" />
     <PackageReference Include="System.IO.Pipes" Version="4.3.0" />
     <PackageReference Include="coverlet.msbuild" Version="2.9.0" />
