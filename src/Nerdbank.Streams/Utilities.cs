@@ -87,7 +87,7 @@ namespace Nerdbank.Streams
             writer.OnReaderCompleted(
                 (ex, tcsObject) =>
                 {
-                    var tcs = (TaskCompletionSource<object?>)tcsObject;
+                    var tcs = (TaskCompletionSource<object?>)tcsObject!;
                     if (ex != null)
                     {
                         tcs.SetException(ex);
@@ -112,7 +112,7 @@ namespace Nerdbank.Streams
             reader.OnWriterCompleted(
                 (ex, wdObject) =>
                 {
-                    var wd = (TaskCompletionSource<object?>)wdObject;
+                    var wd = (TaskCompletionSource<object?>)wdObject!;
                     if (ex != null)
                     {
                         wd.SetException(ex);

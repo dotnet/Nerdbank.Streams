@@ -1158,7 +1158,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         public override Span<byte> GetSpan(int sizeHint = 0) => this.GetMemory(sizeHint).Span;
 
         [Obsolete]
-        public override void OnReaderCompleted(Action<Exception?, object> callback, object state)
+        public override void OnReaderCompleted(Action<Exception?, object?> callback, object? state)
         {
             // We don't have a reader that consumers of this mock need to worry about,
             // so just say we're done when the writing is done.

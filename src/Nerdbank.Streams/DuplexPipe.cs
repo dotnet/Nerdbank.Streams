@@ -75,7 +75,7 @@ namespace Nerdbank.Streams
             public override Span<byte> GetSpan(int sizeHint) => throw ThrowInvalidOperationException();
 
             [Obsolete]
-            public override void OnReaderCompleted(Action<Exception, object> callback, object state)
+            public override void OnReaderCompleted(Action<Exception, object?> callback, object? state)
             {
             }
 
@@ -103,7 +103,7 @@ namespace Nerdbank.Streams
             }
 
             [Obsolete]
-            public override void OnWriterCompleted(Action<Exception, object> callback, object state)
+            public override void OnWriterCompleted(Action<Exception, object?> callback, object? state)
             {
             }
 

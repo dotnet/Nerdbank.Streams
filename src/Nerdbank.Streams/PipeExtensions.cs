@@ -476,7 +476,7 @@ namespace Nerdbank.Streams
                 {
                     try
                     {
-                        ((CancellationTokenSource)state).Cancel();
+                        ((CancellationTokenSource)state!).Cancel();
                     }
                     catch (AggregateException cancelException)
                     {
@@ -495,7 +495,7 @@ namespace Nerdbank.Streams
                     (_, s1) =>
                     {
                         var tuple = (Tuple<Pipe, Stream>)s1!;
-                        tuple.Item1.Writer.OnReaderCompleted((ex, s2) => ((Stream)s2).Dispose(), tuple.Item2);
+                        tuple.Item1.Writer.OnReaderCompleted((ex, s2) => ((Stream)s2!).Dispose(), tuple.Item2);
                     },
                     Tuple.Create(pipe, stream),
                     cancellationToken,

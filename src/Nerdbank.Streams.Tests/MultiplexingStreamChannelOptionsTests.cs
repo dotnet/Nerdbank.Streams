@@ -77,6 +77,7 @@ public class MultiplexingStreamChannelOptionsTests : TestBase
     {
         var options = new MultiplexingStream.ChannelOptions();
 
+        // This was designed before nullable annotations on the IDuplexPipe determined that both properties should always be non-null.
         var pipe = new Pipe();
         Assert.Throws<ArgumentException>(() => options.ExistingPipe = new MockDuplexPipe());
         options.ExistingPipe = new MockDuplexPipe { Input = pipe.Reader };
@@ -98,8 +99,8 @@ public class MultiplexingStreamChannelOptionsTests : TestBase
 
     private class MockDuplexPipe : IDuplexPipe
     {
-        public PipeReader? Input { get; set; }
+        public PipeReader Input { get; set; } = null!;
 
-        public PipeWriter? Output { get; set; }
+        public PipeWriter Output { get; set; } = null!;
     }
 }
