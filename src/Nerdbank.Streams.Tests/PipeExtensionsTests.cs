@@ -287,6 +287,30 @@ public partial class PipeExtensionsTests : TestBase
         Assert.NotSame(pipes.Item1.Output, pipeAgain.Output);
     }
 
+    [Fact]
+    public async Task AsPrebufferedStreamAsync()
+    {
+        var pipe = new Pipe();
+        Task<Stream> streamTask = pipe.Reader.AsPrebufferedStreamAsync();
+        Assert.False(streamTask.IsCompleted);
+        await pipe.Writer.WriteAsync(new byte[] { 1, 2 });
+        Assert.False(streamTask.IsCompleted);
+        await pipe.Writer.CompleteAsync();
+        Stream stream = await streamTask.WithCancellation(this.TimeoutToken);
+
+        var readerCompleted = new AsyncManualResetEvent();
+#pragma warning disable CS0618 // Type or member is obsolete
+        pipe.Writer.OnReaderCompleted((ex, arg) => readerCompleted.Set(), null);
+#pragma warning restore CS0618 // Type or member is obsolete
+
+        Assert.Equal(2, stream.Read(new byte[2], 0, 2));
+        Assert.Equal(0, stream.Read(new byte[2], 0, 2));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => readerCompleted.WaitAsync(ExpectedTimeoutToken));
+
+        stream.Dispose();
+        await readerCompleted.WaitAsync(this.TimeoutToken);
+    }
+
     private async Task AssertStreamClosesAsync(Stream stream)
     {
         Requires.NotNull(stream, nameof(stream));
