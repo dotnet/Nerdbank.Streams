@@ -42,7 +42,7 @@ namespace Nerdbank.Streams
         /// Exposes a <see cref="ReadOnlySequence{T}"/> of <see cref="byte"/> as a <see cref="Stream"/>.
         /// </summary>
         /// <param name="readOnlySequence">The sequence of bytes to expose as a stream.</param>
-        /// <param name="disposeAction">A delegate to invoke when the returned stream is disposed.</param>
+        /// <param name="disposeAction">A delegate to invoke when the returned stream is disposed. This might be useful to recycle the buffers backing the <paramref name="readOnlySequence"/>.</param>
         /// <param name="disposeActionArg">The argument to pass to <paramref name="disposeAction"/>.</param>
         /// <returns>The readable stream.</returns>
         public static Stream AsStream(this ReadOnlySequence<byte> readOnlySequence, Action<object?> disposeAction, object? disposeActionArg) => new ReadOnlySequenceStream(readOnlySequence, disposeAction, disposeActionArg);

@@ -51,6 +51,36 @@ namespace Nerdbank.Streams
         public static Stream AsStream(this PipeReader pipeReader) => pipeReader.AsStream(leaveOpen: false);
 
         /// <summary>
+        /// Exposes a pipe reader as a <see cref="Stream"/> after asynchronously reading all content
+        /// so the returned stream can be read synchronously without needlessly blocking a thread while waiting for more data.
+        /// </summary>
+        /// <param name="pipeReader">The pipe to read from when <see cref="Stream.ReadAsync(byte[], int, int, CancellationToken)"/> is invoked.</param>
+        /// <param name="cancellationToken">A cancellation token.</param>
+        /// <returns>The wrapping stream.</returns>
+        /// <remarks>
+        /// The reader will be completed when the <see cref="Stream"/> is disposed.
+        /// </remarks>
+        public static async Task<Stream> AsPrebufferedStreamAsync(this PipeReader pipeReader, CancellationToken cancellationToken = default)
+        {
+            while (true)
+            {
+                // Read and immediately report all bytes as "examined" so that the next ReadAsync call will block till more bytes come in.
+                // The goal here is to force the PipeReader to buffer everything internally (even if it were to exceed its natural writer threshold limit).
+                ReadResult readResult = await pipeReader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                pipeReader.AdvanceTo(readResult.Buffer.Start, readResult.Buffer.End);
+
+                if (readResult.IsCompleted)
+                {
+                    // After having buffered and "examined" all the bytes, the stream returned from PipeReader.AsStream() would fail
+                    // because it may not "examine" all bytes at once.
+                    // Instead, we'll create our own Stream over just the buffer itself, and recycle the buffers when the stream is disposed
+                    // the way the stream returned from PipeReader.AsStream() would have.
+                    return readResult.Buffer.AsStream(reader => ((PipeReader)reader!).Complete(), pipeReader);
+                }
+            }
+        }
+
+        /// <summary>
         /// Exposes a pipe writer as a <see cref="Stream"/>.
         /// </summary>
         /// <param name="pipeWriter">The pipe to write to when <see cref="Stream.WriteAsync(byte[], int, int, CancellationToken)"/> is invoked.</param>

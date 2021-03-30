@@ -144,6 +144,11 @@ public class ReadOnlySequenceStreamTests : TestBase
             expectedArg);
         stream.Dispose();
         Assert.True(disposed);
+
+        // Verify that disposing twice does not invoke the callback twice.
+        disposed = false;
+        stream.Dispose();
+        Assert.False(disposed);
     }
 
     [Fact]
