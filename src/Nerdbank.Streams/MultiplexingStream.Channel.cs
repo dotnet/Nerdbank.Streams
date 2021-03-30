@@ -442,7 +442,7 @@ namespace Nerdbank.Streams
                 {
                     // This happens when the channel is disposed (while or before flushing).
                     Assumes.True(this.IsDisposed);
-                    writer.Complete();
+                    await writer.CompleteAsync().ConfigureAwait(false);
                 }
             }
 
