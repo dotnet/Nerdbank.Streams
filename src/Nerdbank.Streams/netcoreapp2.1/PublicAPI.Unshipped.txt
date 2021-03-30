@@ -1,1 +1,2 @@
 Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.QualifiedChannelId() -> void
+static Nerdbank.Streams.StreamExtensions.AsStream(this System.Buffers.ReadOnlySequence<byte> readOnlySequence, System.Action<object?>! disposeAction, object? disposeActionArg) -> System.IO.Stream!

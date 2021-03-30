@@ -14,6 +14,9 @@ namespace Nerdbank.Streams
     {
         private static readonly Task<int> TaskOfZero = Task.FromResult(0);
 
+        private readonly Action<object?>? disposeAction;
+        private readonly object? disposeActionArg;
+
         /// <summary>
         /// A reusable task if two consecutive reads return the same number of bytes.
         /// </summary>
@@ -23,9 +26,11 @@ namespace Nerdbank.Streams
 
         private SequencePosition position;
 
-        public ReadOnlySequenceStream(ReadOnlySequence<byte> readOnlySequence)
+        internal ReadOnlySequenceStream(ReadOnlySequence<byte> readOnlySequence, Action<object?>? disposeAction, object? disposeActionArg)
         {
             this.readOnlySequence = readOnlySequence;
+            this.disposeAction = disposeAction;
+            this.disposeActionArg = disposeActionArg;
             this.position = readOnlySequence.Start;
         }
 
@@ -202,6 +207,7 @@ namespace Nerdbank.Streams
         protected override void Dispose(bool disposing)
         {
             this.IsDisposed = true;
+            this.disposeAction?.Invoke(this.disposeActionArg);
             base.Dispose(disposing);
         }
 

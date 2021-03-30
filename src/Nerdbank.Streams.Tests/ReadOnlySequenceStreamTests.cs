@@ -130,6 +130,22 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.True(((IDisposableObservable)this.defaultStream).IsDisposed);
     }
 
+    [Theory, PairwiseData]
+    public void DisposeCallback(bool nullArg)
+    {
+        bool disposed = false;
+        object? expectedArg = nullArg ? null : new object();
+        var stream = DefaultSequence.AsStream(
+            actualArg =>
+            {
+                Assert.Same(expectedArg, actualArg);
+                disposed = true;
+            },
+            expectedArg);
+        stream.Dispose();
+        Assert.True(disposed);
+    }
+
     [Fact]
     public void Flush()
     {
