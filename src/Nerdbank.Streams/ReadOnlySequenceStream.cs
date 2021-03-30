@@ -206,9 +206,12 @@ namespace Nerdbank.Streams
         /// <inheritdoc/>
         protected override void Dispose(bool disposing)
         {
-            this.IsDisposed = true;
-            this.disposeAction?.Invoke(this.disposeActionArg);
-            base.Dispose(disposing);
+            if (!this.IsDisposed)
+            {
+                this.IsDisposed = true;
+                this.disposeAction?.Invoke(this.disposeActionArg);
+                base.Dispose(disposing);
+            }
         }
 
         private T ReturnOrThrowDisposed<T>(T value)
