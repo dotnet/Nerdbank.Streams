@@ -45,7 +45,7 @@ namespace Nerdbank.Streams
         /// <param name="disposeAction">A delegate to invoke when the returned stream is disposed. This might be useful to recycle the buffers backing the <paramref name="readOnlySequence"/>.</param>
         /// <param name="disposeActionArg">The argument to pass to <paramref name="disposeAction"/>.</param>
         /// <returns>The readable stream.</returns>
-        public static Stream AsStream(this ReadOnlySequence<byte> readOnlySequence, Action<object?> disposeAction, object? disposeActionArg) => new ReadOnlySequenceStream(readOnlySequence, disposeAction, disposeActionArg);
+        public static Stream AsStream(this ReadOnlySequence<byte> readOnlySequence, Action<object?>? disposeAction, object? disposeActionArg) => new ReadOnlySequenceStream(readOnlySequence, disposeAction, disposeActionArg);
 
         /// <summary>
         /// Creates a writable <see cref="Stream"/> that can be used to add to a <see cref="IBufferWriter{T}"/> of <see cref="byte"/>.
