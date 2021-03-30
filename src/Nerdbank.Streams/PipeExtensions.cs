@@ -62,6 +62,8 @@ namespace Nerdbank.Streams
         /// </remarks>
         public static async Task<Stream> AsPrebufferedStreamAsync(this PipeReader pipeReader, CancellationToken cancellationToken = default)
         {
+            Requires.NotNull(pipeReader, nameof(pipeReader));
+
             while (true)
             {
                 // Read and immediately report all bytes as "examined" so that the next ReadAsync call will block till more bytes come in.
