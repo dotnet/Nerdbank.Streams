@@ -132,6 +132,12 @@
   <data name="NotSupportedWhenExistingPipeSpecified" xml:space="preserve">
     <value>This operation is not supported when the Channel is created with ChannelOptions.ExistingPipe set.</value>
   </data>
+  <data name="PipeReaderCanceled" xml:space="preserve">
+    <value>The PipeReader was canceled.</value>
+  </data>
+  <data name="PipeWriterFlushCanceled" xml:space="preserve">
+    <value>The PipeWriter flush was canceled.</value>
+  </data>
   <data name="ReadBeforeAdvanceTo" xml:space="preserve">
     <value>No reading operation to complete.</value>
   </data>
