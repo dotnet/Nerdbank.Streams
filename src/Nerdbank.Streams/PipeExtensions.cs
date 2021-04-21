@@ -435,6 +435,12 @@ namespace Nerdbank.Streams
             {
                 try
                 {
+                    if (DuplexPipe.IsDefinitelyCompleted(reader))
+                    {
+                        await writer.CompleteAsync().ConfigureAwait(false);
+                        return;
+                    }
+
                     while (true)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
