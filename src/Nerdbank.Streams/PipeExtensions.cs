@@ -380,19 +380,24 @@ namespace Nerdbank.Streams
         /// Forwards all bytes coming from a <see cref="PipeReader"/> to the specified <see cref="PipeWriter"/>.
         /// </summary>
         /// <param name="reader">The reader to get bytes from.</param>
-        /// <param name="writer">The writer to copy bytes to.</param>
+        /// <param name="writer">The writer to copy bytes to. <see cref="PipeWriter.CompleteAsync(Exception)"/> will be called on this object when the reader completes or an error occurs.</param>
         /// <param name="cancellationToken">A cancellation token.</param>
         /// <returns>
         /// A <see cref="Task"/> that completes when the <paramref name="reader"/> has finished producing bytes, or an error occurs.
         /// This <see cref="Task"/> never faults, since any exceptions are used to complete the <paramref name="writer"/>.
         /// </returns>
         /// <remarks>
-        /// If an error occurs during reading or writing, the <paramref name="writer"/> is completed with the exception.
+        /// If an error occurs during reading or writing, the <paramref name="writer"/> and <paramref name="reader"/> are completed with the exception.
         /// </remarks>
         internal static Task LinkToAsync(this PipeReader reader, PipeWriter writer, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(reader, nameof(reader));
             Requires.NotNull(writer, nameof(writer));
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromCanceled(cancellationToken);
+            }
 
             return Task.Run(async delegate
             {
@@ -401,11 +406,30 @@ namespace Nerdbank.Streams
                     while (true)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        var result = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                        ReadResult result = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                        if (result.IsCanceled)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            throw new OperationCanceledException(Strings.PipeReaderCanceled);
+                        }
+
                         writer.Write(result.Buffer);
                         reader.AdvanceTo(result.Buffer.End);
                         result.ScrubAfterAdvanceTo();
-                        await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+                        FlushResult flushResult = await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+
+                        if (flushResult.IsCanceled)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            throw new OperationCanceledException(Strings.PipeWriterFlushCanceled);
+                        }
+
+                        if (flushResult.IsCompleted)
+                        {
+                            // Break out of copy loop. The receiver doesn't care any more.
+                            break;
+                        }
+
                         if (result.IsCompleted)
                         {
                             await writer.CompleteAsync().ConfigureAwait(false);
@@ -434,7 +458,7 @@ namespace Nerdbank.Streams
         /// This <see cref="Task"/> never faults, since any exceptions are used to complete the <see cref="PipeWriter" /> objects.
         /// </returns>
         /// <remarks>
-        /// If an error occurs during reading or writing, the <see cref="PipeWriter"/> is completed with the exception.
+        /// If an error occurs during reading or writing, both reader and writer are completed with the exception.
         /// </remarks>
         internal static Task LinkToAsync(this IDuplexPipe pipe1, IDuplexPipe pipe2, CancellationToken cancellationToken = default)
         {
