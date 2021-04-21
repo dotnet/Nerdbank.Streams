@@ -631,8 +631,6 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [InlineData(false)]
     public async Task CancelChannelOfferBeforeAcceptance(bool cancelFirst)
     {
-        // TODO: We need to test both the race condition where acceptance is sent before cancellation is received,
-        //       and the case where cancellation is received before we call AcceptChannelAsync.
         var cts = new CancellationTokenSource();
         var offer = this.mx1.OfferChannelAsync(string.Empty, cts.Token);
         cts.Cancel();
@@ -640,6 +638,8 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         Stream? acceptedStream = null;
         try
         {
+            // We need to test both the race condition where acceptance is sent before cancellation is received,
+            // and the case where cancellation is received before we call AcceptChannelAsync.
             if (cancelFirst)
             {
                 // Increase the odds that cancellation will be processed before acceptance.
