@@ -50,6 +50,16 @@ namespace Nerdbank.Streams
         /// <inheritdoc />
         public PipeWriter Output { get; }
 
+        /// <summary>
+        /// Checks whether the given <see cref="PipeReader"/> is known to be already completed.
+        /// </summary>
+        /// <param name="reader">The reader to check.</param>
+        /// <returns><see langword="true" /> if the <paramref name="reader"/> is known to be completed; <see langword="false"/> if the <paramref name="reader"/> is not known to be completed.</returns>
+        /// <remarks>
+        /// This method <em>may</em> return <see langword="false"/> for a completed <see cref="PipeReader"/>.
+        /// </remarks>
+        internal static bool IsDefinitelyCompleted(PipeReader reader) => reader is CompletedPipeReader;
+
         private class CompletedPipeWriter : PipeWriter
         {
             internal static readonly PipeWriter Singleton = new CompletedPipeWriter();

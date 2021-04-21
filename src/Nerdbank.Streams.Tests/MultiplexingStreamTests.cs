@@ -389,6 +389,23 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
+    public async Task ChannelWithExistingSimplexChannel()
+    {
+        var transmittingPipe = new Pipe();
+        var receivingPipe = new Pipe();
+        var mx1ChannelTask = this.mx1.OfferChannelAsync(string.Empty, new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(transmittingPipe.Reader) }, this.TimeoutToken);
+        var mx2ChannelTask = this.mx2.AcceptChannelAsync(string.Empty, new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(receivingPipe.Writer) }, this.TimeoutToken);
+        var channels = await WhenAllSucceedOrAnyFail(mx1ChannelTask, mx2ChannelTask).WithCancellation(this.TimeoutToken);
+
+        var buffer = this.GetBuffer(3);
+        await transmittingPipe.Writer.WriteAsync(buffer, this.TimeoutToken);
+
+        ReadOnlySequence<byte> readBytes = await this.ReadAtLeastAsync(receivingPipe.Reader, buffer.Length);
+        Assert.Equal(buffer.Length, readBytes.Length);
+        Assert.Equal(buffer, readBytes.ToArray());
+    }
+
+    [Fact]
     [Trait("SkipInCodeCoverage", "true")] // far too slow and times out
     [Trait("Stress", "true")]
     public async Task ConcurrentChatOverManyChannels()
