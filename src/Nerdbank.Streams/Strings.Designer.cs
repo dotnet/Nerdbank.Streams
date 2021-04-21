@@ -106,11 +106,20 @@ namespace Nerdbank.Streams {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to No reading operation to complete..
+        ///   Looks up a localized string similar to The PipeReader was canceled..
         /// </summary>
-        internal static string ReadBeforeAdvanceTo {
+        internal static string PipeReaderCanceled {
             get {
-                return ResourceManager.GetString("ReadBeforeAdvanceTo", resourceCulture);
+                return ResourceManager.GetString("PipeReaderCanceled", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The PipeWriter flush was canceled..
+        /// </summary>
+        internal static string PipeWriterFlushCanceled {
+            get {
+                return ResourceManager.GetString("PipeWriterFlushCanceled", resourceCulture);
             }
         }
         
@@ -120,15 +129,6 @@ namespace Nerdbank.Streams {
         internal static string ReadingAfterCompletionNotAllowed {
             get {
                 return ResourceManager.GetString("ReadingAfterCompletionNotAllowed", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Reading has already begun. Call AdvanceTo before reading again..
-        /// </summary>
-        internal static string ReadingMustBeFollowedByAdvance {
-            get {
-                return ResourceManager.GetString("ReadingMustBeFollowedByAdvance", resourceCulture);
             }
         }
         

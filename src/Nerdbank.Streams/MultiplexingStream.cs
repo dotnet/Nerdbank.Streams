@@ -611,7 +611,15 @@ namespace Nerdbank.Streams
                 this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.StreamDisposed, "Disposing.");
             }
 
-            await this.formatter.DisposeAsync().ConfigureAwait(false);
+            await this.sendingSemaphore.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                await this.formatter.DisposeAsync().ConfigureAwait(false);
+            }
+            finally
+            {
+                this.sendingSemaphore.Release();
+            }
 
             lock (this.syncObject)
             {
