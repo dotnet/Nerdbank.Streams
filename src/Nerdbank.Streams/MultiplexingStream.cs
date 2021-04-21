@@ -1087,6 +1087,12 @@ namespace Nerdbank.Streams
                     }
                     else
                     {
+                        if (!this.openChannels.ContainsKey(qualifiedChannelId))
+                        {
+                            // Drop frames regarding channels that are not open.
+                            return;
+                        }
+
                         if (this.channelsPendingTermination.Contains(qualifiedChannelId))
                         {
                             // We shouldn't ever send a frame about a channel after we've transmitted a ChannelTermination frame for it.
