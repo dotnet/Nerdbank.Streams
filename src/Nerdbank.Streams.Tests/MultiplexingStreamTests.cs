@@ -3,12 +3,11 @@
 
 using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipelines;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft;
@@ -581,6 +580,39 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
         // Confirm the writer task completes
         await writerTask;
+    }
+
+    /// <summary>
+    /// Verifies that when a channel's writer is completed with a fault, that fault is communicated to the remote reader.
+    /// </summary>
+    [Theory]
+    [InlineData(typeof(InvalidOperationException))]
+    [InlineData(typeof(Exception))]
+    [InlineData(typeof(KeyNotFoundException))]
+    public async Task UserWriteFaultCommunicatedToUserReader(Type faultType)
+    {
+        var (ch1, ch2) = await this.EstablishChannelsAsync(string.Empty);
+        byte[] buffer = this.GetRandomBuffer(3);
+        await ch1.Output.WriteAsync(buffer, this.TimeoutToken);
+        Exception fault = (Exception)Activator.CreateInstance(faultType, "some exception")!;
+        await ch1.Output.CompleteAsync(fault);
+
+        // Enter a read loop since it's undefined exactly which read will throw.
+        try
+        {
+            while (true)
+            {
+                ReadResult readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
+                ch2.Input.AdvanceTo(readResult.Buffer.End);
+
+                // If reading completed without throwing, that's a failure.
+                Assert.False(readResult.IsCompleted);
+            }
+        }
+        catch (RemoteChannelException wrapperException)
+        {
+            Assert.Same(fault, wrapperException.InnerException);
+        }
     }
 
     [Fact]

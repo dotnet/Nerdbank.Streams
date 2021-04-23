@@ -1,3 +1,8 @@
 Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.QualifiedChannelId() -> void
+Nerdbank.Streams.RemoteChannelException
+Nerdbank.Streams.RemoteChannelException.RemoteChannelException() -> void
+Nerdbank.Streams.RemoteChannelException.RemoteChannelException(string! message) -> void
+Nerdbank.Streams.RemoteChannelException.RemoteChannelException(string! message, System.Exception! inner) -> void
+Nerdbank.Streams.RemoteChannelException.RemoteChannelException(System.Runtime.Serialization.SerializationInfo! info, System.Runtime.Serialization.StreamingContext context) -> void
 static Nerdbank.Streams.PipeExtensions.AsPrebufferedStreamAsync(this System.IO.Pipelines.PipeReader! pipeReader, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.IO.Stream!>!
 static Nerdbank.Streams.StreamExtensions.AsStream(this System.Buffers.ReadOnlySequence<byte> readOnlySequence, System.Action<object?>? disposeAction, object? disposeActionArg) -> System.IO.Stream!
