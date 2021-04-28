@@ -74,6 +74,12 @@ namespace Nerdbank.Streams
         public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
             count = (int)Math.Min(count, this.length);
+
+            if (count == 0)
+            {
+                return 0;
+            }
+
             int bytesRead = await this.underlyingStream.ReadAsync(buffer, offset, count).ConfigureAwaitRunInline();
             this.length -= bytesRead;
             return bytesRead;
@@ -83,6 +89,12 @@ namespace Nerdbank.Streams
         public override int Read(byte[] buffer, int offset, int count)
         {
             count = (int)Math.Min(count, this.length);
+
+            if (count == 0)
+            {
+                return 0;
+            }
+
             int bytesRead = this.underlyingStream.Read(buffer, offset, count);
             this.length -= bytesRead;
             return bytesRead;
@@ -93,6 +105,12 @@ namespace Nerdbank.Streams
         public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
         {
             buffer = buffer.Slice(0, (int)Math.Min(buffer.Length, this.length));
+
+            if (buffer.IsEmpty)
+            {
+                return 0;
+            }
+
             int bytesRead = await this.underlyingStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
             this.length -= bytesRead;
             return bytesRead;
