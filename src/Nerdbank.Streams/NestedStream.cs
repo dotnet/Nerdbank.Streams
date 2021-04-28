@@ -25,6 +25,11 @@ namespace Nerdbank.Streams
         /// <summary>
         /// The remaining bytes allowed to be read.
         /// </summary>
+        private long remainingBytes;
+
+        /// <summary>
+        /// The total length of the stream.
+        /// </summary>
         private long length;
 
         /// <summary>
@@ -39,6 +44,7 @@ namespace Nerdbank.Streams
             Requires.Argument(underlyingStream.CanRead, nameof(underlyingStream), "Stream must be readable.");
 
             this.underlyingStream = underlyingStream;
+            this.remainingBytes = length;
             this.length = length;
         }
 
@@ -55,12 +61,23 @@ namespace Nerdbank.Streams
         public override bool CanWrite => false;
 
         /// <inheritdoc />
-        public override long Length => throw this.ThrowDisposedOr(new NotSupportedException());
+        public override long Length
+        {
+            get
+            {
+                Verify.NotDisposed(this);
+                return this.length;
+            }
+        }
 
         /// <inheritdoc />
         public override long Position
         {
-            get => throw this.ThrowDisposedOr(new NotSupportedException());
+            get
+            {
+                Verify.NotDisposed(this);
+                return this.length - this.remainingBytes;
+            }
             set => throw this.ThrowDisposedOr(new NotSupportedException());
         }
 
@@ -73,7 +90,7 @@ namespace Nerdbank.Streams
         /// <inheritdoc />
         public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
-            count = (int)Math.Min(count, this.length);
+            count = (int)Math.Min(count, this.remainingBytes);
 
             if (count == 0)
             {
@@ -81,14 +98,14 @@ namespace Nerdbank.Streams
             }
 
             int bytesRead = await this.underlyingStream.ReadAsync(buffer, offset, count).ConfigureAwaitRunInline();
-            this.length -= bytesRead;
+            this.remainingBytes -= bytesRead;
             return bytesRead;
         }
 
         /// <inheritdoc />
         public override int Read(byte[] buffer, int offset, int count)
         {
-            count = (int)Math.Min(count, this.length);
+            count = (int)Math.Min(count, this.remainingBytes);
 
             if (count == 0)
             {
@@ -96,7 +113,7 @@ namespace Nerdbank.Streams
             }
 
             int bytesRead = this.underlyingStream.Read(buffer, offset, count);
-            this.length -= bytesRead;
+            this.remainingBytes -= bytesRead;
             return bytesRead;
         }
 
@@ -104,7 +121,7 @@ namespace Nerdbank.Streams
         /// <inheritdoc />
         public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
         {
-            buffer = buffer.Slice(0, (int)Math.Min(buffer.Length, this.length));
+            buffer = buffer.Slice(0, (int)Math.Min(buffer.Length, this.remainingBytes));
 
             if (buffer.IsEmpty)
             {
@@ -112,7 +129,7 @@ namespace Nerdbank.Streams
             }
 
             int bytesRead = await this.underlyingStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
-            this.length -= bytesRead;
+            this.remainingBytes -= bytesRead;
             return bytesRead;
         }
 #endif

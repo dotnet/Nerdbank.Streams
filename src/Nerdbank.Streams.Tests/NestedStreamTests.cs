@@ -47,7 +47,7 @@ public class NestedStreamTests : TestBase
     [Fact]
     public void Length()
     {
-        Assert.Throws<NotSupportedException>(() => this.stream.Length);
+        Assert.Equal(10, this.stream.Length);
         this.stream.Dispose();
         Assert.Throws<ObjectDisposedException>(() => this.stream.Length);
     }
@@ -55,7 +55,13 @@ public class NestedStreamTests : TestBase
     [Fact]
     public void Position()
     {
-        Assert.Throws<NotSupportedException>(() => this.stream.Position);
+        byte[] buffer = new byte[DefaultNestedLength];
+
+        Assert.Equal(0, this.stream.Position);
+        this.stream.Read(buffer, 0, 5);
+        Assert.Equal(5, this.stream.Position);
+        this.stream.Read(buffer, 10, 0);
+
         Assert.Throws<NotSupportedException>(() => this.stream.Position = 0);
         this.stream.Dispose();
         Assert.Throws<ObjectDisposedException>(() => this.stream.Position);
