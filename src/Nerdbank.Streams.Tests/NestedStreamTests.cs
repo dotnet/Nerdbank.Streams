@@ -146,6 +146,16 @@ public class NestedStreamTests : TestBase
     }
 
     [Fact]
+    public async Task ReadAsync_Empty_ReturnsZero()
+    {
+        Assert.Equal(0, await this.stream.ReadAsync(Array.Empty<byte>(), 0, 0, default).WithCancellation(this.TimeoutToken));
+
+#if SPAN_BUILTIN
+        Assert.Equal(0, await this.stream.ReadAsync(Array.Empty<byte>(), default).AsTask().WithCancellation(this.TimeoutToken));
+#endif
+    }
+
+    [Fact]
     public async Task ReadAsync_NoMoreThanGiven()
     {
         byte[] buffer = new byte[this.underlyingStream.Length];
@@ -165,6 +175,12 @@ public class NestedStreamTests : TestBase
 
         Assert.Equal(0, this.stream.Read(buffer, bytesRead, buffer.Length - bytesRead));
         Assert.Equal(DefaultNestedLength, this.underlyingStream.Position);
+    }
+
+    [Fact]
+    public void Read_Empty_ReturnsZero()
+    {
+        Assert.Equal(0, this.stream.Read(Array.Empty<byte>(), 0, 0));
     }
 
     [Fact]
