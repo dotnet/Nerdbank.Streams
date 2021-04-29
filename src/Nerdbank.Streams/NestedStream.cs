@@ -55,7 +55,14 @@ namespace Nerdbank.Streams
         public override bool CanRead => !this.IsDisposed;
 
         /// <inheritdoc />
-        public override bool CanSeek => false;
+        public override bool CanSeek
+        {
+            get
+            {
+                Verify.NotDisposed(this);
+                return this.underlyingStream.CanSeek;
+            }
+        }
 
         /// <inheritdoc />
         public override bool CanWrite => false;
@@ -135,7 +142,29 @@ namespace Nerdbank.Streams
 #endif
 
         /// <inheritdoc />
-        public override long Seek(long offset, SeekOrigin origin) => throw this.ThrowDisposedOr(new NotSupportedException());
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            Verify.NotDisposed(this);
+
+            if (!this.CanSeek)
+            {
+                throw new NotSupportedException("This stream does not support seeking.");
+            }
+
+            if (origin != SeekOrigin.Current)
+            {
+                throw new NotSupportedException("This stream only supports seek operations relative to the current position");
+            }
+
+            var boundedOffset =
+                offset >= 0 ?
+                    Math.Min(offset, this.remainingBytes) :
+                    Math.Max(offset, -1 * this.Position);
+            long currentPosition = this.underlyingStream.Position;
+            long newPosition = this.underlyingStream.Seek(Math.Min(this.remainingBytes, boundedOffset), SeekOrigin.Current);
+            this.remainingBytes -= newPosition - currentPosition;
+            return this.Position;
+        }
 
         /// <inheritdoc />
         public override void SetLength(long value) => throw this.ThrowDisposedOr(new NotSupportedException());

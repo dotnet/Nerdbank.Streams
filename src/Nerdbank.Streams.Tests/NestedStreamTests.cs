@@ -42,7 +42,12 @@ public class NestedStreamTests : TestBase
     }
 
     [Fact]
-    public void CanSeek() => Assert.False(this.stream.CanSeek);
+    public void CanSeek()
+    {
+        Assert.True(this.stream.CanSeek);
+        this.stream.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => this.stream.CanSeek);
+    }
 
     [Fact]
     public void Length()
@@ -95,11 +100,40 @@ public class NestedStreamTests : TestBase
     }
 
     [Fact]
-    public void Seek()
+    public void Seek_Current()
+    {
+        Assert.Equal(0, this.stream.Position);
+        Assert.Equal(0, this.stream.Seek(0, SeekOrigin.Current));
+        Assert.Equal(0, this.stream.Seek(-1, SeekOrigin.Current));
+
+        Assert.Equal(5, this.stream.Seek(5, SeekOrigin.Current));
+        Assert.Equal(5, this.stream.Seek(0, SeekOrigin.Current));
+        Assert.Equal(4, this.stream.Seek(-1, SeekOrigin.Current));
+        Assert.Equal(0, this.stream.Seek(-10, SeekOrigin.Current));
+
+        Assert.Equal(10, this.stream.Seek(10, SeekOrigin.Current));
+        Assert.Equal(10, this.stream.Seek(10, SeekOrigin.Current));
+        Assert.Equal(10, this.stream.Seek(0, SeekOrigin.Current));
+        Assert.Equal(0, this.stream.Seek(-20, SeekOrigin.Current));
+
+        this.stream.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => this.stream.Seek(0, SeekOrigin.Begin));
+    }
+
+    [Fact]
+    public void Seek_Begin()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.Seek(0, SeekOrigin.Begin));
         this.stream.Dispose();
         Assert.Throws<ObjectDisposedException>(() => this.stream.Seek(0, SeekOrigin.Begin));
+    }
+
+    [Fact]
+    public void Seek_End()
+    {
+        Assert.Throws<NotSupportedException>(() => this.stream.Seek(0, SeekOrigin.End));
+        this.stream.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => this.stream.Seek(0, SeekOrigin.End));
     }
 
     [Fact]
