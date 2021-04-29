@@ -23,14 +23,14 @@ namespace Nerdbank.Streams
         private readonly Stream underlyingStream;
 
         /// <summary>
+        /// The total length of the stream.
+        /// </summary>
+        private readonly long length;
+
+        /// <summary>
         /// The remaining bytes allowed to be read.
         /// </summary>
         private long remainingBytes;
-
-        /// <summary>
-        /// The total length of the stream.
-        /// </summary>
-        private long length;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="NestedStream"/> class.
