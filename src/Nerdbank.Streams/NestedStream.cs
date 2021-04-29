@@ -151,15 +151,26 @@ namespace Nerdbank.Streams
                 throw new NotSupportedException("This stream does not support seeking.");
             }
 
-            if (origin != SeekOrigin.Current)
+            long boundedOffset = 0;
+
+            if (origin == SeekOrigin.Current)
             {
-                throw new NotSupportedException("This stream only supports seek operations relative to the current position");
+                boundedOffset = offset;
+            }
+            else if (origin == SeekOrigin.End)
+            {
+                boundedOffset = this.length + offset - this.Position;
+            }
+            else if (origin == SeekOrigin.Begin)
+            {
+                boundedOffset = offset - this.Position;
             }
 
-            var boundedOffset =
-                offset >= 0 ?
-                    Math.Min(offset, this.remainingBytes) :
-                    Math.Max(offset, -1 * this.Position);
+            boundedOffset =
+                boundedOffset >= 0 ?
+                    Math.Min(boundedOffset, this.remainingBytes) :
+                    Math.Max(boundedOffset, -1 * this.Position);
+
             long currentPosition = this.underlyingStream.Position;
             long newPosition = this.underlyingStream.Seek(Math.Min(this.remainingBytes, boundedOffset), SeekOrigin.Current);
             this.remainingBytes -= newPosition - currentPosition;
