@@ -337,7 +337,7 @@ public class NestedStreamTests : TestBase
     {
         var buffer = new byte[20];
 
-        Assert.Throws<ArgumentNullException>(() => this.stream.Read(null, 0, 0));
+        Assert.Throws<ArgumentNullException>(() => this.stream.Read(null!, 0, 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => this.stream.Read(buffer, -1, buffer.Length));
         Assert.Throws<ArgumentOutOfRangeException>(() => this.stream.Read(buffer, 0, -1));
         Assert.Throws<ArgumentException>(() => this.stream.Read(buffer, 1, buffer.Length));
@@ -348,7 +348,7 @@ public class NestedStreamTests : TestBase
     {
         var buffer = new byte[20];
 
-        await Assert.ThrowsAsync<ArgumentNullException>(() => this.stream.ReadAsync(null, 0, 0));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => this.stream.ReadAsync(null!, 0, 0));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.stream.ReadAsync(buffer, -1, buffer.Length));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.stream.ReadAsync(buffer, 0, -1));
         await Assert.ThrowsAsync<ArgumentException>(() => this.stream.ReadAsync(buffer, 1, buffer.Length));
