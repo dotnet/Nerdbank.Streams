@@ -99,6 +99,23 @@ namespace Nerdbank.Streams
         /// <inheritdoc />
         public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
+            Verify.NotDisposed(this);
+
+            if (buffer == null)
+            {
+                throw new ArgumentNullException(nameof(buffer));
+            }
+
+            if (offset < 0 || count < 0)
+            {
+                throw new ArgumentOutOfRangeException();
+            }
+
+            if (offset + count > buffer.Length)
+            {
+                throw new ArgumentException();
+            }
+
             count = (int)Math.Min(count, this.remainingBytes);
 
             if (count <= 0)
@@ -114,6 +131,23 @@ namespace Nerdbank.Streams
         /// <inheritdoc />
         public override int Read(byte[] buffer, int offset, int count)
         {
+            Verify.NotDisposed(this);
+
+            if (buffer == null)
+            {
+                throw new ArgumentNullException(nameof(buffer));
+            }
+
+            if (offset < 0 || count < 0)
+            {
+                throw new ArgumentOutOfRangeException();
+            }
+
+            if (offset + count > buffer.Length)
+            {
+                throw new ArgumentException();
+            }
+
             count = (int)Math.Min(count, this.remainingBytes);
 
             if (count <= 0)
@@ -130,6 +164,8 @@ namespace Nerdbank.Streams
         /// <inheritdoc />
         public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
         {
+            Verify.NotDisposed(this);
+
             // If we're beyond the end of the stream (as the result of a Seek operation), return 0 bytes.
             if (this.remainingBytes < 0)
             {

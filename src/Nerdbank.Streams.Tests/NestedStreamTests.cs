@@ -331,4 +331,46 @@ public class NestedStreamTests : TestBase
         this.underlyingStream.SetLength(DefaultNestedLength * 2);
         Assert.Equal(DefaultNestedLength - firstBlockLength, await this.stream.ReadAsync(buffer, 0, buffer.Length));
     }
+
+    [Fact]
+    public void Read_ValidatesArguments()
+    {
+        var buffer = new byte[20];
+
+        Assert.Throws<ArgumentNullException>(() => this.stream.Read(null, 0, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => this.stream.Read(buffer, -1, buffer.Length));
+        Assert.Throws<ArgumentOutOfRangeException>(() => this.stream.Read(buffer, 0, -1));
+        Assert.Throws<ArgumentException>(() => this.stream.Read(buffer, 1, buffer.Length));
+    }
+
+    [Fact]
+    public async Task ReadAsync_ValidatesArguments()
+    {
+        var buffer = new byte[20];
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() => this.stream.ReadAsync(null, 0, 0));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.stream.ReadAsync(buffer, -1, buffer.Length));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.stream.ReadAsync(buffer, 0, -1));
+        await Assert.ThrowsAsync<ArgumentException>(() => this.stream.ReadAsync(buffer, 1, buffer.Length));
+    }
+
+    [Fact]
+    public void Read_ThrowsIfDisposed()
+    {
+        this.stream.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => this.stream.Read(Array.Empty<byte>(), 0, 0));
+    }
+
+    [Fact]
+    public async Task ReadAsync_ThrowsIfDisposed()
+    {
+        this.stream.Dispose();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream.ReadAsync(Array.Empty<byte>(), 0, 0));
+
+#if SPAN_BUILTIN
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream.ReadAsync(Array.Empty<byte>(), default).AsTask());
+#endif
+    }
 }
