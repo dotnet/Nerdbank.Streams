@@ -87,7 +87,11 @@ namespace Nerdbank.Streams
                 Verify.NotDisposed(this);
                 return this.length - this.remainingBytes;
             }
-            set => throw this.ThrowDisposedOr(new NotSupportedException());
+
+            set
+            {
+                this.Seek(value, SeekOrigin.Begin);
+            }
         }
 
         /// <inheritdoc />

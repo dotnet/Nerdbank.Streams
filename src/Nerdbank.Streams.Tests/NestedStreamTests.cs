@@ -51,6 +51,17 @@ public class NestedStreamTests : TestBase
     }
 
     [Fact]
+    public void CanSeek_NonSeekableStream()
+    {
+        using var gzipStream = new GZipStream(Stream.Null, CompressionMode.Decompress);
+        using var stream = gzipStream.ReadSlice(10);
+
+        Assert.False(stream.CanSeek);
+        stream.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => stream.CanSeek);
+    }
+
+    [Fact]
     public void Length()
     {
         Assert.Equal(DefaultNestedLength, this.stream.Length);
@@ -79,10 +90,28 @@ public class NestedStreamTests : TestBase
         var bytesRead = this.stream.Read(buffer, 0, 5);
         Assert.Equal(bytesRead, this.stream.Position);
 
-        Assert.Throws<NotSupportedException>(() => this.stream.Position = 0);
+        this.stream.Position = 0;
+        byte[] buffer2 = new byte[DefaultNestedLength];
+        bytesRead = this.stream.Read(buffer2, 0, 5);
+        Assert.Equal(bytesRead, this.stream.Position);
+        Assert.Equal<byte>(buffer, buffer2);
+
         this.stream.Dispose();
         Assert.Throws<ObjectDisposedException>(() => this.stream.Position);
         Assert.Throws<ObjectDisposedException>(() => this.stream.Position = 0);
+    }
+
+    [Fact]
+    public void Position_NonSeekableStream()
+    {
+        using var nonSeekableWrapper = new OneWayStreamWrapper(this.underlyingStream, canRead: true);
+        using var stream = nonSeekableWrapper.ReadSlice(10);
+
+        Assert.Equal(0, stream.Position);
+        Assert.Throws<NotSupportedException>(() => stream.Position = 3);
+        Assert.Equal(0, stream.Position);
+        stream.ReadByte();
+        Assert.Equal(1, stream.Position);
     }
 
     [Fact]
@@ -144,6 +173,17 @@ public class NestedStreamTests : TestBase
 
         this.stream.Dispose();
         Assert.Throws<ObjectDisposedException>(() => this.stream.Seek(0, SeekOrigin.Begin));
+    }
+
+    [Fact]
+    public void Sook_WithNonStartPositionInUnderlyingStream()
+    {
+        this.underlyingStream.Position = 1;
+        this.stream = this.underlyingStream.ReadSlice(5);
+
+        Assert.Equal(0, this.stream.Position);
+        Assert.Equal(2, this.stream.Seek(2, SeekOrigin.Current));
+        Assert.Equal(3, this.underlyingStream.Position);
     }
 
     [Fact]
