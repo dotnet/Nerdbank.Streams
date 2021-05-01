@@ -123,6 +123,9 @@
   <data name="Frozen" xml:space="preserve">
     <value>This instance has been frozen. No mutations are allowed.</value>
   </data>
+  <data name="InvalidSeekOrigin" xml:space="preserve">
+    <value>Invalid seek origin.</value>
+  </data>
   <data name="NoChannelFoundById" xml:space="preserve">
     <value>No channel with that ID found.</value>
   </data>
@@ -143,5 +146,11 @@
   </data>
   <data name="SeededChannelsRequireV3Protocol" xml:space="preserve">
     <value>Seeded channels must be empty unless the protocol version is 3 or later.</value>
+  </data>
+  <data name="SeekBeforeBegin" xml:space="preserve">
+    <value>An attempt was made to move the position before the beginning of the stream.</value>
+  </data>
+  <data name="SeekingNotSupported" xml:space="preserve">
+    <value>The underlying stream does not support seeking.</value>
   </data>
 </root>

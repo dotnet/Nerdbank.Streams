@@ -73,7 +73,9 @@ namespace Nerdbank.Streams
             get
             {
                 Verify.NotDisposed(this);
-                return this.length;
+
+                return this.underlyingStream.CanSeek ?
+                    this.length : throw new NotSupportedException();
             }
         }
 
@@ -99,7 +101,7 @@ namespace Nerdbank.Streams
         {
             count = (int)Math.Min(count, this.remainingBytes);
 
-            if (count == 0)
+            if (count <= 0)
             {
                 return 0;
             }
@@ -114,7 +116,7 @@ namespace Nerdbank.Streams
         {
             count = (int)Math.Min(count, this.remainingBytes);
 
-            if (count == 0)
+            if (count <= 0)
             {
                 return 0;
             }
@@ -128,6 +130,12 @@ namespace Nerdbank.Streams
         /// <inheritdoc />
         public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
         {
+            // If we're beyond the end of the stream (as the result of a Seek operation), return 0 bytes.
+            if (this.remainingBytes < 0)
+            {
+                return 0;
+            }
+
             buffer = buffer.Slice(0, (int)Math.Min(buffer.Length, this.remainingBytes));
 
             if (buffer.IsEmpty)
@@ -148,31 +156,26 @@ namespace Nerdbank.Streams
 
             if (!this.CanSeek)
             {
-                throw new NotSupportedException("This stream does not support seeking.");
+                throw new NotSupportedException(Strings.SeekingNotSupported);
             }
 
-            long boundedOffset = 0;
+            // Recalculate offset relative to the current position
+            long newOffset = origin switch
+            {
+                SeekOrigin.Current => offset,
+                SeekOrigin.End => this.length + offset - this.Position,
+                SeekOrigin.Begin => offset - this.Position,
+                _ => throw new ArgumentOutOfRangeException(nameof(origin), Strings.InvalidSeekOrigin),
+            };
 
-            if (origin == SeekOrigin.Current)
+            // Determine whether the requested position is within the bounds of the stream
+            if (this.Position + newOffset < 0)
             {
-                boundedOffset = offset;
+                throw new IOException(Strings.SeekBeforeBegin);
             }
-            else if (origin == SeekOrigin.End)
-            {
-                boundedOffset = this.length + offset - this.Position;
-            }
-            else if (origin == SeekOrigin.Begin)
-            {
-                boundedOffset = offset - this.Position;
-            }
-
-            boundedOffset =
-                boundedOffset >= 0 ?
-                    Math.Min(boundedOffset, this.remainingBytes) :
-                    Math.Max(boundedOffset, -1 * this.Position);
 
             long currentPosition = this.underlyingStream.Position;
-            long newPosition = this.underlyingStream.Seek(Math.Min(this.remainingBytes, boundedOffset), SeekOrigin.Current);
+            long newPosition = this.underlyingStream.Seek(newOffset, SeekOrigin.Current);
             this.remainingBytes -= newPosition - currentPosition;
             return this.Position;
         }
