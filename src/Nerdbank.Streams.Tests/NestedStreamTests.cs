@@ -3,6 +3,7 @@
 
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft;
@@ -42,24 +43,75 @@ public class NestedStreamTests : TestBase
     }
 
     [Fact]
-    public void CanSeek() => Assert.False(this.stream.CanSeek);
+    public void CanSeek()
+    {
+        Assert.True(this.stream.CanSeek);
+        this.stream.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => this.stream.CanSeek);
+    }
+
+    [Fact]
+    public void CanSeek_NonSeekableStream()
+    {
+        using var gzipStream = new GZipStream(Stream.Null, CompressionMode.Decompress);
+        using var stream = gzipStream.ReadSlice(10);
+
+        Assert.False(stream.CanSeek);
+        stream.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => stream.CanSeek);
+    }
 
     [Fact]
     public void Length()
     {
-        Assert.Throws<NotSupportedException>(() => this.stream.Length);
+        Assert.Equal(DefaultNestedLength, this.stream.Length);
         this.stream.Dispose();
         Assert.Throws<ObjectDisposedException>(() => this.stream.Length);
     }
 
     [Fact]
+    public void Length_NonSeekableStream()
+    {
+        using (var gzipStream = new GZipStream(Stream.Null, CompressionMode.Decompress))
+        using (var stream = gzipStream.ReadSlice(10))
+        {
+            Assert.Throws<NotSupportedException>(() => stream.Length);
+            stream.Dispose();
+            Assert.Throws<ObjectDisposedException>(() => stream.Length);
+        }
+    }
+
+    [Fact]
     public void Position()
     {
-        Assert.Throws<NotSupportedException>(() => this.stream.Position);
-        Assert.Throws<NotSupportedException>(() => this.stream.Position = 0);
+        byte[] buffer = new byte[DefaultNestedLength];
+
+        Assert.Equal(0, this.stream.Position);
+        var bytesRead = this.stream.Read(buffer, 0, 5);
+        Assert.Equal(bytesRead, this.stream.Position);
+
+        this.stream.Position = 0;
+        byte[] buffer2 = new byte[DefaultNestedLength];
+        bytesRead = this.stream.Read(buffer2, 0, 5);
+        Assert.Equal(bytesRead, this.stream.Position);
+        Assert.Equal<byte>(buffer, buffer2);
+
         this.stream.Dispose();
         Assert.Throws<ObjectDisposedException>(() => this.stream.Position);
         Assert.Throws<ObjectDisposedException>(() => this.stream.Position = 0);
+    }
+
+    [Fact]
+    public void Position_NonSeekableStream()
+    {
+        using var nonSeekableWrapper = new OneWayStreamWrapper(this.underlyingStream, canRead: true);
+        using var stream = nonSeekableWrapper.ReadSlice(10);
+
+        Assert.Equal(0, stream.Position);
+        Assert.Throws<NotSupportedException>(() => stream.Position = 3);
+        Assert.Equal(0, stream.Position);
+        stream.ReadByte();
+        Assert.Equal(1, stream.Position);
     }
 
     [Fact]
@@ -90,11 +142,91 @@ public class NestedStreamTests : TestBase
     }
 
     [Fact]
-    public void Seek()
+    public void Seek_Current()
     {
-        Assert.Throws<NotSupportedException>(() => this.stream.Seek(0, SeekOrigin.Begin));
+        Assert.Equal(0, this.stream.Position);
+        Assert.Equal(0, this.stream.Seek(0, SeekOrigin.Current));
+        Assert.Equal(0, this.underlyingStream.Position);
+        Assert.Throws<IOException>(() => this.stream.Seek(-1, SeekOrigin.Current));
+        Assert.Equal(0, this.underlyingStream.Position);
+
+        Assert.Equal(5, this.stream.Seek(5, SeekOrigin.Current));
+        Assert.Equal(5, this.underlyingStream.Position);
+        Assert.Equal(5, this.stream.Seek(0, SeekOrigin.Current));
+        Assert.Equal(5, this.underlyingStream.Position);
+        Assert.Equal(4, this.stream.Seek(-1, SeekOrigin.Current));
+        Assert.Equal(4, this.underlyingStream.Position);
+        Assert.Throws<IOException>(() => this.stream.Seek(-10, SeekOrigin.Current));
+        Assert.Equal(4, this.underlyingStream.Position);
+
+        Assert.Equal(0, this.stream.Seek(0, SeekOrigin.Begin));
+        Assert.Equal(0, this.stream.Position);
+
+        Assert.Equal(DefaultNestedLength + 1, this.stream.Seek(DefaultNestedLength + 1, SeekOrigin.Current));
+        Assert.Equal(DefaultNestedLength + 1, this.underlyingStream.Position);
+        Assert.Equal((2 * DefaultNestedLength) + 1, this.stream.Seek(DefaultNestedLength, SeekOrigin.Current));
+        Assert.Equal((2 * DefaultNestedLength) + 1, this.underlyingStream.Position);
+        Assert.Equal((2 * DefaultNestedLength) + 1, this.stream.Seek(0, SeekOrigin.Current));
+        Assert.Equal((2 * DefaultNestedLength) + 1, this.underlyingStream.Position);
+        Assert.Equal(1, this.stream.Seek(-2 * DefaultNestedLength, SeekOrigin.Current));
+        Assert.Equal(1, this.underlyingStream.Position);
+
         this.stream.Dispose();
         Assert.Throws<ObjectDisposedException>(() => this.stream.Seek(0, SeekOrigin.Begin));
+    }
+
+    [Fact]
+    public void Sook_WithNonStartPositionInUnderlyingStream()
+    {
+        this.underlyingStream.Position = 1;
+        this.stream = this.underlyingStream.ReadSlice(5);
+
+        Assert.Equal(0, this.stream.Position);
+        Assert.Equal(2, this.stream.Seek(2, SeekOrigin.Current));
+        Assert.Equal(3, this.underlyingStream.Position);
+    }
+
+    [Fact]
+    public void Seek_Begin()
+    {
+        Assert.Equal(0, this.stream.Position);
+        Assert.Throws<IOException>(() => this.stream.Seek(-1, SeekOrigin.Begin));
+        Assert.Equal(0, this.underlyingStream.Position);
+
+        Assert.Equal(0, this.stream.Seek(0, SeekOrigin.Begin));
+        Assert.Equal(0, this.underlyingStream.Position);
+
+        Assert.Equal(5, this.stream.Seek(5, SeekOrigin.Begin));
+        Assert.Equal(5, this.underlyingStream.Position);
+
+        Assert.Equal(DefaultNestedLength, this.stream.Seek(DefaultNestedLength, SeekOrigin.Begin));
+        Assert.Equal(DefaultNestedLength, this.underlyingStream.Position);
+
+        Assert.Equal(DefaultNestedLength + 1, this.stream.Seek(DefaultNestedLength + 1, SeekOrigin.Begin));
+        Assert.Equal(DefaultNestedLength + 1, this.underlyingStream.Position);
+
+        this.stream.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => this.stream.Seek(0, SeekOrigin.Begin));
+    }
+
+    [Fact]
+    public void Seek_End()
+    {
+        Assert.Equal(0, this.stream.Position);
+        Assert.Equal(9, this.stream.Seek(-1, SeekOrigin.End));
+        Assert.Equal(9, this.underlyingStream.Position);
+
+        Assert.Equal(DefaultNestedLength, this.stream.Seek(0, SeekOrigin.End));
+        Assert.Equal(DefaultNestedLength, this.underlyingStream.Position);
+
+        Assert.Equal(DefaultNestedLength + 5, this.stream.Seek(5, SeekOrigin.End));
+        Assert.Equal(DefaultNestedLength + 5, this.underlyingStream.Position);
+
+        Assert.Throws<IOException>(() => this.stream.Seek(-20, SeekOrigin.Begin));
+        Assert.Equal(DefaultNestedLength + 5, this.underlyingStream.Position);
+
+        this.stream.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => this.stream.Seek(0, SeekOrigin.End));
     }
 
     [Fact]
@@ -152,6 +284,21 @@ public class NestedStreamTests : TestBase
 
 #if SPAN_BUILTIN
         Assert.Equal(0, await this.stream.ReadAsync(Array.Empty<byte>(), default).AsTask().WithCancellation(this.TimeoutToken));
+#endif
+    }
+
+    [Fact]
+    public async Task Read_BeyondEndOfStream_ReturnsZero()
+    {
+        // Seek beyond the end of the stream
+        this.stream.Seek(1, SeekOrigin.End);
+
+        byte[] buffer = new byte[this.underlyingStream.Length];
+
+        Assert.Equal(0, await this.stream.ReadAsync(buffer, 0, buffer.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken));
+
+#if SPAN_BUILTIN
+        Assert.Equal(0, await this.stream.ReadAsync(buffer, this.TimeoutToken).AsTask().WithCancellation(this.TimeoutToken));
 #endif
     }
 
@@ -223,5 +370,47 @@ public class NestedStreamTests : TestBase
         Assert.Equal(firstBlockLength, await this.stream.ReadAsync(buffer, 0, buffer.Length));
         this.underlyingStream.SetLength(DefaultNestedLength * 2);
         Assert.Equal(DefaultNestedLength - firstBlockLength, await this.stream.ReadAsync(buffer, 0, buffer.Length));
+    }
+
+    [Fact]
+    public void Read_ValidatesArguments()
+    {
+        var buffer = new byte[20];
+
+        Assert.Throws<ArgumentNullException>(() => this.stream.Read(null!, 0, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => this.stream.Read(buffer, -1, buffer.Length));
+        Assert.Throws<ArgumentOutOfRangeException>(() => this.stream.Read(buffer, 0, -1));
+        Assert.Throws<ArgumentException>(() => this.stream.Read(buffer, 1, buffer.Length));
+    }
+
+    [Fact]
+    public async Task ReadAsync_ValidatesArguments()
+    {
+        var buffer = new byte[20];
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() => this.stream.ReadAsync(null!, 0, 0));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.stream.ReadAsync(buffer, -1, buffer.Length));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.stream.ReadAsync(buffer, 0, -1));
+        await Assert.ThrowsAsync<ArgumentException>(() => this.stream.ReadAsync(buffer, 1, buffer.Length));
+    }
+
+    [Fact]
+    public void Read_ThrowsIfDisposed()
+    {
+        this.stream.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => this.stream.Read(Array.Empty<byte>(), 0, 0));
+    }
+
+    [Fact]
+    public async Task ReadAsync_ThrowsIfDisposed()
+    {
+        this.stream.Dispose();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream.ReadAsync(Array.Empty<byte>(), 0, 0));
+
+#if SPAN_BUILTIN
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream.ReadAsync(Array.Empty<byte>(), default).AsTask());
+#endif
     }
 }

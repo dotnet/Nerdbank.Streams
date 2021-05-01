@@ -79,6 +79,15 @@ namespace Nerdbank.Streams {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Invalid seek origin..
+        /// </summary>
+        internal static string InvalidSeekOrigin {
+            get {
+                return ResourceManager.GetString("InvalidSeekOrigin", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to No channel with that ID found..
         /// </summary>
         internal static string NoChannelFoundById {
@@ -138,6 +147,24 @@ namespace Nerdbank.Streams {
         internal static string SeededChannelsRequireV3Protocol {
             get {
                 return ResourceManager.GetString("SeededChannelsRequireV3Protocol", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to An attempt was made to move the position before the beginning of the stream..
+        /// </summary>
+        internal static string SeekBeforeBegin {
+            get {
+                return ResourceManager.GetString("SeekBeforeBegin", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The underlying stream does not support seeking..
+        /// </summary>
+        internal static string SeekingNotSupported {
+            get {
+                return ResourceManager.GetString("SeekingNotSupported", resourceCulture);
             }
         }
     }
