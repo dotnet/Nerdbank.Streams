@@ -33,7 +33,7 @@
     "@types/jasmine": "^3.5.10",
     "@types/mkdirp": "^1.0.0",
     "@types/msgpack-lite": "^0.1.7",
-    "@types/node": "^14.0.27",
+    "@types/node": "^15.0.1",
     "@types/promise": "^7.1.30",
     "gulp": "^4.0.2",
     "gulp-typescript": "^6.0.0-alpha.1",
