@@ -55,14 +55,7 @@ namespace Nerdbank.Streams
         public override bool CanRead => !this.IsDisposed;
 
         /// <inheritdoc />
-        public override bool CanSeek
-        {
-            get
-            {
-                Verify.NotDisposed(this);
-                return this.underlyingStream.CanSeek;
-            }
-        }
+        public override bool CanSeek => !this.IsDisposed && this.underlyingStream.CanSeek;
 
         /// <inheritdoc />
         public override bool CanWrite => false;
