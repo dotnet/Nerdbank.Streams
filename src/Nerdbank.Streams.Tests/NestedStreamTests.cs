@@ -47,7 +47,7 @@ public class NestedStreamTests : TestBase
     {
         Assert.True(this.stream.CanSeek);
         this.stream.Dispose();
-        Assert.Throws<ObjectDisposedException>(() => this.stream.CanSeek);
+        Assert.False(this.stream.CanSeek);
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public class NestedStreamTests : TestBase
 
         Assert.False(stream.CanSeek);
         stream.Dispose();
-        Assert.Throws<ObjectDisposedException>(() => stream.CanSeek);
+        Assert.False(stream.CanSeek);
     }
 
     [Fact]
