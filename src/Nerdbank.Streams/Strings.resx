@@ -126,6 +126,12 @@
   <data name="InvalidSeekOrigin" xml:space="preserve">
     <value>Invalid seek origin.</value>
   </data>
+  <data name="ListeningHasAlreadyStarted" xml:space="preserve">
+    <value>This operation is only valid before listening has started.</value>
+  </data>
+  <data name="ListeningHasNotStarted" xml:space="preserve">
+    <value>This operation is only valid after listening has started.</value>
+  </data>
   <data name="NoChannelFoundById" xml:space="preserve">
     <value>No channel with that ID found.</value>
   </data>

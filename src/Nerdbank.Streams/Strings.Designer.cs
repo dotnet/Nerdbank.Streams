@@ -88,6 +88,24 @@ namespace Nerdbank.Streams {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to This operation is only valid before listening has started..
+        /// </summary>
+        internal static string ListeningHasAlreadyStarted {
+            get {
+                return ResourceManager.GetString("ListeningHasAlreadyStarted", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to This operation is only valid after listening has started..
+        /// </summary>
+        internal static string ListeningHasNotStarted {
+            get {
+                return ResourceManager.GetString("ListeningHasNotStarted", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to No channel with that ID found..
         /// </summary>
         internal static string NoChannelFoundById {

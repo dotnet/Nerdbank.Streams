@@ -826,6 +826,63 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         await acceptTask!.WithCancellation(this.TimeoutToken); // Rethrow any exceptions
     }
 
+    /// <summary>
+    /// Demonstrates the pattern by which one party can register for <see cref="MultiplexingStream.ChannelOffered"/> events
+    /// before listening has started and thus before a race condition with an incoming offer leads to the event being raised
+    /// before any handlers have been added.
+    /// </summary>
+    [Fact]
+    public async Task ChannelOffered_AlreadyOfferedByRemote()
+    {
+        (this.transport1, this.transport2) = FullDuplexStream.CreatePair(new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024));
+        var mx1Task = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion }, this.TimeoutToken);
+        var mx2Task = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, StartSuspended = true }, this.TimeoutToken);
+        using var mx1 = await mx1Task;
+        using var mx2 = await mx2Task;
+
+        MultiplexingStream.Channel ch1 = mx1.CreateChannel();
+        await Task.Delay(ExpectedTimeout); // simulate a slow receiving party
+        var invoked = new AsyncManualResetEvent();
+        mx2.ChannelOffered += (sender, args) => invoked.Set();
+        mx2.StartListening();
+        await invoked.WaitAsync(this.TimeoutToken);
+    }
+
+    [Fact]
+    public void StartListening_CalledWithoutStartSuspension()
+    {
+        Assert.Throws<InvalidOperationException>(this.mx1.StartListening);
+    }
+
+    [Fact]
+    public async Task StartListening_CalledTwice()
+    {
+        (this.transport1, this.transport2) = FullDuplexStream.CreatePair(new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024));
+        var mx1Task = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion }, this.TimeoutToken);
+        var mx2Task = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, StartSuspended = true }, this.TimeoutToken);
+        using var mx1 = await mx1Task;
+        using var mx2 = await mx2Task;
+
+        mx2.StartListening();
+        Assert.Throws<InvalidOperationException>(mx2.StartListening);
+    }
+
+    [Fact]
+    public async Task MessageSendingMethodsThrowBeforeListeningHasStarted()
+    {
+        (this.transport1, this.transport2) = FullDuplexStream.CreatePair(new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024));
+        var mx1Task = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion }, this.TimeoutToken);
+        var mx2Task = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, StartSuspended = true }, this.TimeoutToken);
+        using var mx1 = await mx1Task;
+        using var mx2 = await mx2Task;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => mx2.OfferChannelAsync(string.Empty, this.TimeoutToken));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => mx2.AcceptChannelAsync(string.Empty, this.TimeoutToken));
+        Assert.Throws<InvalidOperationException>(() => mx2.CreateChannel());
+        Assert.Throws<InvalidOperationException>(() => mx2.AcceptChannel(1));
+        Assert.Throws<InvalidOperationException>(() => mx2.RejectChannel(1));
+    }
+
     [Fact]
     public async Task ChannelAutoCloses_WhenBothEndsCompleteWriting()
     {
