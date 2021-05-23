@@ -95,6 +95,7 @@ public class MultiplexingStreamOptionsTests
             DefaultChannelTraceSourceFactoryWithQualifier = (id, name) => null,
             ProtocolMajorVersion = 1024,
             TraceSource = new TraceSource("test"),
+            StartSuspended = true,
             SeededChannels =
             {
                 new MultiplexingStream.ChannelOptions(),
@@ -108,6 +109,7 @@ public class MultiplexingStreamOptionsTests
         Assert.Equal(original.DefaultChannelTraceSourceFactoryWithQualifier, copy.DefaultChannelTraceSourceFactoryWithQualifier);
         Assert.Equal(original.ProtocolMajorVersion, copy.ProtocolMajorVersion);
         Assert.Equal(original.TraceSource, copy.TraceSource);
+        Assert.Equal(original.StartSuspended, copy.StartSuspended);
         Assert.NotSame(original.SeededChannels, copy.SeededChannels);
         Assert.Equal<MultiplexingStream.ChannelOptions>(original.SeededChannels, copy.SeededChannels);
     }
@@ -120,6 +122,8 @@ public class MultiplexingStreamOptionsTests
         Assert.Throws<InvalidOperationException>(() => frozen.DefaultChannelTraceSourceFactory = (id, name) => null);
         Assert.Throws<InvalidOperationException>(() => frozen.DefaultChannelTraceSourceFactoryWithQualifier = (id, name) => null);
         Assert.Throws<InvalidOperationException>(() => frozen.ProtocolMajorVersion = 5);
+        Assert.Throws<InvalidOperationException>(() => frozen.StartSuspended = true);
+        Assert.Throws<InvalidOperationException>(() => frozen.StartSuspended = false);
         Assert.Throws<InvalidOperationException>(() => frozen.TraceSource = new TraceSource("test"));
         Assert.Throws<NotSupportedException>(() => frozen.SeededChannels.Clear());
         Assert.Throws<NotSupportedException>(() => frozen.SeededChannels.Add(new MultiplexingStream.ChannelOptions()));
@@ -132,6 +136,7 @@ public class MultiplexingStreamOptionsTests
         var thawedOptions = new MultiplexingStream.Options(frozen);
         Assert.False(thawedOptions.IsFrozen);
         thawedOptions.ProtocolMajorVersion = 500;
+        thawedOptions.StartSuspended = true;
 
         Assert.False(thawedOptions.SeededChannels.IsReadOnly);
         thawedOptions.SeededChannels.Add(new MultiplexingStream.ChannelOptions());

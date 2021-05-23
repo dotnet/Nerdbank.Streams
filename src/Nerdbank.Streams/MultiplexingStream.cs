@@ -111,6 +111,11 @@ namespace Nerdbank.Streams
         private long lastOfferedChannelId;
 
         /// <summary>
+        /// A value indicating whether <see cref="StartListening"/> has been called.
+        /// </summary>
+        private bool listeningStarted;
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="MultiplexingStream"/> class.
         /// </summary>
         /// <param name="formatter">The formatter to use for the multiplexing frames.</param>
@@ -145,14 +150,23 @@ namespace Nerdbank.Streams
 
             this.lastOfferedChannelId += options.SeededChannels.Count;
 
-            // Initiate reading from the transport stream. This will not end until the stream does, or we're disposed.
-            // If reading the stream fails, we'll dispose ourselves.
-            this.DisposeSelfOnFailure(this.ReadStreamAsync());
+            if (!options.StartSuspended)
+            {
+                this.StartListening();
+            }
         }
 
         /// <summary>
         /// Occurs when the remote party offers to establish a channel.
         /// </summary>
+        /// <remarks>
+        /// When adding a handler to this event, consider whether the stream has already started listening
+        /// and you may have already missed some incoming events.
+        /// If you want to receive *all* events from the start,
+        /// be sure to create the <see cref="MultiplexingStream"/> with <see cref="Options.StartSuspended"/>
+        /// set to <see langword="true"/>, then add handler(s) to this event before calling
+        /// <see cref="StartListening"/>.
+        /// </remarks>
         public event EventHandler<ChannelOfferEventArgs>? ChannelOffered;
 
         private enum TraceEventId
@@ -326,6 +340,28 @@ namespace Nerdbank.Streams
         }
 
         /// <summary>
+        /// Starts reading from the stream.
+        /// </summary>
+        /// <remarks>
+        /// This should only be done once, on an instance created with <see cref="Options.StartSuspended"/> set to <see langword="true" />
+        /// and only after any required event handlers have been added so as to avoid a race where incoming messages lead to raising events
+        /// before handlers have been added.
+        /// </remarks>
+        public void StartListening()
+        {
+            Verify.NotDisposed(this);
+            if (this.listeningStarted)
+            {
+                throw new InvalidOperationException(Strings.ListeningHasAlreadyStarted);
+            }
+
+            // Initiate reading from the transport stream. This will not end until the stream does, or we're disposed.
+            // If reading the stream fails, we'll dispose ourselves.
+            this.DisposeSelfOnFailure(this.ReadStreamAsync());
+            this.listeningStarted = true;
+        }
+
+        /// <summary>
         /// Creates an anonymous channel that may be accepted by <see cref="AcceptChannel(int, ChannelOptions)"/>.
         /// Its existance must be communicated by other means (typically another, existing channel) to encourage acceptance.
         /// </summary>
@@ -338,6 +374,7 @@ namespace Nerdbank.Streams
         public Channel CreateChannel(ChannelOptions? options = default)
         {
             Verify.NotDisposed(this);
+            this.ThrowIfNotListening();
 
             var offerParameters = new Channel.OfferParameters(string.Empty, options?.ChannelReceivingWindowSize ?? this.DefaultChannelReceivingWindowSize);
             var payload = this.formatter.Serialize(offerParameters);
@@ -380,6 +417,9 @@ namespace Nerdbank.Streams
         public Channel AcceptChannel(ulong id, ChannelOptions? options = default)
 #pragma warning restore RS0026 // Do not add multiple public overloads with optional parameters
         {
+            Verify.NotDisposed(this);
+            this.ThrowIfNotListening();
+
             options = options ?? DefaultChannelOptions;
             Channel? channel;
             lock (this.syncObject)
@@ -411,6 +451,9 @@ namespace Nerdbank.Streams
         /// <exception cref="InvalidOperationException">Thrown if the channel was already accepted.</exception>
         public void RejectChannel(ulong id)
         {
+            Verify.NotDisposed(this);
+            this.ThrowIfNotListening();
+
             Channel? channel;
             lock (this.syncObject)
             {
@@ -471,6 +514,7 @@ namespace Nerdbank.Streams
 
             cancellationToken.ThrowIfCancellationRequested();
             Verify.NotDisposed(this);
+            this.ThrowIfNotListening();
 
             var offerParameters = new Channel.OfferParameters(name, options?.ChannelReceivingWindowSize ?? this.DefaultChannelReceivingWindowSize);
             var payload = this.formatter.Serialize(offerParameters);
@@ -523,6 +567,7 @@ namespace Nerdbank.Streams
         {
             Requires.NotNull(name, nameof(name));
             Verify.NotDisposed(this);
+            this.ThrowIfNotListening();
 
             options = options ?? DefaultChannelOptions;
 
@@ -1211,6 +1256,14 @@ namespace Nerdbank.Streams
 
             this.completionSource.TrySetException(exception);
             this.DisposeAsync().Forget();
+        }
+
+        private void ThrowIfNotListening()
+        {
+            if (!this.listeningStarted)
+            {
+                throw new InvalidOperationException(Strings.ListeningHasNotStarted);
+            }
         }
     }
 }

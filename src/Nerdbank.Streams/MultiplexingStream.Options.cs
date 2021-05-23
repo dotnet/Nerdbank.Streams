@@ -56,6 +56,11 @@ namespace Nerdbank.Streams
             private Func<QualifiedChannelId, string, TraceSource?>? defaultChannelTraceSourceFactoryWithQualifier;
 
             /// <summary>
+            /// Backing field for the <see cref="StartSuspended"/> property.
+            /// </summary>
+            private bool startSuspended;
+
+            /// <summary>
             /// Initializes a new instance of the <see cref="Options"/> class.
             /// </summary>
             public Options()
@@ -77,6 +82,7 @@ namespace Nerdbank.Streams
                 this.protocolMajorVersion = copyFrom.protocolMajorVersion;
                 this.defaultChannelTraceSourceFactory = copyFrom.defaultChannelTraceSourceFactory;
                 this.defaultChannelTraceSourceFactoryWithQualifier = copyFrom.defaultChannelTraceSourceFactoryWithQualifier;
+                this.startSuspended = copyFrom.startSuspended;
                 this.SeededChannels = copyFrom.SeededChannels.ToList();
             }
 
@@ -186,6 +192,26 @@ namespace Nerdbank.Streams
                 {
                     this.ThrowIfFrozen();
                     this.defaultChannelTraceSourceFactoryWithQualifier = value;
+                }
+            }
+
+            /// <summary>
+            /// Gets or sets a value indicating whether the <see cref="MultiplexingStream"/> should <em>not</em> start
+            /// reading from the stream immediately in order to provide time for the creator to add event handlers
+            /// such as <see cref="ChannelOffered"/>.
+            /// </summary>
+            /// <value>The default value is <see langword="false"/>.</value>
+            /// <remarks>
+            /// When set to <see langword="true" />, the owner must use <see cref="StartListening"/>
+            /// after attaching event handlers to actually being reading from the stream.
+            /// </remarks>
+            public bool StartSuspended
+            {
+                get => this.startSuspended;
+                set
+                {
+                    this.ThrowIfFrozen();
+                    this.startSuspended = value;
                 }
             }
 
