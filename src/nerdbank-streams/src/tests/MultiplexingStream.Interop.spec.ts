@@ -24,7 +24,7 @@ import { ChannelOptions } from "../ChannelOptions";
                     procExited = new Deferred<any>();
                     proc.once("error", (err) => procExited.resolve(err));
                     proc.once("exit", (code) => procExited.resolve(code));
-                    // proc.stdout.pipe(process.stdout);
+                    // proc.stdout!.pipe(process.stdout);
                     proc.stderr!.pipe(process.stderr);
                     expect(await procExited.promise).toEqual(0);
                 } finally {
