@@ -25,7 +25,7 @@ export function writeSubstream(stream: NodeJS.WritableStream): NodeJS.WritableSt
                 await writeAsync(stream, chunk);
                 callback();
             } catch (err) {
-                callback(err);
+                callback(err as Error);
             }
         },
         final(callback: (error?: Error | null) => void) {
