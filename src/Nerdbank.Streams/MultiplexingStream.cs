@@ -649,41 +649,54 @@ namespace Nerdbank.Streams
         /// <returns>A task that indicates when disposal is complete.</returns>
         public async ValueTask DisposeAsync()
         {
-            this.disposalTokenSource.Cancel();
-            this.completionSource.TrySetResult(null);
-            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+            if (this.disposalTokenSource.IsCancellationRequested)
             {
-                this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.StreamDisposed, "Disposing.");
+                return;
             }
 
-            await this.sendingSemaphore.WaitAsync().ConfigureAwait(false);
+            this.disposalTokenSource.Cancel();
             try
             {
-                await this.formatter.DisposeAsync().ConfigureAwait(false);
-            }
-            finally
-            {
-                this.sendingSemaphore.Release();
-            }
-
-            lock (this.syncObject)
-            {
-                foreach (var entry in this.openChannels)
+                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
                 {
-                    entry.Value.Dispose();
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.StreamDisposed, "Disposing.");
                 }
 
-                foreach (var entry in this.acceptingChannels)
+                await this.sendingSemaphore.WaitAsync().ConfigureAwait(false);
+                try
                 {
-                    foreach (var tcs in entry.Value)
+                    await this.formatter.DisposeAsync().ConfigureAwait(false);
+                }
+                finally
+                {
+                    this.sendingSemaphore.Release();
+                }
+
+                lock (this.syncObject)
+                {
+                    foreach (var entry in this.openChannels)
                     {
-                        tcs.TrySetCanceled();
+                        entry.Value.Dispose();
                     }
+
+                    foreach (var entry in this.acceptingChannels)
+                    {
+                        foreach (var tcs in entry.Value)
+                        {
+                            tcs.TrySetCanceled();
+                        }
+                    }
+
+                    this.openChannels.Clear();
+                    this.channelsOfferedByThemByName.Clear();
+                    this.acceptingChannels.Clear();
                 }
 
-                this.openChannels.Clear();
-                this.channelsOfferedByThemByName.Clear();
-                this.acceptingChannels.Clear();
+                this.completionSource.TrySetResult(null);
+            }
+            catch (Exception ex)
+            {
+                this.completionSource.TrySetException(ex);
             }
         }
 
