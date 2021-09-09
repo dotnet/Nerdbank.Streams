@@ -1071,7 +1071,7 @@ namespace Nerdbank.Streams
         {
             Requires.NotNull(channel, nameof(channel));
 
-            if (!this.Completion.IsCompleted)
+            if (!this.Completion.IsCompleted && !this.DisposalToken.IsCancellationRequested)
             {
                 if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
                 {
@@ -1130,6 +1130,8 @@ namespace Nerdbank.Streams
             await this.sendingSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
+                Verify.NotDisposed(this);
+
                 var qualifiedChannelId = header.RequiredChannelId;
                 lock (this.syncObject)
                 {
