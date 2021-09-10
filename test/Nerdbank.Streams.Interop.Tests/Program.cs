@@ -75,7 +75,7 @@ namespace Nerdbank.Streams.Interop.Tests
         {
             var channel = await this.mx.AcceptChannelAsync("clientOffer");
             var (r, w) = CreateStreamIO(channel);
-            string line = await r.ReadLineAsync();
+            string? line = await r.ReadLineAsync();
             await w.WriteLineAsync($"recv: {line}");
         }
 
@@ -85,7 +85,7 @@ namespace Nerdbank.Streams.Interop.Tests
             var (r, w) = CreateStreamIO(channel);
             await w.WriteLineAsync("theserver");
             w.Close();
-            string line = await r.ReadLineAsync();
+            string? line = await r.ReadLineAsync();
             Assumes.True(line == "recv: theserver");
             r.Close();
         }
@@ -94,7 +94,7 @@ namespace Nerdbank.Streams.Interop.Tests
         {
             var channel = this.mx.AcceptChannel(0);
             var (r, w) = CreateStreamIO(channel);
-            string line = await r.ReadLineAsync();
+            string? line = await r.ReadLineAsync();
             await w.WriteLineAsync($"recv: {line}");
         }
     }

@@ -2,12 +2,12 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp2.1</TargetFramework>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Nerdbank.Streams\Nerdbank.Streams.csproj" />
+    <ProjectReference Include="..\..\src\Nerdbank.Streams\Nerdbank.Streams.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -8,6 +8,6 @@ updates:
   schedule:
     interval: monthly
 - package-ecosystem: nuget
-  directory: /src
+  directory: /
   schedule:
     interval: monthly

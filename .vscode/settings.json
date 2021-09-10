@@ -10,5 +10,8 @@
     "**/.hg": true,
     "**/CVS": true,
     "**/.DS_Store": true
-  }
+  },
+  "omnisharp.enableEditorConfigSupport": true,
+  "omnisharp.enableImportCompletion": true,
+  "omnisharp.enableRoslynAnalyzers": true
 }

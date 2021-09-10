@@ -3,9 +3,6 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFrameworks>net5.0;net472</TargetFrameworks>
-    <IsPackable>false</IsPackable>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
-    <CodeAnalysisRuleSet>Nerdbank.Streams.Benchmark.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,6 +11,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Nerdbank.Streams\Nerdbank.Streams.csproj" />
+    <ProjectReference Include="..\..\src\Nerdbank.Streams\Nerdbank.Streams.csproj" />
   </ItemGroup>
 </Project>

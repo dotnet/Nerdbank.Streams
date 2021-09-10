@@ -7,7 +7,7 @@ import { ChannelOptions } from "../ChannelOptions";
 
 [1, 2, 3].forEach(protocolMajorVersion => {
     describe(`MultiplexingStream v${protocolMajorVersion} (interop) `, () => {
-        const projectPath = `${__dirname}/../../../Nerdbank.Streams.Interop.Tests`;
+        const projectPath = `${__dirname}/../../../../test/Nerdbank.Streams.Interop.Tests`;
         let mx: MultiplexingStream;
         let proc: ChildProcess | null;
         let procExited: Deferred<any>;
