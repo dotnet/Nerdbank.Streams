@@ -1,19 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;netcoreapp2.1;netcoreapp3.1</TargetFrameworks>
-    <SignAssembly>true</SignAssembly>
-    <AssemblyOriginatorKeyFile>..\release.snk</AssemblyOriginatorKeyFile>
-    <CodeAnalysisRuleSet>..\shipping.ruleset</CodeAnalysisRuleSet>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TargetFrameworks>netstandard2.0;netstandard2.1</TargetFrameworks>
     <DefineConstants>$(DefineConstants);MESSAGEPACK_INTERNAL;CSHARP8</DefineConstants>
 
     <Summary>Streams for full duplex in-proc communication, wrap a WebSocket, split a stream into multiple channels, etc.</Summary>
     <Description>$(Summary)</Description>
-    <Company>Andrew Arnott</Company>
-    <Authors>Andrew Arnott</Authors>
-    <PackageProjectUrl>https://github.com/AArnott/Nerdbank.Streams</PackageProjectUrl>
-    <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
     <PackageTags>Stream full-duplex websocket multiplexing</PackageTags>
   </PropertyGroup>
 

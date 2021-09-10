@@ -20,6 +20,8 @@ using Xunit.Abstractions;
 
 public abstract class TestBase : IDisposable
 {
+    internal static readonly bool IsMono = Type.GetType("Mono.Runtime") is Type;
+
     protected static readonly TimeSpan ExpectedTimeout = TimeSpan.FromMilliseconds(200);
 
     protected static readonly TimeSpan UnexpectedTimeout = Debugger.IsAttached ? Timeout.InfiniteTimeSpan : TimeSpan.FromSeconds(10);
@@ -177,6 +179,11 @@ public abstract class TestBase : IDisposable
         Requires.NotNullOrEmpty(testMethodName, nameof(testMethodName));
 
 #if NETFRAMEWORK
+        if (IsMono)
+        {
+            return Task.FromException<bool>(new SkipException("Test isolation is not yet supported on this mono."));
+        }
+
         const string testHostProcessName = "IsolatedTestHost.exe";
         if (Process.GetCurrentProcess().ProcessName == Path.GetFileNameWithoutExtension(testHostProcessName))
         {

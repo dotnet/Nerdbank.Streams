@@ -64,7 +64,7 @@ namespace Nerdbank.Streams
 
         /// <inheritdoc/>
         public
-#if NETCOREAPP3_1
+#if NETSTANDARD2_1_OR_GREATER
 new // https://github.com/dotnet/csharplang/issues/3613: There's no way to *override* the base method without a binary breaking change from changing the return type on this method.
 #endif
         Task DisposeAsync() => this.DisposeAsync(CancellationToken.None).AsTask();

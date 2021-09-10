@@ -27,7 +27,7 @@ internal class XunitTraceListener : TraceListener
     /// </summary>
     public Encoding? DataEncoding { get; set; }
 
-    public override unsafe void TraceData(TraceEventCache eventCache, string source, TraceEventType eventType, int id, object data)
+    public override unsafe void TraceData(TraceEventCache? eventCache, string source, TraceEventType eventType, int id, object? data)
     {
         if (data is ReadOnlySequence<byte> sequence)
         {
@@ -105,9 +105,9 @@ internal class XunitTraceListener : TraceListener
         }
     }
 
-    public override void Write(string message) => this.lineInProgress.Append(message);
+    public override void Write(string? message) => this.lineInProgress.Append(message);
 
-    public override void WriteLine(string message)
+    public override void WriteLine(string? message)
     {
         if (!this.disposed)
         {

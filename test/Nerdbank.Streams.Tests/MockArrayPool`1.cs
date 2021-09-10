@@ -30,7 +30,7 @@ internal class MockArrayPool<T> : ArrayPool<T>
         }
 
         minBufferSize = (int)(minBufferSize * this.MinArraySizeFactor);
-        T[] result = this.Contents.FirstOrDefault(a => a.Length >= minBufferSize);
+        T[]? result = this.Contents.FirstOrDefault(a => a.Length >= minBufferSize);
 
         if (result == null)
         {

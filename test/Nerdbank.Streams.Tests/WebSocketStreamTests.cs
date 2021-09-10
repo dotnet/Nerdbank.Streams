@@ -300,7 +300,7 @@ public partial class WebSocketStreamTests : TestBase
                             break;
                         }
 
-                        if (response.Count == 3 && Enumerable.SequenceEqual(CloseRequestMessage, buffer.Array.Take(3)))
+                        if (response.Count == 3 && Enumerable.SequenceEqual(CloseRequestMessage, buffer.Array!.Take(3)))
                         {
                             await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Close requested by special message", context.RequestAborted);
                             break;

@@ -1,11 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net472;netcoreapp2.1;netcoreapp3.1</TargetFrameworks>
-    <IsPackable>false</IsPackable>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TargetFrameworks>net5.0;netcoreapp3.1;net472</TargetFrameworks>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    <CodeAnalysisRuleSet>..\tests.ruleset</CodeAnalysisRuleSet>
     <RootNamespace />
 
     <!-- https://github.com/tonerdo/coverlet -->
@@ -16,7 +12,7 @@
     <Exclude>[xunit.*]*,[IsolatedTestHost]*</Exclude>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\Nerdbank.Streams\Utilities.cs" Link="Utilities.cs" />
+    <Compile Include="..\..\src\Nerdbank.Streams\Utilities.cs" Link="Utilities.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.VisualStudio.Threading" Version="16.10.56" />
@@ -38,6 +34,6 @@
     <ProjectReference Include="..\IsolatedTestHost\IsolatedTestHost.csproj" Condition=" '$(TargetFramework)' != 'netcoreapp1.0' ">
       <Private>true</Private>
     </ProjectReference>
-    <ProjectReference Include="..\Nerdbank.Streams\Nerdbank.Streams.csproj" />
+    <ProjectReference Include="..\..\src\Nerdbank.Streams\Nerdbank.Streams.csproj" />
   </ItemGroup>
 </Project>

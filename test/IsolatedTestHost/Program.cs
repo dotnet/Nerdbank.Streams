@@ -58,13 +58,13 @@ namespace IsolatedTestHost
                 return ExitCodes.AssemblyNotFound;
             }
 
-            Type testClass = assembly.GetType(testClassName);
+            Type? testClass = assembly.GetType(testClassName);
             if (testClass == null)
             {
                 return ExitCodes.TestClassNotFound;
             }
 
-            MethodInfo testMethod = testClass.GetRuntimeMethod(testMethodName, Type.EmptyTypes);
+            MethodInfo? testMethod = testClass.GetRuntimeMethod(testMethodName, Type.EmptyTypes);
             if (testMethod == null)
             {
                 return ExitCodes.TestMethodNotFound;
@@ -112,7 +112,7 @@ namespace IsolatedTestHost
                 var asyncLifetime = testClassInstance as IAsyncLifetime;
                 asyncLifetime?.InitializeAsync().GetAwaiter().GetResult();
 
-                object result = testMethod.Invoke(testClassInstance, Type.EmptyTypes);
+                object? result = testMethod.Invoke(testClassInstance, Type.EmptyTypes);
                 if (result is Task resultTask)
                 {
                     resultTask.GetAwaiter().GetResult();
