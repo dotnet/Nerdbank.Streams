@@ -5,10 +5,8 @@ namespace Nerdbank.Streams
 {
     using System;
     using System.Buffers;
-    using System.Collections.Generic;
     using System.IO;
     using System.IO.Pipelines;
-    using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
     using MessagePack;
@@ -37,7 +35,18 @@ namespace Nerdbank.Streams
 
             protected PipeWriter PipeWriter { get; }
 
-            public virtual ValueTask DisposeAsync() => this.PipeWriter.CompleteAsync();
+            protected bool IsDisposed { get; private set; }
+
+            public virtual ValueTask DisposeAsync()
+            {
+                if (this.IsDisposed)
+                {
+                    return default;
+                }
+
+                this.IsDisposed = true;
+                return this.PipeWriter.CompleteAsync();
+            }
 
             /// <summary>
             /// Writes the initial handshake.
@@ -148,6 +157,11 @@ namespace Nerdbank.Streams
 
             public override ValueTask DisposeAsync()
             {
+                if (this.IsDisposed)
+                {
+                    return default;
+                }
+
                 this.stream.Dispose();
                 return base.DisposeAsync();
             }
@@ -186,6 +200,8 @@ namespace Nerdbank.Streams
 
             internal override void WriteFrame(FrameHeader header, ReadOnlySequence<byte> payload)
             {
+                Verify.NotDisposed(!this.IsDisposed, this);
+
                 var span = this.PipeWriter.GetSpan(checked(HeaderLength + (int)payload.Length));
                 span[0] = (byte)header.Code;
                 Utilities.Write(span.Slice(1, 4), checked((int)(header.ChannelId?.Id ?? 0)));
@@ -272,7 +288,6 @@ namespace Nerdbank.Streams
             private static readonly Version ProtocolVersion = new Version(2, 0);
             private readonly MessagePackStreamReader reader;
             private readonly AsyncSemaphore readingSemaphore = new AsyncSemaphore(1);
-            private bool isDisposed;
 
             internal V2Formatter(PipeWriter writer, Stream readingStream)
                 : base(writer)
@@ -282,7 +297,7 @@ namespace Nerdbank.Streams
 
             public override async ValueTask DisposeAsync()
             {
-                if (this.isDisposed)
+                if (this.IsDisposed)
                 {
                     return;
                 }
@@ -295,7 +310,6 @@ namespace Nerdbank.Streams
                 }
 
                 await base.DisposeAsync().ConfigureAwait(false);
-                this.isDisposed = true;
             }
 
             internal override object? WriteHandshake()
@@ -339,6 +353,8 @@ namespace Nerdbank.Streams
 
             internal override void WriteFrame(FrameHeader header, ReadOnlySequence<byte> payload)
             {
+                Verify.NotDisposed(!this.IsDisposed, this);
+
                 var writer = new MessagePackWriter(this.PipeWriter);
 
                 int elementCount = !payload.IsEmpty ? 3 : header.ChannelId.HasValue ? 2 : 1;
@@ -565,6 +581,8 @@ namespace Nerdbank.Streams
 
             internal override void WriteFrame(FrameHeader header, ReadOnlySequence<byte> payload)
             {
+                Verify.NotDisposed(!this.IsDisposed, this);
+
                 var writer = new MessagePackWriter(this.PipeWriter);
 
                 int elementCount = !payload.IsEmpty ? 4 : header.ChannelId.HasValue ? 3 : 1;
