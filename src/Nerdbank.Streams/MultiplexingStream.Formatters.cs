@@ -143,27 +143,34 @@ namespace Nerdbank.Streams
             /// </summary>
             private static readonly byte[] ProtocolMagicNumber = new byte[] { 0x2f, 0xdf, 0x1d, 0x50 };
             private static readonly Version ProtocolVersion = new Version(1, 0);
-            private readonly Stream stream;
+            private readonly Stream readingStream;
+            private readonly AsyncSemaphore readingSemaphore = new AsyncSemaphore(1);
             private readonly Memory<byte> headerBuffer = new byte[HeaderLength];
             private readonly Memory<byte> payloadBuffer = new byte[FramePayloadMaxLength];
 
             internal V1Formatter(PipeWriter writer, Stream readingStream)
                 : base(writer)
             {
-                this.stream = readingStream;
+                this.readingStream = readingStream;
             }
 
             private static int HeaderLength => sizeof(ControlCode) + sizeof(int) + sizeof(short);
 
-            public override ValueTask DisposeAsync()
+            public override async ValueTask DisposeAsync()
             {
                 if (this.IsDisposed)
                 {
-                    return default;
+                    return;
                 }
 
-                this.stream.Dispose();
-                return base.DisposeAsync();
+                // Take care to never dispose the Stream while we're reading it,
+                // since that can lead to memory corruption and other random exceptions.
+                using (await this.readingSemaphore.EnterAsync().ConfigureAwait(false))
+                {
+                    this.readingStream.Dispose();
+                }
+
+                await base.DisposeAsync().ConfigureAwait(false);
             }
 
             internal override object WriteHandshake()
@@ -183,7 +190,10 @@ namespace Nerdbank.Streams
                 var randomSendBuffer = writeHandshakeResult as byte[] ?? throw new ArgumentException("This should be the result of a prior call to " + nameof(this.WriteHandshake), nameof(writeHandshakeResult));
 
                 var handshakeBytes = new byte[ProtocolMagicNumber.Length + 16];
-                await this.stream.ReadBlockOrThrowAsync(handshakeBytes, cancellationToken).ConfigureAwait(false);
+                using (await this.readingSemaphore.EnterAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    await this.readingStream.ReadBlockOrThrowAsync(handshakeBytes, cancellationToken).ConfigureAwait(false);
+                }
 
                 // Verify that the magic number matches.
                 for (int i = 0; i < ProtocolMagicNumber.Length; i++)
@@ -219,20 +229,24 @@ namespace Nerdbank.Streams
 
             internal override async Task<(FrameHeader, ReadOnlySequence<byte>)?> ReadFrameAsync(CancellationToken cancellationToken)
             {
-                if (!await ReadToFillAsync(this.stream, this.headerBuffer, throwOnEmpty: false, cancellationToken).ConfigureAwait(false))
+                using (await this.readingSemaphore.EnterAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    return null;
+                    Verify.NotDisposed(!this.IsDisposed, this);
+                    if (!await ReadToFillAsync(this.readingStream, this.headerBuffer, throwOnEmpty: false, cancellationToken).ConfigureAwait(false))
+                    {
+                        return null;
+                    }
+
+                    var header = this.CreateFrameHeader(
+                        (ControlCode)this.headerBuffer.Span[0],
+                        checked((ulong)Utilities.ReadInt(this.headerBuffer.Span.Slice(1, 4))),
+                        null);
+
+                    int framePayloadLength = Utilities.ReadInt(this.headerBuffer.Span.Slice(5, 2));
+                    var payloadBuffer = this.payloadBuffer.Slice(0, framePayloadLength);
+                    await ReadToFillAsync(this.readingStream, payloadBuffer, throwOnEmpty: true, cancellationToken).ConfigureAwait(false);
+                    return (header, new ReadOnlySequence<byte>(payloadBuffer));
                 }
-
-                var header = this.CreateFrameHeader(
-                    (ControlCode)this.headerBuffer.Span[0],
-                    checked((ulong)Utilities.ReadInt(this.headerBuffer.Span.Slice(1, 4))),
-                    null);
-
-                int framePayloadLength = Utilities.ReadInt(this.headerBuffer.Span.Slice(5, 2));
-                var payloadBuffer = this.payloadBuffer.Slice(0, framePayloadLength);
-                await ReadToFillAsync(this.stream, payloadBuffer, throwOnEmpty: true, cancellationToken).ConfigureAwait(false);
-                return (header, new ReadOnlySequence<byte>(payloadBuffer));
             }
 
             internal override long DeserializeContentProcessed(ReadOnlySequence<byte> payload)
@@ -385,6 +399,7 @@ namespace Nerdbank.Streams
             {
                 using (await this.readingSemaphore.EnterAsync(cancellationToken).ConfigureAwait(false))
                 {
+                    Verify.NotDisposed(!this.IsDisposed, this);
                     var frameSequence = await this.reader.ReadAsync(cancellationToken).ConfigureAwait(false);
                     if (frameSequence is null)
                     {
