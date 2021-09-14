@@ -26,11 +26,18 @@ public abstract class TestBase : IDisposable
 
     private const bool WriteTestOutputToFile = false;
 
+    /// <summary>
+    /// Provides a unique number for each test that can be included in the log message.
+    /// </summary>
+    /// <remarks>
+    /// Test logs can get misattributed to the wrong test, and prefixing each logged message with a number makes this detectable.
+    /// See <see href="https://github.com/microsoft/vstest/issues/3047">this bug</see>.
+    /// </remarks>
+    private static int testCounter;
+
     private readonly ProcessJobTracker processJobTracker = new ProcessJobTracker();
 
     private readonly CancellationTokenSource timeoutTokenSource;
-
-    private readonly Stopwatch testStopwatch;
 
     private readonly Random random = new Random();
 
@@ -39,21 +46,24 @@ public abstract class TestBase : IDisposable
     protected TestBase(ITestOutputHelper logger)
     {
         this.Logger = WriteTestOutputToFile ? new FileLogger($@"d:\temp\test.{DateTime.Now:HH-mm-ss.ff}.log", logger) : logger;
-        this.testStopwatch = Stopwatch.StartNew();
         this.timeoutTokenSource = new CancellationTokenSource(TestTimeout);
         this.timeoutLoggerRegistration = this.timeoutTokenSource.Token.Register(() => logger.WriteLine("**Timeout token signaled** (Time index: {0:HH:mm:ss.ff}, Elapsed: {1})", DateTime.Now, this.ElapsedTime));
     }
 
     public static CancellationToken ExpectedTimeoutToken => new CancellationTokenSource(ExpectedTimeout).Token;
 
+    protected int TestId { get; } = Interlocked.Increment(ref testCounter);
+
     protected ITestOutputHelper Logger { get; }
 
     protected CancellationToken TimeoutToken => Debugger.IsAttached ? CancellationToken.None : this.timeoutTokenSource.Token;
 
+    protected TimeSpan ElapsedTime => this.TestTimer.Elapsed;
+
     /// <summary>
-    /// Gets the time the test has been running since its timeout timer started.
+    /// Gets a <see cref="Stopwatch"/> that started when the test class was instantiated.
     /// </summary>
-    protected TimeSpan ElapsedTime => this.testStopwatch.Elapsed;
+    protected Stopwatch TestTimer { get; } = Stopwatch.StartNew();
 
     private static TimeSpan TestTimeout => UnexpectedTimeout;
 
@@ -375,7 +385,7 @@ public abstract class TestBase : IDisposable
     {
         if (disposing)
         {
-            this.testStopwatch.Stop();
+            this.TestTimer.Stop();
             this.timeoutLoggerRegistration.Dispose();
             this.processJobTracker.Dispose();
             (this.Logger as IDisposable)?.Dispose();

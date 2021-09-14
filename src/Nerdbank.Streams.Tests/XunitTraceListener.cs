@@ -10,13 +10,16 @@ using Xunit.Abstractions;
 internal class XunitTraceListener : TraceListener
 {
     private readonly ITestOutputHelper logger;
+    private readonly int testId;
     private readonly StringBuilder lineInProgress = new StringBuilder();
-    private readonly Stopwatch testRuntime = Stopwatch.StartNew();
+    private readonly Stopwatch testRuntime;
     private bool disposed;
 
-    internal XunitTraceListener(ITestOutputHelper logger)
+    internal XunitTraceListener(ITestOutputHelper logger, int testId, Stopwatch testTime)
     {
         this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.testId = testId;
+        this.testRuntime = testTime;
     }
 
     public override bool IsThreadSafe => false;
@@ -111,7 +114,7 @@ internal class XunitTraceListener : TraceListener
     {
         if (!this.disposed)
         {
-            this.logger.WriteLine($"{this.testRuntime.Elapsed} {this.lineInProgress}{message}");
+            this.logger.WriteLine($"[{this.testId,4} {this.testRuntime.Elapsed.TotalSeconds:00.00}] {this.lineInProgress}{message}");
             this.lineInProgress.Clear();
         }
     }
