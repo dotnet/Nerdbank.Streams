@@ -42,14 +42,14 @@ public class MultiplexingStreamSeededChannelTests : TestBase, IAsyncLifetime
         var mx1TraceSource = new TraceSource(nameof(this.mx1), SourceLevels.All);
         var mx2TraceSource = new TraceSource(nameof(this.mx2), SourceLevels.All);
 
-        mx1TraceSource.Listeners.Add(new XunitTraceListener(this.Logger));
-        mx2TraceSource.Listeners.Add(new XunitTraceListener(this.Logger));
+        mx1TraceSource.Listeners.Add(new XunitTraceListener(this.Logger, this.TestId, this.TestTimer));
+        mx2TraceSource.Listeners.Add(new XunitTraceListener(this.Logger, this.TestId, this.TestTimer));
 
         Func<string, MultiplexingStream.QualifiedChannelId, string, TraceSource> traceSourceFactory = (string mxInstanceName, MultiplexingStream.QualifiedChannelId id, string name) =>
         {
             var traceSource = new TraceSource(mxInstanceName + " channel " + id, SourceLevels.All);
             traceSource.Listeners.Clear(); // remove DefaultTraceListener
-            traceSource.Listeners.Add(new XunitTraceListener(this.Logger));
+            traceSource.Listeners.Add(new XunitTraceListener(this.Logger, this.TestId, this.TestTimer));
             return traceSource;
         };
 
