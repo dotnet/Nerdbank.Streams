@@ -788,7 +788,7 @@ namespace Nerdbank.Streams
         {
             try
             {
-                while (!this.Completion.IsCompleted)
+                while (!this.DisposalToken.IsCancellationRequested)
                 {
                     if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
                     {
