@@ -1,28 +1,19 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;netcoreapp2.1;netcoreapp3.1</TargetFrameworks>
-    <SignAssembly>true</SignAssembly>
-    <AssemblyOriginatorKeyFile>..\release.snk</AssemblyOriginatorKeyFile>
-    <CodeAnalysisRuleSet>..\shipping.ruleset</CodeAnalysisRuleSet>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TargetFrameworks>netstandard2.0;netstandard2.1</TargetFrameworks>
     <DefineConstants>$(DefineConstants);MESSAGEPACK_INTERNAL;CSHARP8</DefineConstants>
 
     <Summary>Streams for full duplex in-proc communication, wrap a WebSocket, split a stream into multiple channels, etc.</Summary>
     <Description>$(Summary)</Description>
-    <Company>Andrew Arnott</Company>
-    <Authors>Andrew Arnott</Authors>
-    <PackageProjectUrl>https://github.com/AArnott/Nerdbank.Streams</PackageProjectUrl>
-    <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
     <PackageTags>Stream full-duplex websocket multiplexing</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="5.0.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.3.2" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.VisualStudio.Threading" Version="16.9.60" PrivateAssets="build;analyzers;compile" />
-    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="16.9.60" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.VisualStudio.Validation" Version="16.8.33" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading" Version="16.10.56" PrivateAssets="build;analyzers;compile" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="16.10.56" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.VisualStudio.Validation" Version="16.10.34" />
     <PackageReference Include="System.IO.Pipelines" Version="5.0.1" />
     <PackageReference Include="System.Net.WebSockets" Version="4.3.0" />
     <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="5.0.0" />

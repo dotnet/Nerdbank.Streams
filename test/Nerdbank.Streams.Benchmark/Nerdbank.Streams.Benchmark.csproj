@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net5.0;net472</TargetFrameworks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet.Diagnostics.Windows" Version="0.13.1" />
+    <PackageReference Include="BenchmarkDotNet" Version="0.13.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Nerdbank.Streams\Nerdbank.Streams.csproj" />
+  </ItemGroup>
+</Project>

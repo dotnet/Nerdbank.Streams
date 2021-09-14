@@ -7,7 +7,7 @@ import { ChannelOptions } from "../ChannelOptions";
 
 [1, 2, 3].forEach(protocolMajorVersion => {
     describe(`MultiplexingStream v${protocolMajorVersion} (interop) `, () => {
-        const projectPath = `${__dirname}/../../../Nerdbank.Streams.Interop.Tests`;
+        const projectPath = `${__dirname}/../../../../test/Nerdbank.Streams.Interop.Tests`;
         let mx: MultiplexingStream;
         let proc: ChildProcess | null;
         let procExited: Deferred<any>;
@@ -24,7 +24,7 @@ import { ChannelOptions } from "../ChannelOptions";
                     procExited = new Deferred<any>();
                     proc.once("error", (err) => procExited.resolve(err));
                     proc.once("exit", (code) => procExited.resolve(code));
-                    // proc.stdout.pipe(process.stdout);
+                    // proc.stdout!.pipe(process.stdout);
                     proc.stderr!.pipe(process.stderr);
                     expect(await procExited.promise).toEqual(0);
                 } finally {
