@@ -1258,7 +1258,7 @@ namespace Nerdbank.Streams
 
         private void Fault(Exception exception)
         {
-            if (exception is ObjectDisposedException && this.Completion.IsCompleted)
+            if (exception is ObjectDisposedException && this.DisposalToken.IsCancellationRequested)
             {
                 // We're already disposed. Nothing more to do.
                 return;
