@@ -24,9 +24,9 @@
     js-tokens "^4.0.0"
 
 "@types/jasmine@^3.8.2":
-  version "3.9.0"
-  resolved "https://registry.yarnpkg.com/@types/jasmine/-/jasmine-3.9.0.tgz#0118a74c447a580035406521c2600b22f28db4d4"
-  integrity sha512-x7aAO0c4EpBEJkUd/v012GLO7tDXXtv+t7Cz5xK+WdSmitH27eHgsQr+36CblfJFuqBQ0++O0xgBTuaKJnB4fg==
+  version "3.9.1"
+  resolved "https://registry.yarnpkg.com/@types/jasmine/-/jasmine-3.9.1.tgz#94c65ee8bf9d24d9e1d84abaed57b6e0da8b49de"
+  integrity sha512-PVpjh8S8lqKFKurWSKdFATlfBHGPzgy0PoDdzQ+rr78jTQ0aacyh9YndzZcAUPxhk4kRujItFFGQdUJ7flHumw==
 
 "@types/mkdirp@^1.0.2":
   version "1.0.2"
@@ -1666,9 +1666,9 @@ nanomatch@^1.2.9:
     to-regex "^3.0.1"
 
 nerdbank-gitversioning@^3.4.231:
-  version "3.4.231"
-  resolved "https://registry.yarnpkg.com/nerdbank-gitversioning/-/nerdbank-gitversioning-3.4.231.tgz#0bcadf6101c6687e8d245d5dade49c87abadf8e0"
-  integrity sha512-uuec/yV/n9OfM1iMxqP66MyOuZZ4Q6kAujyTjJQ9Z5wOF9GSmX97RM8ElFvPBbmwOFiGqOblt3t4V2WbWhMDuQ==
+  version "3.4.240"
+  resolved "https://registry.yarnpkg.com/nerdbank-gitversioning/-/nerdbank-gitversioning-3.4.240.tgz#ab19cb597ab7484ba8671ee334e4e19167a8dc55"
+  integrity sha512-NfMIwSP7gHCF0QqgLRKZYL0b0p/O37+gJY5M6aQAsGZVGVHnsD2Ip7cdnHXSjAas6HOckY73frwIEmX8fIIUcA==
   dependencies:
     camel-case "^4.1.1"
 
@@ -2481,9 +2481,9 @@ typedarray@^0.0.6:
   integrity sha1-hnrHTjhkGHsdPUfZlqeOxciDB3c=
 
 typescript@^4.3.5:
-  version "4.4.2"
-  resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.4.2.tgz#6d618640d430e3569a1dfb44f7d7e600ced3ee86"
-  integrity sha512-gzP+t5W4hdy4c+68bfcv0t400HVJMMd2+H9B7gae1nQlBzCqvrXX+6GL/b3GAgyTH966pzrZ70/fRjwAtZksSQ==
+  version "4.4.3"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.4.3.tgz#bdc5407caa2b109efd4f82fe130656f977a29324"
+  integrity sha512-4xfscpisVgqqDfPaJo5vkd+Qd/ItkoagnHpufr+i2QCHBsNYp+G7UAoyFl8aPtx879u38wPV65rZ8qbGZijalA==
 
 unc-path-regex@^0.1.2:
   version "0.1.2"

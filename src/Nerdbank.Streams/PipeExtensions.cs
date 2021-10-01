@@ -235,7 +235,9 @@ namespace Nerdbank.Streams
             //                            we can return a decorated PipeReader/PipeWriter that calls us from its Complete method directly.
 #pragma warning disable CS0618 // Type or member is obsolete
             PipeWriter? output = stream.CanWrite ? stream.UsePipeWriter(pipeOptions, cancellationToken) : null;
+#pragma warning disable VSTHRD110 // Observe result of async calls - https://github.com/microsoft/vs-threading/issues/899
             PipeReader? input = stream.CanRead ? stream.UsePipeReader(sizeHint, pipeOptions, output?.WaitForReaderCompletionAsync(), cancellationToken) : null;
+#pragma warning restore VSTHRD110 // Observe result of async calls
 
             Task? closeStreamAntecedent;
             if (input != null && output != null)
