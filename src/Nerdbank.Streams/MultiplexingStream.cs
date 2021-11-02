@@ -298,7 +298,9 @@ namespace Nerdbank.Streams
                 throw new NotSupportedException(Strings.SeededChannelsRequireV3Protocol);
             }
 
-            var streamWriter = stream.UsePipeWriter(cancellationToken: cancellationToken);
+            // Do NOT specify our own cancellationToken parameter in UsePipeWriter, since this PipeWriter
+            // must outlive this method and therefore should not be canceled later if that token is eventually canceled.
+            var streamWriter = stream.UsePipeWriter(cancellationToken: CancellationToken.None);
 
             var formatter = options.ProtocolMajorVersion switch
             {
