@@ -308,6 +308,25 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
+    public async Task CreateAsync_CancellationToken()
+    {
+        var cts = new CancellationTokenSource();
+        var streamPair = FullDuplexStream.CreatePair();
+        Task<MultiplexingStream> mx1Task = MultiplexingStream.CreateAsync(streamPair.Item1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion }, cts.Token);
+        Task<MultiplexingStream> mx2Task = MultiplexingStream.CreateAsync(streamPair.Item2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion }, CancellationToken.None);
+        MultiplexingStream mx1 = await mx1Task;
+        MultiplexingStream mx2 = await mx2Task;
+
+        // At this point the cancellation token really shouldn't have any effect on mx1 now that the connection is established.
+        cts.Cancel();
+
+        Task<MultiplexingStream.Channel> ch1Task = mx1.OfferChannelAsync(string.Empty, this.TimeoutToken);
+        Task<MultiplexingStream.Channel> ch2Task = mx2.AcceptChannelAsync(string.Empty, this.TimeoutToken);
+
+        await Task.WhenAll(ch1Task, ch2Task).WithCancellation(this.TimeoutToken);
+    }
+
+    [Fact]
     public async Task CreateChannelAsync()
     {
         await this.EstablishChannelStreamsAsync("a");
