@@ -561,9 +561,18 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         }
     }
 
-    public onChannelDisposed(channel: ChannelClass) {
+    public async onChannelDisposed(channel: ChannelClass) {
         if (!this._completionSource.isCompleted) {
-            this.sendFrame(ControlCode.ChannelTerminated, channel.qualifiedId);
+            try {
+                await this.sendFrame(ControlCode.ChannelTerminated, channel.qualifiedId);
+            } catch (err) {
+                // Swallow exceptions thrown about channel disposal if the whole stream has been taken down.
+                if (this.isDisposed) {
+                    return;
+                }
+
+                throw err;
+            }
         }
     }
 
