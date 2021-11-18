@@ -240,7 +240,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 
     /**
      * Offers a new, named channel to the remote party so they may accept it with
-     * [acceptChannelAsync](#acceptChannelAsync).
+     * {@link acceptChannelAsync}.
      * @param name A name for the channel, which must be accepted on the remote end to complete creation.
      * It need not be unique, and may be empty but must not be null.
      * Any characters are allowed, and max length is determined by the maximum frame payload (based on UTF-8 encoding).
