@@ -1,6 +1,9 @@
 parameters:
-  windowsPool: Hosted Windows 2019 with VS2019
-  includeMacOS:
+- name: windowsPool
+  type: object
+  default:
+    vmImage: windows-2022
+- name: includeMacOS
 
 jobs:
 - job: Windows
@@ -11,7 +14,7 @@ jobs:
     submodules: true
   - template: install-dependencies.yml
 
-  - powershell: '& (./azure-pipelines/Get-nbgv.ps1) cloud'
+  - powershell: '& (./azure-pipelines/Get-nbgv.ps1) cloud -c'
     displayName: Set build number
 
   - template: dotnet.yml
