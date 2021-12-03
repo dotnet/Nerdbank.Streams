@@ -4,15 +4,15 @@ import { Deferred } from "./Deferred";
 import { IDisposableObservable } from "./IDisposableObservable";
 
 export async function writeAsync(stream: NodeJS.WritableStream, chunk: any) {
-    const deferred = new Deferred<void>();
-    stream.write(chunk, (err: Error | null | undefined) => {
-        if (err) {
-            deferred.reject(err);
-        } else {
-            deferred.resolve();
-        }
+    return new Promise<void>((resolve, reject) => {
+        stream.write(chunk, (err: Error | null | undefined) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve();
+            }
+        });
     });
-    return deferred.promise;
 }
 
 export function writeSubstream(stream: NodeJS.WritableStream): NodeJS.WritableStream {

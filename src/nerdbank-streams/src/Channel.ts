@@ -244,7 +244,7 @@ export class ChannelClass extends Channel {
         }
     }
 
-    public dispose() {
+    public async dispose() {
         if (!this.isDisposed) {
             super.dispose();
 
@@ -256,7 +256,7 @@ export class ChannelClass extends Channel {
             this._duplex.push(null);
 
             this._completion.resolve();
-            this._multiplexingStream.onChannelDisposed(this);
+            await this._multiplexingStream.onChannelDisposed(this);
         }
     }
 

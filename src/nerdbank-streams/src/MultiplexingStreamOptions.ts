@@ -3,7 +3,7 @@ import { ChannelOptions } from "./ChannelOptions";
 export interface MultiplexingStreamOptions {
     /**
      * The protocol version to be used.
-     * @description 1 is the original version. 2 is a protocol breaking change and adds backpressure support.
+     * @description 1 is the original version. 2 is a protocol breaking change and adds backpressure support. 3 is a protocol breaking change, eliminates the handshake packet and adds seeded channels support.
      */
     protocolMajorVersion?: number;
 

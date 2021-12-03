@@ -240,7 +240,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 
     /**
      * Offers a new, named channel to the remote party so they may accept it with
-     * [acceptChannelAsync](#acceptChannelAsync).
+     * {@link acceptChannelAsync}.
      * @param name A name for the channel, which must be accepted on the remote end to complete creation.
      * It need not be unique, and may be empty but must not be null.
      * Any characters are allowed, and max length is determined by the maximum frame payload (based on UTF-8 encoding).
@@ -561,9 +561,18 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         }
     }
 
-    public onChannelDisposed(channel: ChannelClass) {
+    public async onChannelDisposed(channel: ChannelClass) {
         if (!this._completionSource.isCompleted) {
-            this.sendFrame(ControlCode.ChannelTerminated, channel.qualifiedId);
+            try {
+                await this.sendFrame(ControlCode.ChannelTerminated, channel.qualifiedId);
+            } catch (err) {
+                // Swallow exceptions thrown about channel disposal if the whole stream has been taken down.
+                if (this.isDisposed) {
+                    return;
+                }
+
+                throw err;
+            }
         }
     }
 
