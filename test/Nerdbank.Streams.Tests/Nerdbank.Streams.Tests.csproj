@@ -15,9 +15,9 @@
     <Compile Include="..\..\src\Nerdbank.Streams\Utilities.cs" Link="Utilities.cs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.VisualStudio.Threading" Version="17.0.63" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading" Version="17.0.64" />
     <PackageReference Include="PInvoke.Kernel32" Version="0.7.104" />
-    <PackageReference Include="StreamJsonRpc" Version="2.8.28" />
+    <PackageReference Include="StreamJsonRpc" Version="2.9.85" />
     <PackageReference Include="xunit" Version="2.4.1" />
     <PackageReference Include="xunit.combinatorial" Version="1.4.1" />
     <PackageReference Include="xunit.skippablefact" Version="1.4.13" />
