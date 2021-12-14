@@ -119,9 +119,27 @@ namespace Nerdbank.Streams
 
             public override Task CopyToAsync(Stream destination, int bufferSize, CancellationToken cancellationToken) => this.readableStream.CopyToAsync(destination, bufferSize, cancellationToken);
 
-            public override void Write(byte[] buffer, int offset, int count) => this.writableStream.Write(buffer, offset, count);
+            public override void Write(byte[] buffer, int offset, int count)
+            {
+                // Provide consistent behavior for the null buffer case regardless of underlying stream behaviors.
+                if (count == 0 && offset == 0)
+                {
+                    return;
+                }
 
-            public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) => this.writableStream.WriteAsync(buffer, offset, count, cancellationToken);
+                this.writableStream.Write(buffer, offset, count);
+            }
+
+            public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+            {
+                // Provide consistent behavior for the null buffer case regardless of underlying stream behaviors.
+                if (count == 0 && offset == 0)
+                {
+                    return Task.CompletedTask;
+                }
+
+                return this.writableStream.WriteAsync(buffer, offset, count, cancellationToken);
+            }
 
             public override void WriteByte(byte value) => this.writableStream.WriteByte(value);
 
