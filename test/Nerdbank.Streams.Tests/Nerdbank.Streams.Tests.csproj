@@ -13,6 +13,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\src\Nerdbank.Streams\Utilities.cs" Link="Utilities.cs" />
+    <Compile Remove="SequenceReader\*.cs" Condition=" '$(TargetFramework)' != 'net472' " />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.VisualStudio.Threading" Version="17.0.64" />
