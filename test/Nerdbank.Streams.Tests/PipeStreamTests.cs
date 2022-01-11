@@ -107,7 +107,7 @@ public class PipeStreamTests : TestBase
     public void Dispose_NoWriter()
     {
         // Verify that we don't throw when disposing a stream without a writer.
-        var stream = this.pipe.Reader.AsStream();
+        Stream? stream = this.pipe.Reader.AsStream();
         stream.Dispose();
     }
 
@@ -115,7 +115,7 @@ public class PipeStreamTests : TestBase
     public void Dispose_NoReader()
     {
         // Verify that we don't throw when disposing a stream without a reader.
-        var stream = this.pipe.Writer.AsStream();
+        Stream? stream = this.pipe.Writer.AsStream();
         stream.Dispose();
     }
 
@@ -142,7 +142,7 @@ public class PipeStreamTests : TestBase
         this.stream.Dispose();
         Assert.False(this.stream.CanRead);
 
-        var stream = this.pipe.Writer.AsStream();
+        Stream? stream = this.pipe.Writer.AsStream();
         Assert.False(stream.CanRead);
         stream = this.pipe.Reader.AsStream();
         Assert.True(stream.CanRead);
@@ -155,7 +155,7 @@ public class PipeStreamTests : TestBase
         this.stream.Dispose();
         Assert.False(this.stream.CanWrite);
 
-        var stream = this.pipe.Writer.AsStream();
+        Stream? stream = this.pipe.Writer.AsStream();
         Assert.True(stream.CanWrite);
         stream = this.pipe.Reader.AsStream();
         Assert.False(stream.CanWrite);

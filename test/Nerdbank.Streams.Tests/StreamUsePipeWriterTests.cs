@@ -36,10 +36,10 @@ public class StreamUsePipeWriterTests : StreamPipeWriterTestBase
         unreadableStream.Setup(s => s.WriteAsync(It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ThrowsAsync(expectedException);
 #endif
 
-        var writer = this.CreatePipeWriter(unreadableStream.Object);
+        PipeWriter? writer = this.CreatePipeWriter(unreadableStream.Object);
         await writer.WriteAsync(new byte[1], this.TimeoutToken);
 #pragma warning disable CS0618 // Type or member is obsolete
-        var actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => writer.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken));
+        InvalidOperationException? actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => writer.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken));
 #pragma warning restore CS0618 // Type or member is obsolete
         Assert.Same(expectedException, actualException);
     }

@@ -32,7 +32,7 @@ public class PipeWriterCompletionWatcherTests : TestBase
     public async Task NullState()
     {
         var tcs = new TaskCompletionSource<Exception?>();
-        var monitored = this.writer.OnCompleted(
+        PipeWriter? monitored = this.writer.OnCompleted(
             (e, s) =>
             {
                 tcs.SetResult(e);

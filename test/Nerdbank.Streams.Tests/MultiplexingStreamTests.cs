@@ -56,8 +56,8 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         Func<MultiplexingStream.QualifiedChannelId, string, TraceSource> mx2TraceSourceFactory = (MultiplexingStream.QualifiedChannelId id, string name) => traceSourceFactory(nameof(this.mx2), id, name);
 
         (this.transport1, this.transport2) = FullDuplexStream.CreatePair(new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024));
-        var mx1 = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, TraceSource = mx1TraceSource, DefaultChannelTraceSourceFactoryWithQualifier = mx1TraceSourceFactory }, this.TimeoutToken);
-        var mx2 = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, TraceSource = mx2TraceSource, DefaultChannelTraceSourceFactoryWithQualifier = mx2TraceSourceFactory }, this.TimeoutToken);
+        Task<MultiplexingStream>? mx1 = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, TraceSource = mx1TraceSource, DefaultChannelTraceSourceFactoryWithQualifier = mx1TraceSourceFactory }, this.TimeoutToken);
+        Task<MultiplexingStream>? mx2 = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, TraceSource = mx2TraceSource, DefaultChannelTraceSourceFactoryWithQualifier = mx2TraceSourceFactory }, this.TimeoutToken);
         this.mx1 = await mx1;
         this.mx2 = await mx2;
     }
@@ -83,13 +83,13 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
             return null;
         });
         (this.transport1, this.transport2) = FullDuplexStream.CreatePair();
-        var mx1Task = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, DefaultChannelTraceSourceFactory = obsoleteFactory }, this.TimeoutToken);
-        var mx2Task = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion }, this.TimeoutToken);
-        var mx1 = await mx1Task;
-        var mx2 = await mx2Task;
+        Task<MultiplexingStream>? mx1Task = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, DefaultChannelTraceSourceFactory = obsoleteFactory }, this.TimeoutToken);
+        Task<MultiplexingStream>? mx2Task = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion }, this.TimeoutToken);
+        MultiplexingStream? mx1 = await mx1Task;
+        MultiplexingStream? mx2 = await mx2Task;
 
-        var ch = await Task.WhenAll(mx1.OfferChannelAsync("myname"), mx2.AcceptChannelAsync("myname"));
-        var args = await factoryArgs.Task;
+        MultiplexingStream.Channel[]? ch = await Task.WhenAll(mx1.OfferChannelAsync("myname"), mx2.AcceptChannelAsync("myname"));
+        (int, string) args = await factoryArgs.Task;
         Assert.Equal(ch[0].QualifiedId.Id, (ulong)args.Item1);
         Assert.Equal("myname", args.Item2);
     }
@@ -108,10 +108,10 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         await pipe.Writer.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
         pipe.Writer.Complete();
 
-        var ch1 = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(pipe.Reader) });
+        MultiplexingStream.Channel? ch1 = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(pipe.Reader) });
         await this.WaitForEphemeralChannelOfferToPropagateAsync();
-        var ch2 = this.mx2.AcceptChannel(ch1.QualifiedId.Id);
-        var readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
+        MultiplexingStream.Channel? ch2 = this.mx2.AcceptChannel(ch1.QualifiedId.Id);
+        ReadResult readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
         Assert.Equal(3, readResult.Buffer.Length);
         ch2.Input.AdvanceTo(readResult.Buffer.End);
         readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
@@ -125,15 +125,15 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     public async Task OfferReadOnlyPipe()
     {
         // Prepare a readonly pipe that is already fully populated with data for the other end to read.
-        var pipePair = FullDuplexStream.CreatePipePair();
+        (IDuplexPipe, IDuplexPipe) pipePair = FullDuplexStream.CreatePipePair();
         pipePair.Item1.Input.Complete(); // we don't read -- we only write.
         await pipePair.Item1.Output.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
         pipePair.Item1.Output.Complete();
 
-        var ch1 = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = pipePair.Item2 });
+        MultiplexingStream.Channel? ch1 = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = pipePair.Item2 });
         await this.WaitForEphemeralChannelOfferToPropagateAsync();
-        var ch2 = this.mx2.AcceptChannel(ch1.QualifiedId.Id);
-        var readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
+        MultiplexingStream.Channel? ch2 = this.mx2.AcceptChannel(ch1.QualifiedId.Id);
+        ReadResult readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
         Assert.Equal(3, readResult.Buffer.Length);
         ch2.Input.AdvanceTo(readResult.Buffer.End);
         readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
@@ -148,12 +148,12 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     {
         var pipe = new Pipe();
 
-        var ch1 = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(pipe.Writer) });
+        MultiplexingStream.Channel? ch1 = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(pipe.Writer) });
         await this.WaitForEphemeralChannelOfferToPropagateAsync();
-        var ch2 = this.mx2.AcceptChannel(ch1.QualifiedId.Id);
+        MultiplexingStream.Channel? ch2 = this.mx2.AcceptChannel(ch1.QualifiedId.Id);
 
         // Confirm that any attempt to read from the channel is immediately completed.
-        var readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
+        ReadResult readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
         Assert.True(readResult.IsCompleted);
 
         // Now write to the channel.
@@ -172,15 +172,15 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task OfferWriteOnlyPipe()
     {
-        var pipePair = FullDuplexStream.CreatePipePair();
+        (IDuplexPipe, IDuplexPipe) pipePair = FullDuplexStream.CreatePipePair();
         pipePair.Item1.Output.Complete(); // we don't write -- we only read.
 
-        var ch1 = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = pipePair.Item2 });
+        MultiplexingStream.Channel? ch1 = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = pipePair.Item2 });
         await this.WaitForEphemeralChannelOfferToPropagateAsync();
-        var ch2 = this.mx2.AcceptChannel(ch1.QualifiedId.Id);
+        MultiplexingStream.Channel? ch2 = this.mx2.AcceptChannel(ch1.QualifiedId.Id);
 
         // Confirm that any attempt to read from the channel is immediately completed.
-        var readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
+        ReadResult readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
         Assert.True(readResult.IsCompleted);
 
         // Now write to the channel.
@@ -217,7 +217,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task Dispose_DisposesChannels()
     {
-        var (channel1, channel2) = await this.EstablishChannelsAsync("A");
+        (MultiplexingStream.Channel channel1, MultiplexingStream.Channel channel2) = await this.EstablishChannelsAsync("A");
         await this.mx1.DisposeAsync();
         Assert.True(channel1.IsDisposed);
         await channel1.Completion.WithCancellation(this.TimeoutToken);
@@ -234,7 +234,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         var disposal = new AsyncManualResetEvent();
         ms.Disposed += (s, e) => disposal.Set();
 
-        var channel = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = ms.UsePipe() });
+        MultiplexingStream.Channel? channel = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = ms.UsePipe() });
         channel.Dispose();
         await disposal.WaitAsync(this.TimeoutToken);
     }
@@ -246,9 +246,9 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         var disposal = new AsyncManualResetEvent();
         ms.Disposed += (s, e) => disposal.Set();
 
-        var ch1 = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = ms.UsePipe() });
+        MultiplexingStream.Channel? ch1 = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = ms.UsePipe() });
         await this.WaitForEphemeralChannelOfferToPropagateAsync();
-        var ch2 = this.mx2.AcceptChannel(ch1.QualifiedId.Id);
+        MultiplexingStream.Channel? ch2 = this.mx2.AcceptChannel(ch1.QualifiedId.Id);
 
         ch2.Dispose();
         await disposal.WaitAsync(this.TimeoutToken);
@@ -290,9 +290,9 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task CreateChannelAsync_EmptyId()
     {
-        var stream2Task = this.mx2.AcceptChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
-        var channel1 = await this.mx1.OfferChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
-        var channel2 = await stream2Task.WithCancellation(this.TimeoutToken);
+        Task<MultiplexingStream.Channel>? stream2Task = this.mx2.AcceptChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
+        MultiplexingStream.Channel? channel1 = await this.mx1.OfferChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
+        MultiplexingStream.Channel? channel2 = await stream2Task.WithCancellation(this.TimeoutToken);
         Assert.NotNull(channel1);
         Assert.NotNull(channel2);
     }
@@ -301,7 +301,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     public async Task CreateChannelAsync_CanceledBeforeAcceptance()
     {
         var cts = new CancellationTokenSource();
-        var channel1Task = this.mx1.OfferChannelAsync("1st", cts.Token);
+        Task<MultiplexingStream.Channel>? channel1Task = this.mx1.OfferChannelAsync("1st", cts.Token);
         Assert.False(channel1Task.IsCompleted);
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => channel1Task).WithCancellation(this.TimeoutToken);
@@ -311,7 +311,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     public async Task CreateAsync_CancellationToken()
     {
         var cts = new CancellationTokenSource();
-        var streamPair = FullDuplexStream.CreatePair();
+        (Stream, Stream) streamPair = FullDuplexStream.CreatePair();
         Task<MultiplexingStream> mx1Task = MultiplexingStream.CreateAsync(streamPair.Item1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion }, cts.Token);
         Task<MultiplexingStream> mx2Task = MultiplexingStream.CreateAsync(streamPair.Item2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion }, CancellationToken.None);
         MultiplexingStream mx1 = await mx1Task;
@@ -335,19 +335,19 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task CreateChannelAsync_TwiceWithDifferentCapitalization()
     {
-        var (channel1a, channel1b) = await this.EstablishChannelStreamsAsync("a");
-        var (channel2a, channel2b) = await this.EstablishChannelStreamsAsync("A");
+        (Stream channel1a, Stream channel1b) = await this.EstablishChannelStreamsAsync("a");
+        (Stream channel2a, Stream channel2b) = await this.EstablishChannelStreamsAsync("A");
         Assert.Equal(4, new[] { channel1a, channel1b, channel2a, channel2b }.Distinct().Count());
     }
 
     [Fact]
     public async Task CreateChannelAsync_IdCollidesWithPendingRequest()
     {
-        var channel1aTask = this.mx1.OfferChannelAsync("1st", this.TimeoutToken);
-        var channel2aTask = this.mx1.OfferChannelAsync("1st", this.TimeoutToken);
+        Task<MultiplexingStream.Channel>? channel1aTask = this.mx1.OfferChannelAsync("1st", this.TimeoutToken);
+        Task<MultiplexingStream.Channel>? channel2aTask = this.mx1.OfferChannelAsync("1st", this.TimeoutToken);
 
-        var channel1b = await this.mx2.AcceptChannelAsync("1st", this.TimeoutToken).WithCancellation(this.TimeoutToken);
-        var channel2b = await this.mx2.AcceptChannelAsync("1st", this.TimeoutToken).WithCancellation(this.TimeoutToken);
+        MultiplexingStream.Channel? channel1b = await this.mx2.AcceptChannelAsync("1st", this.TimeoutToken).WithCancellation(this.TimeoutToken);
+        MultiplexingStream.Channel? channel2b = await this.mx2.AcceptChannelAsync("1st", this.TimeoutToken).WithCancellation(this.TimeoutToken);
 
         await Task.WhenAll(channel1aTask, channel2aTask).WithCancellation(this.TimeoutToken);
     }
@@ -357,8 +357,8 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     {
         for (int i = 0; i < 10; i++)
         {
-            var channel1aTask = this.mx1.OfferChannelAsync("1st", this.TimeoutToken);
-            var channel1bTask = this.mx2.AcceptChannelAsync("1st", this.TimeoutToken);
+            Task<MultiplexingStream.Channel>? channel1aTask = this.mx1.OfferChannelAsync("1st", this.TimeoutToken);
+            Task<MultiplexingStream.Channel>? channel1bTask = this.mx2.AcceptChannelAsync("1st", this.TimeoutToken);
             await Task.WhenAll(channel1aTask, channel1bTask).WithCancellation(this.TimeoutToken);
         }
     }
@@ -366,9 +366,9 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task CreateChannelAsync_IdRecycledFromPriorChannel()
     {
-        var channel1aTask = this.mx1.OfferChannelAsync("1st", this.TimeoutToken);
-        var channel1bTask = this.mx2.AcceptChannelAsync("1st", this.TimeoutToken);
-        var channels = await Task.WhenAll(channel1aTask, channel1bTask).WithCancellation(this.TimeoutToken);
+        Task<MultiplexingStream.Channel>? channel1aTask = this.mx1.OfferChannelAsync("1st", this.TimeoutToken);
+        Task<MultiplexingStream.Channel>? channel1bTask = this.mx2.AcceptChannelAsync("1st", this.TimeoutToken);
+        MultiplexingStream.Channel[]? channels = await Task.WhenAll(channel1aTask, channel1bTask).WithCancellation(this.TimeoutToken);
         channels[0].Dispose();
         channels[1].Dispose();
 
@@ -381,8 +381,8 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     public async Task CreateChannelAsync_AcceptByAnotherId()
     {
         var cts = new CancellationTokenSource();
-        var createTask = this.mx1.OfferChannelAsync("1st", cts.Token);
-        var acceptTask = this.mx2.AcceptChannelAsync("2nd", cts.Token);
+        Task<MultiplexingStream.Channel>? createTask = this.mx1.OfferChannelAsync("1st", cts.Token);
+        Task<MultiplexingStream.Channel>? acceptTask = this.mx2.AcceptChannelAsync("2nd", cts.Token);
         Assert.False(createTask.IsCompleted);
         Assert.False(acceptTask.IsCompleted);
         cts.CancelAfter(ExpectedTimeout);
@@ -393,7 +393,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public void ChannelExposesMultiplexingStream()
     {
-        var channel = this.mx1.CreateChannel();
+        MultiplexingStream.Channel? channel = this.mx1.CreateChannel();
         Assert.Same(this.mx1, channel.MultiplexingStream);
         channel.Dispose();
         Assert.Same(this.mx1, channel.MultiplexingStream);
@@ -402,7 +402,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task CommunicateOverOneChannel()
     {
-        var (a, b) = await this.EstablishChannelStreamsAsync("a");
+        (Stream a, Stream b) = await this.EstablishChannelStreamsAsync("a");
         await this.TransmitAndVerifyAsync(a, b, Guid.NewGuid().ToByteArray());
         await this.TransmitAndVerifyAsync(b, a, Guid.NewGuid().ToByteArray());
     }
@@ -412,11 +412,11 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     {
         var transmittingPipe = new Pipe();
         var receivingPipe = new Pipe();
-        var mx1ChannelTask = this.mx1.OfferChannelAsync(string.Empty, new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(transmittingPipe.Reader) }, this.TimeoutToken);
-        var mx2ChannelTask = this.mx2.AcceptChannelAsync(string.Empty, new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(receivingPipe.Writer) }, this.TimeoutToken);
-        var channels = await WhenAllSucceedOrAnyFail(mx1ChannelTask, mx2ChannelTask).WithCancellation(this.TimeoutToken);
+        Task<MultiplexingStream.Channel>? mx1ChannelTask = this.mx1.OfferChannelAsync(string.Empty, new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(transmittingPipe.Reader) }, this.TimeoutToken);
+        Task<MultiplexingStream.Channel>? mx2ChannelTask = this.mx2.AcceptChannelAsync(string.Empty, new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(receivingPipe.Writer) }, this.TimeoutToken);
+        MultiplexingStream.Channel[]? channels = await WhenAllSucceedOrAnyFail(mx1ChannelTask, mx2ChannelTask).WithCancellation(this.TimeoutToken);
 
-        var buffer = this.GetBuffer(3);
+        byte[]? buffer = this.GetBuffer(3);
         await transmittingPipe.Writer.WriteAsync(buffer, this.TimeoutToken);
 
         ReadOnlySequence<byte> readBytes = await this.ReadAtLeastAsync(receivingPipe.Reader, buffer.Length);
@@ -439,9 +439,9 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
         async Task CoordinateChatAsync()
         {
-            var (a, b) = await this.EstablishChannelStreamsAsync("chat").WithCancellation(this.TimeoutToken);
-            var messageA = Guid.NewGuid().ToByteArray();
-            var messageB = Guid.NewGuid().ToByteArray().Concat(Guid.NewGuid().ToByteArray()).ToArray();
+            (Stream a, Stream b) = await this.EstablishChannelStreamsAsync("chat").WithCancellation(this.TimeoutToken);
+            byte[]? messageA = Guid.NewGuid().ToByteArray();
+            byte[]? messageB = Guid.NewGuid().ToByteArray().Concat(Guid.NewGuid().ToByteArray()).ToArray();
             await Task.WhenAll(
                 Task.Run(() => ChatAsync(a, messageA, messageB)),
                 Task.Run(() => ChatAsync(b, messageB, messageA)));
@@ -463,9 +463,9 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task ReadReturns0AfterRemoteEnd()
     {
-        var (a, b) = await this.EstablishChannelStreamsAsync("a");
+        (Stream a, Stream b) = await this.EstablishChannelStreamsAsync("a");
         a.Dispose();
-        var buffer = new byte[1];
+        byte[]? buffer = new byte[1];
         Assert.Equal(0, await b.ReadAsync(buffer, 0, buffer.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken));
         Assert.Equal(0, b.Read(buffer, 0, buffer.Length));
         Assert.Equal(-1, b.ReadByte());
@@ -476,8 +476,8 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task ReadByte()
     {
-        var (a, b) = await this.EstablishChannelStreamsAsync("a");
-        var buffer = new byte[] { 5 };
+        (Stream a, Stream b) = await this.EstablishChannelStreamsAsync("a");
+        byte[]? buffer = new byte[] { 5 };
         await a.WriteAsync(buffer, 0, buffer.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken);
         await a.FlushAsync(this.TimeoutToken).WithCancellation(this.TimeoutToken);
         Assert.Equal(5, b.ReadByte());
@@ -489,8 +489,8 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Trait("SkipInCodeCoverage", "true")]
     public async Task TransmitOverStreamAndDisposeStream(int length)
     {
-        var buffer = this.GetBuffer(length);
-        var (a, b) = await this.EstablishChannelStreamsAsync("a");
+        byte[]? buffer = this.GetBuffer(length);
+        (Stream a, Stream b) = await this.EstablishChannelStreamsAsync("a");
         Task writerTask = Task.Run(async delegate
         {
             await a.WriteAsync(buffer, 0, buffer.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken);
@@ -498,7 +498,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
             a.Dispose();
         });
 
-        var receivingBuffer = new byte[length + 1];
+        byte[]? receivingBuffer = new byte[length + 1];
         int readBytes = await ReadAtLeastAsync(b, new ArraySegment<byte>(receivingBuffer), buffer.Length, this.TimeoutToken);
         Assert.Equal(buffer.Length, readBytes);
         Assert.Equal(buffer, receivingBuffer.Take(buffer.Length));
@@ -518,15 +518,15 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Trait("SkipInCodeCoverage", "true")]
     public async Task TransmitOverPipeAndDisposeChannel(int length)
     {
-        var buffer = this.GetBuffer(length);
-        var (a, b) = await this.EstablishChannelsAsync("a");
+        byte[]? buffer = this.GetBuffer(length);
+        (MultiplexingStream.Channel a, MultiplexingStream.Channel b) = await this.EstablishChannelsAsync("a");
         Task writerTask = Task.Run(async delegate
         {
             await a.Output.WriteAsync(buffer, this.TimeoutToken);
             a.Dispose();
         });
 
-        var readBytes = await this.ReadAtLeastAsync(b.Input, length);
+        ReadOnlySequence<byte> readBytes = await this.ReadAtLeastAsync(b.Input, length);
         Assert.Equal(buffer.Length, readBytes.Length);
         Assert.Equal(buffer, readBytes.ToArray());
 
@@ -547,13 +547,13 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Trait("SkipInCodeCoverage", "true")]
     public async Task TransmitOverPreexistingPipeAndDisposeChannel(int length)
     {
-        var buffer = this.GetBuffer(length);
-        var pipePair = FullDuplexStream.CreatePipePair();
+        byte[]? buffer = this.GetBuffer(length);
+        (IDuplexPipe, IDuplexPipe) pipePair = FullDuplexStream.CreatePipePair();
 
         const string channelName = "a";
-        var mx1ChannelTask = this.mx1.OfferChannelAsync(channelName, new MultiplexingStream.ChannelOptions { ExistingPipe = pipePair.Item1 }, this.TimeoutToken);
-        var mx2ChannelTask = this.mx2.AcceptChannelAsync(channelName, this.TimeoutToken);
-        var (a, b) = await Task.WhenAll(mx1ChannelTask, mx2ChannelTask).WithCancellation(this.TimeoutToken);
+        Task<MultiplexingStream.Channel>? mx1ChannelTask = this.mx1.OfferChannelAsync(channelName, new MultiplexingStream.ChannelOptions { ExistingPipe = pipePair.Item1 }, this.TimeoutToken);
+        Task<MultiplexingStream.Channel>? mx2ChannelTask = this.mx2.AcceptChannelAsync(channelName, this.TimeoutToken);
+        (MultiplexingStream.Channel a, MultiplexingStream.Channel b) = await Task.WhenAll(mx1ChannelTask, mx2ChannelTask).WithCancellation(this.TimeoutToken);
 
         Task writerTask = Task.Run(async delegate
         {
@@ -584,8 +584,8 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Trait("SkipInCodeCoverage", "true")]
     public async Task DisposeChannel_WhileRemoteEndIsTransmitting(int length)
     {
-        var buffer = this.GetBuffer(length);
-        var (a, b) = await this.EstablishChannelsAsync("a");
+        byte[]? buffer = this.GetBuffer(length);
+        (MultiplexingStream.Channel a, MultiplexingStream.Channel b) = await this.EstablishChannelsAsync("a");
 
         // We don't await this because with large input sizes it can't complete faster than the reader is reading it.
         ValueTask<FlushResult> writerTask = a.Output.WriteAsync(buffer, this.TimeoutToken);
@@ -605,17 +605,17 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task WriteLargeBuffer()
     {
-        var sendBuffer = new byte[1024 * 1024];
+        byte[]? sendBuffer = new byte[1024 * 1024];
         var random = new Random();
         random.NextBytes(sendBuffer);
-        var (a, b) = await this.EstablishChannelStreamsAsync("a");
+        (Stream a, Stream b) = await this.EstablishChannelStreamsAsync("a");
         Task writeAndFlush = Task.Run(async delegate
         {
             await a.WriteAsync(sendBuffer, 0, sendBuffer.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken);
             await a.FlushAsync(this.TimeoutToken).WithCancellation(this.TimeoutToken);
         });
 
-        var recvBuffer = new byte[sendBuffer.Length];
+        byte[]? recvBuffer = new byte[sendBuffer.Length];
         await this.ReadAsync(b, recvBuffer);
         Assert.Equal(sendBuffer, recvBuffer);
 
@@ -625,7 +625,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task CanProperties()
     {
-        var (s1, s2) = await this.EstablishChannelStreamsAsync(string.Empty);
+        (Stream s1, Stream s2) = await this.EstablishChannelStreamsAsync(string.Empty);
         Assert.False(s1.CanSeek);
         Assert.True(s1.CanWrite);
         Assert.True(s1.CanRead);
@@ -638,7 +638,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task NotSupportedMethodsAndProperties()
     {
-        var (s1, s2) = await this.EstablishChannelStreamsAsync(string.Empty);
+        (Stream s1, Stream s2) = await this.EstablishChannelStreamsAsync(string.Empty);
         Assert.Throws<NotSupportedException>(() => s1.Length);
         Assert.Throws<NotSupportedException>(() => s1.Position);
         Assert.Throws<NotSupportedException>(() => s1.Position = 0);
@@ -655,7 +655,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task PartialFrameSentWithoutExplicitFlush()
     {
-        var (s1, s2) = await this.EstablishChannelStreamsAsync(string.Empty);
+        (Stream s1, Stream s2) = await this.EstablishChannelStreamsAsync(string.Empty);
 
         byte[] smallData = new byte[] { 0x1, 0x2, 0x3 };
         await s1.WriteAsync(smallData, 0, smallData.Length).WithCancellation(this.TimeoutToken);
@@ -669,7 +669,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     public async Task CancelChannelOfferBeforeAcceptance(bool cancelFirst)
     {
         var cts = new CancellationTokenSource();
-        var offer = this.mx1.OfferChannelAsync(string.Empty, cts.Token);
+        Task<MultiplexingStream.Channel>? offer = this.mx1.OfferChannelAsync(string.Empty, cts.Token);
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => offer).WithCancellation(this.TimeoutToken);
         Stream? acceptedStream = null;
@@ -683,7 +683,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
                 await Task.Delay(250);
             }
 
-            var acceptedChannel = await this.mx2.AcceptChannelAsync(string.Empty, ExpectedTimeoutToken).ConfigureAwait(false);
+            MultiplexingStream.Channel? acceptedChannel = await this.mx2.AcceptChannelAsync(string.Empty, ExpectedTimeoutToken).ConfigureAwait(false);
             acceptedStream = acceptedChannel.AsStream();
 
             // In this case, we accepted the channel before receiving the cancellation notice. The channel should be terminated by the remote side very soon.
@@ -703,26 +703,26 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task EphemeralChannels()
     {
-        var ephemeralMessage = new byte[10];
+        byte[]? ephemeralMessage = new byte[10];
         var random = new Random();
         random.NextBytes(ephemeralMessage);
 
         await Task.WhenAll(
             Task.Run(async delegate
             {
-                var rpcChannel = await this.mx1.OfferChannelAsync(string.Empty, this.TimeoutToken);
-                var eph = this.mx1.CreateChannel();
+                MultiplexingStream.Channel? rpcChannel = await this.mx1.OfferChannelAsync(string.Empty, this.TimeoutToken);
+                MultiplexingStream.Channel? eph = this.mx1.CreateChannel();
                 await rpcChannel.Output.WriteAsync(BitConverter.GetBytes(eph.QualifiedId.Id), this.TimeoutToken);
                 await eph.Output.WriteAsync(ephemeralMessage, this.TimeoutToken);
                 await eph.Acceptance;
             }),
             Task.Run(async delegate
             {
-                var rpcChannel = await this.mx2.AcceptChannelAsync(string.Empty, this.TimeoutToken);
-                var buffer = new byte[ephemeralMessage.Length];
-                var readResult = await ReadAtLeastAsync(rpcChannel.AsStream(), new ArraySegment<byte>(buffer), sizeof(int), this.TimeoutToken);
+                MultiplexingStream.Channel? rpcChannel = await this.mx2.AcceptChannelAsync(string.Empty, this.TimeoutToken);
+                byte[]? buffer = new byte[ephemeralMessage.Length];
+                int readResult = await ReadAtLeastAsync(rpcChannel.AsStream(), new ArraySegment<byte>(buffer), sizeof(int), this.TimeoutToken);
                 int channelId = BitConverter.ToInt32(buffer, 0);
-                var eph = this.mx2.AcceptChannel(channelId);
+                MultiplexingStream.Channel? eph = this.mx2.AcceptChannel(channelId);
                 Assert.True(eph.Acceptance.IsCompleted);
                 readResult = await ReadAtLeastAsync(eph.AsStream(), new ArraySegment<byte>(buffer), ephemeralMessage.Length, this.TimeoutToken);
                 Assert.Equal(ephemeralMessage, buffer);
@@ -735,18 +735,18 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         await Task.WhenAll(
             Task.Run(async delegate
             {
-                var rpcChannel = await this.mx1.OfferChannelAsync(string.Empty, this.TimeoutToken);
-                var eph = this.mx1.CreateChannel();
+                MultiplexingStream.Channel? rpcChannel = await this.mx1.OfferChannelAsync(string.Empty, this.TimeoutToken);
+                MultiplexingStream.Channel? eph = this.mx1.CreateChannel();
                 await rpcChannel.Output.WriteAsync(BitConverter.GetBytes(eph.QualifiedId.Id), this.TimeoutToken);
                 await eph.Acceptance;
             }),
             Task.Run(async delegate
             {
-                var buffer = new byte[sizeof(int)];
-                var rpcChannel = await this.mx2.AcceptChannelAsync(string.Empty, this.TimeoutToken);
-                var readResult = await ReadAtLeastAsync(rpcChannel.AsStream(), new ArraySegment<byte>(buffer), sizeof(int), this.TimeoutToken);
+                byte[]? buffer = new byte[sizeof(int)];
+                MultiplexingStream.Channel? rpcChannel = await this.mx2.AcceptChannelAsync(string.Empty, this.TimeoutToken);
+                int readResult = await ReadAtLeastAsync(rpcChannel.AsStream(), new ArraySegment<byte>(buffer), sizeof(int), this.TimeoutToken);
                 int channelId = BitConverter.ToInt32(buffer, 0);
-                var eph = this.mx2.AcceptChannel(channelId);
+                MultiplexingStream.Channel? eph = this.mx2.AcceptChannel(channelId);
                 Assert.Throws<InvalidOperationException>(() => this.mx2.AcceptChannel(channelId));
             })).WithCancellation(this.TimeoutToken);
     }
@@ -757,16 +757,16 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         await Task.WhenAll(
             Task.Run(async delegate
             {
-                var rpcChannel = await this.mx1.OfferChannelAsync(string.Empty, this.TimeoutToken);
-                var eph = this.mx1.CreateChannel();
+                MultiplexingStream.Channel? rpcChannel = await this.mx1.OfferChannelAsync(string.Empty, this.TimeoutToken);
+                MultiplexingStream.Channel? eph = this.mx1.CreateChannel();
                 await rpcChannel.Output.WriteAsync(BitConverter.GetBytes(eph.QualifiedId.Id), this.TimeoutToken);
                 await Assert.ThrowsAnyAsync<OperationCanceledException>(() => eph.Acceptance).WithCancellation(this.TimeoutToken);
             }),
             Task.Run(async delegate
             {
-                var buffer = new byte[sizeof(int)];
-                var rpcChannel = await this.mx2.AcceptChannelAsync(string.Empty, this.TimeoutToken);
-                var readResult = await ReadAtLeastAsync(rpcChannel.AsStream(), new ArraySegment<byte>(buffer), sizeof(int), this.TimeoutToken);
+                byte[]? buffer = new byte[sizeof(int)];
+                MultiplexingStream.Channel? rpcChannel = await this.mx2.AcceptChannelAsync(string.Empty, this.TimeoutToken);
+                int readResult = await ReadAtLeastAsync(rpcChannel.AsStream(), new ArraySegment<byte>(buffer), sizeof(int), this.TimeoutToken);
                 int channelId = BitConverter.ToInt32(buffer, 0);
                 this.mx2.RejectChannel(channelId);
 
@@ -795,8 +795,8 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
             mx2EventArgsSource.SetResult(e);
         };
 
-        var channel = this.mx1.CreateChannel();
-        var mx2EventArgs = await mx2EventArgsSource.Task.WithCancellation(this.TimeoutToken);
+        MultiplexingStream.Channel? channel = this.mx1.CreateChannel();
+        MultiplexingStream.ChannelOfferEventArgs? mx2EventArgs = await mx2EventArgsSource.Task.WithCancellation(this.TimeoutToken);
         Assert.Equal(channel.QualifiedId.Id, mx2EventArgs.QualifiedId.Id);
         Assert.Equal(MultiplexingStream.ChannelSource.Remote, mx2EventArgs.QualifiedId.Source);
         Assert.Equal(string.Empty, mx2EventArgs.Name);
@@ -827,15 +827,15 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
             acceptTask = this.mx2.AcceptChannelAsync(channelName, this.TimeoutToken);
         }
 
-        var channelOfferTask = this.mx1.OfferChannelAsync(channelName, this.TimeoutToken);
+        Task<MultiplexingStream.Channel>? channelOfferTask = this.mx1.OfferChannelAsync(channelName, this.TimeoutToken);
 
-        var mx2EventArgs = await mx2EventArgsSource.Task.WithCancellation(this.TimeoutToken);
+        MultiplexingStream.ChannelOfferEventArgs? mx2EventArgs = await mx2EventArgsSource.Task.WithCancellation(this.TimeoutToken);
         if (!alreadyAccepted)
         {
             acceptTask = this.mx2.AcceptChannelAsync(channelName, this.TimeoutToken);
         }
 
-        var offeredChannel = await channelOfferTask;
+        MultiplexingStream.Channel? offeredChannel = await channelOfferTask;
         Assert.Equal(offeredChannel.QualifiedId.Id, mx2EventArgs.QualifiedId.Id);
         Assert.Equal(MultiplexingStream.ChannelSource.Remote, mx2EventArgs.QualifiedId.Source);
         Assert.Equal(channelName, mx2EventArgs.Name);
@@ -854,10 +854,10 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     public async Task ChannelOffered_AlreadyOfferedByRemote()
     {
         (this.transport1, this.transport2) = FullDuplexStream.CreatePair(new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024));
-        var mx1Task = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion }, this.TimeoutToken);
-        var mx2Task = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, StartSuspended = true }, this.TimeoutToken);
-        using var mx1 = await mx1Task;
-        using var mx2 = await mx2Task;
+        Task<MultiplexingStream>? mx1Task = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion }, this.TimeoutToken);
+        Task<MultiplexingStream>? mx2Task = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, StartSuspended = true }, this.TimeoutToken);
+        using MultiplexingStream? mx1 = await mx1Task;
+        using MultiplexingStream? mx2 = await mx2Task;
 
         MultiplexingStream.Channel ch1 = mx1.CreateChannel();
         await Task.Delay(ExpectedTimeout); // simulate a slow receiving party
@@ -877,10 +877,10 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     public async Task StartListening_CalledTwice()
     {
         (this.transport1, this.transport2) = FullDuplexStream.CreatePair(new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024));
-        var mx1Task = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion }, this.TimeoutToken);
-        var mx2Task = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, StartSuspended = true }, this.TimeoutToken);
-        using var mx1 = await mx1Task;
-        using var mx2 = await mx2Task;
+        Task<MultiplexingStream>? mx1Task = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion }, this.TimeoutToken);
+        Task<MultiplexingStream>? mx2Task = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, StartSuspended = true }, this.TimeoutToken);
+        using MultiplexingStream? mx1 = await mx1Task;
+        using MultiplexingStream? mx2 = await mx2Task;
 
         mx2.StartListening();
         Assert.Throws<InvalidOperationException>(mx2.StartListening);
@@ -890,10 +890,10 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     public async Task MessageSendingMethodsThrowBeforeListeningHasStarted()
     {
         (this.transport1, this.transport2) = FullDuplexStream.CreatePair(new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024));
-        var mx1Task = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion }, this.TimeoutToken);
-        var mx2Task = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, StartSuspended = true }, this.TimeoutToken);
-        using var mx1 = await mx1Task;
-        using var mx2 = await mx2Task;
+        Task<MultiplexingStream>? mx1Task = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion }, this.TimeoutToken);
+        Task<MultiplexingStream>? mx2Task = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, StartSuspended = true }, this.TimeoutToken);
+        using MultiplexingStream? mx1 = await mx1Task;
+        using MultiplexingStream? mx2 = await mx2Task;
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => mx2.OfferChannelAsync(string.Empty, this.TimeoutToken));
         await Assert.ThrowsAsync<InvalidOperationException>(() => mx2.AcceptChannelAsync(string.Empty, this.TimeoutToken));
@@ -905,13 +905,13 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task ChannelAutoCloses_WhenBothEndsCompleteWriting()
     {
-        var aMsg = new byte[] { 0x1 };
-        var bMsg = new byte[] { 0x2 };
-        var (a, b) = await this.EstablishChannelsAsync("a");
+        byte[]? aMsg = new byte[] { 0x1 };
+        byte[]? bMsg = new byte[] { 0x2 };
+        (MultiplexingStream.Channel a, MultiplexingStream.Channel b) = await this.EstablishChannelsAsync("a");
 
         await a.Output.WriteAsync(aMsg, this.TimeoutToken);
         a.Output.Complete();
-        var aMsgReceived = await b.Input.ReadAsync(this.TimeoutToken);
+        ReadResult aMsgReceived = await b.Input.ReadAsync(this.TimeoutToken);
         Assert.Equal(aMsg, aMsgReceived.Buffer.First.Span.ToArray());
         b.Input.AdvanceTo(aMsgReceived.Buffer.End);
 #pragma warning disable CS0618 // Type or member is obsolete
@@ -922,7 +922,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
         await b.Output.WriteAsync(bMsg, this.TimeoutToken);
         b.Output.Complete();
-        var bMsgReceived = await a.Input.ReadAsync(this.TimeoutToken);
+        ReadResult bMsgReceived = await a.Input.ReadAsync(this.TimeoutToken);
         Assert.Equal(bMsg, bMsgReceived.Buffer.First.Span.ToArray());
         a.Input.AdvanceTo(bMsgReceived.Buffer.End);
 #pragma warning disable CS0618 // Type or member is obsolete
@@ -939,14 +939,14 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     {
         var channel2OutboundPipe = new Pipe();
         var channel2InboundPipe = new Pipe();
-        var channel2Stream = new DuplexPipe(channel2InboundPipe.Reader, channel2OutboundPipe.Writer).AsStream();
+        Stream? channel2Stream = new DuplexPipe(channel2InboundPipe.Reader, channel2OutboundPipe.Writer).AsStream();
         var channel2Options = new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(channel2OutboundPipe.Reader, channel2InboundPipe.Writer) };
 
         const string channelName = "channelName";
-        var mx2ChannelTask = this.mx2.AcceptChannelAsync(channelName, channel2Options, this.TimeoutToken);
-        var mx1ChannelTask = this.mx1.OfferChannelAsync(channelName, this.TimeoutToken);
-        var channels = await Task.WhenAll(mx1ChannelTask, mx2ChannelTask).WithCancellation(this.TimeoutToken);
-        var channel1Stream = channels[0].AsStream();
+        Task<MultiplexingStream.Channel>? mx2ChannelTask = this.mx2.AcceptChannelAsync(channelName, channel2Options, this.TimeoutToken);
+        Task<MultiplexingStream.Channel>? mx1ChannelTask = this.mx1.OfferChannelAsync(channelName, this.TimeoutToken);
+        MultiplexingStream.Channel[]? channels = await Task.WhenAll(mx1ChannelTask, mx2ChannelTask).WithCancellation(this.TimeoutToken);
+        Stream? channel1Stream = channels[0].AsStream();
 
         await this.TransmitAndVerifyAsync(channel1Stream, channel2Stream, new byte[] { 1, 2, 3 });
         await this.TransmitAndVerifyAsync(channel2Stream, channel1Stream, new byte[] { 4, 5, 6 });
@@ -957,14 +957,14 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     {
         var channel2OutboundPipe = new Pipe();
         var channel2InboundPipe = new Pipe();
-        var channel2Stream = new DuplexPipe(channel2InboundPipe.Reader, channel2OutboundPipe.Writer).AsStream();
+        Stream? channel2Stream = new DuplexPipe(channel2InboundPipe.Reader, channel2OutboundPipe.Writer).AsStream();
         var channel2Options = new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(channel2OutboundPipe.Reader, channel2InboundPipe.Writer) };
 
         const string channelName = "channelName";
-        var mx2ChannelTask = this.mx2.OfferChannelAsync(channelName, channel2Options, this.TimeoutToken);
-        var mx1ChannelTask = this.mx1.AcceptChannelAsync(channelName, this.TimeoutToken);
-        var channels = await Task.WhenAll(mx1ChannelTask, mx2ChannelTask).WithCancellation(this.TimeoutToken);
-        var channel1Stream = channels[0].AsStream();
+        Task<MultiplexingStream.Channel>? mx2ChannelTask = this.mx2.OfferChannelAsync(channelName, channel2Options, this.TimeoutToken);
+        Task<MultiplexingStream.Channel>? mx1ChannelTask = this.mx1.AcceptChannelAsync(channelName, this.TimeoutToken);
+        MultiplexingStream.Channel[]? channels = await Task.WhenAll(mx1ChannelTask, mx2ChannelTask).WithCancellation(this.TimeoutToken);
+        Stream? channel1Stream = channels[0].AsStream();
 
         await this.TransmitAndVerifyAsync(channel1Stream, channel2Stream, new byte[] { 1, 2, 3 });
         await this.TransmitAndVerifyAsync(channel2Stream, channel1Stream, new byte[] { 4, 5, 6 });
@@ -976,7 +976,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task ExistingPipe_Send_Accept_Recv_Send()
     {
-        var packets = new byte[][]
+        byte[][]? packets = new byte[][]
         {
             new byte[] { 1, 2, 3 },
             new byte[] { 4, 5, 6 },
@@ -985,18 +985,18 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
         var channel2OutboundPipe = new Pipe();
         var channel2InboundPipe = new Pipe();
-        var channel2Stream = new DuplexPipe(channel2InboundPipe.Reader, channel2OutboundPipe.Writer).AsStream();
+        Stream? channel2Stream = new DuplexPipe(channel2InboundPipe.Reader, channel2OutboundPipe.Writer).AsStream();
         var channel2Options = new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(channel2OutboundPipe.Reader, channel2InboundPipe.Writer) };
 
         // Create the channel and transmit before it is accepted.
-        var channel1 = this.mx1.CreateChannel();
-        var channel1Stream = channel1.AsStream();
+        MultiplexingStream.Channel? channel1 = this.mx1.CreateChannel();
+        Stream? channel1Stream = channel1.AsStream();
         await channel1Stream.WriteAsync(packets[0], 0, packets[0].Length, this.TimeoutToken);
         await channel1Stream.FlushAsync(this.TimeoutToken);
 
         // Accept the channel and read the bytes
         await this.WaitForEphemeralChannelOfferToPropagateAsync();
-        var channel2 = this.mx2.AcceptChannel(channel1.QualifiedId.Id, channel2Options);
+        MultiplexingStream.Channel? channel2 = this.mx2.AcceptChannel(channel1.QualifiedId.Id, channel2Options);
         await this.VerifyReceivedDataAsync(channel2Stream, packets[0]);
 
         // Verify we can transmit via the ExistingPipe.
@@ -1013,7 +1013,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task ExistingPipe_Send_Accept_Send()
     {
-        var packets = new byte[][]
+        byte[][]? packets = new byte[][]
         {
             new byte[] { 1, 2, 3 },
             new byte[] { 4, 5, 6 },
@@ -1028,14 +1028,14 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         };
 
         // Create the channel and transmit before it is accepted.
-        var channel1 = this.mx1.CreateChannel();
-        var channel1Stream = channel1.AsStream();
+        MultiplexingStream.Channel? channel1 = this.mx1.CreateChannel();
+        Stream? channel1Stream = channel1.AsStream();
         await channel1Stream.WriteAsync(packets[0], 0, packets[0].Length, this.TimeoutToken);
         await channel1Stream.FlushAsync(this.TimeoutToken);
 
         // Accept the channel
         await this.WaitForEphemeralChannelOfferToPropagateAsync();
-        var channel2 = this.mx2.AcceptChannel(channel1.QualifiedId.Id, channel2Options);
+        MultiplexingStream.Channel? channel2 = this.mx2.AcceptChannel(channel1.QualifiedId.Id, channel2Options);
 
         // Send MORE bytes
         await channel1Stream.WriteAsync(packets[1], 0, packets[1].Length, this.TimeoutToken);
@@ -1061,11 +1061,11 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
             ChannelReceivingWindowSize = DataSize,
         };
 
-        var channel1 = this.mx1.CreateChannel(channelOptions);
+        MultiplexingStream.Channel? channel1 = this.mx1.CreateChannel(channelOptions);
 
         // Blast a bunch of data to the channel as soon as it is accepted.
         await this.WaitForEphemeralChannelOfferToPropagateAsync();
-        var channel2 = this.mx2.AcceptChannel(channel1.QualifiedId.Id, channelOptions);
+        MultiplexingStream.Channel? channel2 = this.mx2.AcceptChannel(channel1.QualifiedId.Id, channelOptions);
         await channel2.Output.WriteAsync(new byte[DataSize], this.TimeoutToken);
 
         // Read all the data, such that the PipeReader has to buffer until the whole payload is read.
@@ -1074,7 +1074,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         int bytesRead = 0;
         while (bytesRead < DataSize)
         {
-            var readResult = await channel1.Input.ReadAsync(this.TimeoutToken);
+            ReadResult readResult = await channel1.Input.ReadAsync(this.TimeoutToken);
             bytesRead += (int)readResult.Buffer.Length;
             SequencePosition consumed = bytesRead == DataSize ? readResult.Buffer.End : readResult.Buffer.Start;
             channel1.Input.AdvanceTo(consumed, readResult.Buffer.End);
@@ -1093,7 +1093,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
             ChannelReceivingWindowSize = 2 * 1024 * 1024,
         };
 
-        var channel1 = this.mx1.CreateChannel();
+        MultiplexingStream.Channel? channel1 = this.mx1.CreateChannel();
         await this.WaitForEphemeralChannelOfferToPropagateAsync();
         var bytesWrittenEvent = new AsyncManualResetEvent();
 
@@ -1117,7 +1117,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
                 await bytesWrittenEvent.WaitAsync(this.TimeoutToken);
             }
 
-            var channel2 = this.mx2.AcceptChannel(channel1.QualifiedId.Id, channelOptions);
+            MultiplexingStream.Channel? channel2 = this.mx2.AcceptChannel(channel1.QualifiedId.Id, channelOptions);
 
             // Read all the data, such that the PipeReader has to buffer until the whole payload is read.
             // Since this is a LOT of data, this would normally overrun the Pipe's max buffer size.
@@ -1125,7 +1125,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
             int bytesRead = 0;
             while (bytesRead < dataSize)
             {
-                var readResult = await channel2.Input.ReadAsync(this.TimeoutToken);
+                ReadResult readResult = await channel2.Input.ReadAsync(this.TimeoutToken);
                 bytesRead += (int)readResult.Buffer.Length;
                 SequencePosition consumed = bytesRead == dataSize ? readResult.Buffer.End : readResult.Buffer.Start;
                 channel2.Input.AdvanceTo(consumed, readResult.Buffer.End);
@@ -1136,7 +1136,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public virtual async Task SeededChannels()
     {
-        var pair = FullDuplexStream.CreatePair();
+        (Stream, Stream) pair = FullDuplexStream.CreatePair();
         var options = new MultiplexingStream.Options
         {
             ProtocolMajorVersion = this.ProtocolMajorVersion,
@@ -1153,7 +1153,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
     protected static Task CompleteChannelsAsync(params MultiplexingStream.Channel[] channels)
     {
-        foreach (var channel in channels)
+        foreach (MultiplexingStream.Channel? channel in channels)
         {
             channel.Output.Complete();
         }
@@ -1168,7 +1168,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         // and wait for that message to be received.
         // The "message" we send is an offer for a named channel, since that can be awaited on to accept.
         const string ChannelName = "EphemeralChannelWaiter";
-        var channels = await Task.WhenAll(
+        MultiplexingStream.Channel[]? channels = await Task.WhenAll(
             this.mx1.OfferChannelAsync(ChannelName, this.TimeoutToken),
             this.mx2.AcceptChannelAsync(ChannelName, this.TimeoutToken)).WithCancellation(this.TimeoutToken);
         channels[0].Dispose();
@@ -1178,9 +1178,9 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     protected async Task<(MultiplexingStream.Channel, MultiplexingStream.Channel)> EstablishChannelsAsync(string identifier, long? receivingWindowSize = null)
     {
         var channelOptions = new MultiplexingStream.ChannelOptions { ChannelReceivingWindowSize = receivingWindowSize };
-        var mx1ChannelTask = this.mx1.OfferChannelAsync(identifier, channelOptions, this.TimeoutToken);
-        var mx2ChannelTask = this.mx2.AcceptChannelAsync(identifier, channelOptions, this.TimeoutToken);
-        var channels = await WhenAllSucceedOrAnyFail(mx1ChannelTask, mx2ChannelTask).WithCancellation(this.TimeoutToken);
+        Task<MultiplexingStream.Channel>? mx1ChannelTask = this.mx1.OfferChannelAsync(identifier, channelOptions, this.TimeoutToken);
+        Task<MultiplexingStream.Channel>? mx2ChannelTask = this.mx2.AcceptChannelAsync(identifier, channelOptions, this.TimeoutToken);
+        MultiplexingStream.Channel[]? channels = await WhenAllSucceedOrAnyFail(mx1ChannelTask, mx2ChannelTask).WithCancellation(this.TimeoutToken);
         Assert.NotNull(channels[0]);
         Assert.NotNull(channels[1]);
         return (channels[0], channels[1]);
@@ -1188,7 +1188,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
     protected async Task<(Stream, Stream)> EstablishChannelStreamsAsync(string identifier, long? receivingWindowSize = null)
     {
-        var (channel1, channel2) = await this.EstablishChannelsAsync(identifier, receivingWindowSize);
+        (MultiplexingStream.Channel channel1, MultiplexingStream.Channel channel2) = await this.EstablishChannelsAsync(identifier, receivingWindowSize);
         return (channel1.AsStream(), channel2.AsStream());
     }
 

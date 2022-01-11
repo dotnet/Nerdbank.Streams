@@ -23,17 +23,17 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
     public async Task Backpressure()
     {
         long backpressureThreshold = this.mx1.DefaultChannelReceivingWindowSize;
-        var (a, b) = await this.EstablishChannelsAsync("a");
+        (MultiplexingStream.Channel a, MultiplexingStream.Channel b) = await this.EstablishChannelsAsync("a");
 
-        var biteSizeChunk = new byte[backpressureThreshold * 2 / 5];
-        var hugeChunk = new byte[backpressureThreshold * 2]; // enough to fill the remote and local windows
+        byte[]? biteSizeChunk = new byte[backpressureThreshold * 2 / 5];
+        byte[]? hugeChunk = new byte[backpressureThreshold * 2]; // enough to fill the remote and local windows
         a.Output.Write(hugeChunk);
         Task flushTask = a.Output.FlushAsync(this.TimeoutToken).AsTask();
         await Task.Delay(ExpectedTimeout);
         Assert.False(flushTask.IsCompleted);
 
         // Verify that another channel can be created and communicate while the first channel is still blocked.
-        var (c, d) = await this.EstablishChannelsAsync("b");
+        (MultiplexingStream.Channel c, MultiplexingStream.Channel d) = await this.EstablishChannelsAsync("b");
         for (int i = 0; i < 5; i++)
         {
             c.Output.Write(biteSizeChunk);
@@ -65,7 +65,7 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
     [Fact]
     public async Task Backpressure_FullButNeedMoreBytesToProcess()
     {
-        var (a, b) = await this.EstablishChannelsAsync("a");
+        (MultiplexingStream.Channel a, MultiplexingStream.Channel b) = await this.EstablishChannelsAsync("a");
 
         // Write far more than would be allowed.
         long bytesWritten = this.mx2.DefaultChannelReceivingWindowSize * 5;
@@ -74,7 +74,7 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
 
         while (true)
         {
-            var readResult = await b.Input.ReadAsync(this.TimeoutToken);
+            ReadResult readResult = await b.Input.ReadAsync(this.TimeoutToken);
             this.Logger.WriteLine("Read returned buffer with length: {0}", readResult.Buffer.Length);
 
             if (readResult.Buffer.Length < bytesWritten)
@@ -97,9 +97,9 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
     public async Task Backpressure_ExistingPipe()
     {
         const int backpressureThreshold = 80 * 1024;
-        var mx2Pipe = FullDuplexStream.CreatePipePair(new PipeOptions(pauseWriterThreshold: backpressureThreshold));
-        var mx1ChannelTask = this.mx1.OfferChannelAsync("a", this.TimeoutToken);
-        var mx2ChannelTask = this.mx2.AcceptChannelAsync(
+        (IDuplexPipe, IDuplexPipe) mx2Pipe = FullDuplexStream.CreatePipePair(new PipeOptions(pauseWriterThreshold: backpressureThreshold));
+        Task<MultiplexingStream.Channel>? mx1ChannelTask = this.mx1.OfferChannelAsync("a", this.TimeoutToken);
+        Task<MultiplexingStream.Channel>? mx2ChannelTask = this.mx2.AcceptChannelAsync(
             "a",
             new MultiplexingStream.ChannelOptions
             {
@@ -107,8 +107,8 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
                 ChannelReceivingWindowSize = backpressureThreshold,
             },
             this.TimeoutToken);
-        var channels = await WhenAllSucceedOrAnyFail(mx1ChannelTask, mx2ChannelTask).WithCancellation(this.TimeoutToken);
-        var (a, b) = (channels[0], channels[1]);
+        MultiplexingStream.Channel[]? channels = await WhenAllSucceedOrAnyFail(mx1ChannelTask, mx2ChannelTask).WithCancellation(this.TimeoutToken);
+        (MultiplexingStream.Channel a, MultiplexingStream.Channel b) = (channels[0], channels[1]);
 
         // Write far more than would be allowed.
         const int bytesWritten = backpressureThreshold * 5;
@@ -117,7 +117,7 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
 
         while (true)
         {
-            var readResult = await mx2Pipe.Item2.Input.ReadAsync(this.TimeoutToken);
+            ReadResult readResult = await mx2Pipe.Item2.Input.ReadAsync(this.TimeoutToken);
             this.Logger.WriteLine("Read returned buffer with length: {0}", readResult.Buffer.Length);
 
             if (readResult.Buffer.Length < bytesWritten)
@@ -149,7 +149,7 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
     public async Task CompleteReadingAfterChannelTerminated()
     {
         long backpressureThreshold = this.mx1.DefaultChannelReceivingWindowSize;
-        var (a, b) = await this.EstablishChannelsAsync("a");
+        (MultiplexingStream.Channel a, MultiplexingStream.Channel b) = await this.EstablishChannelsAsync("a");
 
         await a.Output.WriteAsync(new byte[30 * 1024], this.TimeoutToken);
         await a.Output.CompleteAsync();

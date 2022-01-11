@@ -38,9 +38,9 @@ public class StreamUsePipeReaderTests : StreamPipeReaderTestBase
         unreadableStream.Setup(s => s.ReadAsync(It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ThrowsAsync(expectedException);
 #endif
 
-        var reader = this.CreatePipeReader(unreadableStream.Object);
+        PipeReader? reader = this.CreatePipeReader(unreadableStream.Object);
 #pragma warning disable CS0618 // Type or member is obsolete
-        var actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => reader.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken));
+        InvalidOperationException? actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => reader.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken));
 #pragma warning restore CS0618 // Type or member is obsolete
         Assert.Same(expectedException, actualException);
     }
@@ -49,7 +49,7 @@ public class StreamUsePipeReaderTests : StreamPipeReaderTestBase
     public async Task Complete_CausesWriterCompletion()
     {
         var stream = new SimplexStream();
-        var reader = this.CreatePipeReader(stream);
+        PipeReader? reader = this.CreatePipeReader(stream);
 #pragma warning disable CS0618 // Type or member is obsolete
         Task writerCompletion = reader.WaitForWriterCompletionAsync();
 #pragma warning restore CS0618 // Type or member is obsolete

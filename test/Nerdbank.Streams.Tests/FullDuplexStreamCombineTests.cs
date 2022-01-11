@@ -89,7 +89,7 @@ public class FullDuplexStreamCombineTests : TestBase
         var writableMock = new Mock<Stream>();
         writableMock.SetupGet(s => s.CanWrite).Returns(true);
 
-        var duplex = FullDuplexStream.Splice(readableMock.Object, writableMock.Object);
+        Stream? duplex = FullDuplexStream.Splice(readableMock.Object, writableMock.Object);
         Assert.False(duplex.CanTimeout);
 
         readableMock.SetupGet(s => s.CanTimeout).Returns(true);
@@ -112,7 +112,7 @@ public class FullDuplexStreamCombineTests : TestBase
         var readableMock = new Mock<Stream>();
         readableMock.SetupGet(s => s.CanRead).Returns(true);
         readableMock.SetupProperty(s => s.ReadTimeout);
-        var duplex = FullDuplexStream.Splice(readableMock.Object, Stream.Null);
+        Stream? duplex = FullDuplexStream.Splice(readableMock.Object, Stream.Null);
         duplex.ReadTimeout = 8;
         Assert.Equal(8, duplex.ReadTimeout);
         Assert.Equal(8, readableMock.Object.ReadTimeout);
@@ -124,7 +124,7 @@ public class FullDuplexStreamCombineTests : TestBase
         var writableMock = new Mock<Stream>();
         writableMock.SetupGet(s => s.CanWrite).Returns(true);
         writableMock.SetupProperty(s => s.WriteTimeout);
-        var duplex = FullDuplexStream.Splice(Stream.Null, writableMock.Object);
+        Stream? duplex = FullDuplexStream.Splice(Stream.Null, writableMock.Object);
         duplex.WriteTimeout = 8;
         Assert.Equal(8, duplex.WriteTimeout);
         Assert.Equal(8, writableMock.Object.WriteTimeout);
@@ -161,9 +161,9 @@ public class FullDuplexStreamCombineTests : TestBase
     {
         var readableMock = new Mock<Stream>(MockBehavior.Strict);
         readableMock.SetupGet(s => s.CanRead).Returns(true);
-        var buffer = new byte[3];
+        byte[]? buffer = new byte[3];
         readableMock.Setup(s => s.Read(buffer, 2, 1)).Returns(1);
-        var duplex = FullDuplexStream.Splice(readableMock.Object, Stream.Null);
+        Stream? duplex = FullDuplexStream.Splice(readableMock.Object, Stream.Null);
         Assert.Equal(1, duplex.Read(buffer, 2, 1));
         readableMock.VerifyAll();
     }
@@ -173,11 +173,11 @@ public class FullDuplexStreamCombineTests : TestBase
     {
         var readableMock = new Mock<Stream>(MockBehavior.Strict);
         readableMock.SetupGet(s => s.CanRead).Returns(true);
-        var buffer = new byte[3];
+        byte[]? buffer = new byte[3];
         var tcs = new TaskCompletionSource<int>();
         var cts = new CancellationTokenSource();
         readableMock.Setup(s => s.ReadAsync(buffer, 2, 1, cts.Token)).Returns(tcs.Task);
-        var duplex = FullDuplexStream.Splice(readableMock.Object, Stream.Null);
+        Stream? duplex = FullDuplexStream.Splice(readableMock.Object, Stream.Null);
         Assert.Same(tcs.Task, duplex.ReadAsync(buffer, 2, 1, cts.Token));
         readableMock.VerifyAll();
     }
@@ -188,7 +188,7 @@ public class FullDuplexStreamCombineTests : TestBase
         var readableMock = new Mock<Stream>(MockBehavior.Strict);
         readableMock.SetupGet(s => s.CanRead).Returns(true);
         readableMock.Setup(s => s.ReadByte()).Returns(8);
-        var duplex = FullDuplexStream.Splice(readableMock.Object, Stream.Null);
+        Stream? duplex = FullDuplexStream.Splice(readableMock.Object, Stream.Null);
         Assert.Equal(8, duplex.ReadByte());
         readableMock.VerifyAll();
     }
@@ -198,9 +198,9 @@ public class FullDuplexStreamCombineTests : TestBase
     {
         var writableMock = new Mock<Stream>(MockBehavior.Strict);
         writableMock.SetupGet(s => s.CanWrite).Returns(true);
-        var buffer = new byte[3];
+        byte[]? buffer = new byte[3];
         writableMock.Setup(s => s.Write(buffer, 2, 1));
-        var duplex = FullDuplexStream.Splice(Stream.Null, writableMock.Object);
+        Stream? duplex = FullDuplexStream.Splice(Stream.Null, writableMock.Object);
         duplex.Write(buffer, 2, 1);
         writableMock.VerifyAll();
     }
@@ -210,11 +210,11 @@ public class FullDuplexStreamCombineTests : TestBase
     {
         var writableMock = new Mock<Stream>(MockBehavior.Strict);
         writableMock.SetupGet(s => s.CanWrite).Returns(true);
-        var buffer = new byte[3];
+        byte[]? buffer = new byte[3];
         var tcs = new TaskCompletionSource<object>();
         var cts = new CancellationTokenSource();
         writableMock.Setup(s => s.WriteAsync(buffer, 2, 1, cts.Token)).Returns(tcs.Task);
-        var duplex = FullDuplexStream.Splice(Stream.Null, writableMock.Object);
+        Stream? duplex = FullDuplexStream.Splice(Stream.Null, writableMock.Object);
         Assert.Same(tcs.Task, duplex.WriteAsync(buffer, 2, 1, cts.Token));
         writableMock.VerifyAll();
     }
@@ -229,7 +229,7 @@ public class FullDuplexStreamCombineTests : TestBase
         var task = new ValueTask<int>(new TaskCompletionSource<int>().Task);
         var cts = new CancellationTokenSource();
         readableMock.Setup(s => s.ReadAsync(buffer, cts.Token)).Returns(task);
-        var duplex = FullDuplexStream.Splice(readableMock.Object, Stream.Null);
+        Stream? duplex = FullDuplexStream.Splice(readableMock.Object, Stream.Null);
         Assert.Equal(task, duplex.ReadAsync(buffer, cts.Token));
         readableMock.VerifyAll();
     }
@@ -243,7 +243,7 @@ public class FullDuplexStreamCombineTests : TestBase
         var task = new ValueTask(new TaskCompletionSource<object>().Task);
         var cts = new CancellationTokenSource();
         writableMock.Setup(s => s.WriteAsync(buffer, cts.Token)).Returns(task);
-        var duplex = FullDuplexStream.Splice(Stream.Null, writableMock.Object);
+        Stream? duplex = FullDuplexStream.Splice(Stream.Null, writableMock.Object);
         Assert.Equal(task, duplex.WriteAsync(buffer, cts.Token));
         writableMock.VerifyAll();
     }
@@ -267,9 +267,9 @@ public class FullDuplexStreamCombineTests : TestBase
     {
         var writableMock = new Mock<Stream>(MockBehavior.Strict);
         writableMock.SetupGet(s => s.CanWrite).Returns(true);
-        var buffer = new byte[3];
+        byte[]? buffer = new byte[3];
         writableMock.Setup(s => s.WriteByte(5));
-        var duplex = FullDuplexStream.Splice(Stream.Null, writableMock.Object);
+        Stream? duplex = FullDuplexStream.Splice(Stream.Null, writableMock.Object);
         duplex.WriteByte(5);
         writableMock.VerifyAll();
     }
@@ -279,10 +279,10 @@ public class FullDuplexStreamCombineTests : TestBase
     {
         var writableMock = new Mock<Stream>(MockBehavior.Strict);
         writableMock.SetupGet(s => s.CanWrite).Returns(true);
-        var buffer = new byte[3];
+        byte[]? buffer = new byte[3];
         var cts = new CancellationTokenSource();
         writableMock.Setup(s => s.Flush());
-        var duplex = FullDuplexStream.Splice(Stream.Null, writableMock.Object);
+        Stream? duplex = FullDuplexStream.Splice(Stream.Null, writableMock.Object);
         duplex.Flush();
         writableMock.VerifyAll();
     }
@@ -292,11 +292,11 @@ public class FullDuplexStreamCombineTests : TestBase
     {
         var writableMock = new Mock<Stream>(MockBehavior.Strict);
         writableMock.SetupGet(s => s.CanWrite).Returns(true);
-        var buffer = new byte[3];
+        byte[]? buffer = new byte[3];
         var tcs = new TaskCompletionSource<object>();
         var cts = new CancellationTokenSource();
         writableMock.Setup(s => s.FlushAsync(cts.Token)).Returns(tcs.Task);
-        var duplex = FullDuplexStream.Splice(Stream.Null, writableMock.Object);
+        Stream? duplex = FullDuplexStream.Splice(Stream.Null, writableMock.Object);
         Assert.Same(tcs.Task, duplex.FlushAsync(cts.Token));
         writableMock.VerifyAll();
     }
@@ -318,7 +318,7 @@ public class FullDuplexStreamCombineTests : TestBase
         var tcs = new TaskCompletionSource<object>();
         var cts = new CancellationTokenSource();
         readableMock.Setup(s => s.CopyToAsync(ms, 867, cts.Token)).Returns(tcs.Task);
-        var duplex = FullDuplexStream.Splice(readableMock.Object, Stream.Null);
+        Stream? duplex = FullDuplexStream.Splice(readableMock.Object, Stream.Null);
         Assert.Same(tcs.Task, duplex.CopyToAsync(ms, 867, cts.Token));
         readableMock.VerifyAll();
     }
@@ -334,7 +334,7 @@ public class FullDuplexStreamCombineTests : TestBase
         writableMock.SetupGet(s => s.CanWrite).Returns(true);
         writableMock.Setup(s => s.Close());
 
-        var duplex = FullDuplexStream.Splice(readableMock.Object, writableMock.Object);
+        Stream? duplex = FullDuplexStream.Splice(readableMock.Object, writableMock.Object);
         duplex.Close();
         readableMock.VerifyAll();
         writableMock.VerifyAll();
@@ -345,7 +345,7 @@ public class FullDuplexStreamCombineTests : TestBase
     {
         var readable = new MemoryStream();
         var writable = new MemoryStream();
-        var duplex = FullDuplexStream.Splice(readable, writable);
+        Stream? duplex = FullDuplexStream.Splice(readable, writable);
         duplex.Dispose();
 
         Assert.Throws<ObjectDisposedException>(() => readable.Position);

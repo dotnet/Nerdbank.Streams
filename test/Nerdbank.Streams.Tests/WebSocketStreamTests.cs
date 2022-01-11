@@ -122,7 +122,7 @@ public partial class WebSocketStreamTests : TestBase
         byte[] buffer = new byte[bufferSize];
         this.random.NextBytes(buffer);
         await this.stream.WriteAsync(buffer, 0, buffer.Length, this.TimeoutToken);
-        var message = this.socket.WrittenQueue.Dequeue();
+        MockWebSocket.Message? message = this.socket.WrittenQueue.Dequeue();
         Assert.Equal(buffer, message.Buffer.ToArray());
     }
 
@@ -218,11 +218,11 @@ public partial class WebSocketStreamTests : TestBase
         (this.stream, clientSocket) = await this.EstablishWebSocket();
 
         // Send a buffer and immediately close the client socket, such that the server gets the message and will close it after relaying our first message.
-        var sendBuffer = new byte[20];
+        byte[]? sendBuffer = new byte[20];
         await this.stream.WriteAsync(sendBuffer, 0, sendBuffer.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken);
         await clientSocket.CloseOutputAsync(WebSocketCloseStatus.Empty, string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
 
-        var recvBuffer = new byte[sendBuffer.Length];
+        byte[]? recvBuffer = new byte[sendBuffer.Length];
         await this.ReadAsync(this.stream, recvBuffer);
 
         int bytesRead = await this.stream.ReadAsync(recvBuffer, 0, recvBuffer.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken);
@@ -242,11 +242,11 @@ public partial class WebSocketStreamTests : TestBase
         (this.stream, clientSocket) = await this.EstablishWebSocket();
 
         const int writeCount = 10;
-        var buffer = new byte[5];
+        byte[]? buffer = new byte[5];
         await Task.WhenAll(Enumerable.Range(0, writeCount).Select(i => this.stream.WriteAsync(buffer, 0, buffer.Length, this.TimeoutToken)));
         await this.stream.FlushAsync(this.TimeoutToken);
 
-        var recvBuffer = new byte[buffer.Length * writeCount];
+        byte[]? recvBuffer = new byte[buffer.Length * writeCount];
         int bytesRead = 0;
         while (bytesRead < recvBuffer.Length)
         {

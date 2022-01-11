@@ -174,7 +174,7 @@ public class BufferTextWriterTests : TestBase
         byte[] writtenBytes = this.sequence.AsReadOnlySequence.ToArray();
 
         // Assert the preamble was written, if any.
-        var expectedPreamble = encoding.GetPreamble();
+        byte[]? expectedPreamble = encoding.GetPreamble();
         Assert.Equal(expectedPreamble, writtenBytes.Take(expectedPreamble.Length));
 
         // Skip the preamble when comparing the string.

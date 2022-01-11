@@ -38,7 +38,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
 
         byte[] expectedBuffer = this.GetRandomBuffer(2048);
         var stream = new MemoryStream(expectedBuffer);
-        var reader = this.CreatePipeReader(stream, sizeHint: 50);
+        PipeReader? reader = this.CreatePipeReader(stream, sizeHint: 50);
 
 #pragma warning disable CS0618 // Type or member is obsolete
         Task writerCompletedTask = reader.WaitForWriterCompletionAsync();
@@ -58,7 +58,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
         int bytesRead = 0;
         while (bytesRead < expectedBuffer.Length)
         {
-            var result = await reader.ReadAsync(this.TimeoutToken);
+            ReadResult result = await reader.ReadAsync(this.TimeoutToken);
             foreach (ReadOnlyMemory<byte> segment in result.Buffer)
             {
                 segment.CopyTo(new Memory<byte>(actualBuffer, bytesRead, actualBuffer.Length - bytesRead));
@@ -69,7 +69,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
         }
 
         // Verify that the end of the stream causes the reader to report completion.
-        var lastResult = await reader.ReadAsync(this.TimeoutToken);
+        ReadResult lastResult = await reader.ReadAsync(this.TimeoutToken);
         Assert.Equal(0, lastResult.Buffer.Length);
         Assert.True(lastResult.IsCompleted);
 
@@ -93,7 +93,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
         var stream = new SimplexStream();
         stream.Write(expectedBuffer, 0, 50);
         await stream.FlushAsync(this.TimeoutToken);
-        var reader = this.CreatePipeReader(stream, sizeHint: 50);
+        PipeReader? reader = this.CreatePipeReader(stream, sizeHint: 50);
         byte[] actualBuffer = new byte[expectedBuffer.Length];
 
         ReadResult result = await reader.ReadAsync(this.TimeoutToken);
@@ -111,7 +111,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
         Assert.False(resultTask2.IsCompleted);
         stream.Write(expectedBuffer, 50, 50);
         await stream.FlushAsync(this.TimeoutToken);
-        var result2 = await resultTask2;
+        ReadResult result2 = await resultTask2;
         Assert.True(result2.Buffer.Length > result.Buffer.Length);
 
         // Now consume everything and get even more.
@@ -127,7 +127,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
     {
         byte[] expectedBuffer = this.GetRandomBuffer(2048);
         var stream = new MemoryStream(expectedBuffer);
-        var reader = this.CreatePipeReader(stream, sizeHint: 50);
+        PipeReader? reader = this.CreatePipeReader(stream, sizeHint: 50);
         byte[] actualBuffer = new byte[expectedBuffer.Length];
 
         ReadResult result = await reader.ReadAsync(this.TimeoutToken);
@@ -143,9 +143,9 @@ public abstract class StreamPipeReaderTestBase : TestBase
     [Fact]
     public void TryRead_FalseStillTurnsOnReadingMode()
     {
-        var reader = this.CreatePipeReader(new MemoryStream(new byte[] { 1, 2, 3 }));
+        PipeReader? reader = this.CreatePipeReader(new MemoryStream(new byte[] { 1, 2, 3 }));
 
-        bool tryReadResult = reader.TryRead(out var readResult);
+        bool tryReadResult = reader.TryRead(out ReadResult readResult);
 
         // The non-strict PipeReader is timing sensitive and may or may not be able to synchronously produce a read.
         // So only assert the False result for the strict readers.
@@ -166,19 +166,19 @@ public abstract class StreamPipeReaderTestBase : TestBase
         slowReadStream.WillReadMemory += (s, e) => unblockReader.Wait(this.TimeoutToken);
         slowReadStream.WillRead += (s, e) => unblockReader.Wait(this.TimeoutToken);
 
-        var reader = this.CreatePipeReader(slowReadStream);
+        PipeReader? reader = this.CreatePipeReader(slowReadStream);
 
         // Verify that it's safe to call TryRead repeatedly when it returns False.
-        Assert.False(reader.TryRead(out var readResult));
+        Assert.False(reader.TryRead(out ReadResult readResult));
         Assert.False(reader.TryRead(out readResult));
     }
 
     [Fact]
     public async Task TryRead_AdvanceTo_AfterEndReached()
     {
-        var reader = this.CreatePipeReader(new MemoryStream(new byte[] { 1, 2, 3 }));
+        PipeReader? reader = this.CreatePipeReader(new MemoryStream(new byte[] { 1, 2, 3 }));
 
-        var readResult = await reader.ReadAsync(this.TimeoutToken);
+        ReadResult readResult = await reader.ReadAsync(this.TimeoutToken);
         reader.AdvanceTo(readResult.Buffer.End);
 
         reader.TryRead(out readResult);
@@ -189,8 +189,8 @@ public abstract class StreamPipeReaderTestBase : TestBase
     public async Task ReadAsync_TwiceInARow(bool emptyStream)
     {
         var stream = new MemoryStream(emptyStream ? Array.Empty<byte>() : new byte[3]);
-        var reader = this.CreatePipeReader(stream, sizeHint: 50);
-        var result1 = await reader.ReadAsync(this.TimeoutToken);
+        PipeReader? reader = this.CreatePipeReader(stream, sizeHint: 50);
+        ReadResult result1 = await reader.ReadAsync(this.TimeoutToken);
         if (emptyStream)
         {
             Assert.True(result1.IsCompleted);
@@ -198,7 +198,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
 
         if (this.EmulatePipelinesStreamPipeReader)
         {
-            var result2 = await reader.ReadAsync(this.TimeoutToken);
+            ReadResult result2 = await reader.ReadAsync(this.TimeoutToken);
             Assert.Equal(result1.Buffer.Length, result2.Buffer.Length);
             Assert.Equal(emptyStream, result2.IsCompleted);
         }
@@ -212,10 +212,10 @@ public abstract class StreamPipeReaderTestBase : TestBase
     public async Task TryRead_TwiceInARow(bool emptyStream)
     {
         var stream = new MemoryStream(emptyStream ? Array.Empty<byte>() : new byte[3]);
-        var reader = this.CreatePipeReader(stream, sizeHint: 50);
+        PipeReader? reader = this.CreatePipeReader(stream, sizeHint: 50);
 
         // Read asynchronously once to guarantee that there's a non-empty buffer in the reader.
-        var readResult = await reader.ReadAsync(this.TimeoutToken);
+        ReadResult readResult = await reader.ReadAsync(this.TimeoutToken);
         reader.AdvanceTo(readResult.Buffer.Start);
 
         Assert.Equal(!emptyStream || !this.EmulatePipelinesStreamPipeReader, reader.TryRead(out _));
@@ -233,7 +233,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
     public void AdvanceTo_BeforeRead()
     {
         var stream = new MemoryStream();
-        var reader = this.CreatePipeReader(stream, sizeHint: 50);
+        PipeReader? reader = this.CreatePipeReader(stream, sizeHint: 50);
         if (this.EmulatePipelinesStreamPipeReader)
         {
             reader.AdvanceTo(default);
@@ -243,7 +243,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
             Assert.Throws<InvalidOperationException>(() => reader.AdvanceTo(default));
         }
 
-        var ex = Assert.ThrowsAny<Exception>(() => reader.AdvanceTo(ReadOnlySequence<byte>.Empty.Start));
+        Exception? ex = Assert.ThrowsAny<Exception>(() => reader.AdvanceTo(ReadOnlySequence<byte>.Empty.Start));
         Assert.True(ex is InvalidCastException || ex is InvalidOperationException);
     }
 
@@ -253,7 +253,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
         Skip.If(this is IOPipelinesStreamPipeReaderTests, "OnWriterCompleted isn't supported.");
         byte[] expectedBuffer = this.GetRandomBuffer(50);
         var stream = new MemoryStream(expectedBuffer);
-        var reader = this.CreatePipeReader(stream, sizeHint: 50);
+        PipeReader? reader = this.CreatePipeReader(stream, sizeHint: 50);
         byte[] actualBuffer = new byte[expectedBuffer.Length];
 
         // The exception throwing test is disabled due to https://github.com/dotnet/corefx/issues/31695
@@ -266,7 +266,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
         // Read everything.
         while (true)
         {
-            var result = await reader.ReadAsync(this.TimeoutToken).AsTask().WithCancellation(this.TimeoutToken);
+            ReadResult result = await reader.ReadAsync(this.TimeoutToken).AsTask().WithCancellation(this.TimeoutToken);
             reader.AdvanceTo(result.Buffer.End);
             if (result.IsCompleted)
             {
@@ -287,7 +287,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
     public async Task CancelPendingRead_WithCancellationToken()
     {
         var stream = new SimplexStream();
-        var reader = this.CreatePipeReader(stream, sizeHint: 50);
+        PipeReader? reader = this.CreatePipeReader(stream, sizeHint: 50);
 
         var cts = new CancellationTokenSource();
         ValueTask<ReadResult> readTask = reader.ReadAsync(cts.Token);
@@ -302,7 +302,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
         var ms = new MonitoringStream(stream);
         var disposal = new AsyncManualResetEvent();
         ms.Disposed += (s, e) => disposal.Set();
-        var reader = this.CreatePipeReader(ms);
+        PipeReader? reader = this.CreatePipeReader(ms);
         reader.Complete();
 
         if (this is IOPipelinesStreamPipeReaderTests)
@@ -319,11 +319,11 @@ public abstract class StreamPipeReaderTestBase : TestBase
     public async Task CancelPendingRead()
     {
         var stream = new SimplexStream();
-        var reader = this.CreatePipeReader(stream, sizeHint: 50);
+        PipeReader? reader = this.CreatePipeReader(stream, sizeHint: 50);
 
         ValueTask<ReadResult> readTask = reader.ReadAsync(this.TimeoutToken);
         reader.CancelPendingRead();
-        var readResult = await readTask.AsTask().WithCancellation(this.TimeoutToken);
+        ReadResult readResult = await readTask.AsTask().WithCancellation(this.TimeoutToken);
         Assert.True(readResult.IsCanceled);
 
         // Verify we can read after that without cancellation.

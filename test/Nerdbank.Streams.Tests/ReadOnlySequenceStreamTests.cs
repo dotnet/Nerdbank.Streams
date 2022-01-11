@@ -97,12 +97,12 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.Equal(0, this.defaultStream.Position);
         Assert.Throws<ArgumentOutOfRangeException>(() => this.defaultStream.Position = 1);
 
-        var simpleStream = SimpleSequence.AsStream();
+        Stream? simpleStream = SimpleSequence.AsStream();
         Assert.Equal(0, simpleStream.Position);
         simpleStream.Position++;
         Assert.Equal(1, simpleStream.Position);
 
-        var multiBlockStream = MultiBlockSequence.AsStream();
+        Stream? multiBlockStream = MultiBlockSequence.AsStream();
         Assert.Equal(0, multiBlockStream.Position = 0);
         Assert.Equal(multiBlockStream.Position + 1, multiBlockStream.ReadByte());
 
@@ -135,7 +135,7 @@ public class ReadOnlySequenceStreamTests : TestBase
     {
         bool disposed = false;
         object? expectedArg = nullArg ? null : new object();
-        var stream = DefaultSequence.AsStream(
+        Stream? stream = DefaultSequence.AsStream(
             actualArg =>
             {
                 Assert.Same(expectedArg, actualArg);
@@ -206,7 +206,7 @@ public class ReadOnlySequenceStreamTests : TestBase
     [Fact]
     public void Seek_EmptyStream()
     {
-        var stream = DefaultSequence.AsStream();
+        Stream? stream = DefaultSequence.AsStream();
         Assert.Equal(0, stream.Seek(0, SeekOrigin.Begin));
         Assert.Equal(0, stream.Seek(0, SeekOrigin.Current));
         Assert.Equal(0, stream.Seek(0, SeekOrigin.End));
@@ -215,7 +215,7 @@ public class ReadOnlySequenceStreamTests : TestBase
     [Fact]
     public void Seek()
     {
-        var stream = MultiBlockSequence.AsStream();
+        Stream? stream = MultiBlockSequence.AsStream();
         Assert.Equal(0, stream.Seek(0, SeekOrigin.Begin));
         Assert.Equal(0, stream.Position);
         Assert.Equal(stream.Position + 1, stream.ReadByte());
@@ -261,7 +261,7 @@ public class ReadOnlySequenceStreamTests : TestBase
     [Fact]
     public void ReadByte()
     {
-        var stream = MultiBlockSequence.AsStream();
+        Stream? stream = MultiBlockSequence.AsStream();
 
         for (int i = 0; i < MultiBlockSequence.Length; i++)
         {
@@ -275,8 +275,8 @@ public class ReadOnlySequenceStreamTests : TestBase
     [Fact]
     public void Read()
     {
-        var stream = MultiBlockSequence.AsStream();
-        var buffer = new byte[MultiBlockSequence.Length + 2];
+        Stream? stream = MultiBlockSequence.AsStream();
+        byte[]? buffer = new byte[MultiBlockSequence.Length + 2];
         Assert.Equal(2, stream.Read(buffer, 0, 2));
         Assert.Equal(new byte[] { 1, 2, 0 }, buffer.Take(3));
         Assert.Equal(2, stream.Position);
@@ -298,8 +298,8 @@ public class ReadOnlySequenceStreamTests : TestBase
     [Fact]
     public void Read_Span()
     {
-        var stream = MultiBlockSequence.AsStream();
-        var buffer = new byte[MultiBlockSequence.Length + 2];
+        Stream? stream = MultiBlockSequence.AsStream();
+        byte[]? buffer = new byte[MultiBlockSequence.Length + 2];
         Assert.Equal(2, stream.Read(buffer.AsSpan(0, 2)));
         Assert.Equal(new byte[] { 1, 2, 0 }, buffer.Take(3));
         Assert.Equal(2, stream.Position);
@@ -321,14 +321,14 @@ public class ReadOnlySequenceStreamTests : TestBase
     [Fact]
     public void ReadAsync_ReturnsSynchronously()
     {
-        var stream = SimpleSequence.AsStream();
+        Stream? stream = SimpleSequence.AsStream();
         Assert.True(stream.ReadAsync(new byte[1], 0, 1).IsCompleted);
     }
 
     [Fact]
     public async Task ReadAsync_ReusesTaskResult()
     {
-        var stream = MultiBlockSequence.AsStream();
+        Stream? stream = MultiBlockSequence.AsStream();
         Task<int> task1 = stream.ReadAsync(new byte[1], 0, 1);
         Task<int> task2 = stream.ReadAsync(new byte[1], 0, 1);
         Assert.Same(task1, task2);
@@ -343,8 +343,8 @@ public class ReadOnlySequenceStreamTests : TestBase
     [Fact]
     public async Task ReadAsync_Works()
     {
-        var stream = MultiBlockSequence.AsStream();
-        var buffer = new byte[MultiBlockSequence.Length + 2];
+        Stream? stream = MultiBlockSequence.AsStream();
+        byte[]? buffer = new byte[MultiBlockSequence.Length + 2];
         Assert.Equal(2, await stream.ReadAsync(buffer, 0, 2));
         Assert.Equal(new byte[] { 1, 2, 0 }, buffer.Take(3));
         Assert.Equal(2, stream.Position);
@@ -366,8 +366,8 @@ public class ReadOnlySequenceStreamTests : TestBase
     [Fact]
     public async Task ReadAsync_Memory_Works()
     {
-        var stream = MultiBlockSequence.AsStream();
-        var buffer = new byte[MultiBlockSequence.Length + 2];
+        Stream? stream = MultiBlockSequence.AsStream();
+        byte[]? buffer = new byte[MultiBlockSequence.Length + 2];
         Assert.Equal(2, await stream.ReadAsync(buffer.AsMemory(0, 2)));
         Assert.Equal(new byte[] { 1, 2, 0 }, buffer.Take(3));
         Assert.Equal(2, stream.Position);
@@ -389,7 +389,7 @@ public class ReadOnlySequenceStreamTests : TestBase
     [Fact]
     public async Task CopyToAsync()
     {
-        var stream = MultiBlockSequence.AsStream();
+        Stream? stream = MultiBlockSequence.AsStream();
         var ms = new MemoryStream();
         await stream.CopyToAsync(ms);
         Assert.Equal(MultiBlockSequence.ToArray(), ms.ToArray());

@@ -43,7 +43,7 @@ public partial class PipeExtensionsTests : TestBase
         var ms = new SimplexStream();
         IDuplexPipe pipe = ms.UsePipe(cancellationToken: this.TimeoutToken);
         await pipe.Output.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
-        var readResult = await pipe.Input.ReadAsync(this.TimeoutToken);
+        ReadResult readResult = await pipe.Input.ReadAsync(this.TimeoutToken);
         Assert.Equal(3, readResult.Buffer.Length);
         pipe.Input.AdvanceTo(readResult.Buffer.End);
     }
@@ -68,7 +68,7 @@ public partial class PipeExtensionsTests : TestBase
     [Fact]
     public async Task UsePipe_IpcPipeStream_Disposal()
     {
-        var guid = Guid.NewGuid().ToString();
+        string? guid = Guid.NewGuid().ToString();
 
         var ipcServerTask = Task.Run(async delegate
         {
@@ -121,7 +121,7 @@ public partial class PipeExtensionsTests : TestBase
             pipe.Input.Complete();
         }
 
-        var timeout = ExpectedTimeoutToken;
+        CancellationToken timeout = ExpectedTimeoutToken;
         while (!ms.IsDisposed && !timeout.IsCancellationRequested)
         {
             await Task.Yield();
@@ -140,7 +140,7 @@ public partial class PipeExtensionsTests : TestBase
         {
             while (!this.TimeoutToken.IsCancellationRequested)
             {
-                var readResult = await pipe.Input.ReadAsync(this.TimeoutToken);
+                ReadResult readResult = await pipe.Input.ReadAsync(this.TimeoutToken);
                 pipe.Input.AdvanceTo(readResult.Buffer.End);
             }
         });
@@ -156,15 +156,15 @@ public partial class PipeExtensionsTests : TestBase
     [Fact]
     public async Task UsePipe_Stream_ReadOnlyStream()
     {
-        var streamPair = FullDuplexStream.CreatePair();
+        (Stream, Stream) streamPair = FullDuplexStream.CreatePair();
 
         byte[] expected = new byte[] { 1, 2, 3 };
         await streamPair.Item2.WriteAsync(expected, 0, expected.Length, this.TimeoutToken);
         await streamPair.Item2.FlushAsync(this.TimeoutToken);
 
         var readOnlyStream = new OneWayStreamWrapper(streamPair.Item1, canRead: true);
-        var duplexPipe = readOnlyStream.UsePipe();
-        var readResult = await duplexPipe.Input.ReadAsync(this.TimeoutToken);
+        IDuplexPipe? duplexPipe = readOnlyStream.UsePipe();
+        ReadResult readResult = await duplexPipe.Input.ReadAsync(this.TimeoutToken);
         Assert.Equal(expected, readResult.Buffer.ToArray());
 
         Assert.Throws<InvalidOperationException>(() => duplexPipe.Output.GetSpan());
@@ -177,9 +177,9 @@ public partial class PipeExtensionsTests : TestBase
     [Fact]
     public async Task UsePipe_Stream_WriteOnlyStream()
     {
-        var streamPair = FullDuplexStream.CreatePair();
+        (Stream, Stream) streamPair = FullDuplexStream.CreatePair();
         var writeOnlyStream = new OneWayStreamWrapper(streamPair.Item1, canWrite: true);
-        var duplexPipe = writeOnlyStream.UsePipe();
+        IDuplexPipe? duplexPipe = writeOnlyStream.UsePipe();
 
         // Verify that reading isn't allowed.
         await Assert.ThrowsAsync<InvalidOperationException>(async () => await duplexPipe.Input.ReadAsync(this.TimeoutToken));
@@ -209,11 +209,11 @@ public partial class PipeExtensionsTests : TestBase
     [Fact]
     public async Task UsePipeReader_WebSocket()
     {
-        var expectedBuffer = new byte[] { 4, 5, 6 };
+        byte[]? expectedBuffer = new byte[] { 4, 5, 6 };
         var webSocket = new MockWebSocket();
         webSocket.EnqueueRead(expectedBuffer);
-        var pipeReader = webSocket.UsePipeReader(cancellationToken: this.TimeoutToken);
-        var readResult = await pipeReader.ReadAsync(this.TimeoutToken);
+        PipeReader? pipeReader = webSocket.UsePipeReader(cancellationToken: this.TimeoutToken);
+        ReadResult readResult = await pipeReader.ReadAsync(this.TimeoutToken);
         Assert.Equal(expectedBuffer, readResult.Buffer.First.Span.ToArray());
         pipeReader.AdvanceTo(readResult.Buffer.End);
     }
@@ -221,27 +221,27 @@ public partial class PipeExtensionsTests : TestBase
     [Fact]
     public async Task UsePipeWriter_WebSocket()
     {
-        var expectedBuffer = new byte[] { 4, 5, 6 };
+        byte[]? expectedBuffer = new byte[] { 4, 5, 6 };
         var webSocket = new MockWebSocket();
-        var pipeWriter = webSocket.UsePipeWriter(cancellationToken: this.TimeoutToken);
+        PipeWriter? pipeWriter = webSocket.UsePipeWriter(cancellationToken: this.TimeoutToken);
         await pipeWriter.WriteAsync(expectedBuffer, this.TimeoutToken);
         pipeWriter.Complete();
 #pragma warning disable CS0618 // Type or member is obsolete
         await pipeWriter.WaitForReaderCompletionAsync();
 #pragma warning restore CS0618 // Type or member is obsolete
-        var message = webSocket.WrittenQueue.Dequeue();
+        MockWebSocket.Message? message = webSocket.WrittenQueue.Dequeue();
         Assert.Equal(expectedBuffer, message.Buffer.ToArray());
     }
 
     [Fact]
     public async Task UsePipe_WebSocket()
     {
-        var expectedBuffer = new byte[] { 4, 5, 6 };
+        byte[]? expectedBuffer = new byte[] { 4, 5, 6 };
         var webSocket = new MockWebSocket();
         webSocket.EnqueueRead(expectedBuffer);
-        var pipe = webSocket.UsePipe(cancellationToken: this.TimeoutToken);
+        IDuplexPipe? pipe = webSocket.UsePipe(cancellationToken: this.TimeoutToken);
 
-        var readResult = await pipe.Input.ReadAsync(this.TimeoutToken);
+        ReadResult readResult = await pipe.Input.ReadAsync(this.TimeoutToken);
         Assert.Equal(expectedBuffer, readResult.Buffer.First.Span.ToArray());
         pipe.Input.AdvanceTo(readResult.Buffer.End);
 
@@ -250,7 +250,7 @@ public partial class PipeExtensionsTests : TestBase
 #pragma warning disable CS0618 // Type or member is obsolete
         await pipe.Output.WaitForReaderCompletionAsync();
 #pragma warning restore CS0618 // Type or member is obsolete
-        var message = webSocket.WrittenQueue.Dequeue();
+        MockWebSocket.Message? message = webSocket.WrittenQueue.Dequeue();
         Assert.Equal(expectedBuffer, message.Buffer.ToArray());
     }
 
@@ -264,7 +264,7 @@ public partial class PipeExtensionsTests : TestBase
         {
             while (!this.TimeoutToken.IsCancellationRequested)
             {
-                var readResult = await pipe.Input.ReadAsync(this.TimeoutToken);
+                ReadResult readResult = await pipe.Input.ReadAsync(this.TimeoutToken);
                 pipe.Input.AdvanceTo(readResult.Buffer.End);
             }
         });
@@ -280,9 +280,9 @@ public partial class PipeExtensionsTests : TestBase
     [Fact, Obsolete]
     public void UsePipe_DoesNotCollapseAdapterStacks()
     {
-        var pipes = FullDuplexStream.CreatePipePair();
-        var stream = pipes.Item1.AsStream();
-        var pipeAgain = stream.UsePipe(allowUnwrap: true);
+        (IDuplexPipe, IDuplexPipe) pipes = FullDuplexStream.CreatePipePair();
+        Stream? stream = pipes.Item1.AsStream();
+        IDuplexPipe? pipeAgain = stream.UsePipe(allowUnwrap: true);
         Assert.NotSame(pipes.Item1.Input, pipeAgain.Input);
         Assert.NotSame(pipes.Item1.Output, pipeAgain.Output);
     }

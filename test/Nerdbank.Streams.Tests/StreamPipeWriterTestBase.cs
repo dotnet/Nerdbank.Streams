@@ -42,7 +42,7 @@ public abstract class StreamPipeWriterTestBase : TestBase
     {
         byte[] expectedBuffer = this.GetRandomBuffer(2048);
         var stream = new MemoryStream(expectedBuffer.Length);
-        var writer = this.CreatePipeWriter(stream);
+        PipeWriter? writer = this.CreatePipeWriter(stream);
         await writer.WriteAsync(expectedBuffer.AsMemory(0, 1024), this.TimeoutToken);
         await writer.WriteAsync(expectedBuffer.AsMemory(1024, 1024), this.TimeoutToken);
 
@@ -61,7 +61,7 @@ public abstract class StreamPipeWriterTestBase : TestBase
     {
         byte[] expectedBuffer = this.GetRandomBuffer(2048);
         var stream = new MemoryStream(expectedBuffer.Length);
-        var writer = this.CreatePipeWriter(stream);
+        PipeWriter? writer = this.CreatePipeWriter(stream);
         await writer.WriteAsync(expectedBuffer, this.TimeoutToken);
         writer.Complete();
         Assert.Throws<InvalidOperationException>(() => writer.GetMemory());
@@ -74,8 +74,8 @@ public abstract class StreamPipeWriterTestBase : TestBase
     {
         byte[] expectedBuffer = this.GetRandomBuffer(2048);
         var stream = new MemoryStream(expectedBuffer.Length);
-        var writer = this.CreatePipeWriter(stream);
-        var memory = writer.GetMemory(expectedBuffer.Length);
+        PipeWriter? writer = this.CreatePipeWriter(stream);
+        Memory<byte> memory = writer.GetMemory(expectedBuffer.Length);
         expectedBuffer.CopyTo(memory);
         writer.Advance(expectedBuffer.Length);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => writer.FlushAsync(new CancellationToken(true)).AsTask());
@@ -85,7 +85,7 @@ public abstract class StreamPipeWriterTestBase : TestBase
     public async Task OnReaderCompleted()
     {
         var stream = new MemoryStream();
-        var writer = this.CreatePipeWriter(stream);
+        PipeWriter? writer = this.CreatePipeWriter(stream);
 #pragma warning disable CS0618 // Type or member is obsolete
         Task readerCompleted = writer.WaitForReaderCompletionAsync();
 #pragma warning restore CS0618 // Type or member is obsolete
@@ -97,11 +97,11 @@ public abstract class StreamPipeWriterTestBase : TestBase
     public async Task Complete_WithUnflushedWrittenBytes()
     {
         var stream = new MemoryStream();
-        var writer = this.CreatePipeWriter(stream);
+        PipeWriter? writer = this.CreatePipeWriter(stream);
 #pragma warning disable CS0618 // Type or member is obsolete
         Task readerCompleted = writer.WaitForReaderCompletionAsync();
 #pragma warning restore CS0618 // Type or member is obsolete
-        var mem = writer.GetMemory(1);
+        Memory<byte> mem = writer.GetMemory(1);
         writer.Advance(1);
 
         // Calling Complete implicitly causes the reader to have access to all unflushed buffers.

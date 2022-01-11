@@ -44,14 +44,14 @@ internal class XunitTraceListener : TraceListener
             }
 
             var sb = new StringBuilder(2 + ((int)sequence.Length * 2));
-            var decoder = this.DataEncoding?.GetDecoder();
+            Decoder? decoder = this.DataEncoding?.GetDecoder();
             sb.Append(decoder != null ? "\"" : "0x");
-            foreach (var segment in sequence)
+            foreach (ReadOnlyMemory<byte> segment in sequence)
             {
                 if (decoder != null)
                 {
                     // Write out decoded characters.
-                    using (var segmentPointer = segment.Pin())
+                    using (MemoryHandle segmentPointer = segment.Pin())
                     {
                         int charCount = decoder.GetCharCount((byte*)segmentPointer.Pointer, segment.Length, false);
                         char[] chars = ArrayPool<char>.Shared.Rent(charCount);

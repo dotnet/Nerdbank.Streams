@@ -45,7 +45,7 @@ public class DuplexPipeTests
         pipe.Writer.Advance(0);
         Assert.Throws<InvalidOperationException>(() => duplex.Output.Advance(0));
 
-        var flushResult = await pipe.Writer.FlushAsync();
+        FlushResult flushResult = await pipe.Writer.FlushAsync();
         Assert.False(flushResult.IsCompleted);
         flushResult = await duplex.Output.FlushAsync();
         Assert.False(flushResult.IsCompleted);
