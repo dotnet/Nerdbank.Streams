@@ -280,3 +280,9 @@ override Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.Equals(object? o
 override Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.GetHashCode() -> int
 override Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.ToString() -> string!
 static Nerdbank.Streams.MultiplexingStream.Create(System.IO.Stream! stream, Nerdbank.Streams.MultiplexingStream.Options? options = null) -> Nerdbank.Streams.MultiplexingStream!
+Nerdbank.Streams.MultiplexingStream.Options.StartSuspended.get -> bool
+Nerdbank.Streams.MultiplexingStream.Options.StartSuspended.set -> void
+Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.QualifiedChannelId() -> void
+Nerdbank.Streams.MultiplexingStream.StartListening() -> void
+static Nerdbank.Streams.PipeExtensions.AsPrebufferedStreamAsync(this System.IO.Pipelines.PipeReader! pipeReader, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.IO.Stream!>!
+static Nerdbank.Streams.StreamExtensions.AsStream(this System.Buffers.ReadOnlySequence<byte> readOnlySequence, System.Action<object?>? disposeAction, object? disposeActionArg) -> System.IO.Stream!
