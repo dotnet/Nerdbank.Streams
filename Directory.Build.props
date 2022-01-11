@@ -57,6 +57,10 @@
     </PropertyGroup>
   </Target>
 
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)NOTICE" Pack="true" PackagePath="" Visible="false" />
+  </ItemGroup>
+
   <PropertyGroup Condition="'$(IsWpfTempProject)' == ''">
     <IsWpfTempProject>false</IsWpfTempProject>
     <IsWpfTempProject Condition="$(MSBuildProjectName.EndsWith('_wpftmp'))">true</IsWpfTempProject>
