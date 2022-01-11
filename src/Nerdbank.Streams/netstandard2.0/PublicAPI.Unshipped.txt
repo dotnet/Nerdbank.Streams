@@ -1,9 +1,3 @@
-Nerdbank.Streams.MultiplexingStream.Options.StartSuspended.get -> bool
-Nerdbank.Streams.MultiplexingStream.Options.StartSuspended.set -> void
-Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.QualifiedChannelId() -> void
-Nerdbank.Streams.MultiplexingStream.StartListening() -> void
-static Nerdbank.Streams.PipeExtensions.AsPrebufferedStreamAsync(this System.IO.Pipelines.PipeReader! pipeReader, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.IO.Stream!>!
-static Nerdbank.Streams.StreamExtensions.AsStream(this System.Buffers.ReadOnlySequence<byte> readOnlySequence, System.Action<object?>? disposeAction, object? disposeActionArg) -> System.IO.Stream!
 static System.Buffers.SequenceReaderExtensions.TryReadBigEndian(this ref System.Buffers.SequenceReader<byte> reader, out int value) -> bool
 static System.Buffers.SequenceReaderExtensions.TryReadBigEndian(this ref System.Buffers.SequenceReader<byte> reader, out long value) -> bool
 static System.Buffers.SequenceReaderExtensions.TryReadBigEndian(this ref System.Buffers.SequenceReader<byte> reader, out short value) -> bool
