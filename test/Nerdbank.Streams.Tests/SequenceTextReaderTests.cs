@@ -199,8 +199,8 @@ public class SequenceTextReaderTests : TestBase
     [Fact]
     public void Read_VeryLarge()
     {
-        var smallBytes = DefaultEncoding.GetBytes(CharactersToRead);
-        var bytes = new byte[30000];
+        byte[]? smallBytes = DefaultEncoding.GetBytes(CharactersToRead);
+        byte[]? bytes = new byte[30000];
         for (int i = 0; i < bytes.Length; i += smallBytes.Length)
         {
             Buffer.BlockCopy(smallBytes, 0, bytes, i, Math.Min(bytes.Length - i, smallBytes.Length));
@@ -227,7 +227,7 @@ public class SequenceTextReaderTests : TestBase
     public void SurrogatePairsAtBufferBoundary(bool surrogatePairsStartOnOddIndex)
     {
         // Fill a buffer large enough that it surely exceeds the internal char[] size inside the SequenceTextReader.
-        var surrogateCharsBuffer = new char[5 * 1024];
+        char[]? surrogateCharsBuffer = new char[5 * 1024];
 
         // Now initialize it with surrogate character pairs.
         // Each pair will align at the even or odd indexes (based on test method argument) to ensure that

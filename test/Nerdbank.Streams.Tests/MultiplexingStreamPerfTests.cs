@@ -110,7 +110,7 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
         {
             byte[][] serverBuffers = Enumerable.Range(1, ChannelCount).Select(i => new byte[SegmentSize]).ToArray();
 
-            var (mxServer, mxClient) = await Task.WhenAll(
+            (MultiplexingStream mxServer, MultiplexingStream mxClient) = await Task.WhenAll(
                 MultiplexingStream.CreateAsync(this.serverPipe, this.TimeoutToken).WithCancellation(this.TimeoutToken),
                 MultiplexingStream.CreateAsync(this.clientPipe, this.TimeoutToken).WithCancellation(this.TimeoutToken));
 
@@ -138,7 +138,7 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
                             Enumerable.Range(1, ChannelCount).Select(c => Task.Run(async delegate
                             {
                                 byte[] serverBuffer = serverBuffers[c - 1];
-                                var channel = await mxServer.OfferChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
+                                MultiplexingStream.Channel? channel = await mxServer.OfferChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
                                 for (int i = 0; i < segmentCount / ChannelCount; i++)
                                 {
                                      await channel.Output.WriteAsync(serverBuffer, this.TimeoutToken);
@@ -150,12 +150,12 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
                         await Task.WhenAll(
                             Enumerable.Range(1, ChannelCount).Select(c => Task.Run(async delegate
                             {
-                                var channel = await mxClient.AcceptChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
+                                MultiplexingStream.Channel? channel = await mxClient.AcceptChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
                                 int expectedTotalBytesRead = segmentCount / ChannelCount * SegmentSize;
                                 int totalBytesRead = 0;
                                 do
                                 {
-                                    var readResult = await channel.Input.ReadAsync(this.TimeoutToken);
+                                    System.IO.Pipelines.ReadResult readResult = await channel.Input.ReadAsync(this.TimeoutToken);
                                     totalBytesRead += (int)readResult.Buffer.Length;
                                     channel.Input.AdvanceTo(readResult.Buffer.End);
                                     readResult.ScrubAfterAdvanceTo();
@@ -176,11 +176,11 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
             Stream clientStream;
             if (useChannel)
             {
-                var (mxServer, mxClient) = await Task.WhenAll(
+                (MultiplexingStream mxServer, MultiplexingStream mxClient) = await Task.WhenAll(
                     MultiplexingStream.CreateAsync(this.serverPipe, this.TimeoutToken).WithCancellation(this.TimeoutToken),
                     MultiplexingStream.CreateAsync(this.clientPipe, this.TimeoutToken).WithCancellation(this.TimeoutToken));
 
-                var (serverChannel, clientChannel) = await Task.WhenAll(
+                (MultiplexingStream.Channel serverChannel, MultiplexingStream.Channel clientChannel) = await Task.WhenAll(
                     mxServer.AcceptChannelAsync(string.Empty, this.TimeoutToken),
                     mxClient.OfferChannelAsync(string.Empty, this.TimeoutToken));
 

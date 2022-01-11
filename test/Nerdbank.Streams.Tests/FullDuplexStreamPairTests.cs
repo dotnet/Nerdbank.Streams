@@ -24,7 +24,7 @@ public class FullDuplexStreamPairTests : TestBase
     public FullDuplexStreamPairTests(ITestOutputHelper logger)
         : base(logger)
     {
-        var tuple = FullDuplexStream.CreatePair();
+        (Stream, Stream) tuple = FullDuplexStream.CreatePair();
         Assert.NotNull(tuple.Item1);
         Assert.NotNull(tuple.Item2);
 
@@ -81,7 +81,7 @@ public class FullDuplexStreamPairTests : TestBase
     public async Task Read_BeforeWrite()
     {
         byte[] buffer = new byte[5];
-        var readTask = this.stream2.ReadAsync(buffer, 0, buffer.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken);
+        Task<int>? readTask = this.stream2.ReadAsync(buffer, 0, buffer.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken);
         Assert.False(readTask.IsCompleted);
 
         await this.stream1.WriteAsync(Data3Bytes, 0, Data3Bytes.Length).WithCancellation(this.TimeoutToken);
@@ -97,7 +97,7 @@ public class FullDuplexStreamPairTests : TestBase
         // Verify that closing the transmitting stream after reading has been requested
         // appropriately ends the read attempt.
         byte[] buffer = new byte[5];
-        var readTask = this.stream2.ReadAsync(buffer, 0, buffer.Length, this.TimeoutToken);
+        Task<int>? readTask = this.stream2.ReadAsync(buffer, 0, buffer.Length, this.TimeoutToken);
         Assert.False(readTask.IsCompleted);
         this.stream1.Close();
         int bytesRead = await readTask.WithCancellation(this.TimeoutToken);
@@ -112,7 +112,7 @@ public class FullDuplexStreamPairTests : TestBase
     public async Task Write_EmptyBufferDoesNotTerminateOtherStream()
     {
         await this.stream1.WriteAsync(Data3Bytes, 0, 0).WithCancellation(this.TimeoutToken);
-        var buffer = new byte[10];
+        byte[]? buffer = new byte[10];
         await Assert.ThrowsAsync<OperationCanceledException>(
             () => this.stream2.ReadAsync(buffer, 0, buffer.Length, ExpectedTimeoutToken)).WithCancellation(this.TimeoutToken);
     }
@@ -262,7 +262,7 @@ public class FullDuplexStreamPairTests : TestBase
     public void Read_ThrowsInvalidOperationException()
     {
         this.stream1.Dispose();
-        var buffer = new byte[1];
+        byte[]? buffer = new byte[1];
         Assert.Throws<InvalidOperationException>(() => this.stream1.Read(buffer, 0, buffer.Length));
     }
 
@@ -270,7 +270,7 @@ public class FullDuplexStreamPairTests : TestBase
     public async Task ReadAsync_ThrowsAfterDisposal()
     {
         this.stream1.Dispose();
-        var buffer = new byte[1];
+        byte[]? buffer = new byte[1];
         await Assert.ThrowsAsync<InvalidOperationException>(() => this.stream1.ReadAsync(buffer, 0, buffer.Length).WithCancellation(this.TimeoutToken));
     }
 
@@ -278,7 +278,7 @@ public class FullDuplexStreamPairTests : TestBase
     public void Write_ThrowsAfterDisposal()
     {
         this.stream1.Dispose();
-        var buffer = new byte[1];
+        byte[]? buffer = new byte[1];
         Assert.Throws<InvalidOperationException>(() => this.stream1.Write(buffer, 0, buffer.Length));
     }
 
@@ -286,7 +286,7 @@ public class FullDuplexStreamPairTests : TestBase
     public async Task WriteAsync_ThrowsAfterDisposal()
     {
         this.stream1.Dispose();
-        var buffer = new byte[1];
+        byte[]? buffer = new byte[1];
         await Assert.ThrowsAsync<InvalidOperationException>(() => this.stream1.WriteAsync(buffer, 0, buffer.Length).WithCancellation(this.TimeoutToken));
     }
 
@@ -317,8 +317,8 @@ public class FullDuplexStreamPairTests : TestBase
     [Fact]
     public async Task StreamPairWithUsePipe()
     {
-        var pipe1 = this.stream1.UsePipe();
-        var pipe2 = this.stream2.UsePipe();
+        System.IO.Pipelines.IDuplexPipe? pipe1 = this.stream1.UsePipe();
+        System.IO.Pipelines.IDuplexPipe? pipe2 = this.stream2.UsePipe();
 
         // Complete the pipe's reader and writer. Assert that this disposes their stream.
         pipe2.Output.Complete();
@@ -346,7 +346,7 @@ public class FullDuplexStreamPairTests : TestBase
     [Fact]
     public async Task PipePair()
     {
-        var (party1, party2) = FullDuplexStream.CreatePipePair();
+        (System.IO.Pipelines.IDuplexPipe party1, System.IO.Pipelines.IDuplexPipe party2) = FullDuplexStream.CreatePipePair();
 
         // First party indicates they're done sending messages (but might still be reading).
         party1.Output.Complete();

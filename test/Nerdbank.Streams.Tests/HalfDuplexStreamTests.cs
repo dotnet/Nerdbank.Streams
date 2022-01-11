@@ -251,7 +251,7 @@ public class HalfDuplexStreamTests : TestBase
         writer.Write(new byte[] { 1, 2, 3 });
         writer.Write(new byte[] { 4, 5, 6, 7, 8, 9 });
         await this.stream.FlushAsync(this.TimeoutToken);
-        var readBuffer = new byte[10];
+        byte[]? readBuffer = new byte[10];
         int bytesRead = await this.stream.ReadAsync(readBuffer, 0, 10, this.TimeoutToken);
         Assert.Equal(9, bytesRead);
         Assert.Equal(Enumerable.Range(1, 9).Select(i => (byte)i), readBuffer.Take(bytesRead));

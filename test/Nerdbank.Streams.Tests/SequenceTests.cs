@@ -33,13 +33,13 @@ public class SequenceTests : TestBase
         var seq = new Sequence<char>(new MockMemoryPool<char>());
         seq.MinimumSpanLength = 1;
 
-        var mem1 = seq.GetMemory(16);
+        Memory<char> mem1 = seq.GetMemory(16);
         Assert.Equal(16, mem1.Length);
 
-        var mem2 = seq.GetMemory(32);
+        Memory<char> mem2 = seq.GetMemory(32);
         Assert.Equal(32, mem2.Length);
 
-        var mem3 = seq.GetMemory(0);
+        Memory<char> mem3 = seq.GetMemory(0);
         Assert.NotEqual(0, mem3.Length);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => seq.GetMemory(-1));
@@ -58,7 +58,7 @@ public class SequenceTests : TestBase
     public void MemoryPool_ReleasesReferenceOnRecycle()
     {
         var seq = new Sequence<object>(new MockMemoryPool<object>());
-        var weakReference = StoreReferenceInSequence(seq);
+        WeakReference? weakReference = StoreReferenceInSequence(seq);
         seq.Reset();
         GC.Collect();
         Assert.False(weakReference.IsAlive);
@@ -68,7 +68,7 @@ public class SequenceTests : TestBase
     public void ArrayPool_ReleasesReferenceOnRecycle()
     {
         var seq = new Sequence<object>(new MockArrayPool<object>());
-        var weakReference = StoreReferenceInSequence(seq);
+        WeakReference? weakReference = StoreReferenceInSequence(seq);
         seq.Reset();
         GC.Collect();
         Assert.False(weakReference.IsAlive);
@@ -78,7 +78,7 @@ public class SequenceTests : TestBase
     public void ArrayPool_ReleasesReferenceInStructsOnRecycle()
     {
         var seq = new Sequence<ValueTuple<object>>(new MockArrayPool<ValueTuple<object>>());
-        var weakReference = StoreReferenceInSequence(seq);
+        WeakReference? weakReference = StoreReferenceInSequence(seq);
         seq.Reset();
         GC.Collect();
         Assert.False(weakReference.IsAlive);
@@ -100,14 +100,14 @@ public class SequenceTests : TestBase
             seq.Advance(1);
         }
 
-        var mem1 = seq.GetMemory(16);
+        Memory<char> mem1 = seq.GetMemory(16);
 
         // This second request cannot be satisfied by the first one since it's larger. So the first should be freed.
-        var mem2 = seq.GetMemory(32);
+        Memory<char> mem2 = seq.GetMemory(32);
         mockPool.AssertContents(mem1);
 
         // This third one *can* be satisfied by the 32 byte array allocation requested previously, so no recycling should take place.
-        var mem3 = seq.GetMemory(24);
+        Memory<char> mem3 = seq.GetMemory(24);
         mockPool.AssertContents(mem1);
     }
 
@@ -121,10 +121,10 @@ public class SequenceTests : TestBase
     {
         var seq = new Sequence<char>();
 
-        var headerSpan = seq.GetSpan(4);
+        Span<char> headerSpan = seq.GetSpan(4);
         seq.Advance(4);
 
-        var contentSpan = seq.GetSpan(10);
+        Span<char> contentSpan = seq.GetSpan(10);
         "0123456789".AsSpan().CopyTo(contentSpan);
         seq.Advance(10);
 
@@ -144,7 +144,7 @@ public class SequenceTests : TestBase
     public void Advance_OneBlock()
     {
         var seq = new Sequence<char>();
-        var mem1 = seq.GetMemory(3);
+        Memory<char> mem1 = seq.GetMemory(3);
         mem1.Span[0] = 'a';
         mem1.Span[1] = 'b';
         Assert.True(seq.AsReadOnlySequence.IsEmpty);
@@ -157,12 +157,12 @@ public class SequenceTests : TestBase
     {
         var seq = new Sequence<char>();
 
-        var mem1 = seq.GetMemory(3);
+        Memory<char> mem1 = seq.GetMemory(3);
         mem1.Span[0] = 'a';
         mem1.Span[1] = 'b';
         seq.Advance(2);
 
-        var mem2 = seq.GetMemory(2);
+        Memory<char> mem2 = seq.GetMemory(2);
         mem2.Span[0] = 'c';
         mem2.Span[1] = 'd';
         seq.Advance(2);
@@ -179,7 +179,7 @@ public class SequenceTests : TestBase
     public void Advance_EmptyBlock()
     {
         var seq = new Sequence<char>();
-        var mem1 = seq.GetMemory(3);
+        Memory<char> mem1 = seq.GetMemory(3);
         seq.Advance(0);
 
         Assert.True(seq.AsReadOnlySequence.IsEmpty);
@@ -189,7 +189,7 @@ public class SequenceTests : TestBase
     public void Advance_InvalidArgs()
     {
         var seq = new Sequence<char>();
-        var mem1 = seq.GetMemory(3);
+        Memory<char> mem1 = seq.GetMemory(3);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => seq.Advance(-1));
     }
@@ -198,7 +198,7 @@ public class SequenceTests : TestBase
     public void Advance_TooFar()
     {
         var seq = new Sequence<char>();
-        var mem1 = seq.GetMemory(3);
+        Memory<char> mem1 = seq.GetMemory(3);
         Assert.Throws<ArgumentOutOfRangeException>(() => seq.Advance(mem1.Length + 1));
     }
 
@@ -225,15 +225,15 @@ public class SequenceTests : TestBase
         MockMemoryPool<char> mockPool = new MockMemoryPool<char>();
         var seq = new Sequence<char>(mockPool);
 
-        var mem1 = seq.GetMemory(3);
+        Memory<char> mem1 = seq.GetMemory(3);
         mem1.Span.Fill('a');
         seq.Advance(mem1.Length);
 
-        var mem2 = seq.GetMemory(3);
+        Memory<char> mem2 = seq.GetMemory(3);
         mem2.Span.Fill('b');
         seq.Advance(mem2.Length);
 
-        var mem3 = seq.GetMemory(3);
+        Memory<char> mem3 = seq.GetMemory(3);
         mem3.Span.Fill('c');
         seq.Advance(mem3.Length);
 
@@ -268,11 +268,11 @@ public class SequenceTests : TestBase
         MockMemoryPool<char> mockPool = new MockMemoryPool<char>();
         var seq = new Sequence<char>(mockPool);
 
-        var mem1 = seq.GetMemory(3).Slice(0, 3);
+        Memory<char> mem1 = seq.GetMemory(3).Slice(0, 3);
         mem1.Span.Fill('a');
         seq.Advance(mem1.Length);
 
-        var mem2 = seq.GetMemory(3).Slice(0, 3);
+        Memory<char> mem2 = seq.GetMemory(3).Slice(0, 3);
         mem2.Span.Fill('b');
         seq.Advance(mem2.Length);
 
@@ -292,11 +292,11 @@ public class SequenceTests : TestBase
         MockMemoryPool<char> mockPool = new MockMemoryPool<char>();
         var seq = new Sequence<char>(mockPool);
 
-        var mem1 = seq.GetMemory(3).Slice(0, 3);
+        Memory<char> mem1 = seq.GetMemory(3).Slice(0, 3);
         mem1.Span.Fill('a');
         seq.Advance(mem1.Length);
 
-        var mem2 = seq.GetMemory(3).Slice(0, 3);
+        Memory<char> mem2 = seq.GetMemory(3).Slice(0, 3);
         mem2.Span.Fill('b');
         seq.Advance(mem2.Length);
 
@@ -318,18 +318,18 @@ public class SequenceTests : TestBase
         var seqA = new Sequence<char>(mockPool);
         var seqB = new Sequence<char>(mockPool);
 
-        var mem1 = seqA.GetMemory(3).Slice(0, 3);
+        Memory<char> mem1 = seqA.GetMemory(3).Slice(0, 3);
         mem1.Span.Fill('a');
         seqA.Advance(mem1.Length);
 
-        var mem2 = seqB.GetMemory(3).Slice(0, 3);
+        Memory<char> mem2 = seqB.GetMemory(3).Slice(0, 3);
         mem2.Span.Fill('b');
         seqB.Advance(mem2.Length);
 
         ReadOnlySequence<char> rosA = seqA;
         ReadOnlySequence<char> rosB = seqB;
 
-        var posB = rosB.GetPosition(2);
+        SequencePosition posB = rosB.GetPosition(2);
         Assert.Throws<ArgumentException>(() => seqA.AdvanceTo(posB));
         Assert.Equal(3, seqA.AsReadOnlySequence.Length);
         Assert.Equal(3, seqB.AsReadOnlySequence.Length);
@@ -341,7 +341,7 @@ public class SequenceTests : TestBase
         ReadOnlySpan<char> original = "abcdefg".ToCharArray();
         var seq = new Sequence<char>();
         seq.Write(original);
-        var ros = seq.AsReadOnlySequence;
+        ReadOnlySequence<char> ros = seq.AsReadOnlySequence;
 
         seq.AdvanceTo(ros.GetPosition(5, ros.Start));
         ros = seq.AsReadOnlySequence;
@@ -357,12 +357,12 @@ public class SequenceTests : TestBase
         ReadOnlySpan<char> original = "abcdefg".ToCharArray();
         ReadOnlySpan<char> later = "hijkl".ToCharArray();
         var seq = new Sequence<char>();
-        var mem = seq.GetMemory(30); // Specify a size with enough space to store both buffers
+        Memory<char> mem = seq.GetMemory(30); // Specify a size with enough space to store both buffers
         original.CopyTo(mem.Span);
         seq.Advance(original.Length);
 
-        var originalRos = seq.AsReadOnlySequence;
-        var origLastCharPosition = originalRos.GetPosition(originalRos.Length - 1);
+        ReadOnlySequence<char> originalRos = seq.AsReadOnlySequence;
+        SequencePosition origLastCharPosition = originalRos.GetPosition(originalRos.Length - 1);
         char origLastChar = originalRos.Slice(origLastCharPosition, 1).First.Span[0];
 
         // "Consume" a few characters, but leave the origEnd an unconsumed position so it should be valid.
@@ -386,7 +386,7 @@ public class SequenceTests : TestBase
         // use the mock pool so that we can predict the actual array size will not exceed what we ask for.
         var seq = new Sequence<int>(new MockMemoryPool<int>());
 
-        var span = seq.GetSpan(10);
+        Span<int> span = seq.GetSpan(10);
         Enumerable.Range(1, 10).ToArray().CopyTo(span);
         seq.Advance(10);
 
@@ -432,7 +432,7 @@ public class SequenceTests : TestBase
         Assert.Equal(0, seq.MinimumSpanLength);
         seq.MinimumSpanLength = minLength;
         Assert.Equal(minLength, seq.MinimumSpanLength);
-        var span = seq.GetSpan(1);
+        Span<int> span = seq.GetSpan(1);
         Assert.True(span.Length >= seq.MinimumSpanLength);
 
         seq.Reset();
@@ -445,7 +445,7 @@ public class SequenceTests : TestBase
         var pool = new MockMemoryPool<int>();
         var seq = new Sequence<int>(pool);
         seq.MinimumSpanLength = 0;
-        var span = seq.GetSpan(0);
+        Span<int> span = seq.GetSpan(0);
         Assert.Equal(pool.DefaultLength, span.Length);
     }
 
@@ -457,7 +457,7 @@ public class SequenceTests : TestBase
         var expected = new List<Memory<char>>();
         for (int i = 0; i < 3; i++)
         {
-            var mem = seq.GetMemory(3);
+            Memory<char> mem = seq.GetMemory(3);
             expected.Add(mem);
             seq.Advance(mem.Length);
         }
@@ -475,8 +475,8 @@ public class SequenceTests : TestBase
         var expected = new List<char[]>();
         for (int i = 0; i < 3; i++)
         {
-            var mem = seq.GetMemory(3);
-            Assumes.True(MemoryMarshal.TryGetArray<char>(mem, out var segment));
+            Memory<char> mem = seq.GetMemory(3);
+            Assumes.True(MemoryMarshal.TryGetArray<char>(mem, out ArraySegment<char> segment));
             expected.Add(segment.Array!);
             seq.Advance(mem.Length);
         }
@@ -509,9 +509,9 @@ public class SequenceTests : TestBase
     [Fact]
     public void Append()
     {
-        var first = new int[] { 1, 2, 3 };
-        var second = new int[] { 4, 5, 6 };
-        var third = new int[] { 7, 8, 9 };
+        int[]? first = new int[] { 1, 2, 3 };
+        int[]? second = new int[] { 4, 5, 6 };
+        int[]? third = new int[] { 7, 8, 9 };
 
         // Arrange for an array pool that will definitely create slack space so we can verify it is handled properly.
         var arrayPool = new MockArrayPool<int> { MinArraySizeFactor = 2 };
@@ -528,12 +528,12 @@ public class SequenceTests : TestBase
         seq.Advance(third.Length);
         Assert.Equal(first.Length + second.Length + third.Length, seq.Length);
 
-        var ros = seq.AsReadOnlySequence;
+        ReadOnlySequence<int> ros = seq.AsReadOnlySequence;
         Assert.Equal(Enumerable.Range(1, 9), ros.ToArray());
 
         // Verify that the second segment is the only one that has reference equality with the original buffer.
         int idx = 0;
-        foreach (var segment in ros)
+        foreach (ReadOnlyMemory<int> segment in ros)
         {
             switch (idx++)
             {
@@ -589,7 +589,7 @@ public class SequenceTests : TestBase
     public void AutoIncreaseMinimumSpanLength_TrueBehavior()
     {
         var sequence = new Sequence<int>(new MockArrayPool<int>()) { AutoIncreaseMinimumSpanLength = true, MinimumSpanLength = 4 };
-        var span = sequence.GetSpan(2);
+        Span<int> span = sequence.GetSpan(2);
         Assert.Equal(4, span.Length);
         sequence.Advance(2);
 
@@ -645,7 +645,7 @@ public class SequenceTests : TestBase
     public void AutoIncreaseMinimumSpanLength_DoesNotReduceSpanFromMinSizePools()
     {
         var sequence = new Sequence<int>(new MockMemoryPool<int> { DefaultLength = 32 }) { AutoIncreaseMinimumSpanLength = true };
-        var span = sequence.GetSpan(0);
+        Span<int> span = sequence.GetSpan(0);
         Assert.Equal(32, span.Length);
         sequence.Advance(32);
 
@@ -661,7 +661,7 @@ public class SequenceTests : TestBase
     public void AutoIncreaseMinimumSpanLength_FalseBehavior()
     {
         var sequence = new Sequence<int>(new MockArrayPool<int>()) { AutoIncreaseMinimumSpanLength = false, MinimumSpanLength = 4 };
-        var span = sequence.GetSpan(2);
+        Span<int> span = sequence.GetSpan(2);
         Assert.Equal(4, span.Length);
         sequence.Advance(2);
 
@@ -704,7 +704,7 @@ public class SequenceTests : TestBase
     {
         var o = new T();
         var tracker = new WeakReference(o);
-        var span = seq.GetSpan(5);
+        Span<T> span = seq.GetSpan(5);
         span[0] = o;
         seq.Advance(1);
         return tracker;
@@ -722,7 +722,7 @@ public class SequenceTests : TestBase
     {
         var o = new T();
         var tracker = new WeakReference(o);
-        var span = seq.GetSpan(5);
+        Span<ValueTuple<T>> span = seq.GetSpan(5);
         span[0] = new ValueTuple<T>(o);
         seq.Advance(1);
         return tracker;

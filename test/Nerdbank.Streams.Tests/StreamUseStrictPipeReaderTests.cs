@@ -37,8 +37,8 @@ public class StreamUseStrictPipeReaderTests : StreamPipeReaderTestBase
         unreadableStream.Setup(s => s.ReadAsync(It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ThrowsAsync(expectedException);
 #endif
 
-        var reader = this.CreatePipeReader(unreadableStream.Object);
-        var actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => reader.ReadAsync(this.TimeoutToken).AsTask());
+        PipeReader? reader = this.CreatePipeReader(unreadableStream.Object);
+        InvalidOperationException? actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => reader.ReadAsync(this.TimeoutToken).AsTask());
         Assert.Same(expectedException, actualException);
     }
 

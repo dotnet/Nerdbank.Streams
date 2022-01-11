@@ -51,10 +51,10 @@ public class PrefixingBufferWriterTests
         int expectedLength = 0;
         for (int i = 0; i < stepCount - 1; i++)
         {
-            var spanToWrite = Payload.Span.Slice(stepSize * i, stepSize);
+            ReadOnlySpan<byte> spanToWrite = Payload.Span.Slice(stepSize * i, stepSize);
             if (excessSpan)
             {
-                var targetSpan = prefixWriter.GetSpan((int)(spanToWrite.Length * 1.5));
+                Span<byte> targetSpan = prefixWriter.GetSpan((int)(spanToWrite.Length * 1.5));
                 spanToWrite.CopyTo(targetSpan);
                 prefixWriter.Advance(spanToWrite.Length);
             }
@@ -77,7 +77,7 @@ public class PrefixingBufferWriterTests
     public void GetSpan_WriteWithHint0()
     {
         var prefixWriter = new PrefixingBufferWriter<byte>(this.sequence, Prefix.Length, 0);
-        var span = prefixWriter.GetSpan(0);
+        Span<byte> span = prefixWriter.GetSpan(0);
         Assert.NotEqual(0, span.Length);
     }
 
@@ -85,7 +85,7 @@ public class PrefixingBufferWriterTests
     public void GetSpan_WriteFillThenRequest0()
     {
         var prefixWriter = new PrefixingBufferWriter<byte>(this.sequence, Prefix.Length, 0);
-        var span = prefixWriter.GetSpan(5);
+        Span<byte> span = prefixWriter.GetSpan(5);
         prefixWriter.Advance(span.Length);
         span = prefixWriter.GetSpan(0);
         Assert.NotEqual(0, span.Length);
@@ -95,7 +95,7 @@ public class PrefixingBufferWriterTests
     public void GetMemory()
     {
         var prefixWriter = new PrefixingBufferWriter<byte>(this.sequence, Prefix.Length, 0);
-        var mem = prefixWriter.GetMemory(Payload.Length);
+        Memory<byte> mem = prefixWriter.GetMemory(Payload.Length);
         Assert.NotEqual(0, mem.Length);
         Payload.CopyTo(mem);
         prefixWriter.Advance(Payload.Length);
@@ -122,7 +122,7 @@ public class PrefixingBufferWriterTests
     [InlineData(-1)]
     public void Ctor_NonPositivePrefixHintSizes(int size)
     {
-        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => new PrefixingBufferWriter<byte>(this.sequence, size));
+        ArgumentOutOfRangeException? ex = Assert.Throws<ArgumentOutOfRangeException>(() => new PrefixingBufferWriter<byte>(this.sequence, size));
         Assert.Equal("prefixSize", ex.ParamName);
     }
 
@@ -136,7 +136,7 @@ public class PrefixingBufferWriterTests
     {
         // There mustn't be any calls to Advance on the underlying buffer yet, or else we've lost the opportunity to write the prefix.
         Assert.Equal(0, this.sequence.Length);
-        var length = prefixWriter.Length;
+        long length = prefixWriter.Length;
 
         // Go ahead and commit everything, with our prefix.
         Prefix.CopyTo(prefixWriter.Prefix);

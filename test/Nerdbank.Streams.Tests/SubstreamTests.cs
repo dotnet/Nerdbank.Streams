@@ -61,7 +61,7 @@ public class SubstreamTests : TestBase
     [Fact]
     public void ReadSubstream_Position()
     {
-        var substream = this.underlyingStream.ReadSubstream();
+        Stream? substream = this.underlyingStream.ReadSubstream();
         Assert.Throws<NotSupportedException>(() => substream.Position = 0);
         Assert.Throws<NotSupportedException>(() => substream.Position);
         substream.Dispose();
@@ -73,7 +73,7 @@ public class SubstreamTests : TestBase
     [PairwiseData]
     public async Task WriteSubstream_Position(bool async)
     {
-        var substream = this.underlyingStream.WriteSubstream();
+        Substream? substream = this.underlyingStream.WriteSubstream();
         Assert.Throws<NotSupportedException>(() => substream.Position = 0);
         Assert.Throws<NotSupportedException>(() => substream.Position);
         await this.DisposeSyncOrAsync(substream, async);
@@ -84,7 +84,7 @@ public class SubstreamTests : TestBase
     [Fact]
     public void ReadSubstream_Length()
     {
-        var substream = this.underlyingStream.ReadSubstream();
+        Stream? substream = this.underlyingStream.ReadSubstream();
         Assert.Throws<NotSupportedException>(() => substream.Length);
         substream.Dispose();
         Assert.Throws<ObjectDisposedException>(() => substream.Length);
@@ -94,7 +94,7 @@ public class SubstreamTests : TestBase
     [PairwiseData]
     public async Task WriteSubstream_Length(bool async)
     {
-        var substream = this.underlyingStream.WriteSubstream();
+        Substream? substream = this.underlyingStream.WriteSubstream();
         Assert.Throws<NotSupportedException>(() => substream.Length);
         await this.DisposeSyncOrAsync(substream, async);
         Assert.Throws<ObjectDisposedException>(() => substream.Length);
@@ -104,7 +104,7 @@ public class SubstreamTests : TestBase
     [PairwiseData]
     public async Task WriteSubstream_Seek(bool async)
     {
-        var substream = this.underlyingStream.WriteSubstream();
+        Substream? substream = this.underlyingStream.WriteSubstream();
         Assert.Throws<NotSupportedException>(() => substream.Seek(0, SeekOrigin.Begin));
         await this.DisposeSyncOrAsync(substream, async);
         Assert.Throws<ObjectDisposedException>(() => substream.Seek(0, SeekOrigin.Begin));
@@ -113,7 +113,7 @@ public class SubstreamTests : TestBase
     [Fact]
     public void ReadSubstream_Seek()
     {
-        var substream = this.underlyingStream.ReadSubstream();
+        Stream? substream = this.underlyingStream.ReadSubstream();
         Assert.Throws<NotSupportedException>(() => substream.Seek(0, SeekOrigin.Begin));
         substream.Dispose();
         Assert.Throws<ObjectDisposedException>(() => substream.Seek(0, SeekOrigin.Begin));
@@ -123,7 +123,7 @@ public class SubstreamTests : TestBase
     [PairwiseData]
     public async Task WriteSubstream_SetLength(bool async)
     {
-        var substream = this.underlyingStream.WriteSubstream();
+        Substream? substream = this.underlyingStream.WriteSubstream();
         Assert.Throws<NotSupportedException>(() => substream.SetLength(0));
         await this.DisposeSyncOrAsync(substream, async);
         Assert.Throws<ObjectDisposedException>(() => substream.SetLength(0));
@@ -132,7 +132,7 @@ public class SubstreamTests : TestBase
     [Fact]
     public void ReadSubstream_SetLength()
     {
-        var substream = this.underlyingStream.ReadSubstream();
+        Stream? substream = this.underlyingStream.ReadSubstream();
         Assert.Throws<NotSupportedException>(() => substream.SetLength(0));
         substream.Dispose();
         Assert.Throws<ObjectDisposedException>(() => substream.SetLength(0));
@@ -157,7 +157,7 @@ public class SubstreamTests : TestBase
     [PairwiseData]
     public async Task ReadSubstream_Write(bool async)
     {
-        var substream = this.underlyingStream.ReadSubstream();
+        Stream? substream = this.underlyingStream.ReadSubstream();
         await Assert.ThrowsAsync<NotSupportedException>(() => this.WriteSyncOrAsync(substream, async, new byte[1], 0, 1));
         substream.Dispose();
         await Assert.ThrowsAsync<ObjectDisposedException>(() => this.WriteSyncOrAsync(substream, async, new byte[1], 0, 1));
@@ -167,7 +167,7 @@ public class SubstreamTests : TestBase
     [PairwiseData]
     public async Task ReadSubstream_Flush(bool async)
     {
-        var substream = this.underlyingStream.ReadSubstream();
+        Stream? substream = this.underlyingStream.ReadSubstream();
         await Assert.ThrowsAsync<NotSupportedException>(() => this.FlushSyncOrAsync(substream, async));
         substream.Dispose();
         await Assert.ThrowsAsync<ObjectDisposedException>(() => this.FlushSyncOrAsync(substream, async));
@@ -177,7 +177,7 @@ public class SubstreamTests : TestBase
     [PairwiseData]
     public async Task WriteSubstream_Read(bool async)
     {
-        var substream = this.underlyingStream.WriteSubstream();
+        Substream? substream = this.underlyingStream.WriteSubstream();
         await Assert.ThrowsAsync<NotSupportedException>(() => this.ReadSyncOrAsync(substream, async, new byte[1], 0, 1));
         await this.DisposeSyncOrAsync(substream, async);
         await Assert.ThrowsAsync<ObjectDisposedException>(() => this.ReadSyncOrAsync(substream, async, new byte[1], 0, 1));
@@ -187,16 +187,16 @@ public class SubstreamTests : TestBase
     [PairwiseData]
     public async Task Write_Read([CombinatorialValues(0, 1, 3, 8 * 1024)] int substreamLength, bool async)
     {
-        var substream = this.underlyingStream.WriteSubstream();
-        var substreamBuffer = this.GetRandomBuffer(substreamLength);
+        Substream? substream = this.underlyingStream.WriteSubstream();
+        byte[]? substreamBuffer = this.GetRandomBuffer(substreamLength);
         await this.WriteSyncOrAsync(substream, async, substreamBuffer, 0, substreamLength);
         await this.DisposeSyncOrAsync(substream, async);
 
         this.underlyingStream.Write(new byte[] { 0xaa }, 0, 1);
         this.underlyingStream.Position = 0;
 
-        var readSubstream = this.underlyingStream.ReadSubstream();
-        var readBuffer = new byte[substreamLength + 5];
+        Stream? readSubstream = this.underlyingStream.ReadSubstream();
+        byte[]? readBuffer = new byte[substreamLength + 5];
         int bytesRead = await this.ReadSyncOrAsync(readSubstream, async, readBuffer, 0, readBuffer.Length);
         Assert.Equal(substreamLength, bytesRead);
         Assert.Equal(substreamBuffer, readBuffer.Take(substreamLength));
@@ -214,8 +214,8 @@ public class SubstreamTests : TestBase
     public async Task WriteInManySmallChunks_ReadInLargeOnes(bool async)
     {
         int bufferSize = 64;
-        var substream = this.underlyingStream.WriteSubstream(bufferSize);
-        var substreamBuffer = this.GetRandomBuffer(256);
+        Substream? substream = this.underlyingStream.WriteSubstream(bufferSize);
+        byte[]? substreamBuffer = this.GetRandomBuffer(256);
         await this.WriteSyncOrAsync(substream, async, substreamBuffer, 0, 5);
         await this.WriteSyncOrAsync(substream, async, substreamBuffer, 5, 15);
         await this.WriteSyncOrAsync(substream, async, substreamBuffer, 20, 20);
@@ -224,8 +224,8 @@ public class SubstreamTests : TestBase
         await this.DisposeSyncOrAsync(substream, async);
 
         this.underlyingStream.Position = 0;
-        var readSubstream = this.underlyingStream.ReadSubstream();
-        var readBuffer = new byte[substreamBuffer.Length + 5];
+        Stream? readSubstream = this.underlyingStream.ReadSubstream();
+        byte[]? readBuffer = new byte[substreamBuffer.Length + 5];
         int bytesRead = await this.ReadSyncOrAsync(readSubstream, async, readBuffer, 0, readBuffer.Length);
         this.Logger.WriteLine($"Block of {bytesRead} bytes just read.");
         Assert.True(bytesRead >= bufferSize); // confirm we get more than just the tiny sizes we wrote out
@@ -245,8 +245,8 @@ public class SubstreamTests : TestBase
     public async Task Flush_WritesOutSmallBuffers(bool async)
     {
         int bufferSize = 64;
-        var substream = this.underlyingStream.WriteSubstream(bufferSize);
-        var substreamBuffer = this.GetRandomBuffer(256);
+        Substream? substream = this.underlyingStream.WriteSubstream(bufferSize);
+        byte[]? substreamBuffer = this.GetRandomBuffer(256);
         await this.WriteSyncOrAsync(substream, async, substreamBuffer, 0, 5);
         await this.FlushSyncOrAsync(substream, async);
         await this.WriteSyncOrAsync(substream, async, substreamBuffer, 5, 15);
@@ -257,8 +257,8 @@ public class SubstreamTests : TestBase
         await this.DisposeSyncOrAsync(substream, async);
 
         this.underlyingStream.Position = 0;
-        var readSubstream = this.underlyingStream.ReadSubstream();
-        var readBuffer = new byte[substreamBuffer.Length + 5];
+        Stream? readSubstream = this.underlyingStream.ReadSubstream();
+        byte[]? readBuffer = new byte[substreamBuffer.Length + 5];
         int bytesRead = 0;
         int bytesJustRead = await this.ReadSyncOrAsync(readSubstream, async, readBuffer, bytesRead, readBuffer.Length);
         bytesRead += bytesJustRead;
@@ -283,7 +283,7 @@ public class SubstreamTests : TestBase
     [PairwiseData]
     public async Task Flush_RepeatedlyDoesNotWriteMore(bool async)
     {
-        var substream = this.underlyingStream.WriteSubstream();
+        Substream? substream = this.underlyingStream.WriteSubstream();
         await this.FlushSyncOrAsync(substream, async);
         await this.FlushSyncOrAsync(substream, async);
         Assert.Equal(0, this.underlyingStream.Length);
@@ -302,8 +302,8 @@ public class SubstreamTests : TestBase
         monitoredStream.DidFlush += (s, e) => lastOperation = 2;
 
         const int bufferSize = 64;
-        var substream = monitoredStream.WriteSubstream(bufferSize);
-        var substreamBuffer = this.GetRandomBuffer(256);
+        Substream? substream = monitoredStream.WriteSubstream(bufferSize);
+        byte[]? substreamBuffer = this.GetRandomBuffer(256);
         await this.DisposeSyncOrAsync(substream, async);
         Assert.Equal(2, lastOperation);
     }
@@ -317,8 +317,8 @@ public class SubstreamTests : TestBase
         monitoredStream.DidFlush += (s, e) => flushed++;
 
         const int bufferSize = 4;
-        var substreamBuffer = this.GetRandomBuffer(bufferSize);
-        var substream = monitoredStream.WriteSubstream(64);
+        byte[]? substreamBuffer = this.GetRandomBuffer(bufferSize);
+        Substream? substream = monitoredStream.WriteSubstream(64);
         await this.WriteSyncOrAsync(substream, async, substreamBuffer, 0, substreamBuffer.Length, this.TimeoutToken);
         Assert.Equal(0, flushed);
         await this.FlushSyncOrAsync(substream, async);
@@ -329,7 +329,7 @@ public class SubstreamTests : TestBase
     [PairwiseData]
     public async Task Write_AfterDisposeThrows(bool async)
     {
-        var substream = this.underlyingStream.WriteSubstream();
+        Substream? substream = this.underlyingStream.WriteSubstream();
         await this.DisposeSyncOrAsync(substream, async);
         Assert.False(substream.CanWrite);
         await Assert.ThrowsAsync<ObjectDisposedException>(() => this.WriteSyncOrAsync(substream, async, new byte[1], 0, 1));

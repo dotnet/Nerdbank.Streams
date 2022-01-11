@@ -24,7 +24,7 @@ public class MultiplexingStreamV3Tests : MultiplexingStreamV2Tests
     [Fact]
     public async Task Create()
     {
-        var pair = FullDuplexStream.CreatePair();
+        (Stream, Stream) pair = FullDuplexStream.CreatePair();
         var mx1 = MultiplexingStream.Create(pair.Item1);
         var mx2 = MultiplexingStream.Create(pair.Item2);
 
@@ -36,7 +36,7 @@ public class MultiplexingStreamV3Tests : MultiplexingStreamV2Tests
     [Fact]
     public override async Task SeededChannels()
     {
-        var pair = FullDuplexStream.CreatePair();
+        (Stream, Stream) pair = FullDuplexStream.CreatePair();
         var options = new MultiplexingStream.Options
         {
             ProtocolMajorVersion = this.ProtocolMajorVersion,
@@ -49,10 +49,10 @@ public class MultiplexingStreamV3Tests : MultiplexingStreamV2Tests
         var mx1 = MultiplexingStream.Create(pair.Item1, options);
         var mx2 = MultiplexingStream.Create(pair.Item2, options);
 
-        var channel1_0 = mx1.AcceptChannel(0);
-        var channel1_1 = mx1.AcceptChannel(1);
-        var channel2_0 = mx2.AcceptChannel(0);
-        var channel2_1 = mx2.AcceptChannel(1);
+        MultiplexingStream.Channel? channel1_0 = mx1.AcceptChannel(0);
+        MultiplexingStream.Channel? channel1_1 = mx1.AcceptChannel(1);
+        MultiplexingStream.Channel? channel2_0 = mx2.AcceptChannel(0);
+        MultiplexingStream.Channel? channel2_1 = mx2.AcceptChannel(1);
 
         await this.TransmitAndVerifyAsync(channel1_0.AsStream(), channel2_0.AsStream(), new byte[] { 1, 2, 3 });
         await this.TransmitAndVerifyAsync(channel1_1.AsStream(), channel2_1.AsStream(), new byte[] { 4, 5, 6 });

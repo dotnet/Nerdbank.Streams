@@ -80,10 +80,10 @@ public class MultiplexingStreamSeededChannelTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task SeededChannels_SendContent()
     {
-        var channel1_0 = this.mx1.AcceptChannel(0);
-        var channel1_1 = this.mx1.AcceptChannel(1);
-        var channel2_0 = this.mx2.AcceptChannel(0);
-        var channel2_1 = this.mx2.AcceptChannel(1);
+        MultiplexingStream.Channel? channel1_0 = this.mx1.AcceptChannel(0);
+        MultiplexingStream.Channel? channel1_1 = this.mx1.AcceptChannel(1);
+        MultiplexingStream.Channel? channel2_0 = this.mx2.AcceptChannel(0);
+        MultiplexingStream.Channel? channel2_1 = this.mx2.AcceptChannel(1);
 
         await this.TransmitAndVerifyAsync(channel1_0.AsStream(), channel2_0.AsStream(), new byte[] { 1, 2, 3 });
         await this.TransmitAndVerifyAsync(channel1_1.AsStream(), channel2_1.AsStream(), new byte[] { 4, 5, 6 });
@@ -92,12 +92,12 @@ public class MultiplexingStreamSeededChannelTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task SeededChannels_CanBeClosed()
     {
-        var channel1 = this.mx1.AcceptChannel(0);
+        MultiplexingStream.Channel? channel1 = this.mx1.AcceptChannel(0);
         channel1.Output.Complete();
         channel1.Input.Complete();
 
-        var channel2 = this.mx2.AcceptChannel(0);
-        var readResult = await channel2.Input.ReadAsync(this.TimeoutToken);
+        MultiplexingStream.Channel? channel2 = this.mx2.AcceptChannel(0);
+        ReadResult readResult = await channel2.Input.ReadAsync(this.TimeoutToken);
         Assert.True(readResult.IsCompleted);
         channel2.Output.Complete();
 
@@ -121,14 +121,14 @@ public class MultiplexingStreamSeededChannelTests : TestBase, IAsyncLifetime
     [Fact]
     public void CreateChannel_DoesNotOverlapSeededChannelIDs()
     {
-        var channel = this.mx1.CreateChannel();
+        MultiplexingStream.Channel? channel = this.mx1.CreateChannel();
         Assert.True(channel.QualifiedId.Id >= (ulong)this.options.SeededChannels.Count);
     }
 
     [Fact]
     public void Create_VersionsWithHandshakes()
     {
-        var pair = FullDuplexStream.CreatePair();
+        (Stream, Stream) pair = FullDuplexStream.CreatePair();
         Assert.Throws<NotSupportedException>(() => MultiplexingStream.Create(pair.Item1, new MultiplexingStream.Options { ProtocolMajorVersion = 1 }));
         Assert.Throws<NotSupportedException>(() => MultiplexingStream.Create(pair.Item1, new MultiplexingStream.Options { ProtocolMajorVersion = 2 }));
     }

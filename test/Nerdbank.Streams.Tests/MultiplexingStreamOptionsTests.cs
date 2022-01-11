@@ -77,7 +77,7 @@ public class MultiplexingStreamOptionsTests
     public void IsFrozen()
     {
         Assert.False(this.options.IsFrozen);
-        var frozen = this.options.GetFrozenCopy();
+        MultiplexingStream.Options? frozen = this.options.GetFrozenCopy();
         Assert.NotSame(this.options, frozen);
         Assert.True(frozen.IsFrozen);
         Assert.False(this.options.IsFrozen);
@@ -117,7 +117,7 @@ public class MultiplexingStreamOptionsTests
     [Fact]
     public void Frozen_ThrowsOnChanges()
     {
-        var frozen = this.options.GetFrozenCopy();
+        MultiplexingStream.Options? frozen = this.options.GetFrozenCopy();
         Assert.Throws<InvalidOperationException>(() => frozen.DefaultChannelReceivingWindowSize = 1024);
         Assert.Throws<InvalidOperationException>(() => frozen.DefaultChannelTraceSourceFactory = (id, name) => null);
         Assert.Throws<InvalidOperationException>(() => frozen.DefaultChannelTraceSourceFactoryWithQualifier = (id, name) => null);

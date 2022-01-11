@@ -32,7 +32,7 @@ public class PipeReaderCompletionWatcherTests : TestBase
     public async Task NullState()
     {
         var tcs = new TaskCompletionSource<Exception?>();
-        var monitored = this.reader.OnCompleted(
+        PipeReader? monitored = this.reader.OnCompleted(
             (e, s) =>
             {
                 tcs.SetResult(e);

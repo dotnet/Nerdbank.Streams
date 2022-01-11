@@ -110,10 +110,10 @@ public abstract class TestBase : IDisposable
         var bytesReceived = new Sequence<byte>();
         while (bytesReceived.Length < minLength)
         {
-            var readResult = await reader.ReadAsync(this.TimeoutToken);
-            foreach (var segment in readResult.Buffer)
+            ReadResult readResult = await reader.ReadAsync(this.TimeoutToken);
+            foreach (ReadOnlyMemory<byte> segment in readResult.Buffer)
             {
-                var memory = bytesReceived.GetMemory(segment.Length);
+                Memory<byte> memory = bytesReceived.GetMemory(segment.Length);
                 segment.CopyTo(memory);
                 bytesReceived.Advance(segment.Length);
             }
@@ -150,7 +150,7 @@ public abstract class TestBase : IDisposable
     {
         while (true)
         {
-            var readResult = await reader.ReadAsync(this.TimeoutToken);
+            ReadResult readResult = await reader.ReadAsync(this.TimeoutToken);
             reader.AdvanceTo(readResult.Buffer.End);
             if (readResult.IsCompleted)
             {
@@ -161,7 +161,7 @@ public abstract class TestBase : IDisposable
 
     internal byte[] GetBuffer(int length)
     {
-        var buffer = new byte[length];
+        byte[]? buffer = new byte[length];
         for (int i = 0; i < buffer.Length; i++)
         {
             buffer[i] = 0xcc;
@@ -286,7 +286,7 @@ public abstract class TestBase : IDisposable
     {
         var tcs = new TaskCompletionSource<int>();
         Task.WhenAll(tasks).ApplyResultTo(tcs);
-        foreach (var task in tasks)
+        foreach (Task? task in tasks)
         {
             task.ContinueWith(t => tcs.TrySetException(t.Exception!), CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default).Forget();
         }
@@ -298,7 +298,7 @@ public abstract class TestBase : IDisposable
     {
         var tcs = new TaskCompletionSource<T[]>();
         Task.WhenAll(tasks).ApplyResultTo(tcs);
-        foreach (var task in tasks)
+        foreach (Task<T>? task in tasks)
         {
             task.ContinueWith(t => tcs.TrySetException(t.Exception!), CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default).Forget();
         }
@@ -401,7 +401,7 @@ public abstract class TestBase : IDisposable
 
     protected byte[] GetRandomBuffer(int length)
     {
-        var buffer = new byte[length];
+        byte[]? buffer = new byte[length];
         this.random.NextBytes(buffer);
         return buffer;
     }
@@ -422,7 +422,7 @@ public abstract class TestBase : IDisposable
         Requires.NotNull(readFrom, nameof(readFrom));
         Requires.NotNull(data, nameof(data));
 
-        var readBuffer = new byte[data.Length * 2];
+        byte[]? readBuffer = new byte[data.Length * 2];
         int readBytes = await ReadAtLeastAsync(readFrom, new ArraySegment<byte>(readBuffer), data.Length, this.TimeoutToken);
         Assert.Equal(data.Length, readBytes);
         for (int i = 0; i < data.Length; i++)

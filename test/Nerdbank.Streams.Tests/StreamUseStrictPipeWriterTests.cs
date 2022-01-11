@@ -36,8 +36,8 @@ public class StreamUseStrictPipeWriterTests : StreamPipeWriterTestBase
         unreadableStream.Setup(s => s.WriteAsync(It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ThrowsAsync(expectedException);
 #endif
 
-        var writer = this.CreatePipeWriter(unreadableStream.Object);
-        var actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => writer.WriteAsync(new byte[1], this.TimeoutToken).AsTask());
+        PipeWriter? writer = this.CreatePipeWriter(unreadableStream.Object);
+        InvalidOperationException? actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => writer.WriteAsync(new byte[1], this.TimeoutToken).AsTask());
         Assert.Same(expectedException, actualException);
     }
 
@@ -55,12 +55,12 @@ public class StreamUseStrictPipeWriterTests : StreamPipeWriterTestBase
         streamMock.Setup(s => s.WriteAsync(It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).Returns(writeCompletedSource.Task);
 #endif
 
-        var stream = streamMock.Object;
-        var writer = this.CreatePipeWriter(stream);
+        Stream? stream = streamMock.Object;
+        PipeWriter? writer = this.CreatePipeWriter(stream);
         writer.GetMemory(1);
         writer.Advance(1);
         var cts = new CancellationTokenSource();
-        var flushTask = writer.FlushAsync(cts.Token);
+        ValueTask<FlushResult> flushTask = writer.FlushAsync(cts.Token);
         cts.Cancel();
         writeCompletedSource.SetResult(null);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => flushTask.AsTask());
@@ -80,14 +80,14 @@ public class StreamUseStrictPipeWriterTests : StreamPipeWriterTestBase
         streamMock.Setup(s => s.WriteAsync(It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).Returns(writeCompletedSource.Task);
 #endif
 
-        var stream = streamMock.Object;
-        var writer = this.CreatePipeWriter(stream);
+        Stream? stream = streamMock.Object;
+        PipeWriter? writer = this.CreatePipeWriter(stream);
         writer.GetMemory(1);
         writer.Advance(1);
-        var flushTask = writer.FlushAsync();
+        ValueTask<FlushResult> flushTask = writer.FlushAsync();
         writer.CancelPendingFlush();
         writeCompletedSource.SetResult(null);
-        var flushResult = await flushTask;
+        FlushResult flushResult = await flushTask;
         Assert.True(flushResult.IsCanceled);
     }
 
@@ -95,7 +95,7 @@ public class StreamUseStrictPipeWriterTests : StreamPipeWriterTestBase
     public async Task Write_MultipleBlocks()
     {
         var ms = new MemoryStream();
-        var w = ms.UseStrictPipeWriter();
+        PipeWriter? w = ms.UseStrictPipeWriter();
         w.GetMemory(4);
         w.Advance(4);
         w.GetMemory(1024);
@@ -108,11 +108,11 @@ public class StreamUseStrictPipeWriterTests : StreamPipeWriterTestBase
     public async Task CancelPendingFlush_BeforeFlushDoesNotCancelFutureFlush()
     {
         var stream = new MemoryStream();
-        var writer = this.CreatePipeWriter(stream);
+        PipeWriter? writer = this.CreatePipeWriter(stream);
         writer.GetMemory(1);
         writer.Advance(1);
         writer.CancelPendingFlush();
-        var flushResult = await writer.FlushAsync(this.TimeoutToken);
+        FlushResult flushResult = await writer.FlushAsync(this.TimeoutToken);
         Assert.False(flushResult.IsCanceled);
         Assert.Equal(1, stream.Length);
     }

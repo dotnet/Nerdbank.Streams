@@ -25,7 +25,7 @@ public class NestedStreamTests : TestBase
         : base(logger)
     {
         var random = new Random();
-        var buffer = new byte[20];
+        byte[]? buffer = new byte[20];
         random.NextBytes(buffer);
         this.underlyingStream = new MemoryStream(buffer);
         this.stream = this.underlyingStream.ReadSlice(DefaultNestedLength);
@@ -54,7 +54,7 @@ public class NestedStreamTests : TestBase
     public void CanSeek_NonSeekableStream()
     {
         using var gzipStream = new GZipStream(Stream.Null, CompressionMode.Decompress);
-        using var stream = gzipStream.ReadSlice(10);
+        using Stream? stream = gzipStream.ReadSlice(10);
 
         Assert.False(stream.CanSeek);
         stream.Dispose();
@@ -73,7 +73,7 @@ public class NestedStreamTests : TestBase
     public void Length_NonSeekableStream()
     {
         using (var gzipStream = new GZipStream(Stream.Null, CompressionMode.Decompress))
-        using (var stream = gzipStream.ReadSlice(10))
+        using (Stream? stream = gzipStream.ReadSlice(10))
         {
             Assert.Throws<NotSupportedException>(() => stream.Length);
             stream.Dispose();
@@ -87,7 +87,7 @@ public class NestedStreamTests : TestBase
         byte[] buffer = new byte[DefaultNestedLength];
 
         Assert.Equal(0, this.stream.Position);
-        var bytesRead = this.stream.Read(buffer, 0, 5);
+        int bytesRead = this.stream.Read(buffer, 0, 5);
         Assert.Equal(bytesRead, this.stream.Position);
 
         this.stream.Position = 0;
@@ -105,7 +105,7 @@ public class NestedStreamTests : TestBase
     public void Position_NonSeekableStream()
     {
         using var nonSeekableWrapper = new OneWayStreamWrapper(this.underlyingStream, canRead: true);
-        using var stream = nonSeekableWrapper.ReadSlice(10);
+        using Stream? stream = nonSeekableWrapper.ReadSlice(10);
 
         Assert.Equal(0, stream.Position);
         Assert.Throws<NotSupportedException>(() => stream.Position = 3);
@@ -353,7 +353,7 @@ public class NestedStreamTests : TestBase
     [Fact]
     public void Read_UnderlyingStreamReturnsFewerBytesThanRequested()
     {
-        var buffer = new byte[20];
+        byte[]? buffer = new byte[20];
         int firstBlockLength = DefaultNestedLength / 2;
         this.underlyingStream.SetLength(firstBlockLength);
         Assert.Equal(firstBlockLength, this.stream.Read(buffer, 0, buffer.Length));
@@ -364,7 +364,7 @@ public class NestedStreamTests : TestBase
     [Fact]
     public async Task ReadAsync_UnderlyingStreamReturnsFewerBytesThanRequested()
     {
-        var buffer = new byte[20];
+        byte[]? buffer = new byte[20];
         int firstBlockLength = DefaultNestedLength / 2;
         this.underlyingStream.SetLength(firstBlockLength);
         Assert.Equal(firstBlockLength, await this.stream.ReadAsync(buffer, 0, buffer.Length));
@@ -375,7 +375,7 @@ public class NestedStreamTests : TestBase
     [Fact]
     public void Read_ValidatesArguments()
     {
-        var buffer = new byte[20];
+        byte[]? buffer = new byte[20];
 
         Assert.Throws<ArgumentNullException>(() => this.stream.Read(null!, 0, 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => this.stream.Read(buffer, -1, buffer.Length));
@@ -386,7 +386,7 @@ public class NestedStreamTests : TestBase
     [Fact]
     public async Task ReadAsync_ValidatesArguments()
     {
-        var buffer = new byte[20];
+        byte[]? buffer = new byte[20];
 
         await Assert.ThrowsAsync<ArgumentNullException>(() => this.stream.ReadAsync(null!, 0, 0));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.stream.ReadAsync(buffer, -1, buffer.Length));
