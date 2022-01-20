@@ -143,53 +143,6 @@ namespace Nerdbank.Streams.Tests.SequenceReader
 
         [Theory,
             InlineData(false),
-            InlineData(true),]
-        public void TryReadToSpan_Sequence(bool advancePastDelimiter)
-        {
-            ReadOnlySequence<byte> bytes = SequenceFactory.Create(new byte[][] {
-                new byte[] { 0, 0 },
-                new byte[] { 1, 1, 2, 2 },
-                new byte[] { },
-                new byte[] { 3, 3, 4, 4, 5, 5, 6, 6 }
-            });
-
-            SequenceReader<byte> baseReader = new SequenceReader<byte>(bytes);
-            for (byte i = 0; i < bytes.Length / 2 - 1; i++)
-            {
-                byte[] expected = new byte[i * 2 + 1];
-                for (int j = 0; j < expected.Length - 1; j++)
-                {
-                    expected[j] = (byte)(j / 2);
-                }
-                expected[i * 2] = i;
-                ReadOnlySpan<byte> searchFor = new byte[] { i, (byte)(i + 1) };
-                SequenceReader<byte> copy = baseReader;
-
-                Assert.True(copy.TryReadTo(out ReadOnlySpan<byte> sp, searchFor, advancePastDelimiter));
-                Assert.True(sp.SequenceEqual(expected));
-
-                copy = baseReader;
-                Assert.True(copy.TryReadTo(out ReadOnlySequence<byte> seq, searchFor, advancePastDelimiter));
-                Assert.True(seq.ToArray().AsSpan().SequenceEqual(expected));
-            }
-
-            bytes = SequenceFactory.Create(new byte[][] {
-                new byte[] { 47, 42, 66, 32, 42, 32, 66, 42, 47 }   // /*b * b*/
-            });
-
-            baseReader = new SequenceReader<byte>(bytes);
-            SequenceReader<byte> copyReader = baseReader;
-
-            Assert.True(copyReader.TryReadTo(out ReadOnlySpan<byte> span, new byte[] { 42, 47 }, advancePastDelimiter));    //  */
-            Assert.True(span.SequenceEqual(new byte[] { 47, 42, 66, 32, 42, 32, 66 }));
-
-            copyReader = baseReader;
-            Assert.True(copyReader.TryReadTo(out ReadOnlySequence<byte> sequence, new byte[] { 42, 47 }, advancePastDelimiter));    //  */
-            Assert.True(sequence.ToArray().AsSpan().SequenceEqual(new byte[] { 47, 42, 66, 32, 42, 32, 66 }));
-        }
-
-        [Theory,
-            InlineData(false),
             InlineData(true)]
         public void TryReadTo_NotFound_Span(bool advancePastDelimiter)
         {
@@ -216,58 +169,6 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             SequenceReader<byte> reader = new SequenceReader<byte>(bytes);
             reader.Advance(4);
             Assert.False(reader.TryReadTo(out ReadOnlySequence<byte> span, 255, 0, advancePastDelimiter));
-        }
-
-        [Fact]
-        public void TryReadTo_SingleDelimiter()
-        {
-            ReadOnlySequence<byte> bytes = SequenceFactory.Create(new byte[][] {
-                new byte[] { 1 },
-                new byte[] { 2, 3, 4, 5, 6 }
-            });
-
-            SequenceReader<byte> baseReader = new SequenceReader<byte>(bytes);
-
-            SequenceReader<byte> spanReader = baseReader;
-            SequenceReader<byte> sequenceReader = baseReader;
-            Span<byte> delimiter = new byte[] { 1 };
-
-            for (int i = 1; i < 6; i += 1)
-            {
-                // Also check scanning from the start.
-                SequenceReader<byte> resetReader = baseReader;
-                delimiter[0] = (byte)i;
-                Assert.True(spanReader.TryReadTo(out ReadOnlySpan<byte> span, delimiter, advancePastDelimiter: true));
-                Assert.True(resetReader.TryReadTo(out span, delimiter, advancePastDelimiter: true));
-                Assert.True(spanReader.TryPeek(out byte value));
-                Assert.Equal(i + 1, value);
-                Assert.True(resetReader.TryPeek(out value));
-                Assert.Equal(i + 1, value);
-
-                // Also check scanning from the start.
-                resetReader = baseReader;
-                delimiter[0] = (byte)i;
-                Assert.True(sequenceReader.TryReadTo(out ReadOnlySequence<byte> sequence, delimiter, advancePastDelimiter: true));
-                Assert.True(resetReader.TryReadTo(out sequence, delimiter, advancePastDelimiter: true));
-                Assert.True(sequenceReader.TryPeek(out value));
-                Assert.Equal(i + 1, value);
-                Assert.True(resetReader.TryPeek(out value));
-                Assert.Equal(i + 1, value);
-            }
-        }
-
-        [Fact]
-        public void TryReadTo_Span_At_Segments_Boundary()
-        {
-            Span<byte> delimiter = new byte[] { 13, 10 }; // \r\n
-            BufferSegment<byte> segment = new BufferSegment<byte>(System.Text.Encoding.ASCII.GetBytes("Hello\r"));
-            segment.Append(System.Text.Encoding.ASCII.GetBytes("\nWorld")); // add next segment
-            ReadOnlySequence<byte> inputSeq = new ReadOnlySequence<byte>(segment, 0, segment, 6); // span only the first segment!
-            SequenceReader<byte> sr = new SequenceReader<byte>(inputSeq);
-            bool r = sr.TryReadTo(out ReadOnlySpan<byte> _, delimiter);
-            Assert.False(r);
-            r = sr.TryReadTo(out ReadOnlySequence<byte> _, delimiter);
-            Assert.False(r);
         }
     }
 }
