@@ -11,7 +11,6 @@ System.Buffers.SequenceReader<T>.AdvancePastAny(System.ReadOnlySpan<T> values) -
 System.Buffers.SequenceReader<T>.AdvancePastAny(T value0, T value1) -> long
 System.Buffers.SequenceReader<T>.AdvancePastAny(T value0, T value1, T value2) -> long
 System.Buffers.SequenceReader<T>.AdvancePastAny(T value0, T value1, T value2, T value3) -> long
-System.Buffers.SequenceReader<T>.AdvanceToEnd() -> void
 System.Buffers.SequenceReader<T>.Consumed.get -> long
 System.Buffers.SequenceReader<T>.CurrentSpan.get -> System.ReadOnlySpan<T>
 System.Buffers.SequenceReader<T>.CurrentSpanIndex.get -> int
@@ -28,18 +27,15 @@ System.Buffers.SequenceReader<T>.SequenceReader(System.Buffers.ReadOnlySequence<
 System.Buffers.SequenceReader<T>.TryAdvanceTo(T delimiter, bool advancePastDelimiter = true) -> bool
 System.Buffers.SequenceReader<T>.TryAdvanceToAny(System.ReadOnlySpan<T> delimiters, bool advancePastDelimiter = true) -> bool
 System.Buffers.SequenceReader<T>.TryCopyTo(System.Span<T> destination) -> bool
-System.Buffers.SequenceReader<T>.TryPeek(long offset, out T value) -> bool
 System.Buffers.SequenceReader<T>.TryPeek(out T value) -> bool
 System.Buffers.SequenceReader<T>.TryRead(out T value) -> bool
 System.Buffers.SequenceReader<T>.TryReadExact(int count, out System.Buffers.ReadOnlySequence<T> sequence) -> bool
 System.Buffers.SequenceReader<T>.TryReadTo(out System.Buffers.ReadOnlySequence<T> sequence, System.ReadOnlySpan<T> delimiter, bool advancePastDelimiter = true) -> bool
 System.Buffers.SequenceReader<T>.TryReadTo(out System.Buffers.ReadOnlySequence<T> sequence, T delimiter, bool advancePastDelimiter = true) -> bool
 System.Buffers.SequenceReader<T>.TryReadTo(out System.Buffers.ReadOnlySequence<T> sequence, T delimiter, T delimiterEscape, bool advancePastDelimiter = true) -> bool
-System.Buffers.SequenceReader<T>.TryReadTo(out System.ReadOnlySpan<T> span, System.ReadOnlySpan<T> delimiter, bool advancePastDelimiter = true) -> bool
 System.Buffers.SequenceReader<T>.TryReadTo(out System.ReadOnlySpan<T> span, T delimiter, bool advancePastDelimiter = true) -> bool
 System.Buffers.SequenceReader<T>.TryReadTo(out System.ReadOnlySpan<T> span, T delimiter, T delimiterEscape, bool advancePastDelimiter = true) -> bool
 System.Buffers.SequenceReader<T>.TryReadToAny(out System.Buffers.ReadOnlySequence<T> sequence, System.ReadOnlySpan<T> delimiters, bool advancePastDelimiter = true) -> bool
 System.Buffers.SequenceReader<T>.TryReadToAny(out System.ReadOnlySpan<T> span, System.ReadOnlySpan<T> delimiters, bool advancePastDelimiter = true) -> bool
-System.Buffers.SequenceReader<T>.UnreadSequence.get -> System.Buffers.ReadOnlySequence<T>
 System.Buffers.SequenceReader<T>.UnreadSpan.get -> System.ReadOnlySpan<T>
 System.Buffers.SequenceReaderExtensions
