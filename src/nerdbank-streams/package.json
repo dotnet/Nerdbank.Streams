@@ -37,7 +37,7 @@
     "@types/promise": "^7.1.30",
     "gulp": "^4.0.2",
     "gulp-typescript": "^6.0.0-alpha.1",
-    "jasmine": "^3.8.0",
+    "jasmine": "^4.0.2",
     "jshint": "^2.13.0",
     "mkdirp": "^1.0.4",
     "nerdbank-gitversioning": "^3.4.231",
