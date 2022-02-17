@@ -60,6 +60,32 @@ namespace Nerdbank.Streams
         }
 
         /// <summary>
+        /// Reads from the stream into a memory buffer.
+        /// </summary>
+        /// <param name="stream">The stream to read from.</param>
+        /// <param name="buffer">The buffer to copy the data into.</param>
+        /// <returns>The number of bytes actually read.</returns>
+        /// <devremarks>
+        /// This method shamelessly copied from the .NET Core 2.1 Stream class: https://github.com/dotnet/coreclr/blob/a113b1c803783c9d64f1f0e946ff9a853e3bc140/src/System.Private.CoreLib/shared/System/IO/Stream.cs#L366-L391.
+        /// </devremarks>
+        internal static int Read(this Stream stream, Span<byte> buffer)
+        {
+            Requires.NotNull(stream, nameof(stream));
+
+            byte[] sharedBuffer = ArrayPool<byte>.Shared.Rent(buffer.Length);
+            try
+            {
+                int numRead = stream.Read(sharedBuffer, 0, buffer.Length);
+                new ReadOnlySpan<byte>(sharedBuffer, 0, numRead).CopyTo(buffer);
+                return numRead;
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(sharedBuffer);
+            }
+        }
+
+        /// <summary>
         /// Writes to a stream from a memory buffer.
         /// </summary>
         /// <param name="stream">The stream to write to.</param>

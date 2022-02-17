@@ -1,0 +1,11 @@
+Nerdbank.Streams.StreamPipeReader
+Nerdbank.Streams.StreamPipeReader.Read() -> System.IO.Pipelines.ReadResult
+Nerdbank.Streams.StreamPipeReader.StreamPipeReader(System.IO.Stream! stream) -> void
+Nerdbank.Streams.StreamPipeReader.StreamPipeReader(System.IO.Stream! stream, int bufferSize, bool leaveOpen) -> void
+override Nerdbank.Streams.StreamPipeReader.AdvanceTo(System.SequencePosition consumed) -> void
+override Nerdbank.Streams.StreamPipeReader.AdvanceTo(System.SequencePosition consumed, System.SequencePosition examined) -> void
+override Nerdbank.Streams.StreamPipeReader.CancelPendingRead() -> void
+override Nerdbank.Streams.StreamPipeReader.Complete(System.Exception? exception = null) -> void
+override Nerdbank.Streams.StreamPipeReader.OnWriterCompleted(System.Action<System.Exception?, object?>! callback, object? state) -> void
+override Nerdbank.Streams.StreamPipeReader.ReadAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.IO.Pipelines.ReadResult>
+override Nerdbank.Streams.StreamPipeReader.TryRead(out System.IO.Pipelines.ReadResult result) -> bool

@@ -16,8 +16,7 @@ namespace Nerdbank.Streams
     /// A <see cref="PipeReader"/> that reads from an underlying <see cref="Stream"/> exactly when told to do so
     /// rather than constantly reading from the stream and buffering up the results.
     /// </summary>
-    [Obsolete("Use " + nameof(PipeReader) + "." + nameof(PipeReader.Create) + " instead.")]
-    internal class StreamPipeReader : PipeReader
+    public class StreamPipeReader : PipeReader
     {
         private readonly object syncObject = new object();
 
@@ -51,13 +50,22 @@ namespace Nerdbank.Streams
 
         private List<(Action<Exception?, object?>, object?)>? writerCompletedCallbacks;
 
+        /// <inheritdoc cref="StreamPipeReader(Stream, int, bool)" />
+        /// <remarks>
+        /// The <paramref name="stream"/> will be disposed of when the reader is completed.
+        /// </remarks>
+        public StreamPipeReader(Stream stream)
+            : this(stream, bufferSize: 4096, leaveOpen: false)
+        {
+        }
+
         /// <summary>
         /// Initializes a new instance of the <see cref="StreamPipeReader"/> class.
         /// </summary>
         /// <param name="stream">The stream to read from.</param>
         /// <param name="bufferSize">A hint at the size of messages that are commonly transferred. Use 0 for a commonly reasonable default.</param>
         /// <param name="leaveOpen"><c>true</c> to leave the underlying <paramref name="stream"/> open after calling <see cref="PipeReader.Complete(Exception)"/>; <c>false</c> to close the stream.</param>
-        internal StreamPipeReader(Stream stream, int bufferSize, bool leaveOpen)
+        public StreamPipeReader(Stream stream, int bufferSize, bool leaveOpen)
         {
             Requires.NotNull(stream, nameof(stream));
             Requires.Argument(stream.CanRead, nameof(stream), "Stream must be readable.");
@@ -170,6 +178,37 @@ namespace Nerdbank.Streams
                 {
                     return new ReadResult(this.buffer, isCanceled: true, isCompleted: this.isReaderCompleted);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Reads a sequence of bytes from the from the buffer or underlying <see cref="Stream" /> using synchronous APIs.
+        /// </summary>
+        /// <returns>The read buffer.</returns>
+        public ReadResult Read()
+        {
+            if (this.TryRead(out ReadResult result))
+            {
+                return result;
+            }
+
+            Memory<byte> memory;
+            lock (this.syncObject)
+            {
+                memory = this.buffer.GetMemory(this.bufferSize);
+            }
+
+            int bytesRead = this.stream.Read(memory.Span);
+            if (bytesRead == 0)
+            {
+                this.CompleteWriting();
+                return new ReadResult(this.buffer, isCanceled: false, isCompleted: true);
+            }
+
+            lock (this.syncObject)
+            {
+                this.buffer.Advance(bytesRead);
+                return new ReadResult(this.buffer, isCanceled: false, isCompleted: false);
             }
         }
 
