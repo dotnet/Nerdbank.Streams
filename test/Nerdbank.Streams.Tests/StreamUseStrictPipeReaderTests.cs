@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Pipelines;
@@ -40,6 +41,24 @@ public class StreamUseStrictPipeReaderTests : StreamPipeReaderTestBase
         PipeReader? reader = this.CreatePipeReader(unreadableStream.Object);
         InvalidOperationException? actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => reader.ReadAsync(this.TimeoutToken).AsTask());
         Assert.Same(expectedException, actualException);
+    }
+
+    [Fact]
+    public void Read()
+    {
+        MemoryStream ms = new(new byte[] { 1, 2, 3 });
+        var reader = (StreamPipeReader)this.CreatePipeReader(ms);
+        ReadResult result = reader.Read();
+        Assert.Equal(new byte[] { 1, 2, 3 }, result.Buffer.ToArray());
+        Assert.False(result.IsCompleted);
+        reader.AdvanceTo(result.Buffer.GetPosition(1));
+        result = reader.Read();
+        Assert.Equal(new byte[] { 2, 3 }, result.Buffer.ToArray());
+        Assert.False(result.IsCompleted);
+        reader.AdvanceTo(result.Buffer.End);
+        result = reader.Read();
+        Assert.Equal(0, result.Buffer.Length);
+        Assert.True(result.IsCompleted);
     }
 
     protected override PipeReader CreatePipeReader(Stream stream, int sizeHint = 0) => stream.UseStrictPipeReader(sizeHint);
