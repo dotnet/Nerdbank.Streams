@@ -257,9 +257,9 @@ namespace Nerdbank.Streams
 
             options = options ?? new Options { ProtocolMajorVersion = 3 };
 
-            var streamWriter = stream.UsePipeWriter();
+            PipeWriter? streamWriter = stream.UsePipeWriter();
 
-            var formatter = options.ProtocolMajorVersion switch
+            V3Formatter? formatter = options.ProtocolMajorVersion switch
             {
                 // We do NOT support 1-2 here because they require an asynchronous handshake.
                 3 => new V3Formatter(streamWriter, stream),
@@ -300,9 +300,9 @@ namespace Nerdbank.Streams
 
             // Do NOT specify our own cancellationToken parameter in UsePipeWriter, since this PipeWriter
             // must outlive this method and therefore should not be canceled later if that token is eventually canceled.
-            var streamWriter = stream.UsePipeWriter(cancellationToken: CancellationToken.None);
+            PipeWriter? streamWriter = stream.UsePipeWriter(cancellationToken: CancellationToken.None);
 
-            var formatter = options.ProtocolMajorVersion switch
+            Formatter? formatter = options.ProtocolMajorVersion switch
             {
                 1 => (Formatter)new V1Formatter(streamWriter, stream),
                 2 => new V2Formatter(streamWriter, stream),
@@ -321,7 +321,7 @@ namespace Nerdbank.Streams
                 object? handshakeData = formatter.WriteHandshake();
                 await formatter.FlushAsync(cancellationToken).ConfigureAwait(false);
 
-                var handshakeResult = await formatter.ReadHandshakeAsync(handshakeData, options, cancellationToken).ConfigureAwait(false);
+                (bool? IsOdd, Version ProtocolVersion) handshakeResult = await formatter.ReadHandshakeAsync(handshakeData, options, cancellationToken).ConfigureAwait(false);
 
                 if (options.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
                 {
@@ -379,7 +379,7 @@ namespace Nerdbank.Streams
             this.ThrowIfNotListening();
 
             var offerParameters = new Channel.OfferParameters(string.Empty, options?.ChannelReceivingWindowSize ?? this.DefaultChannelReceivingWindowSize);
-            var payload = this.formatter.Serialize(offerParameters);
+            ReadOnlySequence<byte> payload = this.formatter.Serialize(offerParameters);
 
             var qualifiedId = new QualifiedChannelId(this.GetUnusedChannelId(), ChannelSource.Local);
             Channel channel = new Channel(this, qualifiedId, offerParameters, options ?? DefaultChannelOptions);
@@ -428,7 +428,7 @@ namespace Nerdbank.Streams
             {
                 if (this.openChannels.TryGetValue(new QualifiedChannelId(id, ChannelSource.Remote), out channel))
                 {
-                    if (channel.Name is object && this.channelsOfferedByThemByName.TryGetValue(channel.Name, out var queue))
+                    if (channel.Name is object && this.channelsOfferedByThemByName.TryGetValue(channel.Name, out Queue<Channel>? queue))
                     {
                         queue.RemoveMidQueue(channel);
                     }
@@ -461,7 +461,7 @@ namespace Nerdbank.Streams
             {
                 if (this.openChannels.TryGetValue(new QualifiedChannelId(id, ChannelSource.Remote), out channel))
                 {
-                    if (channel.Name != null && this.channelsOfferedByThemByName.TryGetValue(channel.Name, out var queue))
+                    if (channel.Name != null && this.channelsOfferedByThemByName.TryGetValue(channel.Name, out Queue<Channel>? queue))
                     {
                         queue.RemoveMidQueue(channel);
                     }
@@ -519,7 +519,7 @@ namespace Nerdbank.Streams
             this.ThrowIfNotListening();
 
             var offerParameters = new Channel.OfferParameters(name, options?.ChannelReceivingWindowSize ?? this.DefaultChannelReceivingWindowSize);
-            var payload = this.formatter.Serialize(offerParameters);
+            ReadOnlySequence<byte> payload = this.formatter.Serialize(offerParameters);
             var qualifiedId = new QualifiedChannelId(this.GetUnusedChannelId(), ChannelSource.Local);
             Channel channel = new Channel(this, qualifiedId, offerParameters, options ?? DefaultChannelOptions);
             lock (this.syncObject)
@@ -579,7 +579,7 @@ namespace Nerdbank.Streams
                 TaskCompletionSource<Channel>? pendingAcceptChannel = null;
                 lock (this.syncObject)
                 {
-                    if (this.channelsOfferedByThemByName.TryGetValue(name, out var channelsOfferedByThem))
+                    if (this.channelsOfferedByThemByName.TryGetValue(name, out Queue<Channel>? channelsOfferedByThem))
                     {
                         while (channel == null && channelsOfferedByThem.Count > 0)
                         {
@@ -604,7 +604,7 @@ namespace Nerdbank.Streams
                             this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.AcceptChannelWaiting, "Waiting to accept channel \"{0}\", when offered by the other side.", name);
                         }
 
-                        if (!this.acceptingChannels.TryGetValue(name, out var acceptingChannels))
+                        if (!this.acceptingChannels.TryGetValue(name, out Queue<TaskCompletionSource<Channel>>? acceptingChannels))
                         {
                             this.acceptingChannels.Add(name, acceptingChannels = new Queue<TaskCompletionSource<Channel>>());
                         }
@@ -676,14 +676,14 @@ namespace Nerdbank.Streams
 
                 lock (this.syncObject)
                 {
-                    foreach (var entry in this.openChannels)
+                    foreach (KeyValuePair<QualifiedChannelId, Channel> entry in this.openChannels)
                     {
                         entry.Value.Dispose();
                     }
 
-                    foreach (var entry in this.acceptingChannels)
+                    foreach (KeyValuePair<string, Queue<TaskCompletionSource<Channel>>> entry in this.acceptingChannels)
                     {
-                        foreach (var tcs in entry.Value)
+                        foreach (TaskCompletionSource<Channel>? tcs in entry.Value)
                         {
                             tcs.TrySetCanceled();
                         }
@@ -757,7 +757,7 @@ namespace Nerdbank.Streams
                 int bytesRead = 0;
                 while (bytesRead < length)
                 {
-                    var memory = rented.AsMemory(0, Math.Min(rented.Length, length - bytesRead));
+                    Memory<byte> memory = rented.AsMemory(0, Math.Min(rented.Length, length - bytesRead));
                     int bytesJustRead = await stream.ReadAsync(memory, cancellationToken).ConfigureAwait(false);
                     if (bytesJustRead == 0)
                     {
@@ -797,13 +797,13 @@ namespace Nerdbank.Streams
                         this.TraceSource.TraceEvent(TraceEventType.Verbose, (int)TraceEventId.WaitingForNextFrame, "Waiting for next frame");
                     }
 
-                    var frame = await this.formatter.ReadFrameAsync(this.DisposalToken).ConfigureAwait(false);
+                    (FrameHeader Header, ReadOnlySequence<byte> Payload)? frame = await this.formatter.ReadFrameAsync(this.DisposalToken).ConfigureAwait(false);
                     if (!frame.HasValue)
                     {
                         break;
                     }
 
-                    var header = frame.Value.Header;
+                    FrameHeader header = frame.Value.Header;
                     header.FlipChannelPerspective();
                     if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
                     {
@@ -843,7 +843,7 @@ namespace Nerdbank.Streams
             {
                 lock (this.syncObject)
                 {
-                    foreach (var entry in this.openChannels)
+                    foreach (KeyValuePair<QualifiedChannelId, Channel> entry in this.openChannels)
                     {
                         entry.Value.OnContentWritingCompleted();
                     }
@@ -868,7 +868,7 @@ namespace Nerdbank.Streams
                     this.channelsPendingTermination.Remove(channelId);
                     if (channel.Name != null)
                     {
-                        if (this.channelsOfferedByThemByName.TryGetValue(channel.Name, out var queue))
+                        if (this.channelsOfferedByThemByName.TryGetValue(channel.Name, out Queue<Channel>? queue))
                         {
                             queue.RemoveMidQueue(channel);
                         }
@@ -903,7 +903,7 @@ namespace Nerdbank.Streams
         private async ValueTask OnContentAsync(FrameHeader header, ReadOnlySequence<byte> payload, CancellationToken cancellationToken)
         {
             Channel channel;
-            var channelId = header.RequiredChannelId;
+            QualifiedChannelId channelId = header.RequiredChannelId;
             lock (this.syncObject)
             {
                 channel = this.openChannels[channelId];
@@ -929,7 +929,7 @@ namespace Nerdbank.Streams
         private void OnOfferAccepted(FrameHeader header, ReadOnlySequence<byte> payloadBuffer)
         {
             Channel.AcceptanceParameters acceptanceParameters = this.formatter.DeserializeAcceptanceParameters(payloadBuffer);
-            var channelId = header.RequiredChannelId;
+            QualifiedChannelId channelId = header.RequiredChannelId;
             Channel? channel;
             lock (this.syncObject)
             {
@@ -976,18 +976,18 @@ namespace Nerdbank.Streams
 
         private void OnOffer(QualifiedChannelId channelId, ReadOnlySequence<byte> payloadBuffer)
         {
-            var offerParameters = this.formatter.DeserializeOfferParameters(payloadBuffer);
+            Channel.OfferParameters? offerParameters = this.formatter.DeserializeOfferParameters(payloadBuffer);
 
             var channel = new Channel(this, channelId, offerParameters);
             bool acceptingChannelAlreadyPresent = false;
             ChannelOptions? options = DefaultChannelOptions;
             lock (this.syncObject)
             {
-                if (this.acceptingChannels.TryGetValue(offerParameters.Name, out var acceptingChannels))
+                if (this.acceptingChannels.TryGetValue(offerParameters.Name, out Queue<TaskCompletionSource<Channel>>? acceptingChannels))
                 {
                     while (acceptingChannels.Count > 0)
                     {
-                        var candidate = acceptingChannels.Dequeue();
+                        TaskCompletionSource<Channel>? candidate = acceptingChannels.Dequeue();
                         if (candidate.TrySetResult(channel))
                         {
                             if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
@@ -1010,7 +1010,7 @@ namespace Nerdbank.Streams
                         this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelOfferReceived, "Remote party offers channel {1} \"{0}\" which has no pending " + nameof(this.AcceptChannelAsync), offerParameters.Name, channelId);
                     }
 
-                    if (!this.channelsOfferedByThemByName.TryGetValue(offerParameters.Name, out var offeredChannels))
+                    if (!this.channelsOfferedByThemByName.TryGetValue(offerParameters.Name, out Queue<Channel>? offeredChannels))
                     {
                         this.channelsOfferedByThemByName.Add(offerParameters.Name, offeredChannels = new Queue<Channel>());
                     }
@@ -1134,7 +1134,7 @@ namespace Nerdbank.Streams
             {
                 Verify.NotDisposed(this);
 
-                var qualifiedChannelId = header.RequiredChannelId;
+                QualifiedChannelId qualifiedChannelId = header.RequiredChannelId;
                 lock (this.syncObject)
                 {
                     if (header.Code == ControlCode.ChannelTerminated)
@@ -1211,7 +1211,7 @@ namespace Nerdbank.Streams
         private void AcceptChannelCanceled(object state)
         {
             Requires.NotNull(state, nameof(state));
-            var (channelSource, name) = (Tuple<TaskCompletionSource<Channel>, string>)state;
+            (TaskCompletionSource<Channel> channelSource, string name) = (Tuple<TaskCompletionSource<Channel>, string>)state;
             if (channelSource.TrySetCanceled())
             {
                 if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
@@ -1221,7 +1221,7 @@ namespace Nerdbank.Streams
 
                 lock (this.syncObject)
                 {
-                    if (this.acceptingChannels.TryGetValue(name, out var queue))
+                    if (this.acceptingChannels.TryGetValue(name, out Queue<TaskCompletionSource<Channel>>? queue))
                     {
                         Assumes.True(queue.RemoveMidQueue(channelSource));
                     }

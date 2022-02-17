@@ -164,8 +164,8 @@ namespace Nerdbank.Streams
                 // Now copy any excess buffer.
                 if (this.usingExcessMemory)
                 {
-                    var span = this.innerWriter.GetSpan((int)this.excessSequence!.Length);
-                    foreach (var segment in this.excessSequence.AsReadOnlySequence)
+                    Span<T> span = this.innerWriter.GetSpan((int)this.excessSequence!.Length);
+                    foreach (ReadOnlyMemory<T> segment in this.excessSequence.AsReadOnlySequence)
                     {
                         segment.Span.CopyTo(span);
                         span = span.Slice(segment.Length);
@@ -188,7 +188,7 @@ namespace Nerdbank.Streams
             if (this.prefixMemory.Length == 0)
             {
                 int sizeToRequest = this.expectedPrefixSize + Math.Max(sizeHint, this.payloadSizeHint == 0 ? PayloadSizeGuess : this.payloadSizeHint);
-                var memory = this.innerWriter.GetMemory(sizeToRequest);
+                Memory<T> memory = this.innerWriter.GetMemory(sizeToRequest);
                 this.prefixMemory = memory.Slice(0, this.expectedPrefixSize);
                 this.realMemory = memory.Slice(this.expectedPrefixSize);
             }

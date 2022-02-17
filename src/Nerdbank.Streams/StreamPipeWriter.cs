@@ -83,7 +83,7 @@ namespace Nerdbank.Streams
             else
             {
                 // Completing with unflushed buffers should implicitly flush.
-                var nowait = this.FlushAsync();
+                ValueTask<FlushResult> nowait = this.FlushAsync();
             }
         }
 
@@ -110,8 +110,8 @@ namespace Nerdbank.Streams
                             // Allow cancellation in between each write, but not during one.
                             // That way we don't corrupt the outbound stream.
                             cts.Token.ThrowIfCancellationRequested();
-                            var readOnlySeq = this.buffer.AsReadOnlySequence;
-                            var segment = readOnlySeq.First;
+                            System.Buffers.ReadOnlySequence<byte> readOnlySeq = this.buffer.AsReadOnlySequence;
+                            ReadOnlyMemory<byte> segment = readOnlySeq.First;
                             await this.stream.WriteAsync(segment).ConfigureAwait(false);
                             this.buffer.AdvanceTo(readOnlySeq.GetPosition(segment.Length));
                         }
@@ -196,7 +196,7 @@ namespace Nerdbank.Streams
 
             if (readerCompletedCallbacks != null)
             {
-                foreach (var callback in readerCompletedCallbacks)
+                foreach ((Action<Exception?, object?>, object?) callback in readerCompletedCallbacks)
                 {
                     try
                     {

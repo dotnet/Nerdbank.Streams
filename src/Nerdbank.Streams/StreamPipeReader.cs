@@ -208,7 +208,7 @@ namespace Nerdbank.Streams
 
             if (writerCompletedCallbacks != null)
             {
-                foreach (var callback in writerCompletedCallbacks)
+                foreach ((Action<Exception?, object?>, object?) callback in writerCompletedCallbacks)
                 {
                     try
                     {

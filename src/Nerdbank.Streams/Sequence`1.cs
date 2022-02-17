@@ -155,7 +155,7 @@ namespace Nerdbank.Streams
             int firstIndex = position.GetInteger();
 
             // Before making any mutations, confirm that the block specified belongs to this sequence.
-            var current = this.first;
+            Sequence<T>.SequenceSegment? current = this.first;
             while (current != firstSegment && current != null)
             {
                 current = current.Next;
@@ -222,7 +222,7 @@ namespace Nerdbank.Streams
         {
             if (memory.Length > 0)
             {
-                var segment = this.segmentPool.Count > 0 ? this.segmentPool.Pop() : new SequenceSegment();
+                Sequence<T>.SequenceSegment? segment = this.segmentPool.Count > 0 ? this.segmentPool.Pop() : new SequenceSegment();
                 segment.AssignForeign(memory);
                 this.Append(segment);
             }
@@ -242,7 +242,7 @@ namespace Nerdbank.Streams
         /// </summary>
         public void Reset()
         {
-            var current = this.first;
+            Sequence<T>.SequenceSegment? current = this.first;
             while (current != null)
             {
                 current = this.RecycleAndGetNext(current);
@@ -274,7 +274,7 @@ namespace Nerdbank.Streams
 
             if (minBufferSize.HasValue)
             {
-                var segment = this.segmentPool.Count > 0 ? this.segmentPool.Pop() : new SequenceSegment();
+                Sequence<T>.SequenceSegment? segment = this.segmentPool.Count > 0 ? this.segmentPool.Pop() : new SequenceSegment();
                 if (this.arrayPool != null)
                 {
                     segment.Assign(this.arrayPool.Rent(minBufferSize.Value == -1 ? DefaultLengthFromArrayPool : minBufferSize.Value));
@@ -329,8 +329,8 @@ namespace Nerdbank.Streams
 
         private SequenceSegment? RecycleAndGetNext(SequenceSegment segment)
         {
-            var recycledSegment = segment;
-            var nextSegment = segment.Next;
+            Sequence<T>.SequenceSegment? recycledSegment = segment;
+            Sequence<T>.SequenceSegment? nextSegment = segment.Next;
             recycledSegment.ResetMemory(this.arrayPool);
             this.segmentPool.Push(recycledSegment);
             return nextSegment;

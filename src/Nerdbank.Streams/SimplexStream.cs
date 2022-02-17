@@ -138,7 +138,7 @@ namespace Nerdbank.Streams
             Requires.Range(count >= 0, nameof(count));
             Verify.NotDisposed(this);
 
-            var memory = this.pipe.Writer.GetMemory(count);
+            Memory<byte> memory = this.pipe.Writer.GetMemory(count);
             buffer.AsMemory(offset, count).CopyTo(memory);
             this.pipe.Writer.Advance(count);
         }

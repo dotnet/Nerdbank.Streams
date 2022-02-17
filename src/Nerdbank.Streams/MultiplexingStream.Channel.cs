@@ -389,7 +389,7 @@ namespace Nerdbank.Streams
                 {
                     // We Complete the writer because only the writing (logical) thread should complete it
                     // to avoid race conditions, and Channel.Dispose can be called from any thread.
-                    var writer = this.GetReceivedMessagePipeWriter();
+                    PipeWriter? writer = this.GetReceivedMessagePipeWriter();
                     await writer.CompleteAsync().ConfigureAwait(false);
                 }
                 catch (ObjectDisposedException)
@@ -401,11 +401,11 @@ namespace Nerdbank.Streams
             internal async ValueTask OnContentAsync(FrameHeader header, ReadOnlySequence<byte> payload, CancellationToken cancellationToken)
             {
                 PipeWriter writer = this.GetReceivedMessagePipeWriter();
-                foreach (var segment in payload)
+                foreach (ReadOnlyMemory<byte> segment in payload)
                 {
                     try
                     {
-                        var memory = writer.GetMemory(segment.Length);
+                        Memory<byte> memory = writer.GetMemory(segment.Length);
                         segment.CopyTo(memory);
                         writer.Advance(segment.Length);
                     }
@@ -457,7 +457,7 @@ namespace Nerdbank.Streams
                     {
                         try
                         {
-                            var writer = this.GetReceivedMessagePipeWriter();
+                            PipeWriter? writer = this.GetReceivedMessagePipeWriter();
                             await writer.CompleteAsync().ConfigureAwait(false);
                         }
                         catch (ObjectDisposedException)
@@ -499,7 +499,7 @@ namespace Nerdbank.Streams
                 {
                     if (this.QualifiedId.Source != ChannelSource.Seeded)
                     {
-                        var payload = this.MultiplexingStream.formatter.Serialize(acceptanceParameters);
+                        ReadOnlySequence<byte> payload = this.MultiplexingStream.formatter.Serialize(acceptanceParameters);
                         this.MultiplexingStream.SendFrame(
                             new FrameHeader
                             {
@@ -655,7 +655,7 @@ namespace Nerdbank.Streams
                         }
 
                         var writerRelay = new Pipe();
-                        var readerRelay = this.BackpressureSupportEnabled
+                        Pipe? readerRelay = this.BackpressureSupportEnabled
                             ? new Pipe(new PipeOptions(pauseWriterThreshold: this.localWindowSize.Value + 1)) // +1 prevents pause when remote window is exactly filled
                             : new Pipe();
                         this.mxStreamIOReader = writerRelay.Reader;
@@ -730,7 +730,7 @@ namespace Nerdbank.Streams
                             bytesToSend = Math.Min(this.RemoteWindowRemaining, bytesToSend);
                         }
 
-                        var bufferToRelay = result.Buffer.Slice(0, bytesToSend);
+                        ReadOnlySequence<byte> bufferToRelay = result.Buffer.Slice(0, bytesToSend);
                         this.OnTransmittingBytes(bufferToRelay.Length);
                         bool isCompleted = result.IsCompleted && result.Buffer.Length == bufferToRelay.Length;
                         if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
@@ -990,7 +990,7 @@ namespace Nerdbank.Streams
 
                 private long Consumed(SequencePosition consumed, SequencePosition examined)
                 {
-                    var lastExamined = this.lastExaminedPosition;
+                    SequencePosition lastExamined = this.lastExaminedPosition;
                     if (lastExamined.Equals(default))
                     {
                         lastExamined = this.lastReadResult.Buffer.Start;

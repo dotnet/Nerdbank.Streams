@@ -170,7 +170,7 @@ namespace Nerdbank.Streams
         /// <inheritdoc/>
         public override async Task CopyToAsync(Stream destination, int bufferSize, CancellationToken cancellationToken)
         {
-            foreach (var segment in this.readOnlySequence)
+            foreach (ReadOnlyMemory<byte> segment in this.readOnlySequence)
             {
                 await destination.WriteAsync(segment, cancellationToken).ConfigureAwait(false);
             }
