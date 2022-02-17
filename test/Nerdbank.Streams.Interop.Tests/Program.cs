@@ -39,7 +39,7 @@ namespace Nerdbank.Streams.Interop.Tests
                 options.SeededChannels.Add(new MultiplexingStream.ChannelOptions());
             }
 
-            var mx = await MultiplexingStream.CreateAsync(
+            MultiplexingStream? mx = await MultiplexingStream.CreateAsync(
                 FullDuplexStream.Splice(Console.OpenStandardInput(), Console.OpenStandardOutput()),
                 options);
             var program = new Program(mx);
@@ -73,16 +73,16 @@ namespace Nerdbank.Streams.Interop.Tests
 
         private async Task ClientOfferAsync()
         {
-            var channel = await this.mx.AcceptChannelAsync("clientOffer");
-            var (r, w) = CreateStreamIO(channel);
+            MultiplexingStream.Channel? channel = await this.mx.AcceptChannelAsync("clientOffer");
+            (StreamReader r, StreamWriter w) = CreateStreamIO(channel);
             string? line = await r.ReadLineAsync();
             await w.WriteLineAsync($"recv: {line}");
         }
 
         private async Task ServerOfferAsync()
         {
-            var channel = await this.mx.OfferChannelAsync("serverOffer");
-            var (r, w) = CreateStreamIO(channel);
+            MultiplexingStream.Channel? channel = await this.mx.OfferChannelAsync("serverOffer");
+            (StreamReader r, StreamWriter w) = CreateStreamIO(channel);
             await w.WriteLineAsync("theserver");
             w.Close();
             string? line = await r.ReadLineAsync();
@@ -92,8 +92,8 @@ namespace Nerdbank.Streams.Interop.Tests
 
         private async Task SeededChannelAsync()
         {
-            var channel = this.mx.AcceptChannel(0);
-            var (r, w) = CreateStreamIO(channel);
+            MultiplexingStream.Channel? channel = this.mx.AcceptChannel(0);
+            (StreamReader r, StreamWriter w) = CreateStreamIO(channel);
             string? line = await r.ReadLineAsync();
             await w.WriteLineAsync($"recv: {line}");
         }

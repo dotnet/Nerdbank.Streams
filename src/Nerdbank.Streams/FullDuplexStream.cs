@@ -26,7 +26,7 @@ namespace Nerdbank.Streams
         /// <returns>A pair of streams.</returns>
         public static (Stream, Stream) CreatePair(PipeOptions? pipeOptions = null)
         {
-            var (pipe1, pipe2) = CreatePipePair(pipeOptions);
+            (IDuplexPipe pipe1, IDuplexPipe pipe2) = CreatePipePair(pipeOptions);
             return (pipe1.AsStream(), pipe2.AsStream());
         }
 

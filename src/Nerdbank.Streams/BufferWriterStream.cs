@@ -75,7 +75,7 @@ namespace Nerdbank.Streams
             Requires.NotNull(buffer, nameof(buffer));
             Verify.NotDisposed(this);
 
-            var span = this.writer.GetSpan(count);
+            Span<byte> span = this.writer.GetSpan(count);
             buffer.AsSpan(offset, count).CopyTo(span);
             this.writer.Advance(count);
         }
@@ -92,7 +92,7 @@ namespace Nerdbank.Streams
         public override void WriteByte(byte value)
         {
             Verify.NotDisposed(this);
-            var span = this.writer.GetSpan(1);
+            Span<byte> span = this.writer.GetSpan(1);
             span[0] = value;
             this.writer.Advance(1);
         }
@@ -109,7 +109,7 @@ namespace Nerdbank.Streams
         public override void Write(ReadOnlySpan<byte> buffer)
         {
             Verify.NotDisposed(this);
-            var span = this.writer.GetSpan(buffer.Length);
+            Span<byte> span = this.writer.GetSpan(buffer.Length);
             buffer.CopyTo(span);
             this.writer.Advance(buffer.Length);
         }

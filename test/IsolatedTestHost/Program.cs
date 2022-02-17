@@ -98,9 +98,9 @@ namespace IsolatedTestHost
         {
             try
             {
-                var ctorWithLogger = testClass.GetConstructors().FirstOrDefault(
+                ConstructorInfo? ctorWithLogger = testClass.GetConstructors().FirstOrDefault(
                     ctor => ctor.GetParameters().Length == 1 && ctor.GetParameters()[0].ParameterType.IsAssignableFrom(typeof(TestOutputHelper)));
-                var ctorDefault = testClass.GetConstructor(Type.EmptyTypes);
+                ConstructorInfo? ctorDefault = testClass.GetConstructor(Type.EmptyTypes);
                 object? testClassInstance =
                     ctorWithLogger?.Invoke(new object[] { new TestOutputHelper() }) ??
                     ctorDefault?.Invoke(Type.EmptyTypes);

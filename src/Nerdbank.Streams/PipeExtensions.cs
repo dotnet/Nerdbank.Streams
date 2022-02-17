@@ -281,7 +281,9 @@ namespace Nerdbank.Streams
                     try
                     {
                         cancellationToken.ThrowIfCancellationRequested();
+#pragma warning disable IDE0008 // Use explicit type - it varies across TFMs so we rely on duck-typing.
                         var readResult = await webSocket.ReceiveAsync(memory, cancellationToken).ConfigureAwait(false);
+#pragma warning restore IDE0008 // Use explicit type
                         if (readResult.Count == 0)
                         {
                             break;
@@ -622,8 +624,8 @@ namespace Nerdbank.Streams
 
             foreach (ReadOnlyMemory<byte> sourceMemory in sequence)
             {
-                var sourceSpan = sourceMemory.Span;
-                var targetSpan = writer.GetSpan(sourceSpan.Length);
+                ReadOnlySpan<byte> sourceSpan = sourceMemory.Span;
+                Span<byte> targetSpan = writer.GetSpan(sourceSpan.Length);
                 sourceSpan.CopyTo(targetSpan);
                 writer.Advance(sourceSpan.Length);
             }

@@ -17,48 +17,48 @@ namespace Nerdbank.Streams.Benchmark
         [Benchmark]
         public void OneSegment_GetMemory()
         {
-            var mem = this.sequence.GetMemory(12);
+            Memory<byte> mem = this.sequence.GetMemory(12);
             this.sequence.Advance(4);
             mem = this.sequence.GetMemory(8);
             this.sequence.Advance(4);
-            var ros = this.sequence.AsReadOnlySequence;
+            ReadOnlySequence<byte> ros = this.sequence.AsReadOnlySequence;
             this.sequence.Reset();
         }
 
         [Benchmark]
         public void OneSegment_GetSpan()
         {
-            var span = this.sequence.GetSpan(12);
+            Span<byte> span = this.sequence.GetSpan(12);
             this.sequence.Advance(4);
             span = this.sequence.GetSpan(8);
             this.sequence.Advance(4);
-            var ros = this.sequence.AsReadOnlySequence;
+            ReadOnlySequence<byte> ros = this.sequence.AsReadOnlySequence;
             this.sequence.Reset();
         }
 
         [Benchmark]
         public void MultiSegment_GetMemory()
         {
-            var mem = this.sequence.GetMemory(12);
+            Memory<byte> mem = this.sequence.GetMemory(12);
             this.sequence.Advance(10);
             mem = this.sequence.GetMemory(128);
             this.sequence.Advance(120);
             mem = this.sequence.GetMemory(256);
             this.sequence.Advance(250);
-            var ros = this.sequence.AsReadOnlySequence;
+            ReadOnlySequence<byte> ros = this.sequence.AsReadOnlySequence;
             this.sequence.Reset();
         }
 
         [Benchmark]
         public void MultiSegment_GetSpan()
         {
-            var span = this.sequence.GetSpan(12);
+            Span<byte> span = this.sequence.GetSpan(12);
             this.sequence.Advance(10);
             span = this.sequence.GetSpan(128);
             this.sequence.Advance(120);
             span = this.sequence.GetSpan(256);
             this.sequence.Advance(250);
-            var ros = this.sequence.AsReadOnlySequence;
+            ReadOnlySequence<byte> ros = this.sequence.AsReadOnlySequence;
             this.sequence.Reset();
         }
 

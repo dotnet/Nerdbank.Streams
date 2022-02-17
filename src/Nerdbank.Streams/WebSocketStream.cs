@@ -81,7 +81,7 @@ namespace Nerdbank.Streams
                 return 0;
             }
 
-            var result = await this.webSocket.ReceiveAsync(new ArraySegment<byte>(buffer, offset, count), cancellationToken).ConfigureAwait(false);
+            WebSocketReceiveResult? result = await this.webSocket.ReceiveAsync(new ArraySegment<byte>(buffer, offset, count), cancellationToken).ConfigureAwait(false);
             return result.Count;
         }
 

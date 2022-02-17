@@ -31,7 +31,7 @@ namespace Nerdbank.Streams
         public override void Complete(Exception? exception = null)
         {
             this.inner.Complete(exception);
-            var callback = Interlocked.Exchange(ref this.callback, null);
+            Action<Exception?, object?>? callback = Interlocked.Exchange(ref this.callback, null);
             callback?.Invoke(exception, this.state);
             this.state = null;
         }
