@@ -9,6 +9,7 @@
     "duplex"
   ],
   "main": "js/index.js",
+  "typings": "js/index.d.ts",
   "homepage": "https://github.com/AArnott/Nerdbank.Streams",
   "repository": {
     "type": "git",
