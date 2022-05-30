@@ -122,6 +122,28 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
+    public async Task OfferPipeWithError()
+    {
+        try
+        {
+            // Prepare a readonly pipe that is already fully populated with data for the other end to read.
+            var pipe = new Pipe();
+            await pipe.Writer.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
+            var writeException = new NullReferenceException("Write Error exception");
+            pipe.Writer.Complete(writeException);
+
+            MultiplexingStream.Channel? ch1 = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(pipe.Reader) });
+            await this.WaitForEphemeralChannelOfferToPropagateAsync();
+            MultiplexingStream.Channel? ch2 = this.mx2.AcceptChannel(ch1.QualifiedId.Id);
+            ReadResult readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
+        }
+        catch (Exception error)
+        {
+            this.Logger.WriteLine("Encountered error inside offer pipe with error: " + error.Message);
+        }
+    }
+
+    [Fact]
     public async Task OfferReadOnlyPipe()
     {
         // Prepare a readonly pipe that is already fully populated with data for the other end to read.

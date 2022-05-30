@@ -97,6 +97,11 @@ namespace Nerdbank.Streams
             private bool isDisposed;
 
             /// <summary>
+            /// Indicates whether we closed the writing channel due to an exception.
+            /// </summary>
+            private bool receivedContentWriteError;
+
+            /// <summary>
             /// The <see cref="PipeReader"/> to use to get data to be transmitted over the <see cref="Streams.MultiplexingStream"/>.
             /// </summary>
             private PipeReader? mxStreamIOReader;
@@ -449,8 +454,29 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Called by the <see cref="MultiplexingStream"/> when when it will not be writing any more data to the channel.
             /// </summary>
-            internal void OnContentWritingCompleted()
+            /// <param name="error">If we are closing the writing channel due to us receiving an error, defaults to null.</param>
+            internal void OnContentWritingCompleted(Exception? error = null)
             {
+                if (this.receivedContentWriteError)
+                {
+                    if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                    {
+                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Exiting from writing completed since it was already called");
+                    }
+
+                    // We received a content write error so we have already closed the channel
+                    return;
+                }
+
+                if (error != null)
+                {
+                    this.receivedContentWriteError = true;
+                    if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                    {
+                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Exception {0} passed into writing complete", error);
+                    }
+                }
+
                 this.DisposeSelfOnFailure(Task.Run(async delegate
                 {
                     if (!this.IsDisposed)
@@ -458,13 +484,13 @@ namespace Nerdbank.Streams
                         try
                         {
                             PipeWriter? writer = this.GetReceivedMessagePipeWriter();
-                            await writer.CompleteAsync().ConfigureAwait(false);
+                            await writer.CompleteAsync(error).ConfigureAwait(false);
                         }
                         catch (ObjectDisposedException)
                         {
                             if (this.mxStreamIOWriter != null)
                             {
-                                await this.mxStreamIOWriter.CompleteAsync().ConfigureAwait(false);
+                                await this.mxStreamIOWriter.CompleteAsync(error).ConfigureAwait(false);
                             }
                         }
                     }
@@ -472,7 +498,7 @@ namespace Nerdbank.Streams
                     {
                         if (this.mxStreamIOWriter != null)
                         {
-                            await this.mxStreamIOWriter.CompleteAsync().ConfigureAwait(false);
+                            await this.mxStreamIOWriter.CompleteAsync(error).ConfigureAwait(false);
                         }
                     }
 
@@ -711,6 +737,11 @@ namespace Nerdbank.Streams
                             break;
                         }
 
+                        if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                        {
+                            this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.FrameReceived, "Received buffer of length {0} inside process outbound", result.Buffer.Length);
+                        }
+
                         if (result.IsCanceled)
                         {
                             // We've been asked to cancel. Presumably the channel has been disposed.
@@ -785,6 +816,12 @@ namespace Nerdbank.Streams
                 catch (Exception ex)
                 {
                     await this.mxStreamIOReader!.CompleteAsync(ex).ConfigureAwait(false);
+                    if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                    {
+                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Caught exception when processing outbound data");
+                    }
+
+                    this.MultiplexingStream.OnChannelWritingError(this, ex);
                     throw;
                 }
                 finally
