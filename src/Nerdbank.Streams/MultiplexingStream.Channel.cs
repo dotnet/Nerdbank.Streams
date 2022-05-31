@@ -97,11 +97,6 @@ namespace Nerdbank.Streams
             private bool isDisposed;
 
             /// <summary>
-            /// Indicates whether we closed the writing channel due to an exception.
-            /// </summary>
-            private bool receivedContentWriteError;
-
-            /// <summary>
             /// The <see cref="PipeReader"/> to use to get data to be transmitted over the <see cref="Streams.MultiplexingStream"/>.
             /// </summary>
             private PipeReader? mxStreamIOReader;
@@ -457,20 +452,9 @@ namespace Nerdbank.Streams
             /// <param name="error">If we are closing the writing channel due to us receiving an error, defaults to null.</param>
             internal void OnContentWritingCompleted(Exception? error = null)
             {
-                if (this.receivedContentWriteError)
-                {
-                    if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                    {
-                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Exiting from writing completed since it was already called");
-                    }
-
-                    // We received a content write error so we have already closed the channel
-                    return;
-                }
 
                 if (error != null)
                 {
-                    this.receivedContentWriteError = true;
                     if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                     {
                         this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Exception {0} passed into writing complete", error);
@@ -896,7 +880,10 @@ namespace Nerdbank.Streams
                 }
 
                 this.mxStreamIOReader?.Complete(exception);
-                this.Dispose();
+                if (!this.IsDisposed)
+                {
+                    this.Dispose();
+                }
             }
 
             private void DisposeSelfOnFailure(Task task)

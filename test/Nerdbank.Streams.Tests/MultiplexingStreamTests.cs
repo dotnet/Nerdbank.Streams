@@ -124,6 +124,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task OfferPipeWithError()
     {
+        bool errorThrown = false;
         try
         {
             // Prepare a readonly pipe that is already fully populated with data for the other end to read.
@@ -139,8 +140,11 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         }
         catch (Exception error)
         {
-            this.Logger.WriteLine("Encountered error inside offer pipe with error: " + error.Message);
+            this.Logger.WriteLine("Encountered error inside Offer Pipe with error: " + error.Message);
+            errorThrown = true;
         }
+
+        Assert.True(errorThrown);
     }
 
     [Fact]
