@@ -35,7 +35,7 @@ import * as assert from "assert";
             }
         });
 
-        it("rejects null stream", async () => {
+        it("CreateAsync rejects null stream", async () => {
             expectThrow(MultiplexingStream.CreateAsync(null!));
             expectThrow(MultiplexingStream.CreateAsync(undefined!));
         });
@@ -269,6 +269,27 @@ import * as assert from "assert";
             it("Rejects seeded channels", async () => {
                 const underlyingPair = FullDuplexStream.CreatePair();
                 await expectThrow<MultiplexingStream>(MultiplexingStream.CreateAsync(underlyingPair.first, { protocolMajorVersion, seededChannels: [{}] }));
+            });
+        } else {
+            it("Create rejects null stream", () => {
+                assert.throws(() => MultiplexingStream.Create(null!));
+                assert.throws(() => MultiplexingStream.Create(undefined!));
+            });
+
+            it("Create rejects older protocol versions", () => {
+                const underlyingPair = FullDuplexStream.CreatePair();
+                assert.throws(() => MultiplexingStream.Create(underlyingPair.first, { protocolMajorVersion: 2 }));
+                assert.throws(() => MultiplexingStream.Create(underlyingPair.first, { protocolMajorVersion: 1 }));
+            });
+
+            it("Create accepts protocol v3", async () => {
+                const underlyingPair = FullDuplexStream.CreatePair();
+                const mx1Local = MultiplexingStream.Create(underlyingPair.first, { protocolMajorVersion: 3 });
+                const mx2Local = MultiplexingStream.Create(underlyingPair.second);
+                await Promise.all([
+                    mx1Local.offerChannelAsync(""),
+                    mx2Local.acceptChannelAsync(""),
+                ]);
             });
         }
     });
