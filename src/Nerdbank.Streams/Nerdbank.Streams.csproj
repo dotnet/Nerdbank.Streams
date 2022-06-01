@@ -13,7 +13,7 @@
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.3.3" PrivateAssets="all" />
     <PackageReference Include="Microsoft.VisualStudio.Threading" Version="17.1.46" PrivateAssets="build;analyzers;compile" />
     <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.1.46" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.VisualStudio.Validation" Version="17.0.43" />
+    <PackageReference Include="Microsoft.VisualStudio.Validation" Version="17.0.53" />
     <PackageReference Include="System.IO.Pipelines" Version="6.0.1" />
     <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.0.0" />
   </ItemGroup>
