@@ -30,7 +30,7 @@
     "test": "jasmine"
   },
   "devDependencies": {
-    "@types/jasmine": "^3.8.2",
+    "@types/jasmine": "^4.0.3",
     "@types/mkdirp": "^1.0.2",
     "@types/msgpack-lite": "^0.1.8",
     "@types/node": "^15.14.5",
