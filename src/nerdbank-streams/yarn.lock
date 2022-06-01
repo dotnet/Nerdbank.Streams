@@ -337,7 +337,7 @@ call-bind@^1.0.0:
     function-bind "^1.1.1"
     get-intrinsic "^1.0.2"
 
-camel-case@^4.1.1:
+camel-case@^4.1.2:
   version "4.1.2"
   resolved "https://registry.yarnpkg.com/camel-case/-/camel-case-4.1.2.tgz#9728072a954f805228225a6deea6b38461e1bd5a"
   integrity sha512-gxGWBrTT1JuMx6R+o5PTXMmUnhnVzLQ9SNutD4YqKtI6ap897t3tKECYla6gCWEkplXnlNybEkZg9GEGxKFCgw==
@@ -1665,11 +1665,11 @@ nanomatch@^1.2.9:
     to-regex "^3.0.1"
 
 nerdbank-gitversioning@^3.4.231:
-  version "3.4.255"
-  resolved "https://registry.yarnpkg.com/nerdbank-gitversioning/-/nerdbank-gitversioning-3.4.255.tgz#b9cf4e96a1aa8eaf0269b280ab5a351601a114ad"
-  integrity sha512-tFYJEcDckfOriAa4orhLtULVVllm9ojqJpJIPcGjO7/C/2oEVVZKQCmPGIAXdE5PjDdPpoSke0HsMXeAgJSecA==
+  version "3.5.107"
+  resolved "https://registry.yarnpkg.com/nerdbank-gitversioning/-/nerdbank-gitversioning-3.5.107.tgz#0987cc7d8267d116800db0cb3cb2ba64ebeed6fb"
+  integrity sha512-7Jup7ZA3jpDML8abXScBD7Zq31etZOklMhnQUt5XuWVCdRLeUuyvzYAS2Xo6TmbD6mJczWaegmZFoZW76m1rIQ==
   dependencies:
-    camel-case "^4.1.1"
+    camel-case "^4.1.2"
 
 next-tick@~1.0.0:
   version "1.0.0"
