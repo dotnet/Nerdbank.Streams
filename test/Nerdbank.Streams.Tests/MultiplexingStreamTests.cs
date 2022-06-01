@@ -127,7 +127,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         bool errorThrown = false;
         string errorMessage = "Hello World";
 
-        // Prepare a readonly pipe that is already fully populated with data for the other end to read.
+        // Prepare a readonly pipe that is already fully populated with data but is completed with an exception
         var pipe = new Pipe();
         await pipe.Writer.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
         var writeException = new NullReferenceException(errorMessage);
@@ -137,13 +137,27 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         await this.WaitForEphemeralChannelOfferToPropagateAsync();
         MultiplexingStream.Channel? ch2 = this.mx2.AcceptChannel(ch1.QualifiedId.Id);
 
-        try
+        bool continueReading = true;
+        while (continueReading)
         {
-            ReadResult readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
-        }
-        catch (MultiplexingProtocolException error)
-        {
-            errorThrown = error.Message.Contains(errorMessage);
+            try
+            {
+                ReadResult readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
+                if (readResult.IsCanceled || readResult.IsCompleted)
+                {
+                    continueReading = false;
+                }
+
+                ch2.Input.AdvanceTo(readResult.Buffer.End);
+            }
+            catch (MultiplexingProtocolException error)
+            {
+                errorThrown = error.Message.Contains(errorMessage);
+                if (errorThrown)
+                {
+                    continueReading = false;
+                }
+            }
         }
 
         Assert.True(errorThrown);
