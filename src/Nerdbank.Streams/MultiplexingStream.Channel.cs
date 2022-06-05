@@ -452,7 +452,6 @@ namespace Nerdbank.Streams
             /// <param name="error">If we are closing the writing channel due to us receiving an error, defaults to null.</param>
             internal void OnContentWritingCompleted(Exception? error = null)
             {
-
                 if (error != null)
                 {
                     if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))

@@ -47,7 +47,8 @@ namespace Nerdbank.Streams
 
             /// <summary>
             /// Sent when we encounter error writing data on a given channel and is sent before a
-            /// <see cref="ContentWritingCompleted"/> to indicate the reason for the content writing closure.
+            /// <see cref="MultiplexingStream.ControlCode.ContentWritingCompleted"/> to indicate the reason
+            /// for the content writing closure.
             /// </summary>
             ContentWritingError,
         }
