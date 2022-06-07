@@ -38,6 +38,8 @@
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <IncludeSymbols Condition=" '$(DebugType)' != 'embedded' ">true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+
+    <VSThreadingVersion>17.1.46</VSThreadingVersion>
   </PropertyGroup>
 
   <ItemGroup>
