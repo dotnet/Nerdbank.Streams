@@ -1,5 +1,5 @@
 <Project>
   <PropertyGroup>
-    <VSThreadingVersion>17.1.46</VSThreadingVersion>
+    <VSThreadingVersion>17.2.32</VSThreadingVersion>
   </PropertyGroup>
 </Project>
