@@ -15,11 +15,10 @@ jobs:
   - template: install-dependencies.yml
 
   - powershell: '& (./azure-pipelines/Get-nbgv.ps1) cloud -c'
-    displayName: Set build number
+    displayName: ⚙ Set build number
 
   - template: dotnet.yml
   - template: node.yml
-  - template: publish-afterjob.yml
 
 - job: Linux
   pool:
@@ -31,7 +30,6 @@ jobs:
   - template: install-dependencies.yml
   - template: dotnet.yml
   - template: node.yml
-  - template: publish-afterjob.yml
 
 - job: macOS
   condition: ${{ parameters.includeMacOS }}
@@ -44,15 +42,13 @@ jobs:
   - template: install-dependencies.yml
   - template: dotnet.yml
   - template: node.yml
-  - template: publish-afterjob.yml
 
 - job: WrapUp
   dependsOn:
   - Windows
   - Linux
   - macOS
-  pool:
-    vmImage: Ubuntu 20.04
+  pool: ${{ parameters.windowsPool }} # Use Windows agent because PublishSymbols task requires it (https://github.com/microsoft/azure-pipelines-tasks/issues/13821).
   condition: succeededOrFailed()
   steps:
   - checkout: self
@@ -60,6 +56,9 @@ jobs:
   - template: install-dependencies.yml
     parameters:
       initArgs: -NoRestore
+  - template: publish-symbols.yml
+    parameters:
+      includeMacOS: ${{ parameters.includeMacOS }}
   - template: publish-codecoverage.yml
     parameters:
       includeMacOS: ${{ parameters.includeMacOS }}
