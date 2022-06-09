@@ -153,10 +153,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
             catch (MultiplexingProtocolException error)
             {
                 errorThrown = error.Message.Contains(errorMessage);
-                if (errorThrown)
-                {
-                    continueReading = false;
-                }
+                continueReading = false;
             }
         }
 

@@ -941,8 +941,7 @@ namespace Nerdbank.Streams
             }
 
             // First close the channel and then throw the exception
-            WriteError errorClass = MessagePackSerializer.Deserialize<WriteError>(message);
-            string errorMessage = errorClass.ErrorMessage;
+            string errorMessage = Encoding.Unicode.GetString(message.ToArray());
             Exception remoteException = new MultiplexingProtocolException($"Remote party indicated writing error: {errorMessage}");
 
             if (!this.channelsPendingTermination.Contains(channelId))
@@ -1173,8 +1172,7 @@ namespace Nerdbank.Streams
                 if (!this.channelsPendingTermination.Contains(channel.QualifiedId) && this.openChannels.ContainsKey(channel.QualifiedId))
                 {
                     string errorMessage = error.Message;
-                    WriteError errorClass = new WriteError(errorMessage);
-                    byte[] messageBytes = MessagePackSerializer.Serialize(errorClass);
+                    byte[] messageBytes = Encoding.Unicode.GetBytes(errorMessage);
                     ReadOnlySequence<byte> messageToSend = new ReadOnlySequence<byte>(messageBytes);
                     FrameHeader header = new FrameHeader
                     {

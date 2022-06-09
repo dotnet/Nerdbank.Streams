@@ -317,65 +317,75 @@ namespace Nerdbank.Streams
             /// </remarks>
             public void Dispose()
             {
-                if (!this.IsDisposed)
+
+                bool hasBeenDisposed;
+                lock (this.SyncObject)
                 {
-                    // The code in this delegate needs to happen in several branches including possibly asynchronously.
-                    // We carefully define it here with no closure so that the C# compiler generates a static field for the delegate
-                    // thus avoiding any extra allocations from reusing code in this way.
-                    Action<object?, object> finalDisposalAction = (exOrAntecedent, state) =>
-                    {
-                        var self = (Channel)state;
-                        self.disposalTokenSource.Cancel();
-                        self.completionSource.TrySetResult(null);
-                        self.MultiplexingStream.OnChannelDisposed(self);
-                    };
-
-                    this.acceptanceSource.TrySetCanceled();
-                    this.optionsAppliedTaskSource?.TrySetCanceled();
-
-                    PipeWriter? mxStreamIOWriter;
-                    lock (this.SyncObject)
-                    {
-                        this.isDisposed = true;
-                        mxStreamIOWriter = this.mxStreamIOWriter;
-                    }
-
-                    // Complete writing so that the mxstream cannot write to this channel any more.
-                    // We must also cancel a pending flush since no one is guaranteed to be reading this any more
-                    // and we don't want to deadlock on a full buffer in a disposed channel's pipe.
-                    mxStreamIOWriter?.Complete();
-                    mxStreamIOWriter?.CancelPendingFlush();
-                    this.mxStreamIOWriterCompleted.Set();
-
-                    if (this.channelIO != null)
-                    {
-                        // We're using our own Pipe to relay user messages, so we can shutdown writing and allow for our reader to propagate what was already written
-                        // before actually shutting down.
-                        this.channelIO.Output.Complete();
-                    }
-                    else
-                    {
-                        // We don't own the user's PipeWriter to complete it (so they can't write anything more to this channel).
-                        // We can't know whether there is or will be more bytes written to the user's PipeWriter,
-                        // but we need to terminate our reader for their writer as part of reclaiming resources.
-                        // We want to complete reading immediately and cancel any pending read.
-                        this.mxStreamIOReader?.Complete();
-                        this.mxStreamIOReader?.CancelPendingRead();
-                    }
-
-                    // Unblock the reader that might be waiting on this.
-                    this.remoteWindowHasCapacity.Set();
-
-                    // As a minor perf optimization, avoid allocating a continuation task if the antecedent is already completed.
-                    if (this.mxStreamIOReaderCompleted?.IsCompleted ?? true)
-                    {
-                        finalDisposalAction(null, this);
-                    }
-                    else
-                    {
-                        this.mxStreamIOReaderCompleted!.ContinueWith(finalDisposalAction!, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Forget();
-                    }
+                    hasBeenDisposed = this.IsDisposed;
+                    this.isDisposed = true;
                 }
+
+                if (hasBeenDisposed)
+                {
+                    return;
+                }
+
+                // The code in this delegate needs to happen in several branches including possibly asynchronously.
+                // We carefully define it here with no closure so that the C# compiler generates a static field for the delegate
+                // thus avoiding any extra allocations from reusing code in this way.
+                Action<object?, object> finalDisposalAction = (exOrAntecedent, state) =>
+                {
+                    var self = (Channel)state;
+                    self.disposalTokenSource.Cancel();
+                    self.completionSource.TrySetResult(null);
+                    self.MultiplexingStream.OnChannelDisposed(self);
+                };
+
+                this.acceptanceSource.TrySetCanceled();
+                this.optionsAppliedTaskSource?.TrySetCanceled();
+
+                PipeWriter? mxStreamIOWriter;
+                lock (this.SyncObject)
+                {
+                    mxStreamIOWriter = this.mxStreamIOWriter;
+                }
+
+                // Complete writing so that the mxstream cannot write to this channel any more.
+                // We must also cancel a pending flush since no one is guaranteed to be reading this any more
+                // and we don't want to deadlock on a full buffer in a disposed channel's pipe.
+                mxStreamIOWriter?.Complete();
+                mxStreamIOWriter?.CancelPendingFlush();
+                this.mxStreamIOWriterCompleted.Set();
+
+                if (this.channelIO != null)
+                {
+                    // We're using our own Pipe to relay user messages, so we can shutdown writing and allow for our reader to propagate what was already written
+                    // before actually shutting down.
+                    this.channelIO.Output.Complete();
+                }
+                else
+                {
+                    // We don't own the user's PipeWriter to complete it (so they can't write anything more to this channel).
+                    // We can't know whether there is or will be more bytes written to the user's PipeWriter,
+                    // but we need to terminate our reader for their writer as part of reclaiming resources.
+                    // We want to complete reading immediately and cancel any pending read.
+                    this.mxStreamIOReader?.Complete();
+                    this.mxStreamIOReader?.CancelPendingRead();
+                }
+
+                // Unblock the reader that might be waiting on this.
+                this.remoteWindowHasCapacity.Set();
+
+                // As a minor perf optimization, avoid allocating a continuation task if the antecedent is already completed.
+                if (this.mxStreamIOReaderCompleted?.IsCompleted ?? true)
+                {
+                    finalDisposalAction(null, this);
+                }
+                else
+                {
+                    this.mxStreamIOReaderCompleted!.ContinueWith(finalDisposalAction!, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Forget();
+                }
+
             }
 
             internal async Task OnChannelTerminatedAsync()
@@ -458,6 +468,11 @@ namespace Nerdbank.Streams
                     {
                         this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Exception {0} passed into writing complete", error);
                     }
+                }
+
+                if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Critical) ?? false)
+                {
+                    this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Calling disposed self in {0} for content writing completed", this.QualifiedId);
                 }
 
                 this.DisposeSelfOnFailure(Task.Run(async delegate
@@ -618,10 +633,8 @@ namespace Nerdbank.Streams
                             Assumes.NotNull(this.channelIO);
                             this.existingPipe = channelOptions.ExistingPipe;
                             this.existingPipeGiven = true;
-
                             // We always want to write ALL received data to the user's ExistingPipe, rather than truncating it on disposal, so don't use a cancellation token in that direction.
                             this.DisposeSelfOnFailure(this.channelIO.Input.LinkToAsync(channelOptions.ExistingPipe.Output));
-
                             // Upon disposal, we no longer want to continue reading from the user's ExistingPipe into our buffer since we won't be propagating it any further, so use our DisposalToken.
                             this.DisposeSelfOnFailure(channelOptions.ExistingPipe.Input.LinkToAsync(this.channelIO.Output, this.DisposalToken));
                         }
@@ -873,21 +886,35 @@ namespace Nerdbank.Streams
 
             private void Fault(Exception exception)
             {
-                if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Critical) ?? false)
+
+                bool hasBeenDisposed;
+                lock (this.SyncObject)
                 {
+                    hasBeenDisposed = this.IsDisposed;
+                }
+
+                if (!hasBeenDisposed && (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Critical) ?? false))
+                {
+                    string callerName = new StackTrace().GetFrame(1)
+                        .GetMethod().Name;
+                    this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Fault called in {0} by {1}", this.QualifiedId, callerName);
                     this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Channel Closing self due to exception: {0}", exception);
                 }
 
                 this.mxStreamIOReader?.Complete(exception);
-                if (!this.IsDisposed)
-                {
-                    this.Dispose();
-                }
+                this.Dispose();
             }
 
             private void DisposeSelfOnFailure(Task task)
             {
                 Requires.NotNull(task, nameof(task));
+
+                if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Critical) ?? false)
+                {
+                    string callerName = new StackTrace().GetFrame(1)
+                        .GetMethod().Name;
+                    this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "DisposeSelfOnFailure called in {0} by {1}", this.QualifiedId, callerName);
+                }
 
                 if (task.IsCompleted)
                 {

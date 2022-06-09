@@ -14,7 +14,6 @@ namespace Nerdbank.Streams
         /// A class containing information about a write error and which is sent to the
         /// remote alongside <see cref="MultiplexingStream.ControlCode.ContentWritingError"/>.
         /// </summary>
-        [MessagePackObject]
         public class WriteError
         {
             /// <summary>
@@ -29,7 +28,6 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Gets the error message that we want to send to receiver.
             /// </summary>
-            [Key(0)]
             public string ErrorMessage { get; }
         }
     }
