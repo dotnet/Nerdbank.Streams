@@ -23,10 +23,10 @@
     chalk "^2.0.0"
     js-tokens "^4.0.0"
 
-"@types/jasmine@^3.8.2":
-  version "3.10.3"
-  resolved "https://registry.yarnpkg.com/@types/jasmine/-/jasmine-3.10.3.tgz#a89798b3d5a8bd23ca56e855a9aee3e5a93bdaaa"
-  integrity sha512-SWyMrjgdAUHNQmutvDcKablrJhkDLy4wunTme8oYLjKp41GnHGxMRXr2MQMvy/qy8H3LdzwQk9gH4hZ6T++H8g==
+"@types/jasmine@^4.0.3":
+  version "4.0.3"
+  resolved "https://registry.yarnpkg.com/@types/jasmine/-/jasmine-4.0.3.tgz#097ce710d70eb7f3662e96c1f75824dd22c27d5c"
+  integrity sha512-Opp1LvvEuZdk8fSSvchK2mZwhVrsNT0JgJE9Di6MjnaIpmEXM8TLCPPrVtNTYh8+5MPdY8j9bAHMu2SSfwpZJg==
 
 "@types/mkdirp@^1.0.2":
   version "1.0.2"
@@ -337,7 +337,7 @@ call-bind@^1.0.0:
     function-bind "^1.1.1"
     get-intrinsic "^1.0.2"
 
-camel-case@^4.1.1:
+camel-case@^4.1.2:
   version "4.1.2"
   resolved "https://registry.yarnpkg.com/camel-case/-/camel-case-4.1.2.tgz#9728072a954f805228225a6deea6b38461e1bd5a"
   integrity sha512-gxGWBrTT1JuMx6R+o5PTXMmUnhnVzLQ9SNutD4YqKtI6ap897t3tKECYla6gCWEkplXnlNybEkZg9GEGxKFCgw==
@@ -1403,18 +1403,18 @@ isobject@^3.0.0, isobject@^3.0.1:
   resolved "https://registry.yarnpkg.com/isobject/-/isobject-3.0.1.tgz#4e431e92b11a9731636aa1f9c8d1ccbcfdab78df"
   integrity sha1-TkMekrEalzFjaqH5yNHMvP2reN8=
 
-jasmine-core@^4.0.0:
-  version "4.0.0"
-  resolved "https://registry.yarnpkg.com/jasmine-core/-/jasmine-core-4.0.0.tgz#8299ed38a100c47a1d154af63449a40967a7be5c"
-  integrity sha512-tq24OCqHElgU9KDpb/8O21r1IfotgjIzalfW9eCmRR40LZpvwXT68iariIyayMwi0m98RDt16aljdbwK0sBMmQ==
+jasmine-core@^4.1.0:
+  version "4.1.0"
+  resolved "https://registry.yarnpkg.com/jasmine-core/-/jasmine-core-4.1.0.tgz#2377349b0e8bfd3fbdb36c9e4f09e3b1a17cf5c2"
+  integrity sha512-8E8BiffCL8sBwK1zU9cbavLe8xpJAgOduSJ6N8PJVv8VosQ/nxVTuXj2kUeHxTlZBVvh24G19ga7xdiaxlceKg==
 
 jasmine@^4.0.2:
-  version "4.0.2"
-  resolved "https://registry.yarnpkg.com/jasmine/-/jasmine-4.0.2.tgz#6f5ff7fbf6b67f56600235fdb7d299ac52876c4b"
-  integrity sha512-YsrgxJQEggxzByYe4j68eQLOiQeSrPDYGv4sHhGBp3c6HHdq+uPXeAQ73kOAQpdLZ3/0zN7x/TZTloqeE1/qIA==
+  version "4.1.0"
+  resolved "https://registry.yarnpkg.com/jasmine/-/jasmine-4.1.0.tgz#0de347ca8bb6cc764b0ed186ae4cfc45bd64bdc4"
+  integrity sha512-4VhjbUgwfNS9CBnUMoSWr9tdNgOoOhNIjAD8YRxTn+PmOf4qTSC0Uqhk66dWGnz2vJxtNIU0uBjiwnsp4Ud9VA==
   dependencies:
     glob "^7.1.6"
-    jasmine-core "^4.0.0"
+    jasmine-core "^4.1.0"
 
 js-tokens@^4.0.0:
   version "4.0.0"
@@ -1598,9 +1598,9 @@ minimatch@^3.0.4, minimatch@~3.0.2:
     brace-expansion "^1.1.7"
 
 minimist@^1.2.5:
-  version "1.2.5"
-  resolved "https://registry.yarnpkg.com/minimist/-/minimist-1.2.5.tgz#67d66014b66a6a8aaa0c083c5fd58df4e4e97602"
-  integrity sha512-FM9nNUYrRBAELZQT3xeZQ7fmMOBg6nWNmJKTcgsJeaLstP/UODVpGsr5OhXhhXg6f+qtJ8uiZ+PUxkDWcgIXLw==
+  version "1.2.6"
+  resolved "https://registry.yarnpkg.com/minimist/-/minimist-1.2.6.tgz#8637a5b759ea0d6e98702cfb3a9283323c93af44"
+  integrity sha512-Jsjnk4bw3YJqYzbdyBiNsPWHPfO++UGG749Cxs6peCu5Xg4nrena6OVxOYxrQTqww0Jmwt+Ref8rggumkTLz9Q==
 
 mixin-deep@^1.2.0:
   version "1.3.2"
@@ -1665,11 +1665,11 @@ nanomatch@^1.2.9:
     to-regex "^3.0.1"
 
 nerdbank-gitversioning@^3.4.231:
-  version "3.4.255"
-  resolved "https://registry.yarnpkg.com/nerdbank-gitversioning/-/nerdbank-gitversioning-3.4.255.tgz#b9cf4e96a1aa8eaf0269b280ab5a351601a114ad"
-  integrity sha512-tFYJEcDckfOriAa4orhLtULVVllm9ojqJpJIPcGjO7/C/2oEVVZKQCmPGIAXdE5PjDdPpoSke0HsMXeAgJSecA==
+  version "3.5.107"
+  resolved "https://registry.yarnpkg.com/nerdbank-gitversioning/-/nerdbank-gitversioning-3.5.107.tgz#0987cc7d8267d116800db0cb3cb2ba64ebeed6fb"
+  integrity sha512-7Jup7ZA3jpDML8abXScBD7Zq31etZOklMhnQUt5XuWVCdRLeUuyvzYAS2Xo6TmbD6mJczWaegmZFoZW76m1rIQ==
   dependencies:
-    camel-case "^4.1.1"
+    camel-case "^4.1.2"
 
 next-tick@~1.0.0:
   version "1.0.0"
@@ -2475,9 +2475,9 @@ typedarray@^0.0.6:
   integrity sha1-hnrHTjhkGHsdPUfZlqeOxciDB3c=
 
 typescript@^4.3.5:
-  version "4.6.2"
-  resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.6.2.tgz#fe12d2727b708f4eef40f51598b3398baa9611d4"
-  integrity sha512-HM/hFigTBHZhLXshn9sN37H085+hQGeJHJ/X7LpBWLID/fbc2acUMfU+lGD98X81sKP+pFa9f0DZmCwB9GnbAg==
+  version "4.7.2"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.7.2.tgz#1f9aa2ceb9af87cca227813b4310fff0b51593c4"
+  integrity sha512-Mamb1iX2FDUpcTRzltPxgWMKy3fhg0TN378ylbktPGPK/99KbDtMQ4W1hwgsbPAsG3a0xKa1vmw4VKZQbkvz5A==
 
 unc-path-regex@^0.1.2:
   version "0.1.2"
@@ -2626,10 +2626,10 @@ vinyl@^2.0.0, vinyl@^2.2.0:
     remove-trailing-separator "^1.0.1"
     replace-ext "^1.0.0"
 
-vscode-jsonrpc@^6.0.0:
-  version "6.0.0"
-  resolved "https://registry.yarnpkg.com/vscode-jsonrpc/-/vscode-jsonrpc-6.0.0.tgz#108bdb09b4400705176b957ceca9e0880e9b6d4e"
-  integrity sha512-wnJA4BnEjOSyFMvjZdpiOwhSq9uDoK8e/kpRJDTaMYzwlkrhG1fwDIZI94CLsLzlCK5cIbMMtFlJlfR57Lavmg==
+vscode-jsonrpc@^8.0.1:
+  version "8.0.1"
+  resolved "https://registry.yarnpkg.com/vscode-jsonrpc/-/vscode-jsonrpc-8.0.1.tgz#f30b0625ebafa0fb3bc53e934ca47b706445e57e"
+  integrity sha512-N/WKvghIajmEvXpatSzvTvOIz61ZSmOSa4BRA4pTLi+1+jozquQKP/MkaylP9iB68k73Oua1feLQvH3xQuigiQ==
 
 which-module@^1.0.0:
   version "1.0.0"

@@ -75,7 +75,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
         }
 
         options = options || {};
-        options.protocolMajorVersion = options.protocolMajorVersion || 1;
+        options.protocolMajorVersion ??= 1;
         options.defaultChannelReceivingWindowSize = options.defaultChannelReceivingWindowSize || MultiplexingStream.recommendedDefaultChannelReceivingWindowSize;
         if (options.protocolMajorVersion < 3 && options.seededChannels && options.seededChannels.length > 0) {
             throw new Error("Seeded channels require v3 of the protocol at least.");
@@ -84,9 +84,9 @@ export abstract class MultiplexingStream implements IDisposableObservable {
         // Send the protocol magic number, and a random 16-byte number to establish even/odd assignments.
         const formatter: MultiplexingStreamFormatter | undefined =
             options.protocolMajorVersion === 1 ? new MultiplexingStreamV1Formatter(stream) :
-                options.protocolMajorVersion === 2 ? new MultiplexingStreamV2Formatter(stream) :
-                    options.protocolMajorVersion === 3 ? new MultiplexingStreamV3Formatter(stream) :
-                        undefined;
+            options.protocolMajorVersion === 2 ? new MultiplexingStreamV2Formatter(stream) :
+            options.protocolMajorVersion === 3 ? new MultiplexingStreamV3Formatter(stream) :
+            undefined;
         if (!formatter) {
             throw new Error(`Protocol major version ${options.protocolMajorVersion} is not supported.`);
         }
@@ -96,6 +96,30 @@ export abstract class MultiplexingStream implements IDisposableObservable {
         formatter.isOdd = handshakeResult.isOdd;
 
         return new MultiplexingStreamClass(stream, handshakeResult.isOdd, options);
+    }
+
+    /**
+     * Initializes a new instance of the `MultiplexingStream` class
+     * with protocolMajorVersion set to 3.
+     * @param stream The duplex stream to read and write to.
+     * Use `FullDuplexStream.Splice` if you have distinct input/output streams.
+     * @param options Options to customize the behavior of the stream.
+     * @returns The multiplexing stream.
+     */
+     public static Create(
+        stream: NodeJS.ReadWriteStream,
+        options?: MultiplexingStreamOptions) : MultiplexingStream {
+        options ??= { protocolMajorVersion: 3 };
+        options.protocolMajorVersion ??= 3;
+
+        const formatter: MultiplexingStreamFormatter | undefined =
+            options.protocolMajorVersion === 3 ? new MultiplexingStreamV3Formatter(stream) :
+            undefined;
+        if (!formatter) {
+            throw new Error(`Protocol major version ${options.protocolMajorVersion} is not supported. Try CreateAsync instead.`);
+        }
+
+        return new MultiplexingStreamClass(stream, undefined, options);
     }
 
     /**

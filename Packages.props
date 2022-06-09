@@ -1,0 +1,5 @@
+<Project>
+  <PropertyGroup>
+    <VSThreadingVersion>17.1.46</VSThreadingVersion>
+  </PropertyGroup>
+</Project>

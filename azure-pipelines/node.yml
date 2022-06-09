@@ -1,8 +1,8 @@
 steps:
 - task: UseNode@1
-  displayName: Use Node 10.x
+  displayName: Use Node 16.x
   inputs:
-    version: 10.x
+    version: 16.x
 
 - task: YarnInstaller@3
   displayName: Use yarn 1.x
