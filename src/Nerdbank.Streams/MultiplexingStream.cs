@@ -12,7 +12,6 @@ namespace Nerdbank.Streams
     using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
-    using MessagePack;
     using Microsoft;
     using Microsoft.VisualStudio.Threading;
 

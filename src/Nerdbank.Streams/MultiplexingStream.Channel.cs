@@ -317,7 +317,6 @@ namespace Nerdbank.Streams
             /// </remarks>
             public void Dispose()
             {
-
                 bool hasBeenDisposed;
                 lock (this.SyncObject)
                 {
@@ -385,7 +384,6 @@ namespace Nerdbank.Streams
                 {
                     this.mxStreamIOReaderCompleted!.ContinueWith(finalDisposalAction!, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Forget();
                 }
-
             }
 
             internal async Task OnChannelTerminatedAsync()
@@ -633,8 +631,10 @@ namespace Nerdbank.Streams
                             Assumes.NotNull(this.channelIO);
                             this.existingPipe = channelOptions.ExistingPipe;
                             this.existingPipeGiven = true;
+
                             // We always want to write ALL received data to the user's ExistingPipe, rather than truncating it on disposal, so don't use a cancellation token in that direction.
                             this.DisposeSelfOnFailure(this.channelIO.Input.LinkToAsync(channelOptions.ExistingPipe.Output));
+
                             // Upon disposal, we no longer want to continue reading from the user's ExistingPipe into our buffer since we won't be propagating it any further, so use our DisposalToken.
                             this.DisposeSelfOnFailure(channelOptions.ExistingPipe.Input.LinkToAsync(this.channelIO.Output, this.DisposalToken));
                         }
@@ -886,7 +886,6 @@ namespace Nerdbank.Streams
 
             private void Fault(Exception exception)
             {
-
                 bool hasBeenDisposed;
                 lock (this.SyncObject)
                 {
