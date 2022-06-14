@@ -939,9 +939,23 @@ namespace Nerdbank.Streams
                 throw new MultiplexingProtocolException($"Remote party indicated error writing to channel {channelId} before accepting it.");
             }
 
-            // First close the channel and then throw the exception
-            string errorMessage = Encoding.Unicode.GetString(message.ToArray());
-            Exception remoteException = new MultiplexingProtocolException($"Remote party indicated writing error: {errorMessage}");
+            if (!(this.formatter is V1Formatter))
+            {
+                // TODO: Handle the case that we are not using the V2Formatter, currently don't process the message
+                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Not processing error message due to invalid formatter");
+                }
+
+                return;
+            }
+
+            // Extract the exception from the payload
+            V1Formatter formatterWithError = (V1Formatter)this.formatter;
+            WriteError errorClass = formatterWithError.DeserializeWritingError(message);
+
+            // Close the channel with the exception
+            Exception remoteException = new MultiplexingProtocolException($"Remote party indicated writing error: {errorClass.ErrorMessage}");
 
             if (!this.channelsPendingTermination.Contains(channelId))
             {
@@ -1165,14 +1179,27 @@ namespace Nerdbank.Streams
         private void OnChannelWritingError(Channel channel, Exception error)
         {
             Requires.NotNull(channel, nameof(channel));
+
+            if (!(this.formatter is V1Formatter))
+            {
+                // TODO: Handle the case that we are not using the V2Formatter, currently don't process the message
+                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Not sending error message due to invalid formatter");
+                }
+
+                return;
+            }
+
             lock (this.syncObject)
             {
                 // Only inform the remote side if this channel has not already been terminated.
                 if (!this.channelsPendingTermination.Contains(channel.QualifiedId) && this.openChannels.ContainsKey(channel.QualifiedId))
                 {
-                    string errorMessage = error.Message;
-                    byte[] messageBytes = Encoding.Unicode.GetBytes(errorMessage);
-                    ReadOnlySequence<byte> messageToSend = new ReadOnlySequence<byte>(messageBytes);
+                    WriteError errorClass = new WriteError(error.Message);
+                    V1Formatter formatterWithError = (V1Formatter)this.formatter;
+                    ReadOnlySequence<byte> messageToSend = formatterWithError.SerializeWritingError(errorClass);
+
                     FrameHeader header = new FrameHeader
                     {
                         Code = ControlCode.ContentWritingError,
