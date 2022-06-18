@@ -122,7 +122,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
-    public async Task OfferPipeWithError()
+    public async Task ErrorInPipeIgnoredForV1()
     {
         bool errorThrown = false;
         string errorMessage = "Hello World";
@@ -157,7 +157,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
             }
         }
 
-        Assert.True(errorThrown);
+        Assert.False(errorThrown);
     }
 
     [Fact]

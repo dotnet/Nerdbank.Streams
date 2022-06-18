@@ -939,9 +939,9 @@ namespace Nerdbank.Streams
                 throw new MultiplexingProtocolException($"Remote party indicated error writing to channel {channelId} before accepting it.");
             }
 
-            if (!(this.formatter is V1Formatter))
+            if (this.formatter is V1Formatter)
             {
-                // TODO: Handle the case that we are not using the V2Formatter, currently don't process the message
+                // If we are using a V1 Formatter then ignore the write error message
                 if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                 {
                     this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Not processing error message due to invalid formatter");
@@ -951,8 +951,18 @@ namespace Nerdbank.Streams
             }
 
             // Extract the exception from the payload
-            V1Formatter formatterWithError = (V1Formatter)this.formatter;
-            WriteError errorClass = formatterWithError.DeserializeWritingError(message);
+            V2Formatter formatterWithError = (V2Formatter)this.formatter;
+            WriteError? errorClass = formatterWithError.DeserializeWritingError(message);
+
+            if (errorClass == null)
+            {
+                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Not processing error message due to version numbers not matching up");
+                }
+
+                return;
+            }
 
             // Close the channel with the exception
             Exception remoteException = new MultiplexingProtocolException($"Remote party indicated writing error: {errorClass.ErrorMessage}");
@@ -961,7 +971,7 @@ namespace Nerdbank.Streams
             {
                 if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                 {
-                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Calling write complete for {0}", channel);
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Calling write complete for {0} with error {1}", channel, remoteException);
                 }
 
                 // We haven't already sent a termination frame so close the channel
@@ -1180,9 +1190,9 @@ namespace Nerdbank.Streams
         {
             Requires.NotNull(channel, nameof(channel));
 
-            if (!(this.formatter is V1Formatter))
+            if (this.formatter is V1Formatter)
             {
-                // TODO: Handle the case that we are not using the V2Formatter, currently don't process the message
+                // Ignore error if we are using a V1 Formatter
                 if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                 {
                     this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Not sending error message due to invalid formatter");
@@ -1197,7 +1207,7 @@ namespace Nerdbank.Streams
                 if (!this.channelsPendingTermination.Contains(channel.QualifiedId) && this.openChannels.ContainsKey(channel.QualifiedId))
                 {
                     WriteError errorClass = new WriteError(error.Message);
-                    V1Formatter formatterWithError = (V1Formatter)this.formatter;
+                    V2Formatter formatterWithError = (V2Formatter)this.formatter;
                     ReadOnlySequence<byte> messageToSend = formatterWithError.SerializeWritingError(errorClass);
 
                     FrameHeader header = new FrameHeader
@@ -1207,12 +1217,7 @@ namespace Nerdbank.Streams
                     };
                     if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                     {
-                        this.TraceSource.TraceEvent(
-                            TraceEventType.Information,
-                            (int)TraceEventId.WriteError,
-                            "Sending write error header {0} for channel {1}",
-                            header,
-                            channel);
+                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Sending write error header {0} for channel {1}", header, channel);
                     }
 
                     this.SendFrame(header, messageToSend, CancellationToken.None);

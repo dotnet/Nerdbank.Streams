@@ -295,41 +295,6 @@ namespace Nerdbank.Streams
             {
                 throw new NotSupportedException();
             }
-
-            /// <summary>
-            /// Method to serialize a write error object using <see cref="MessagePack"/>.
-            /// </summary>
-            /// <param name="error">The <see cref="WriteError"/> object that we want to serialize.</param>
-            /// <returns>The serialized version of the error object.</returns>
-            internal ReadOnlySequence<byte> SerializeWritingError(WriteError error)
-            {
-                var sequence = new Sequence<byte>();
-                var writer = new MessagePackWriter(sequence);
-                writer.WriteArrayHeader(1);
-                writer.Write(error.ErrorMessage);
-                writer.Flush();
-                return sequence.AsReadOnlySequence;
-            }
-
-            /// <summary>
-            /// Method to deserialize a write error object using <see cref="MessagePack"/>.
-            /// </summary>
-            /// <param name="payload">The serialized sequence that we are trying to deserialize.</param>
-            /// <returns> The deserialized <see cref="WriteError"/> object.</returns>
-            /// <exception cref="MultiplexingProtocolException">Thrown if payload can't be deserialized.</exception>
-            internal WriteError DeserializeWritingError(ReadOnlySequence<byte> payload)
-            {
-                var reader = new MessagePackReader(payload);
-                int elementsCount = reader.ReadArrayHeader();
-                if (elementsCount != 1)
-                {
-                    throw new MultiplexingProtocolException("Improper number of elements in writing error payload in " + elementsCount);
-                }
-
-                string errorMessage = reader.ReadString();
-                return new WriteError(errorMessage);
-            }
-
         }
 
         internal class V2Formatter : Formatter
@@ -528,6 +493,48 @@ namespace Nerdbank.Streams
                 }
 
                 return new Channel.AcceptanceParameters(remoteWindowSize);
+            }
+
+            /// <summary>
+            /// Method to serialize a write error object using <see cref="MessagePack"/>.
+            /// </summary>
+            /// <param name="error">The <see cref="WriteError"/> object that we want to serialize.</param>
+            /// <returns>The serialized version of the error object.</returns>
+            internal ReadOnlySequence<byte> SerializeWritingError(WriteError error)
+            {
+                var sequence = new Sequence<byte>();
+                var writer = new MessagePackWriter(sequence);
+                writer.WriteArrayHeader(2);
+                writer.WriteInt32(ProtocolVersion.Major);
+                writer.Write(error.ErrorMessage);
+                writer.Flush();
+                return sequence.AsReadOnlySequence;
+            }
+
+            /// <summary>
+            /// Method to deserialize a write error object using <see cref="MessagePack"/>.
+            /// </summary>
+            /// <param name="payload">The serialized sequence that we are trying to deserialize.</param>
+            /// <returns> The deserialized <see cref="WriteError"/> object if the sender's version matches our version, null if it doesn't.</returns>
+            /// <exception cref="MultiplexingProtocolException">Thrown if payload can't be deserialized.</exception>
+            internal WriteError? DeserializeWritingError(ReadOnlySequence<byte> payload)
+            {
+                var reader = new MessagePackReader(payload);
+                int elementsCount = reader.ReadArrayHeader();
+                if (elementsCount != 2)
+                {
+                    throw new MultiplexingProtocolException("Improper number of elements in writing error payload in " + elementsCount);
+                }
+
+                int senderVersion = reader.ReadInt32();
+                if (senderVersion != ProtocolVersion.Major)
+                {
+                    // TODO: For the time being use the strict requirement that the versions need to line up but need to look into this
+                    return null;
+                }
+
+                string errorMessage = reader.ReadString();
+                return new WriteError(errorMessage);
             }
 
             protected virtual (FrameHeader Header, ReadOnlySequence<byte> Payload) DeserializeFrame(ReadOnlySequence<byte> frameSequence)

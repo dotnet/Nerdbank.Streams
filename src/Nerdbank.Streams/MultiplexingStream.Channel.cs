@@ -130,6 +130,11 @@ namespace Nerdbank.Streams
             private bool? existingPipeGiven;
 
             /// <summary>
+            /// A value indicating whether the <see cref="mxStreamIOWriter"/> was closed with an error.
+            /// </summary>
+            private bool writerCompletedWithError;
+
+            /// <summary>
             /// Initializes a new instance of the <see cref="Channel"/> class.
             /// </summary>
             /// <param name="multiplexingStream">The owning <see cref="Streams.MultiplexingStream"/>.</param>
@@ -144,6 +149,7 @@ namespace Nerdbank.Streams
                 this.MultiplexingStream = multiplexingStream;
                 this.channelId = channelId;
                 this.OfferParams = offerParameters;
+                this.writerCompletedWithError = false;
 
                 switch (channelId.Source)
                 {
@@ -460,45 +466,79 @@ namespace Nerdbank.Streams
             /// <param name="error">If we are closing the writing channel due to us receiving an error, defaults to null.</param>
             internal void OnContentWritingCompleted(Exception? error = null)
             {
-                if (error != null)
+                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Called Content Writing Complete with error {0}", error);
+                }
+
+                // Ensure that we don't complete the writer if we previously completed with an error
+                bool alreadyCompletedWithError = this.writerCompletedWithError;
+                this.writerCompletedWithError = error != null;
+
+                if (alreadyCompletedWithError)
                 {
                     if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                     {
-                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Exception {0} passed into writing complete", error);
+                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Previously called Content Writing Completed with error message so don't process this");
                     }
-                }
 
-                if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Critical) ?? false)
-                {
-                    this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Calling disposed self in {0} for content writing completed", this.QualifiedId);
+                    return;
                 }
 
                 this.DisposeSelfOnFailure(Task.Run(async delegate
                 {
+                    if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Information) ?? false)
+                    {
+                        this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Content Writing Completed had disposed of {0}", this.IsDisposed);
+                    }
+
                     if (!this.IsDisposed)
                     {
                         try
                         {
                             PipeWriter? writer = this.GetReceivedMessagePipeWriter();
-                            await writer.CompleteAsync(error).ConfigureAwait(false);
+                            if (writer != null)
+                            {
+                                if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Information) ?? false)
+                                {
+                                    this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.WriteError, "Closing pipe writer {0} with error {1}", writer, error);
+                                }
+
+                                await writer.CompleteAsync(error).ConfigureAwait(false);
+                            }
                         }
                         catch (ObjectDisposedException)
                         {
+                            if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Information) ?? false)
+                            {
+                                this.TraceSource!.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "ObjectDisposedException when closing pipe writer");
+                            }
+
                             if (this.mxStreamIOWriter != null)
                             {
+                                if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Information) ?? false)
+                                {
+                                    this.TraceSource!.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Closing general writer {0} with error {1}", this.mxStreamIOWriter, error);
+                                }
+
                                 await this.mxStreamIOWriter.CompleteAsync(error).ConfigureAwait(false);
                             }
                         }
                     }
-                    else
+                    else if (this.mxStreamIOWriter != null)
                     {
-                        if (this.mxStreamIOWriter != null)
+                        if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Information) ?? false)
                         {
-                            await this.mxStreamIOWriter.CompleteAsync(error).ConfigureAwait(false);
+                            this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Closing general writer {0} with error {1}", this.mxStreamIOWriter, error);
                         }
+
+                        await this.mxStreamIOWriter.CompleteAsync(error).ConfigureAwait(false);
                     }
 
-                    this.mxStreamIOWriterCompleted.Set();
+                    if (this.mxStreamIOWriter != null)
+                    {
+                        this.mxStreamIOWriterCompleted.Set();
+                    }
                 }));
             }
 
@@ -887,20 +927,23 @@ namespace Nerdbank.Streams
             private void Fault(Exception exception)
             {
                 bool hasBeenDisposed;
+
                 lock (this.SyncObject)
                 {
-                    hasBeenDisposed = this.IsDisposed;
+                    hasBeenDisposed = this.isDisposed;
+                    if (!this.isDisposed)
+                    {
+                        this.mxStreamIOReader?.Complete(exception);
+                    }
                 }
 
                 if (!hasBeenDisposed && (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Critical) ?? false))
                 {
-                    string callerName = new StackTrace().GetFrame(1)
-                        .GetMethod().Name;
+                    string callerName = new StackTrace().GetFrame(1).GetMethod().Name;
                     this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Fault called in {0} by {1}", this.QualifiedId, callerName);
                     this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Channel Closing self due to exception: {0}", exception);
                 }
 
-                this.mxStreamIOReader?.Complete(exception);
                 this.Dispose();
             }
 
@@ -917,6 +960,11 @@ namespace Nerdbank.Streams
 
                 if (task.IsCompleted)
                 {
+                    if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Information) ?? false)
+                    {
+                        this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "DisposeSelfOnFailure completed with faulted value of {0}", task.IsFaulted);
+                    }
+
                     if (task.IsFaulted)
                     {
                         this.Fault(task.Exception!.InnerException ?? task.Exception);
