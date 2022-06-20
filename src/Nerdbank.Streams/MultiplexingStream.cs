@@ -184,6 +184,7 @@ namespace Nerdbank.Streams
             ChannelDisposed,
             OfferChannelCanceled,
             FrameSent,
+            FrameSendSkipped,
             FrameReceived,
             FrameSentPayload,
             FrameReceivedPayload,
@@ -1160,10 +1161,15 @@ namespace Nerdbank.Streams
                             // But backpressure frames *can* come in 'late' because even after both sides have finished writing, they may still be reading
                             // what they've received.
                             // In such cases, we should just suppress transmission of the frame because the other side does not care.
-                            if (header.Code != ControlCode.ContentProcessed)
+                            // ContentWritingCompleted can be sent to SendFrame after a ChannelTerminated message such that neither have been transmitted yet
+                            // and thus wasn't in the termination collection until later, so forgive that too.
+                            if (header.Code is ControlCode.ContentProcessed or ControlCode.ContentWritingCompleted)
                             {
-                                Assumes.Fail($"Sending {header.Code} frame for channel {header.ChannelId}, which we've already sent termination for.");
+                                this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.FrameSendSkipped, "Skipping {0} frame for channel {1} because we're about to terminate it.", header.Code, header.ChannelId);
+                                return;
                             }
+
+                            Assumes.Fail($"Sending {header.Code} frame for channel {header.ChannelId}, which we've already sent termination for.");
                         }
                     }
                 }
