@@ -510,20 +510,21 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
     /// <summary>
     /// Verifies that writing to a <see cref="MultiplexingStream.Channel"/> (without an <see cref="MultiplexingStream.ChannelOptions.ExistingPipe"/>)
-    /// and then immediately disposing the channel still writes everything that was pending.
+    /// and then immediately completing the writer still writes everything that was pending.
     /// </summary>
     [Theory]
     [InlineData(1024 * 1024)]
     [InlineData(5)]
     [Trait("SkipInCodeCoverage", "true")]
-    public async Task TransmitOverPipeAndDisposeChannel(int length)
+    public async Task TransmitOverPipeAndCompleteWriting(int length)
     {
         byte[]? buffer = this.GetBuffer(length);
         (MultiplexingStream.Channel a, MultiplexingStream.Channel b) = await this.EstablishChannelsAsync("a");
+        await b.Output.CompleteAsync(); // we won't Write anything in this direction.
         Task writerTask = Task.Run(async delegate
         {
             await a.Output.WriteAsync(buffer, this.TimeoutToken);
-            a.Dispose();
+            await a.Output.CompleteAsync();
         });
 
         ReadOnlySequence<byte> readBytes = await this.ReadAtLeastAsync(b.Input, length);
@@ -598,7 +599,8 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         // such that the reader would stop if the disposed channel's content were not being actively discarded.
         await this.EstablishChannelsAsync("b");
 
-        // Confirm the writer task completes
+        // Confirm the writer task completes.
+        // Although the receiving end was disposed, we should never throw on the transmission end as a result of that.
         await writerTask;
     }
 
