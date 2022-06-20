@@ -97,6 +97,14 @@ namespace Nerdbank.Streams
             private bool isDisposed;
 
             /// <summary>
+            /// The original exception that led to faulting this channel.
+            /// </summary>
+            /// <remarks>
+            /// This should only be set with a <see cref="SyncObject"/> lock and after checking that it is <see langword="null" />.
+            /// </remarks>
+            private Exception? faultingException;
+
+            /// <summary>
             /// The <see cref="PipeReader"/> to use to get data to be transmitted over the <see cref="Streams.MultiplexingStream"/>.
             /// </summary>
             private PipeReader? mxStreamIOReader;
@@ -358,9 +366,21 @@ namespace Nerdbank.Streams
                         // We don't own the user's PipeWriter to complete it (so they can't write anything more to this channel).
                         // We can't know whether there is or will be more bytes written to the user's PipeWriter,
                         // but we need to terminate our reader for their writer as part of reclaiming resources.
-                        // We want to complete reading immediately and cancel any pending read.
-                        this.mxStreamIOReader?.Complete();
+                        // Cancel the pending or next read operation so the reader loop will immediately notice and shutdown.
                         this.mxStreamIOReader?.CancelPendingRead();
+
+                        // Only Complete the reader if our async reader doesn't own it to avoid thread-safety bugs.
+                        PipeReader? mxStreamIOReader = null;
+                        lock (this.SyncObject)
+                        {
+                            if (this.mxStreamIOReader is not UnownedPipeReader)
+                            {
+                                mxStreamIOReader = this.mxStreamIOReader;
+                                this.mxStreamIOReader = null;
+                            }
+                        }
+
+                        mxStreamIOReader?.Complete();
                     }
 
                     // Unblock the reader that might be waiting on this.
@@ -668,8 +688,23 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Relays data that the local channel owner wants to send to the remote party.
             /// </summary>
+            /// <remarks>
+            /// This method takes ownership of <see cref="mxStreamIOReader"/> and guarantees that it will be completed by the time this method completes,
+            /// whether successfully or in a faulted state.
+            /// To protect thread-safety, this method replaces the <see cref="mxStreamIOReader"/> field with an instance of <see cref="UnownedPipeReader"/>
+            /// so no one else can mess with it and introduce thread-safety bugs. The field is restored as this method exits.
+            /// </remarks>
             private async Task ProcessOutboundTransmissionsAsync()
             {
+                PipeReader? mxStreamIOReader;
+                lock (this.SyncObject)
+                {
+                    // Capture the PipeReader field for our exclusive use. This guards against thread-safety bugs.
+                    mxStreamIOReader = this.mxStreamIOReader;
+                    Assumes.NotNull(mxStreamIOReader);
+                    this.mxStreamIOReader = new UnownedPipeReader(mxStreamIOReader);
+                }
+
                 try
                 {
                     // Don't transmit data on the channel until the remote party has accepted it.
@@ -695,25 +730,11 @@ namespace Nerdbank.Streams
                             break;
                         }
 
-                        ReadResult result;
-                        try
-                        {
-                            result = await this.mxStreamIOReader!.ReadAsync().ConfigureAwait(false);
-                        }
-                        catch (InvalidOperationException ex)
-                        {
-                            // Someone completed the reader. The channel was probably disposed.
-                            if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
-                            {
-                                this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Transmission terminated because the reader threw: {0}", ex);
-                            }
-
-                            break;
-                        }
-
+                        // We don't use a CancellationToken on this call because we prefer the exception-free cancellation path used by our Dispose method (CancelPendingRead).
+                        ReadResult result = await mxStreamIOReader.ReadAsync().ConfigureAwait(false);
                         if (result.IsCanceled)
                         {
-                            // We've been asked to cancel. Presumably the channel has been disposed.
+                            // We've been asked to cancel. Presumably the channel has faulted or been disposed.
                             if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
                             {
                                 this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Transmission terminated because the read was canceled.");
@@ -749,25 +770,12 @@ namespace Nerdbank.Streams
                             await this.MultiplexingStream.SendFrameAsync(header, bufferToRelay, CancellationToken.None).ConfigureAwait(false);
                         }
 
-                        try
-                        {
-                            // Let the pipe know exactly how much we read, which might be less than we were given.
-                            this.mxStreamIOReader.AdvanceTo(bufferToRelay.End);
+                        // Let the pipe know exactly how much we read, which might be less than we were given.
+                        mxStreamIOReader.AdvanceTo(bufferToRelay.End);
 
-                            // We mustn't accidentally access the memory that may have been recycled now that we called AdvanceTo.
-                            bufferToRelay = default;
-                            result.ScrubAfterAdvanceTo();
-                        }
-                        catch (InvalidOperationException ex)
-                        {
-                            // Someone completed the reader. The channel was probably disposed.
-                            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
-                            {
-                                this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Transmission terminated because the reader threw: {0}", ex);
-                            }
-
-                            break;
-                        }
+                        // We mustn't accidentally access the memory that may have been recycled now that we called AdvanceTo.
+                        bufferToRelay = default;
+                        result.ScrubAfterAdvanceTo();
 
                         if (isCompleted)
                         {
@@ -780,16 +788,31 @@ namespace Nerdbank.Streams
                         }
                     }
 
-                    await this.mxStreamIOReader!.CompleteAsync().ConfigureAwait(false);
+                    await mxStreamIOReader!.CompleteAsync(this.faultingException).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
-                    await this.mxStreamIOReader!.CompleteAsync(ex).ConfigureAwait(false);
+                    if (ex is OperationCanceledException && this.DisposalToken.IsCancellationRequested)
+                    {
+                        await mxStreamIOReader!.CompleteAsync().ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        await mxStreamIOReader!.CompleteAsync(ex).ConfigureAwait(false);
+                    }
+
                     throw;
                 }
                 finally
                 {
                     this.MultiplexingStream.OnChannelWritingCompleted(this);
+
+                    // Restore the PipeReader to the field.
+                    lock (this.SyncObject)
+                    {
+                        this.mxStreamIOReader = mxStreamIOReader;
+                        mxStreamIOReader = null;
+                    }
                 }
             }
 
@@ -858,7 +881,12 @@ namespace Nerdbank.Streams
                     this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Channel Closing self due to exception: {0}", exception);
                 }
 
-                this.mxStreamIOReader?.Complete(exception);
+                lock (this.SyncObject)
+                {
+                    this.faultingException ??= exception;
+                }
+
+                this.mxStreamIOReader?.CancelPendingRead();
                 this.Dispose();
             }
 
