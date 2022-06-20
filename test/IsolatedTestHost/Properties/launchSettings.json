@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "IsolatedTestHost": {
-      "commandName": "Executable",
-      "commandLineArgs": "\"D:\\git\\Microsoft.VisualStudio.MultiplexingStream\\bin\\Microsoft.VisualStudio.MultiplexingStream.Tests\\Debug\\net46\\Microsoft.VisualStudio.MultiplexingStream.Tests.dll\" \"MultiplexingStreamPerfTests\" \"SendLargePayloadOnManyChannels\" \"False\""
-    }
-  }
-}
