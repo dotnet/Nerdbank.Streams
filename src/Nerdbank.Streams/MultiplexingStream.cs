@@ -836,6 +836,9 @@ namespace Nerdbank.Streams
                         case ControlCode.ChannelTerminated:
                             await this.OnChannelTerminatedAsync(header.RequiredChannelId).ConfigureAwait(false);
                             break;
+                        case ControlCode.ContentWritingError:
+                            this.OnContentWritingError(header.RequiredChannelId, frame.Value.Payload);
+                            break;
                         default:
                             break;
                     }
@@ -887,6 +890,94 @@ namespace Nerdbank.Streams
                 await channel.OnChannelTerminatedAsync().ConfigureAwait(false);
                 channel.IsRemotelyTerminated = true;
                 channel.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Called when the channel receives a frame with code <see cref="ControlCode.ContentWritingError"/> from the remote.
+        /// </summary>
+        /// <param name="channelId">The channel id of the sender of the frame.</param>
+        /// <param name="payload">The payload that the sender sent in the frame.</param>
+        private void OnContentWritingError(QualifiedChannelId channelId, ReadOnlySequence<byte> payload)
+        {
+            if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+            {
+                this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "OnContentWritingError received from remote party {0}", channelId);
+            }
+
+            if (this.formatter is V1Formatter)
+            {
+                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Rejecting writing error from {0} as stream uses V1Formatter", channelId);
+                }
+
+                return;
+            }
+
+            Channel? channel;
+            lock (this.syncObject)
+            {
+                if (this.openChannels.ContainsKey(channelId))
+                {
+                    channel = this.openChannels[channelId];
+                }
+                else
+                {
+                    channel = null;
+                }
+            }
+
+            if (channel == null)
+            {
+                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Rejecting content writing error from non open channel {0}", channelId);
+                }
+
+                return;
+            }
+
+            if (channelId.Source == ChannelSource.Local && !channel.IsAccepted)
+            {
+                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Rejecting content writing error from non accepted channel {0}", channelId);
+                }
+
+                throw new MultiplexingProtocolException($"Remote party indicated they're done writing to channel {channelId} before accepting it.");
+            }
+
+            if (channel.IsRejectedOrCanceled || this.channelsPendingTermination.Contains(channelId))
+            {
+                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Rejecting content writing error from channel {0} as it is in an unwanted state", channelId);
+                }
+
+                return;
+            }
+
+            // Deserialize the payload
+            V2Formatter wrappedFormatter = (V2Formatter)this.formatter;
+            WriteError? error = wrappedFormatter.DeserializeWriteError(payload);
+
+            if (error == null)
+            {
+                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Rejecting content writing error from channel {0} as can't deserialize payload {1} using {2}", channelId, payload, this.formatter);
+                }
+
+                return;
+            }
+
+            string errorMessage = error.ErrorMessage;
+            MultiplexingProtocolException channelClosingException = new MultiplexingProtocolException($"Remote party indicated writing error: {errorMessage}");
+
+            if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+            {
+                this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Content Writing Error closing channel {0} using error {1}", channelId, channelClosingException.Message);
             }
         }
 
@@ -1090,6 +1181,12 @@ namespace Nerdbank.Streams
             }
         }
 
+        /// <summary>
+        /// Called when the local end was not able to completely write all the data to this channel due to an error,
+        /// leading to the transmission of a <see cref="ControlCode.ContentWritingError"/> frame being sent for this channel.
+        /// </summary>
+        /// <param name="channel">The channel whose writing was halted.</param>
+        /// <param name="exception">The exception that caused the writing to be haulted.</param>
         private void OnChannelWritingError(Channel channel, Exception exception)
         {
             Requires.NotNull(channel, nameof(channel));
