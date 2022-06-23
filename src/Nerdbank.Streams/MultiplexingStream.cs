@@ -12,6 +12,7 @@ namespace Nerdbank.Streams
     using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
+    using MessagePack;
     using Microsoft;
     using Microsoft.VisualStudio.Threading;
 
@@ -187,7 +188,6 @@ namespace Nerdbank.Streams
             FrameReceived,
             FrameSentPayload,
             FrameReceivedPayload,
-            WriteError,
 
             /// <summary>
             /// Raised when content arrives for a channel that has been disposed locally, resulting in discarding the content.
@@ -828,9 +828,6 @@ namespace Nerdbank.Streams
                         case ControlCode.ContentWritingCompleted:
                             this.OnContentWritingCompleted(header.RequiredChannelId);
                             break;
-                        case ControlCode.ContentWritingError:
-                            this.OnContentWritingError(header.RequiredChannelId, frame.Value.Payload);
-                            break;
                         case ControlCode.ChannelTerminated:
                             await this.OnChannelTerminatedAsync(header.RequiredChannelId).ConfigureAwait(false);
                             break;
@@ -902,82 +899,6 @@ namespace Nerdbank.Streams
             }
 
             channel.OnContentWritingCompleted();
-        }
-
-        private void OnContentWritingError(QualifiedChannelId channelId, ReadOnlySequence<byte> message)
-        {
-            if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-            {
-                this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Received Write Error from channel {0}", channelId);
-            }
-
-            Channel? channel;
-            lock (this.syncObject)
-            {
-                if (this.openChannels.ContainsKey(channelId))
-                {
-                    channel = this.openChannels[channelId];
-                }
-                else
-                {
-                    channel = null;
-                }
-            }
-
-            if (channel == null)
-            {
-                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                {
-                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Found no open channels {0}", channelId);
-                }
-
-                // This is not an open channel so ignore the error message
-                return;
-            }
-
-            if (channelId.Source == ChannelSource.Local && !channel.IsAccepted)
-            {
-                throw new MultiplexingProtocolException($"Remote party indicated error writing to channel {channelId} before accepting it.");
-            }
-
-            if (this.formatter is V1Formatter)
-            {
-                // If we are using a V1 Formatter then ignore the write error message
-                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                {
-                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Not processing error message due to invalid formatter");
-                }
-
-                return;
-            }
-
-            // Extract the exception from the payload
-            V2Formatter formatterWithError = (V2Formatter)this.formatter;
-            WriteError? errorClass = formatterWithError.DeserializeWritingError(message);
-
-            if (errorClass == null)
-            {
-                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                {
-                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Not processing error message due to version numbers not matching up");
-                }
-
-                return;
-            }
-
-            // Close the channel with the exception
-            Exception remoteException = new MultiplexingProtocolException($"Remote party indicated writing error: {errorClass.ErrorMessage}");
-
-            if (!this.channelsPendingTermination.Contains(channelId))
-            {
-                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                {
-                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Calling write complete for {0} with error {1}", channel, remoteException);
-                }
-
-                // We haven't already sent a termination frame so close the channel
-                channel.OnContentWritingCompleted(remoteException);
-            }
         }
 
         private async ValueTask OnContentAsync(FrameHeader header, ReadOnlySequence<byte> payload, CancellationToken cancellationToken)
@@ -1168,6 +1089,7 @@ namespace Nerdbank.Streams
         /// Indicates that the local end will not be writing any more data to this channel,
         /// leading to the transmission of a <see cref="ControlCode.ContentWritingCompleted"/> frame being sent for this channel.
         /// </summary>
+        /// <param name="channel">The channel whose writing has finished.</param>
         private void OnChannelWritingCompleted(Channel channel)
         {
             Requires.NotNull(channel, nameof(channel));
@@ -1177,51 +1099,6 @@ namespace Nerdbank.Streams
                 if (!this.channelsPendingTermination.Contains(channel.QualifiedId) && this.openChannels.ContainsKey(channel.QualifiedId))
                 {
                     this.SendFrame(ControlCode.ContentWritingCompleted, channel.QualifiedId);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Indicate that the local end encountered an error writing data to this channel,
-        /// leading to the transmission of a <see cref="ControlCode.ContentWritingError"/> frame being sent to this channel.
-        /// </summary>
-        /// <param name="channel">The channel we encountered writing the message to.</param>
-        /// <param name="error">The error we encountered when trying to write to the channel.</param>
-        private void OnChannelWritingError(Channel channel, Exception error)
-        {
-            Requires.NotNull(channel, nameof(channel));
-
-            if (this.formatter is V1Formatter)
-            {
-                // Ignore error if we are using a V1 Formatter
-                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                {
-                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Not sending error message due to invalid formatter");
-                }
-
-                return;
-            }
-
-            lock (this.syncObject)
-            {
-                // Only inform the remote side if this channel has not already been terminated.
-                if (!this.channelsPendingTermination.Contains(channel.QualifiedId) && this.openChannels.ContainsKey(channel.QualifiedId))
-                {
-                    WriteError errorClass = new WriteError(error.Message);
-                    V2Formatter formatterWithError = (V2Formatter)this.formatter;
-                    ReadOnlySequence<byte> messageToSend = formatterWithError.SerializeWritingError(errorClass);
-
-                    FrameHeader header = new FrameHeader
-                    {
-                        Code = ControlCode.ContentWritingError,
-                        ChannelId = channel.QualifiedId,
-                    };
-                    if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                    {
-                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Sending write error header {0} for channel {1}", header, channel);
-                    }
-
-                    this.SendFrame(header, messageToSend, CancellationToken.None);
                 }
             }
         }

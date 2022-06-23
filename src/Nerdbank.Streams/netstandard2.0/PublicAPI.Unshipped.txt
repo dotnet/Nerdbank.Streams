@@ -1,7 +1,4 @@
 Nerdbank.Streams.BufferWriterExtensions
-Nerdbank.Streams.MultiplexingStream.WriteError
-Nerdbank.Streams.MultiplexingStream.WriteError.ErrorMessage.get -> string!
-Nerdbank.Streams.MultiplexingStream.WriteError.WriteError(string! message) -> void
 Nerdbank.Streams.ReadOnlySequenceExtensions
 Nerdbank.Streams.StreamPipeReader
 Nerdbank.Streams.StreamPipeReader.Read() -> System.IO.Pipelines.ReadResult

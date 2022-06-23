@@ -143,11 +143,6 @@ namespace Nerdbank.Streams
             private bool? existingPipeGiven;
 
             /// <summary>
-            /// A value indicating whether the <see cref="mxStreamIOWriter"/> was closed with an error.
-            /// </summary>
-            private bool writerCompletedWithError;
-
-            /// <summary>
             /// Initializes a new instance of the <see cref="Channel"/> class.
             /// </summary>
             /// <param name="multiplexingStream">The owning <see cref="Streams.MultiplexingStream"/>.</param>
@@ -162,7 +157,6 @@ namespace Nerdbank.Streams
                 this.MultiplexingStream = multiplexingStream;
                 this.channelId = channelId;
                 this.OfferParams = offerParameters;
-                this.writerCompletedWithError = false;
 
                 switch (channelId.Source)
                 {
@@ -336,22 +330,17 @@ namespace Nerdbank.Streams
             /// </remarks>
             public void Dispose()
             {
-                bool hasBeenDisposed;
-                lock (this.SyncObject)
+                if (!this.IsDisposed)
                 {
                     this.acceptanceSource.TrySetCanceled();
                     this.optionsAppliedTaskSource?.TrySetCanceled();
 
-                // The code in this delegate needs to happen in several branches including possibly asynchronously.
-                // We carefully define it here with no closure so that the C# compiler generates a static field for the delegate
-                // thus avoiding any extra allocations from reusing code in this way.
-                Action<object?, object> finalDisposalAction = (exOrAntecedent, state) =>
-                {
-                    var self = (Channel)state;
-                    self.disposalTokenSource.Cancel();
-                    self.completionSource.TrySetResult(null);
-                    self.MultiplexingStream.OnChannelDisposed(self);
-                };
+                    PipeWriter? mxStreamIOWriter;
+                    lock (this.SyncObject)
+                    {
+                        this.isDisposed = true;
+                        mxStreamIOWriter = this.mxStreamIOWriter;
+                    }
 
                     // Complete writing so that the mxstream cannot write to this channel any more.
                     // We must also cancel a pending flush since no one is guaranteed to be reading this any more
@@ -408,12 +397,8 @@ namespace Nerdbank.Streams
                         mxStreamIOReader?.Complete();
                     }
 
-                // Complete writing so that the mxstream cannot write to this channel any more.
-                // We must also cancel a pending flush since no one is guaranteed to be reading this any more
-                // and we don't want to deadlock on a full buffer in a disposed channel's pipe.
-                mxStreamIOWriter?.Complete();
-                mxStreamIOWriter?.CancelPendingFlush();
-                this.mxStreamIOWriterCompleted.Set();
+                    // Unblock the reader that might be waiting on this.
+                    this.remoteWindowHasCapacity.Set();
 
                     this.disposalTokenSource.Cancel();
                     this.completionSource.TrySetResult(null);
@@ -490,35 +475,10 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Called by the <see cref="MultiplexingStream"/> when when it will not be writing any more data to the channel.
             /// </summary>
-            /// <param name="error">If we are closing the writing channel due to us receiving an error, defaults to null.</param>
-            internal void OnContentWritingCompleted(Exception? error = null)
+            internal void OnContentWritingCompleted()
             {
-                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                {
-                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Called Content Writing Complete with error {0}", error);
-                }
-
-                // Ensure that we don't complete the writer if we previously completed with an error
-                bool alreadyCompletedWithError = this.writerCompletedWithError;
-                this.writerCompletedWithError = error != null;
-
-                if (alreadyCompletedWithError)
-                {
-                    if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                    {
-                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Previously called Content Writing Completed with error message so don't process this");
-                    }
-
-                    return;
-                }
-
                 this.DisposeSelfOnFailure(Task.Run(async delegate
                 {
-                    if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Information) ?? false)
-                    {
-                        this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Content Writing Completed had disposed of {0}", this.IsDisposed);
-                    }
-
                     if (!this.IsDisposed)
                     {
                         try
@@ -528,11 +488,6 @@ namespace Nerdbank.Streams
                         }
                         catch (ObjectDisposedException)
                         {
-                            if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Information) ?? false)
-                            {
-                                this.TraceSource!.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "ObjectDisposedException when closing pipe writer");
-                            }
-
                             if (this.mxStreamIOWriter != null)
                             {
                                 using AsyncSemaphore.Releaser releaser = await this.mxStreamIOWriterSemaphore.EnterAsync().ConfigureAwait(false);
@@ -540,21 +495,16 @@ namespace Nerdbank.Streams
                             }
                         }
                     }
-                    else if (this.mxStreamIOWriter != null)
+                    else
                     {
-                        if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Information) ?? false)
+                        if (this.mxStreamIOWriter != null)
                         {
                             using AsyncSemaphore.Releaser releaser = await this.mxStreamIOWriterSemaphore.EnterAsync().ConfigureAwait(false);
                             await this.mxStreamIOWriter.CompleteAsync().ConfigureAwait(false);
                         }
-
-                        await this.mxStreamIOWriter.CompleteAsync(error).ConfigureAwait(false);
                     }
 
-                    if (this.mxStreamIOWriter != null)
-                    {
-                        this.mxStreamIOWriterCompleted.Set();
-                    }
+                    this.mxStreamIOWriterCompleted.Set();
                 }));
             }
 
@@ -944,21 +894,8 @@ namespace Nerdbank.Streams
 
             private void Fault(Exception exception)
             {
-                bool hasBeenDisposed;
-
-                lock (this.SyncObject)
+                if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Critical) ?? false)
                 {
-                    hasBeenDisposed = this.isDisposed;
-                    if (!this.isDisposed)
-                    {
-                        this.mxStreamIOReader?.Complete(exception);
-                    }
-                }
-
-                if (!hasBeenDisposed && (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Critical) ?? false))
-                {
-                    string callerName = new StackTrace().GetFrame(1).GetMethod().Name;
-                    this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Fault called in {0} by {1}", this.QualifiedId, callerName);
                     this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Channel Closing self due to exception: {0}", exception);
                 }
 
@@ -975,20 +912,8 @@ namespace Nerdbank.Streams
             {
                 Requires.NotNull(task, nameof(task));
 
-                if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Critical) ?? false)
-                {
-                    string callerName = new StackTrace().GetFrame(1)
-                        .GetMethod().Name;
-                    this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "DisposeSelfOnFailure called in {0} by {1}", this.QualifiedId, callerName);
-                }
-
                 if (task.IsCompleted)
                 {
-                    if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Information) ?? false)
-                    {
-                        this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "DisposeSelfOnFailure completed with faulted value of {0}", task.IsFaulted);
-                    }
-
                     if (task.IsFaulted)
                     {
                         this.Fault(task.Exception!.InnerException ?? task.Exception);
