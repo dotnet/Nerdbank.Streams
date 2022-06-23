@@ -979,6 +979,8 @@ namespace Nerdbank.Streams
             {
                 this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Content Writing Error closing channel {0} using error {1}", channelId, channelClosingException.Message);
             }
+
+            channel.OnContentWritingCompleted(channelClosingException);
         }
 
         private void OnContentWritingCompleted(QualifiedChannelId channelId)
@@ -1193,7 +1195,7 @@ namespace Nerdbank.Streams
 
             if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
             {
-                this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "onChannelWritingError called for {0} with exception {1}", channel.QualifiedId, exception);
+                this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "onChannelWritingError called for {0} with exception {1}", channel.QualifiedId, exception.Message);
             }
 
             if (this.formatter is V1Formatter)

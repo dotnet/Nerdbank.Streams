@@ -43,14 +43,16 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
                 if (readResult.IsCompleted || readResult.IsCanceled)
                 {
                     readMoreData = false;
+                    this.Logger.WriteLine("Set readMoreData to False based on readResult fields");
                 }
 
                 ch2.Input.AdvanceTo(readResult.Buffer.End);
             }
-            catch (MultiplexingProtocolException exception)
+            catch (Exception exception)
             {
                 errorThrown = exception.Message.Contains(errorMessage);
                 readMoreData = !errorThrown;
+                this.Logger.WriteLine("Set readMoreData to " + readMoreData + " based on catching error with message " + exception.Message);
             }
         }
 
