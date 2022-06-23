@@ -495,6 +495,42 @@ namespace Nerdbank.Streams
                 return new Channel.AcceptanceParameters(remoteWindowSize);
             }
 
+            /// <summary>
+            /// Serializes an <see cref="WriteError"/> object using <see cref="MessagePack"/>.
+            /// </summary>
+            /// <param name="error">An instance of <see cref="WriteError"/> that we want to seralize.</param>
+            /// <returns>A <see cref="ReadOnlySequence"/> which is the serialized version of the error.</returns>
+            internal ReadOnlySequence<byte> SerializeWriteError(WriteError error)
+            {
+                var errorSequence = new Sequence<byte>();
+                var writer = new MessagePackWriter(errorSequence);
+                writer.WriteArrayHeader(2);
+                writer.WriteInt32(ProtocolVersion.Major);
+                writer.Write(error.ErrorMessage);
+                writer.Flush();
+                return errorSequence.AsReadOnlySequence;
+            }
+
+            internal WriteError? DeserializeWriteError(ReadOnlySequence<byte> serializedError)
+            {
+                var reader = new MessagePackReader(serializedError);
+                if (reader.ReadArrayHeader() != 2)
+                {
+                    // For now the error sequence will only contain the major version and the error message
+                    return null;
+                }
+
+                int senderVersion = reader.ReadInt32();
+                if (senderVersion != ProtocolVersion.Major)
+                {
+                    // For now a channel should only process write errors from channels with the same major version
+                    return null;
+                }
+
+                string errorMessage = reader.ReadString();
+                return new WriteError(errorMessage);
+            }
+
             protected virtual (FrameHeader Header, ReadOnlySequence<byte> Payload) DeserializeFrame(ReadOnlySequence<byte> frameSequence)
             {
                 var reader = new MessagePackReader(frameSequence);

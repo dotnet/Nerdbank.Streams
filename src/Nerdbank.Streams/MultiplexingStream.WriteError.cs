@@ -3,8 +3,6 @@
 
 namespace Nerdbank.Streams
 {
-    using MessagePack;
-
     /// <content>
     /// Contains the <see cref="WriteError"/> nested type.
     /// </content>

@@ -44,6 +44,13 @@ namespace Nerdbank.Streams
             /// allowing them to send more data.
             /// </summary>
             ContentProcessed,
+
+            /// <summary>
+            /// Sent when a channel encountered an error writin data on a given channel. This is sent right before a
+            /// <see cref="ContentWritingCompleted"/> to indicate that all data can't be transmitted and the cause of
+            /// that error.
+            /// </summary>
+            ContentWritingError,
         }
     }
 }

@@ -208,6 +208,11 @@ namespace Nerdbank.Streams
             /// Raised when the protocol handshake is starting, to annouce the major version being used.
             /// </summary>
             HandshakeStarted,
+
+            /// <summary>
+            /// Raised when we are tracing an event related to <see cref="MultiplexingStream.ControlCode.ContentWritingError"/>.
+            /// </summary>
+            WriteError,
         }
 
         /// <summary>
