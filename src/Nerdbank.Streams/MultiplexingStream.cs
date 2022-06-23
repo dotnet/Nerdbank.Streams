@@ -1090,6 +1090,65 @@ namespace Nerdbank.Streams
             }
         }
 
+        private void OnChannelWritingError(Channel channel, Exception exception)
+        {
+            Requires.NotNull(channel, nameof(channel));
+
+            if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+            {
+                this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "onChannelWritingError called for {0} with exception {1}", channel.QualifiedId, exception);
+            }
+
+            if (this.formatter is V1Formatter)
+            {
+                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Not sending WriteError frame from {0} since we are using a V1 Formatter", channel.QualifiedId);
+                }
+
+                return;
+            }
+
+            lock (this.syncObject)
+            {
+                // Only inform the remote side if this channel has not already been terminated.
+                if (!this.channelsPendingTermination.Contains(channel.QualifiedId) && this.openChannels.ContainsKey(channel.QualifiedId))
+                {
+                    WriteError error = new WriteError(exception.Message);
+                    V2Formatter wrappedFormatter = (V2Formatter)this.formatter;
+                    ReadOnlySequence<byte> serializedError = wrappedFormatter.SerializeWriteError(error);
+
+                    if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                    {
+                        this.TraceSource.TraceEvent(
+                            TraceEventType.Information,
+                            (int)TraceEventId.WriteError,
+                            "Generated MessagePack object {0} for write error with message {1} in channel {2}",
+                            serializedError,
+                            error.ErrorMessage,
+                            channel.QualifiedId);
+                    }
+
+                    FrameHeader header = new FrameHeader
+                    {
+                        Code = ControlCode.ContentWritingError,
+                        ChannelId = channel.QualifiedId,
+                    };
+
+                    if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                    {
+                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Sending write error with frame header {0} in channel {1}", header, channel.QualifiedId);
+                    }
+
+                    this.SendFrame(header, serializedError, CancellationToken.None);
+                }
+                else if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Not sending WriteError frame since channel {0} is terminated", channel.QualifiedId);
+                }
+            }
+        }
+
         /// <summary>
         /// Indicates that the local end will not be writing any more data to this channel,
         /// leading to the transmission of a <see cref="ControlCode.ContentWritingCompleted"/> frame being sent for this channel.

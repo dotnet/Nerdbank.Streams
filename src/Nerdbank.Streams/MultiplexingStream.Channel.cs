@@ -816,7 +816,13 @@ namespace Nerdbank.Streams
                     }
                     else
                     {
+                        if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                        {
+                            this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Completing channel {0} with exception {1}", this.QualifiedId, ex.Message);
+                        }
+
                         await mxStreamIOReader!.CompleteAsync(ex).ConfigureAwait(false);
+                        this.MultiplexingStream.OnChannelWritingError(this, ex);
                     }
 
                     throw;
@@ -896,12 +902,19 @@ namespace Nerdbank.Streams
             {
                 if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Critical) ?? false)
                 {
-                    this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Channel Closing self due to exception: {0}", exception);
+                    this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Fault called in {0} with exception message {1}", this.QualifiedId, exception.Message);
                 }
 
+                bool alreadyFaulted = false;
                 lock (this.SyncObject)
                 {
+                    alreadyFaulted = this.faultingException != null;
                     this.faultingException ??= exception;
+                }
+
+                if (!alreadyFaulted && (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Critical) ?? false))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Channel {0} closing self due to exception: {1}", this.QualifiedId, exception);
                 }
 
                 this.mxStreamIOReader?.CancelPendingRead();

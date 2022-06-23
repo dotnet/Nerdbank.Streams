@@ -499,7 +499,7 @@ namespace Nerdbank.Streams
             /// Serializes an <see cref="WriteError"/> object using <see cref="MessagePack"/>.
             /// </summary>
             /// <param name="error">An instance of <see cref="WriteError"/> that we want to seralize.</param>
-            /// <returns>A <see cref="ReadOnlySequence"/> which is the serialized version of the error.</returns>
+            /// <returns>A <see cref="Sequence{T}"/> which is the serialized version of the error.</returns>
             internal ReadOnlySequence<byte> SerializeWriteError(WriteError error)
             {
                 var errorSequence = new Sequence<byte>();
