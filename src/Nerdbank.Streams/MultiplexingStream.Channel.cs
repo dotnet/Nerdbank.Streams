@@ -143,6 +143,11 @@ namespace Nerdbank.Streams
             private bool? existingPipeGiven;
 
             /// <summary>
+            /// The exception to close any <see cref="PipeWriter"/> that sends data to the user, defaults to null.
+            /// </summary>
+            private Exception? writerCompletionException = null;
+
+            /// <summary>
             /// Initializes a new instance of the <see cref="Channel"/> class.
             /// </summary>
             /// <param name="multiplexingStream">The owning <see cref="Streams.MultiplexingStream"/>.</param>
@@ -322,16 +327,6 @@ namespace Nerdbank.Streams
             private bool BackpressureSupportEnabled => this.MultiplexingStream.protocolMajorVersion > 1;
 
             /// <summary>
-            /// Gets or sets a value indicating whether the open writers have been requested to be closed by onComplete.
-            /// </summary>
-            private bool WriterCompletedWithException { get; set; }
-
-            /// <summary>
-            /// Gets or sets a value indicating whether the writers that need to be closed have been closed by onComplete.
-            /// </summary>
-            private bool WriterCompleteFinished { get; set; }
-
-            /// <summary>
             /// Closes this channel and releases all resources associated with it.
             /// </summary>
             /// <remarks>
@@ -340,17 +335,6 @@ namespace Nerdbank.Streams
             /// </remarks>
             public void Dispose()
             {
-                if (this.WriterCompletedWithException && this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                {
-                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Dispose called on {0} with writer excepted to close due to exception", this.QualifiedId);
-
-                    // Temp solution: Block until we have finished executing on Complete
-                    while (!this.WriterCompleteFinished)
-                    {
-                        continue;
-                    }
-                }
-
                 if (!this.IsDisposed)
                 {
                     this.acceptanceSource.TrySetCanceled();
@@ -382,7 +366,7 @@ namespace Nerdbank.Streams
                                         mxStreamIOWriter = self.mxStreamIOWriter;
                                     }
 
-                                    mxStreamIOWriter?.Complete();
+                                    mxStreamIOWriter?.Complete(self.writerCompletionException);
                                     self.mxStreamIOWriterCompleted.Set();
                                 }
                                 finally
@@ -436,7 +420,7 @@ namespace Nerdbank.Streams
 
                 try
                 {
-                    if (this.WriterCompletedWithException && !this.IsDisposed)
+                    if (this.writerCompletionException != null)
                     {
                         if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                         {
@@ -501,7 +485,7 @@ namespace Nerdbank.Streams
 
                 if (flushResult.IsCanceled)
                 {
-                    if (this.WriterCompletedWithException && !this.IsDisposed)
+                    if (this.writerCompletionException != null && !this.IsDisposed)
                     {
                         if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                         {
@@ -532,7 +516,7 @@ namespace Nerdbank.Streams
                     this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Called OnContentWritingCompleted on {0} with exception {1}", this.QualifiedId, error.Message);
                 }
 
-                if (this.WriterCompletedWithException)
+                if (this.writerCompletionException != null)
                 {
                     if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                     {
@@ -542,7 +526,7 @@ namespace Nerdbank.Streams
                     return;
                 }
 
-                this.WriterCompletedWithException = error != null;
+                this.writerCompletionException = error;
 
                 this.DisposeSelfOnFailure(Task.Run(async delegate
                 {
@@ -551,7 +535,7 @@ namespace Nerdbank.Streams
                         try
                         {
                             using PipeWriterRental writerRental = await this.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
-                            await writerRental.Writer.CompleteAsync(error).ConfigureAwait(false);
+                            await writerRental.Writer.CompleteAsync(this.writerCompletionException).ConfigureAwait(false);
 
                             if (error != null && this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                             {
@@ -563,7 +547,7 @@ namespace Nerdbank.Streams
                             if (this.mxStreamIOWriter != null)
                             {
                                 using AsyncSemaphore.Releaser releaser = await this.mxStreamIOWriterSemaphore.EnterAsync().ConfigureAwait(false);
-                                await this.mxStreamIOWriter.CompleteAsync(error).ConfigureAwait(false);
+                                await this.mxStreamIOWriter.CompleteAsync(this.writerCompletionException).ConfigureAwait(false);
 
                                 if (error != null && this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                                 {
@@ -577,7 +561,7 @@ namespace Nerdbank.Streams
                         if (this.mxStreamIOWriter != null)
                         {
                             using AsyncSemaphore.Releaser releaser = await this.mxStreamIOWriterSemaphore.EnterAsync().ConfigureAwait(false);
-                            await this.mxStreamIOWriter.CompleteAsync(error).ConfigureAwait(false);
+                            await this.mxStreamIOWriter.CompleteAsync(this.writerCompletionException).ConfigureAwait(false);
 
                             if (error != null && this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                             {
@@ -585,8 +569,6 @@ namespace Nerdbank.Streams
                             }
                         }
                     }
-
-                    this.WriterCompleteFinished = true;
 
                     this.mxStreamIOWriterCompleted.Set();
                 }));
@@ -979,11 +961,11 @@ namespace Nerdbank.Streams
                     this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelAutoClosing, "Channel {0} \"{1}\" self-closing because both reader and writer are complete.", this.QualifiedId, this.Name);
                 }
 
-                if (!this.WriterCompletedWithException)
+                if (this.writerCompletionException == null)
                 {
                     this.Dispose();
                 }
-                else if (this.WriterCompletedWithException && this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                else if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                 {
                     this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Not calling Dispose inside AutoClose method on channel {0} as we except writer to be completed with error", this.QualifiedId);
                 }
@@ -1009,7 +991,6 @@ namespace Nerdbank.Streams
                 }
 
                 this.mxStreamIOReader?.CancelPendingRead();
-                this.WriterCompleteFinished = true;
                 this.Dispose();
             }
 
