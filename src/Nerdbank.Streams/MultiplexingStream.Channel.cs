@@ -143,9 +143,9 @@ namespace Nerdbank.Streams
             private bool? existingPipeGiven;
 
             /// <summary>
-            /// The exception to close any <see cref="PipeWriter"/> that sends data to the user, defaults to null.
+            /// A value indicating whether this <see cref="Channel"/> received an error from a remote party in <see cref="OnContentWritingCompleted(MultiplexingProtocolException?)"/>.
             /// </summary>
-            private Exception? writerCompletionException = null;
+            private bool receivedRemoteException;
 
             /// <summary>
             /// Initializes a new instance of the <see cref="Channel"/> class.
@@ -366,7 +366,7 @@ namespace Nerdbank.Streams
                                         mxStreamIOWriter = self.mxStreamIOWriter;
                                     }
 
-                                    mxStreamIOWriter?.Complete(self.writerCompletionException);
+                                    mxStreamIOWriter?.Complete(self.GetWriterException());
                                     self.mxStreamIOWriterCompleted.Set();
                                 }
                                 finally
@@ -420,24 +420,10 @@ namespace Nerdbank.Streams
 
                 try
                 {
-                    if (this.writerCompletionException != null)
-                    {
-                        if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                        {
-                            this.TraceSource.TraceEvent(
-                                TraceEventType.Information,
-                                (int)TraceEventId.WriteError,
-                                "Not completing rental writer inside OnChannelTerminatedAsync on channel {0} as we expect writer rental to be completed with error",
-                                this.QualifiedId);
-                        }
-
-                        return;
-                    }
-
                     // We Complete the writer because only the writing (logical) thread should complete it
                     // to avoid race conditions, and Channel.Dispose can be called from any thread.
                     using PipeWriterRental writerRental = await this.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
-                    await writerRental.Writer.CompleteAsync().ConfigureAwait(false);
+                    await writerRental.Writer.CompleteAsync(this.GetWriterException()).ConfigureAwait(false);
                 }
                 catch (ObjectDisposedException)
                 {
@@ -485,23 +471,9 @@ namespace Nerdbank.Streams
 
                 if (flushResult.IsCanceled)
                 {
-                    if (this.writerCompletionException != null && !this.IsDisposed)
-                    {
-                        if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                        {
-                            this.TraceSource.TraceEvent(
-                                TraceEventType.Information,
-                                (int)TraceEventId.WriteError,
-                                "Not completing rental writer inside OnContentAsync on channel {0} as we expect writer rental to be completed with error",
-                                this.QualifiedId);
-                        }
-
-                        return;
-                    }
-
                     // This happens when the channel is disposed (while or before flushing).
                     Assumes.True(this.IsDisposed);
-                    await writerRental.Writer.CompleteAsync().ConfigureAwait(false);
+                    await writerRental.Writer.CompleteAsync(this.GetWriterException()).ConfigureAwait(false);
                 }
             }
 
@@ -509,24 +481,31 @@ namespace Nerdbank.Streams
             /// Called by the <see cref="MultiplexingStream"/> when when it will not be writing any more data to the channel.
             /// </summary>
             /// <param name="error">Optional param used to indicate if we are stopping writing due to an error.</param>
-            internal void OnContentWritingCompleted(Exception? error = null)
+            internal void OnContentWritingCompleted(MultiplexingProtocolException? error = null)
             {
-                if (error != null && this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                {
-                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Called OnContentWritingCompleted on {0} with exception {1}", this.QualifiedId, error.Message);
-                }
-
-                if (this.writerCompletionException != null)
+                if (this.receivedRemoteException)
                 {
                     if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                     {
-                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Rejecting OnContentWritingCompleted call on {0} due to previous call with error", this.QualifiedId);
+                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Current call to onContentWritingCompleted ignored due to previous call with error on {0}", this.QualifiedId);
                     }
 
                     return;
                 }
 
-                this.writerCompletionException = error;
+                if (error != null)
+                {
+                    if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                    {
+                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Processed error from remote on {0} with message {1}", this.QualifiedId, error.Message);
+                    }
+
+                    lock (this.SyncObject)
+                    {
+                        this.faultingException = error;
+                        this.receivedRemoteException = true;
+                    }
+                }
 
                 this.DisposeSelfOnFailure(Task.Run(async delegate
                 {
@@ -535,7 +514,7 @@ namespace Nerdbank.Streams
                         try
                         {
                             using PipeWriterRental writerRental = await this.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
-                            await writerRental.Writer.CompleteAsync(this.writerCompletionException).ConfigureAwait(false);
+                            await writerRental.Writer.CompleteAsync(this.GetWriterException()).ConfigureAwait(false);
 
                             if (error != null && this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                             {
@@ -547,7 +526,7 @@ namespace Nerdbank.Streams
                             if (this.mxStreamIOWriter != null)
                             {
                                 using AsyncSemaphore.Releaser releaser = await this.mxStreamIOWriterSemaphore.EnterAsync().ConfigureAwait(false);
-                                await this.mxStreamIOWriter.CompleteAsync(this.writerCompletionException).ConfigureAwait(false);
+                                await this.mxStreamIOWriter.CompleteAsync(this.GetWriterException()).ConfigureAwait(false);
 
                                 if (error != null && this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                                 {
@@ -561,7 +540,7 @@ namespace Nerdbank.Streams
                         if (this.mxStreamIOWriter != null)
                         {
                             using AsyncSemaphore.Releaser releaser = await this.mxStreamIOWriterSemaphore.EnterAsync().ConfigureAwait(false);
-                            await this.mxStreamIOWriter.CompleteAsync(this.writerCompletionException).ConfigureAwait(false);
+                            await this.mxStreamIOWriter.CompleteAsync(this.GetWriterException()).ConfigureAwait(false);
 
                             if (error != null && this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                             {
@@ -686,6 +665,15 @@ namespace Nerdbank.Streams
                     releaser.Dispose();
                     throw;
                 }
+            }
+
+            /// <summary>
+            /// Gets the <see cref="Exception"/> to close any <see cref="PipeWriter"/> that the channel is managing.
+            /// </summary>
+            /// <returns>The exception sent from the remote if there is one, null otherwise.</returns>
+            private Exception? GetWriterException()
+            {
+                return this.receivedRemoteException ? this.faultingException : null;
             }
 
             /// <summary>
@@ -961,14 +949,7 @@ namespace Nerdbank.Streams
                     this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelAutoClosing, "Channel {0} \"{1}\" self-closing because both reader and writer are complete.", this.QualifiedId, this.Name);
                 }
 
-                if (this.writerCompletionException == null)
-                {
-                    this.Dispose();
-                }
-                else if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                {
-                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Not calling Dispose inside AutoClose method on channel {0} as we except writer to be completed with error", this.QualifiedId);
-                }
+                this.Dispose();
             }
 
             private void Fault(Exception exception)

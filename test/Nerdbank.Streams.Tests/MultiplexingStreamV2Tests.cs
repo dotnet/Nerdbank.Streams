@@ -20,46 +20,6 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
     protected override int ProtocolMajorVersion => 2;
 
     [Fact]
-    public async Task OfferPipeWithError()
-    {
-        bool errorThrown = false;
-        string errorMessage = "Hello World";
-
-        // Prepare a readonly pipe that is already fully populated with data but also with an error
-        var pipe = new Pipe();
-        await pipe.Writer.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
-        pipe.Writer.Complete(new NullReferenceException(errorMessage));
-
-        MultiplexingStream.Channel? ch1 = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(pipe.Reader) });
-        await this.WaitForEphemeralChannelOfferToPropagateAsync();
-        MultiplexingStream.Channel? ch2 = this.mx2.AcceptChannel(ch1.QualifiedId.Id);
-
-        bool readMoreData = true;
-        while (readMoreData)
-        {
-            try
-            {
-                ReadResult readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
-                if (readResult.IsCompleted || readResult.IsCanceled)
-                {
-                    readMoreData = false;
-                    this.Logger.WriteLine("Set readMoreData to False based on readResult fields");
-                }
-
-                ch2.Input.AdvanceTo(readResult.Buffer.End);
-            }
-            catch (Exception exception)
-            {
-                errorThrown = exception.Message.Contains(errorMessage);
-                readMoreData = !errorThrown;
-                this.Logger.WriteLine("Set readMoreData to " + readMoreData + " based on catching error with message " + exception.Message);
-            }
-        }
-
-        Assert.True(errorThrown);
-    }
-
-    [Fact]
     public async Task Backpressure()
     {
         long backpressureThreshold = this.mx1.DefaultChannelReceivingWindowSize;

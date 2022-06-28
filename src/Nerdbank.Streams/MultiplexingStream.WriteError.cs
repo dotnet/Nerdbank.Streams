@@ -12,7 +12,7 @@ namespace Nerdbank.Streams
         /// A class containing information about a write error and which is sent to the
         /// remote alongside <see cref="MultiplexingStream.ControlCode.ContentWritingError"/>.
         /// </summary>
-        public class WriteError
+        internal class WriteError
         {
             /// <summary>
             /// Initializes a new instance of the <see cref="WriteError"/> class.
