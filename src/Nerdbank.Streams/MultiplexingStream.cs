@@ -930,20 +930,14 @@ namespace Nerdbank.Streams
                 channel = this.openChannels[channelId];
             }
 
-            try
+            if (channelId.Source == ChannelSource.Local && !channel.IsAccepted)
             {
-                if (channelId.Source == ChannelSource.Local && !channel.IsAccepted)
-                {
-                    throw new MultiplexingProtocolException($"Remote party sent content for channel {channelId} before accepting it.");
-                }
-
-                if (!payload.IsEmpty)
-                {
-                    await channel.OnContentAsync(header, payload, cancellationToken).ConfigureAwait(false);
-                }
+                throw new MultiplexingProtocolException($"Remote party sent content for channel {channelId} before accepting it.");
             }
-            catch (ObjectDisposedException) when (channel.IsDisposed)
+
+            if (!payload.IsEmpty)
             {
+                await channel.OnContentAsync(payload, cancellationToken).ConfigureAwait(false);
             }
         }
 
