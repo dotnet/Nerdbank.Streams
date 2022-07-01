@@ -185,6 +185,7 @@ namespace Nerdbank.Streams
             OfferChannelCanceled,
             FrameSent,
             FrameReceived,
+            FrameNotReceived,
             FrameSentPayload,
             FrameReceivedPayload,
 
@@ -787,6 +788,11 @@ namespace Nerdbank.Streams
                     var frame = await this.formatter.ReadFrameAsync(this.DisposalToken).ConfigureAwait(false);
                     if (!frame.HasValue)
                     {
+                        if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                        {
+                            this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.FrameNotReceived, "Clean end of stream.");
+                        }
+
                         break;
                     }
 
@@ -825,9 +831,37 @@ namespace Nerdbank.Streams
             catch (EndOfStreamException)
             {
                 // When we unexpectedly hit an end of stream, just close up shop.
+                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Error))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Error, (int)TraceEventId.FatalError, "End of stream in the middle of a frame.");
+                }
+            }
+            catch (Exception ex)
+            {
+                if (ex is OperationCanceledException && this.DisposalToken.IsCancellationRequested)
+                {
+                    if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                    {
+                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelDisposed, $"{nameof(MultiplexingStream)}.{nameof(this.ReadStreamAsync)} shutting down due to cancellation and disposal.");
+                    }
+                }
+                else
+                {
+                    if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Error))
+                    {
+                        this.TraceSource.TraceEvent(TraceEventType.Error, (int)TraceEventId.FatalError, $"Exception thrown in {nameof(MultiplexingStream)}.{nameof(this.ReadStreamAsync)} leading to stream shutdown: {{0}}", ex);
+                    }
+                }
+
+                throw;
             }
             finally
             {
+                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Information, 0, $"{nameof(MultiplexingStream)}.{nameof(this.ReadStreamAsync)} is shutting down all channels before exiting.");
+                }
+
                 lock (this.syncObject)
                 {
                     foreach (var entry in this.openChannels)

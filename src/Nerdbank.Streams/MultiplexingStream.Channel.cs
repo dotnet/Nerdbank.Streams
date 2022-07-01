@@ -771,9 +771,9 @@ namespace Nerdbank.Streams
 
                         if (isCompleted)
                         {
-                            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
+                            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
                             {
-                                this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Transmission terminated because the writer completed.");
+                                this.TraceSource.TraceEvent(TraceEventType.Information, 0, "Transmission terminated because the writer completed.");
                             }
 
                             break;
