@@ -186,6 +186,7 @@ namespace Nerdbank.Streams
             FrameSent,
             FrameSendSkipped,
             FrameReceived,
+            FrameNotReceived,
             FrameSentPayload,
             FrameReceivedPayload,
 
@@ -801,6 +802,11 @@ namespace Nerdbank.Streams
                     (FrameHeader Header, ReadOnlySequence<byte> Payload)? frame = await this.formatter.ReadFrameAsync(this.DisposalToken).ConfigureAwait(false);
                     if (!frame.HasValue)
                     {
+                        if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                        {
+                            this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.FrameNotReceived, "Clean end of stream.");
+                        }
+
                         break;
                     }
 
@@ -839,9 +845,37 @@ namespace Nerdbank.Streams
             catch (EndOfStreamException)
             {
                 // When we unexpectedly hit an end of stream, just close up shop.
+                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Error))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Error, (int)TraceEventId.FatalError, "End of stream in the middle of a frame.");
+                }
+            }
+            catch (Exception ex)
+            {
+                if (ex is OperationCanceledException && this.DisposalToken.IsCancellationRequested)
+                {
+                    if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                    {
+                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelDisposed, $"{nameof(MultiplexingStream)}.{nameof(this.ReadStreamAsync)} shutting down due to cancellation and disposal.");
+                    }
+                }
+                else
+                {
+                    if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Error))
+                    {
+                        this.TraceSource.TraceEvent(TraceEventType.Error, (int)TraceEventId.FatalError, $"Exception thrown in {nameof(MultiplexingStream)}.{nameof(this.ReadStreamAsync)} leading to stream shutdown: {{0}}", ex);
+                    }
+                }
+
+                throw;
             }
             finally
             {
+                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Information, 0, $"{nameof(MultiplexingStream)}.{nameof(this.ReadStreamAsync)} is shutting down all channels before exiting.");
+                }
+
                 lock (this.syncObject)
                 {
                     foreach (KeyValuePair<QualifiedChannelId, Channel> entry in this.openChannels)
@@ -910,20 +944,14 @@ namespace Nerdbank.Streams
                 channel = this.openChannels[channelId];
             }
 
-            try
+            if (channelId.Source == ChannelSource.Local && !channel.IsAccepted)
             {
-                if (channelId.Source == ChannelSource.Local && !channel.IsAccepted)
-                {
-                    throw new MultiplexingProtocolException($"Remote party sent content for channel {channelId} before accepting it.");
-                }
-
-                if (!payload.IsEmpty)
-                {
-                    await channel.OnContentAsync(header, payload, cancellationToken).ConfigureAwait(false);
-                }
+                throw new MultiplexingProtocolException($"Remote party sent content for channel {channelId} before accepting it.");
             }
-            catch (ObjectDisposedException) when (channel.IsDisposed)
+
+            if (!payload.IsEmpty)
             {
+                await channel.OnContentAsync(payload, cancellationToken).ConfigureAwait(false);
             }
         }
 

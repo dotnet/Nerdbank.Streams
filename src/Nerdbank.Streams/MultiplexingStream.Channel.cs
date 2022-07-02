@@ -426,49 +426,71 @@ namespace Nerdbank.Streams
                 }
             }
 
-            internal async ValueTask OnContentAsync(FrameHeader header, ReadOnlySequence<byte> payload, CancellationToken cancellationToken)
+            /// <summary>
+            /// Receives content from the <see cref="MultiplexingStream"/> that is bound for this channel.
+            /// </summary>
+            /// <param name="payload">The content for this channel.</param>
+            /// <param name="cancellationToken">A token that is canceled if the overall <see cref="MultiplexingStream"/> gets disposed of.</param>
+            /// <returns>
+            /// A task that completes when content has been accepted.
+            /// All multiplexing stream reads are held up till this completes, so this should only pause in exceptional circumstances.
+            /// Faulting the returned <see cref="ValueTask"/> will fault the whole multiplexing stream.
+            /// </returns>
+            internal async ValueTask OnContentAsync(ReadOnlySequence<byte> payload, CancellationToken cancellationToken)
             {
-                PipeWriterRental writerRental = await this.GetReceivedMessagePipeWriterAsync(cancellationToken).ConfigureAwait(false);
-                if (this.mxStreamIOWriterCompleted.IsSet)
+                try
                 {
-                    // Someone already completed the writer.
-                    return;
-                }
-
-                foreach (ReadOnlyMemory<byte> segment in payload)
-                {
-                    Memory<byte> memory = writerRental.Writer.GetMemory(segment.Length);
-                    segment.CopyTo(memory);
-                    writerRental.Writer.Advance(segment.Length);
-                }
-
-                if (!payload.IsEmpty && this.MultiplexingStream.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
-                {
-                    this.MultiplexingStream.TraceSource.TraceData(TraceEventType.Verbose, (int)TraceEventId.FrameReceivedPayload, payload);
-                }
-
-                ValueTask<FlushResult> flushResult = writerRental.Writer.FlushAsync(cancellationToken);
-                if (this.BackpressureSupportEnabled)
-                {
-                    if (!flushResult.IsCompleted)
+                    PipeWriterRental writerRental = await this.GetReceivedMessagePipeWriterAsync(cancellationToken).ConfigureAwait(false);
+                    if (this.mxStreamIOWriterCompleted.IsSet)
                     {
-                        // The incoming data has overrun the size of the write buffer inside the PipeWriter.
-                        // This should never happen if we created the Pipe because we specify the Pause threshold to exceed the window size.
-                        // If it happens, it should be because someone specified an ExistingPipe with an inappropriately sized buffer in its PipeWriter.
-                        Assumes.True(this.existingPipeGiven == true); // Make sure this isn't an internal error
-                        this.Fault(new InvalidOperationException(Strings.ExistingPipeOutputHasPauseThresholdSetTooLow));
+                        // Someone already completed the writer.
+                        return;
+                    }
+
+                    foreach (ReadOnlyMemory<byte> segment in payload)
+                    {
+                        Memory<byte> memory = writerRental.Writer.GetMemory(segment.Length);
+                        segment.CopyTo(memory);
+                        writerRental.Writer.Advance(segment.Length);
+                    }
+
+                    if (!payload.IsEmpty && this.MultiplexingStream.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
+                    {
+                        this.MultiplexingStream.TraceSource.TraceData(TraceEventType.Verbose, (int)TraceEventId.FrameReceivedPayload, payload);
+                    }
+
+                    ValueTask<FlushResult> flushResult = writerRental.Writer.FlushAsync(cancellationToken);
+                    if (this.BackpressureSupportEnabled)
+                    {
+                        if (!flushResult.IsCompleted)
+                        {
+                            // The incoming data has overrun the size of the write buffer inside the PipeWriter.
+                            // This should never happen if we created the Pipe because we specify the Pause threshold to exceed the window size.
+                            // If it happens, it should be because someone specified an ExistingPipe with an inappropriately sized buffer in its PipeWriter.
+                            Assumes.True(this.existingPipeGiven == true); // Make sure this isn't an internal error
+                            this.Fault(new InvalidOperationException(Strings.ExistingPipeOutputHasPauseThresholdSetTooLow));
+                        }
+                    }
+                    else
+                    {
+                        await flushResult.ConfigureAwait(false);
+                    }
+
+                    if (flushResult.IsCanceled)
+                    {
+                        // This happens when the channel is disposed (while or before flushing).
+                        Assumes.True(this.IsDisposed);
+                        await writerRental.Writer.CompleteAsync().ConfigureAwait(false);
                     }
                 }
-                else
+                catch (ObjectDisposedException) when (this.IsDisposed)
                 {
-                    await flushResult.ConfigureAwait(false);
+                    // Just eat these.
                 }
-
-                if (flushResult.IsCanceled)
+                catch (Exception ex)
                 {
-                    // This happens when the channel is disposed (while or before flushing).
-                    Assumes.True(this.IsDisposed);
-                    await writerRental.Writer.CompleteAsync().ConfigureAwait(false);
+                    // Contain the damage for any other failure so we don't fault the entire multiplexing stream.
+                    this.Fault(ex);
                 }
             }
 
@@ -797,9 +819,9 @@ namespace Nerdbank.Streams
 
                         if (isCompleted)
                         {
-                            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Verbose))
+                            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
                             {
-                                this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Transmission terminated because the writer completed.");
+                                this.TraceSource.TraceEvent(TraceEventType.Information, 0, "Transmission terminated because the writer completed.");
                             }
 
                             break;
