@@ -19,6 +19,7 @@ jobs:
 
   - template: dotnet.yml
   - template: node.yml
+  - template: collect-artifacts.yml
 
 - job: Linux
   pool:
@@ -30,6 +31,7 @@ jobs:
   - template: install-dependencies.yml
   - template: dotnet.yml
   - template: node.yml
+  - template: collect-artifacts.yml
 
 - job: macOS
   condition: ${{ parameters.includeMacOS }}
@@ -42,6 +44,7 @@ jobs:
   - template: install-dependencies.yml
   - template: dotnet.yml
   - template: node.yml
+  - template: collect-artifacts.yml
 
 - job: WrapUp
   dependsOn:
