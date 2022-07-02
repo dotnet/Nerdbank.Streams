@@ -1151,6 +1151,32 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
             MultiplexingStream.CreateAsync(pair.Item2, options, this.TimeoutToken)));
     }
 
+    /// <summary>
+    /// Verifies that faulting a <see cref="PipeReader"/> that receives channel data will not adversely impact other channels on the <see cref="MultiplexingStream"/>.
+    /// </summary>
+    [Fact]
+    public async Task FaultingChannelReader()
+    {
+        Task<MultiplexingStream.Channel> baselineOffer = this.mx1.OfferChannelAsync("baseline", cancellationToken: this.TimeoutToken);
+        Task<MultiplexingStream.Channel> sketchyOffer = this.mx1.OfferChannelAsync("sketchy", cancellationToken: this.TimeoutToken);
+
+        MultiplexingStream.Channel mx2Baseline = await this.mx2.AcceptChannelAsync("baseline", this.TimeoutToken);
+        MultiplexingStream.Channel mx2Sketchy = await this.mx2.AcceptChannelAsync("sketchy", this.TimeoutToken);
+
+        MultiplexingStream.Channel mx1Baseline = await baselineOffer;
+        MultiplexingStream.Channel mx1Sketchy = await sketchyOffer;
+
+        // Now fault one reader
+        await mx2Sketchy.Input.CompleteAsync(new InvalidOperationException("Sketchy reader fail."));
+
+        // Transmit data on this channel from the other side to force the mxstream to notice that we faulted a reader.
+        await mx1Sketchy.Output.WriteAsync(new byte[3], this.TimeoutToken);
+
+        // Verify communication over the good channel.
+        await mx1Baseline.Output.WriteAsync(new byte[3], this.TimeoutToken);
+        await this.ReadAtLeastAsync(mx2Baseline.Input, 3);
+    }
+
     protected static Task CompleteChannelsAsync(params MultiplexingStream.Channel[] channels)
     {
         foreach (var channel in channels)
