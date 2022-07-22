@@ -136,6 +136,28 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
         await writeTask;
     }
 
+    [Fact]
+    public async Task Backpressure_CopyToAsync()
+    {
+        long backpressureThreshold = this.mx1.DefaultChannelReceivingWindowSize;
+        (MultiplexingStream.Channel a, MultiplexingStream.Channel b) = await this.EstablishChannelsAsync("a");
+
+        byte[]? hugeChunk = new byte[backpressureThreshold * 2]; // enough to fill the remote and local windows
+        a.Output.Write(hugeChunk);
+        Task flushTask = Task.Run(async delegate
+        {
+            await a.Output.FlushAsync(this.TimeoutToken);
+            await a.Output.CompleteAsync();
+        });
+
+        // Now read from the channel and verify it unblocks the writer, using CopyToAsync specifically.
+        long drainedBytesCount = await this.DrainReaderTillCompletedAsync(b.Input, useCopyToAsync: true);
+        Assert.Equal(hugeChunk.Length, drainedBytesCount);
+
+        await flushTask.WithCancellation(this.TimeoutToken);
+        await CompleteChannelsAsync(a, b);
+    }
+
     /// <summary>
     /// Regression test for <see href="https://github.com/AArnott/Nerdbank.Streams/issues/253">#253</see>.
     /// </summary>
