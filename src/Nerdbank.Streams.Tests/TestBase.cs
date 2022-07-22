@@ -134,17 +134,30 @@ public abstract class TestBase : IDisposable
         }
     }
 
-    public async Task DrainReaderTillCompletedAsync(PipeReader reader)
+    public async Task<long> DrainReaderTillCompletedAsync(PipeReader reader, bool useCopyToAsync = false)
     {
-        while (true)
+        long bytesDrained = 0;
+        if (useCopyToAsync)
         {
-            var readResult = await reader.ReadAsync(this.TimeoutToken);
-            reader.AdvanceTo(readResult.Buffer.End);
-            if (readResult.IsCompleted)
+            MemoryStream ms = new MemoryStream();
+            await reader.CopyToAsync(ms, this.TimeoutToken);
+            bytesDrained = ms.Length;
+        }
+        else
+        {
+            while (true)
             {
-                break;
+                ReadResult readResult = await reader.ReadAsync(this.TimeoutToken);
+                bytesDrained += readResult.Buffer.Length;
+                reader.AdvanceTo(readResult.Buffer.End);
+                if (readResult.IsCompleted)
+                {
+                    break;
+                }
             }
         }
+
+        return bytesDrained;
     }
 
     internal byte[] GetBuffer(int length)
