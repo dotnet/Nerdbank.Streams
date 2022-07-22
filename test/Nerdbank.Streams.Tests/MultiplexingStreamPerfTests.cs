@@ -5,6 +5,7 @@ using System;
 using System.Buffers;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Pipelines;
 using System.IO.Pipes;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -28,8 +29,8 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
         : base(logger)
     {
         string pipeName = Guid.NewGuid().ToString();
-        this.serverPipe = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
-        this.clientPipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+        this.serverPipe = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, System.IO.Pipes.PipeOptions.Asynchronous);
+        this.clientPipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, System.IO.Pipes.PipeOptions.Asynchronous);
     }
 
     public async Task InitializeAsync()
@@ -141,7 +142,7 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
                                 MultiplexingStream.Channel? channel = await mxServer.OfferChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
                                 for (int i = 0; i < segmentCount / ChannelCount; i++)
                                 {
-                                     await channel.Output.WriteAsync(serverBuffer, this.TimeoutToken);
+                                    await channel.Output.WriteAsync(serverBuffer, this.TimeoutToken);
                                 }
                             })));
                     }),
@@ -166,6 +167,198 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
                     })).WithCancellation(this.TimeoutToken);
             }
         }
+    }
+
+    [Fact]
+    public async Task TransmissionSpeedBaseline_Stream()
+    {
+        const long TotalSize = 1L * 1024 * 1024 * 1024;
+        (Stream read, Stream write) = FullDuplexStream.CreatePair();
+
+        Stopwatch sw = Stopwatch.StartNew();
+        Task<long> readTask = ReadToBitBucketAsync(read, CancellationToken.None);
+        Task<long> writeTask = WriteAsync(write, CancellationToken.None);
+        await WhenAllSucceedOrAnyFail(writeTask, readTask);
+        sw.Stop();
+        long bytesRead = await readTask;
+        long bytesWritten = await writeTask;
+        this.Logger.WriteLine($"Wrote {bytesWritten / 1024 / 1024} MB in {sw.Elapsed}. Rate: {bytesWritten / (1024 * 1024) / sw.Elapsed.TotalSeconds:0} MBps.");
+        this.Logger.WriteLine($"Read {bytesRead}.");
+
+        static async Task<long> WriteAsync(Stream s, CancellationToken cancellationToken)
+        {
+            await Task.Yield().ConfigureAwait(false);
+            var buffer = new byte[4096];
+            long bytesToWrite = TotalSize;
+            try
+            {
+                while (bytesToWrite > 0)
+                {
+                    int bytesToWriteThisTime = (int)Math.Min(bytesToWrite, buffer.Length);
+                    await s.WriteAsync(buffer, 0, bytesToWriteThisTime, cancellationToken);
+                    await s.FlushAsync(cancellationToken);
+                    bytesToWrite -= bytesToWriteThisTime;
+                }
+
+                return TotalSize;
+            }
+            finally
+            {
+                s.Dispose();
+            }
+        }
+
+        static async Task<long> ReadToBitBucketAsync(Stream s, CancellationToken cancellationToken)
+        {
+            await Task.Yield().ConfigureAwait(false);
+            var buffer = new byte[4096];
+            long totalBytesRead = 0, bytesRead;
+            while ((bytesRead = await s.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
+            {
+                totalBytesRead += bytesRead;
+            }
+
+            return totalBytesRead;
+        }
+    }
+
+    [Fact]
+    public async Task TransmissionSpeedBaseline_Pipe()
+    {
+        const long TotalSize = 1L * 1024 * 1024 * 1024;
+        (IDuplexPipe read, IDuplexPipe write) = FullDuplexStream.CreatePipePair();
+
+        Stopwatch sw = Stopwatch.StartNew();
+        Task<long> readTask = ReadToBitBucketAsync(read.Input, this.TimeoutToken);
+        Task<long> writeTask = WriteAsync(write.Output, this.TimeoutToken);
+        await WhenAllSucceedOrAnyFail(writeTask, readTask);
+        sw.Stop();
+        long bytesRead = await readTask;
+        long bytesWritten = await writeTask;
+        this.Logger.WriteLine($"Wrote {bytesWritten / 1024 / 1024} MB in {sw.Elapsed}. Rate: {bytesWritten / (1024 * 1024) / sw.Elapsed.TotalSeconds:0} MBps.");
+        this.Logger.WriteLine($"Read {bytesRead}.");
+
+        static async Task<long> WriteAsync(PipeWriter s, CancellationToken cancellationToken)
+        {
+            await Task.Yield().ConfigureAwait(false);
+            var buffer = new byte[4096];
+            long bytesToWrite = TotalSize;
+            try
+            {
+                while (bytesToWrite > 0)
+                {
+                    int bytesToWriteThisTime = (int)Math.Min(bytesToWrite, buffer.Length);
+                    await s.WriteAsync(buffer.AsMemory(0, bytesToWriteThisTime), cancellationToken);
+                    bytesToWrite -= bytesToWriteThisTime;
+                }
+
+                await s.CompleteAsync();
+                return TotalSize;
+            }
+            catch (Exception ex)
+            {
+                await s.CompleteAsync(ex);
+                throw;
+            }
+        }
+
+        static async Task<long> ReadToBitBucketAsync(PipeReader s, CancellationToken cancellationToken)
+        {
+            await Task.Yield().ConfigureAwait(false);
+            long totalBytesRead = 0;
+            while (true)
+            {
+                ReadResult read = await s.ReadAsync(cancellationToken);
+                totalBytesRead += read.Buffer.Length;
+                s.AdvanceTo(read.Buffer.End);
+                if (read.IsCompleted)
+                {
+                    break;
+                }
+            }
+
+            return totalBytesRead;
+        }
+    }
+
+    [Theory, PairwiseData]
+    public async Task TransmissionSpeed_Channel([CombinatorialRange(1, 3)] int protocolVersion)
+    {
+        const long TotalSize = 1L * 1024 * 1024 * 1024;
+        MultiplexingStream.Options options = new()
+        {
+            ProtocolMajorVersion = protocolVersion,
+        };
+        (MultiplexingStream.Channel ch1, MultiplexingStream.Channel ch2) = await this.EstablishChannelsAsync("perftest", options);
+
+        Stopwatch sw = Stopwatch.StartNew();
+        Task<long> readTask = ReadToBitBucketAsync(ch1.Input, this.TimeoutToken);
+        Task<long> writeTask = WriteAsync(ch2.Output, this.TimeoutToken);
+        await WhenAllSucceedOrAnyFail(writeTask, readTask);
+        sw.Stop();
+        long bytesRead = await readTask;
+        long bytesWritten = await writeTask;
+        this.Logger.WriteLine($"Wrote {bytesWritten / 1024 / 1024} MB in {sw.Elapsed}. Rate: {bytesWritten / (1024 * 1024) / sw.Elapsed.TotalSeconds:0} MBps.");
+        this.Logger.WriteLine($"Read {bytesRead}.");
+
+        static async Task<long> WriteAsync(PipeWriter s, CancellationToken cancellationToken)
+        {
+            await Task.Yield().ConfigureAwait(false);
+            var buffer = new byte[4096];
+            long bytesToWrite = TotalSize;
+            try
+            {
+                while (bytesToWrite > 0)
+                {
+                    int bytesToWriteThisTime = (int)Math.Min(bytesToWrite, buffer.Length);
+                    await s.WriteAsync(buffer.AsMemory(0, bytesToWriteThisTime), cancellationToken);
+                    bytesToWrite -= bytesToWriteThisTime;
+                }
+
+                await s.CompleteAsync();
+                return TotalSize;
+            }
+            catch (Exception ex)
+            {
+                await s.CompleteAsync(ex);
+                throw;
+            }
+        }
+
+        static async Task<long> ReadToBitBucketAsync(PipeReader s, CancellationToken cancellationToken)
+        {
+            await Task.Yield().ConfigureAwait(false);
+            long totalBytesRead = 0;
+            while (true)
+            {
+                ReadResult read = await s.ReadAsync(cancellationToken);
+                totalBytesRead += read.Buffer.Length;
+                s.AdvanceTo(read.Buffer.End);
+                if (read.IsCompleted)
+                {
+                    break;
+                }
+            }
+
+            return totalBytesRead;
+        }
+    }
+
+    protected async Task<(MultiplexingStream.Channel Party1, MultiplexingStream.Channel Party2)> EstablishChannelsAsync(string identifier, MultiplexingStream.Options? options = null, long? receivingWindowSize = null)
+    {
+        (Stream pipe1, Stream pipe2) = FullDuplexStream.CreatePair();
+
+        (MultiplexingStream mxServer, MultiplexingStream mxClient) = await Task.WhenAll(
+            MultiplexingStream.CreateAsync(pipe1, options, this.TimeoutToken).WithCancellation(this.TimeoutToken),
+            MultiplexingStream.CreateAsync(pipe2, options, this.TimeoutToken).WithCancellation(this.TimeoutToken));
+
+        var channelOptions = new MultiplexingStream.ChannelOptions { ChannelReceivingWindowSize = receivingWindowSize };
+        Task<MultiplexingStream.Channel>? mx1ChannelTask = mxClient.OfferChannelAsync(identifier, channelOptions, this.TimeoutToken);
+        Task<MultiplexingStream.Channel>? mx2ChannelTask = mxServer.AcceptChannelAsync(identifier, channelOptions, this.TimeoutToken);
+        MultiplexingStream.Channel[]? channels = await WhenAllSucceedOrAnyFail(mx1ChannelTask, mx2ChannelTask).WithCancellation(this.TimeoutToken);
+        Assert.NotNull(channels[0]);
+        Assert.NotNull(channels[1]);
+        return (channels[0], channels[1]);
     }
 
     private async Task JsonRpcPerf(bool useChannel, [CallerMemberName] string? testMethodName = null)
