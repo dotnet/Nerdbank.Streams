@@ -1003,10 +1003,6 @@ namespace Nerdbank.Streams
 
                 public override ValueTask CompleteAsync(Exception? exception = null) => this.inner.CompleteAsync(exception);
 
-                public override Task CopyToAsync(PipeWriter destination, CancellationToken cancellationToken = default) => this.inner.CopyToAsync(destination, cancellationToken);
-
-                public override Task CopyToAsync(Stream destination, CancellationToken cancellationToken = default) => this.inner.CopyToAsync(destination, cancellationToken);
-
                 [Obsolete]
                 public override void OnWriterCompleted(Action<Exception?, object?> callback, object? state) => this.inner.OnWriterCompleted(callback, state);
 
