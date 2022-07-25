@@ -71,6 +71,7 @@ export class ChannelClass extends Channel {
     private readonly _completion = new Deferred<void>();
     public localWindowSize?: number;
     private remoteWindowSize?: number;
+    private remoteError?: Error;
 
     /**
      * The number of bytes transmitted from here but not yet acknowledged as processed from there,
@@ -214,7 +215,16 @@ export class ChannelClass extends Channel {
         return this._acceptance.resolve();
     }
 
-    public onContent(buffer: Buffer | null) {
+    public onContent(buffer: Buffer | null, error?: Error) {
+        // Already received remote error so don't process any future messages
+        if (this.remoteError) {
+            return;
+        }
+
+        if (error) {
+            this.remoteError = error;
+        } 
+
         this._duplex.push(buffer);
 
         // We should find a way to detect when we *actually* share the received buffer with the Channel's user
@@ -244,15 +254,23 @@ export class ChannelClass extends Channel {
         }
     }
 
-    public async dispose() {
+    public async dispose(errorToSend? : Error) {
         if (!this.isDisposed) {
             super.dispose();
+
+            if (errorToSend) {
+                await this._multiplexingStream.onChannelWritingError(this, errorToSend.message);
+            }
 
             this._acceptance.reject(new CancellationToken.CancellationError("disposed"));
 
             // For the pipes, we Complete *our* ends, and leave the user's ends alone.
             // The completion will propagate when it's ready to.
-            this._duplex.end();
+            if (this.remoteError) {
+                this._duplex.destroy(this.remoteError);
+            } else {
+                this._duplex.end();
+            }
             this._duplex.push(null);
 
             this._completion.resolve();
