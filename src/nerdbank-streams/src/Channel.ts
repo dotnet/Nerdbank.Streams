@@ -55,7 +55,7 @@ export abstract class Channel implements IDisposableObservable {
 
     /**
      * Closes this channel. If an error is passed in then that error message is sent
-     * to the remote side. 
+     * to the remote side before dispoing the channel.
      */
     public async dispose(error? : Error) {
         // The interesting stuff is in the derived class.
