@@ -54,9 +54,10 @@ export abstract class Channel implements IDisposableObservable {
     }
 
     /**
-     * Closes this channel.
+     * Closes this channel. If an error is passed in then that error message is sent
+     * to the remote side. 
      */
-    public dispose() {
+    public async dispose(error? : Error) {
         // The interesting stuff is in the derived class.
         this._isDisposed = true;
     }
@@ -272,8 +273,14 @@ export class ChannelClass extends Channel {
                 this._duplex.end();
             }
             this._duplex.push(null);
-
-            this._completion.resolve();
+            
+            // Reject or Resolve the completion based on the remote error
+            if (this.remoteError) {
+                this._completion.reject(this.remoteError);
+            } else {
+                this._completion.resolve();
+            }
+            
             await this._multiplexingStream.onChannelDisposed(this);
         }
     }

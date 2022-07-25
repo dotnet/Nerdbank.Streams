@@ -35,6 +35,29 @@ import * as assert from "assert";
             }
         });
 
+        it("Encountered error writing content", async() => {
+            const errorMessage = "Sending error to the remote that there was an writing error";
+            const errorToSend = new Error(errorMessage);
+
+            const channels = await Promise.all([
+                mx1.offerChannelAsync("test"),
+                mx2.acceptChannelAsync("test"),
+            ]);
+            channels[0].stream.write("abc");
+            await channels[0].dispose(errorToSend);
+
+            // Ensure that the message is completed with an error
+            let caughtError = false;
+            try {
+                await channels[1].completion;
+            } catch(error) {
+                caughtError = true;
+            }
+
+            assert.deepStrictEqual(protocolMajorVersion > 1, caughtError);
+
+        });
+
         it("CreateAsync rejects null stream", async () => {
             expectThrow(MultiplexingStream.CreateAsync(null!));
             expectThrow(MultiplexingStream.CreateAsync(undefined!));
