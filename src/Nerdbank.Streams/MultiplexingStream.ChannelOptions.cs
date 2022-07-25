@@ -50,6 +50,9 @@ namespace Nerdbank.Streams
             /// The <see cref="PipeWriter"/> specified in <see cref="IDuplexPipe.Output"/> *must* be created with <see cref="PipeOptions.PauseWriterThreshold"/> that *exceeds*
             /// the value of <see cref="ChannelReceivingWindowSize"/> and <see cref="Options.DefaultChannelReceivingWindowSize"/>.
             /// </para>
+            /// <para>
+            /// If set to an pipe that was completed with an error, then that error gets sents to the remote using a <see cref="ControlCode.ContentWritingError"/> frame.
+            /// </para>
             /// </remarks>
             /// <exception cref="ArgumentException">Thrown if set to an <see cref="IDuplexPipe"/> that returns <c>null</c> for either of its properties.</exception>
             public IDuplexPipe? ExistingPipe

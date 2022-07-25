@@ -406,7 +406,16 @@ namespace Nerdbank.Streams
                     this.remoteWindowHasCapacity.Set();
 
                     this.disposalTokenSource.Cancel();
-                    this.completionSource.TrySetResult(null);
+
+                    if (this.faultingException != null)
+                    {
+                        this.completionSource.TrySetException(this.faultingException);
+                    }
+                    else
+                    {
+                        this.completionSource.TrySetResult(null);
+                    }
+
                     this.MultiplexingStream.OnChannelDisposed(this);
                 }
             }
@@ -895,6 +904,11 @@ namespace Nerdbank.Streams
                         if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                         {
                             this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Completing channel {0} with exception {1}", this.QualifiedId, ex.Message);
+                        }
+
+                        lock (this.SyncObject)
+                        {
+                            this.faultingException = ex;
                         }
 
                         await mxStreamIOReader!.CompleteAsync(ex).ConfigureAwait(false);
