@@ -293,6 +293,14 @@ export class MultiplexingStreamV2Formatter extends MultiplexingStreamFormatter {
         return msgpack.decode(payload)[0];
     }
 
+    serializeErrorMessage(errorMessage : string) : Buffer {
+        return msgpack.encode([errorMessage])
+    }
+
+    deserializeErrorMessage(payload : Buffer) : string {
+        return msgpack.decode(payload)[0]
+    }
+
     protected async readMessagePackAsync(cancellationToken: CancellationToken): Promise<{} | [] | null> {
         const streamEnded = new Deferred<void>();
         while (true) {
