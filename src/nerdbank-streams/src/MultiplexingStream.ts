@@ -585,6 +585,20 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         }
     }
 
+    public onChannelWritingError(channel : ChannelClass, errorMessage? : string) {
+        // Perform error check to ensure that we can send the frame
+        if(this.formatter instanceof MultiplexingStreamV1Formatter) {
+            return;
+        }
+        if(channel.isDisposed || !this.getOpenChannel(channel.qualifiedId)) {
+            return;
+        }
+        // Convert the error message into a payload and send that
+        let errorFormatter = this.formatter as MultiplexingStreamV2Formatter;
+        let errorPayload = errorFormatter.serializeErrorMessage(errorMessage);
+        this.rejectOnFailure(this.sendFrameAsync(new FrameHeader(ControlCode.ContentWritingError, channel.qualifiedId), errorPayload));
+    }
+
     public async onChannelDisposed(channel: ChannelClass) {
         if (!this._completionSource.isCompleted) {
             try {
@@ -631,6 +645,9 @@ export class MultiplexingStreamClass extends MultiplexingStream {
                     break;
                 case ControlCode.ChannelTerminated:
                     this.onChannelTerminated(frame.header.requiredChannel);
+                    break;
+                case ControlCode.ContentWritingError:
+                    this.onContentWritingError(frame.header.requiredChannel, frame.payload);
                     break;
                 default:
                     break;
@@ -714,6 +731,22 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 
         const bytesProcessed = this.formatter.deserializeContentProcessed(payload);
         channel.onContentProcessed(bytesProcessed);
+    }
+
+    private onContentWritingError(channelId : QualifiedChannelId, payload : Buffer) {
+        // Ensure that we should process the enrror message
+        if (this.formatter as MultiplexingStreamV1Formatter) {
+            return;
+        }
+        const channel = this.getOpenChannel(channelId);
+        if (!channel) {
+            throw new Error(`No channel with id ${channelId} found.`);
+        }
+        // Convert the payload into an error
+        let errorFormatter = this.formatter as MultiplexingStreamV2Formatter;
+        let errorMessage = errorFormatter.deserializeErrorMessage(payload);
+        let remoteError = new Error(errorMessage);
+        throw remoteError;
     }
 
     private onContentWritingCompleted(channelId: QualifiedChannelId) {

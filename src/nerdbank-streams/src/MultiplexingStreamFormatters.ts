@@ -293,7 +293,7 @@ export class MultiplexingStreamV2Formatter extends MultiplexingStreamFormatter {
         return msgpack.decode(payload)[0];
     }
 
-    serializeErrorMessage(errorMessage : string) : Buffer {
+    serializeErrorMessage(errorMessage? : string) : Buffer {
         return msgpack.encode([errorMessage])
     }
 
