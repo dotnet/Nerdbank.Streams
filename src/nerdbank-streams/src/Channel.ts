@@ -257,11 +257,12 @@ export class ChannelClass extends Channel {
 
     public async dispose(errorToSend? : Error) {
         if (!this.isDisposed) {
+
             super.dispose();
 
             if (errorToSend) {
                 await this._multiplexingStream.onChannelWritingError(this, errorToSend.message);
-            }
+            } 
 
             this._acceptance.reject(new CancellationToken.CancellationError("disposed"));
 
@@ -275,13 +276,14 @@ export class ChannelClass extends Channel {
             this._duplex.push(null);
             
             // Reject or Resolve the completion based on the remote error
-            if (this.remoteError) {
-                this._completion.reject(this.remoteError);
+            if (errorToSend?? this.remoteError) {
+                this._completion.reject(errorToSend?? this.remoteError);
             } else {
                 this._completion.resolve();
             }
             
             await this._multiplexingStream.onChannelDisposed(this);
+
         }
     }
 

@@ -43,7 +43,7 @@ import * as assert from "assert";
                 mx1.offerChannelAsync("test"),
                 mx2.acceptChannelAsync("test"),
             ]);
-            channels[0].stream.write("abc");
+
             await channels[0].dispose(errorToSend);
 
             // Ensure that the message is completed with an error

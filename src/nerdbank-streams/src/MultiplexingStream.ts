@@ -585,18 +585,18 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         }
     }
 
-    public onChannelWritingError(channel : ChannelClass, errorMessage? : string) {
+    public async onChannelWritingError(channel : ChannelClass, errorMessage? : string) {
         // Perform error check to ensure that we can send the frame
         if(this.formatter instanceof MultiplexingStreamV1Formatter) {
             return;
         }
-        if(channel.isDisposed || !this.getOpenChannel(channel.qualifiedId)) {
+        if(!this.getOpenChannel(channel.qualifiedId)) {
             return;
         }
         // Convert the error message into a payload and send that
         let errorFormatter = this.formatter as MultiplexingStreamV2Formatter;
         let errorPayload = errorFormatter.serializeErrorMessage(errorMessage);
-        this.rejectOnFailure(this.sendFrameAsync(new FrameHeader(ControlCode.ContentWritingError, channel.qualifiedId), errorPayload));
+        await this.sendFrameAsync(new FrameHeader(ControlCode.ContentWritingError, channel.qualifiedId), errorPayload);
     }
 
     public async onChannelDisposed(channel: ChannelClass) {
@@ -735,7 +735,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 
     private onContentWritingError(channelId : QualifiedChannelId, payload : Buffer) {
         // Ensure that we should process the enrror message
-        if (this.formatter as MultiplexingStreamV1Formatter) {
+        if (this.formatter instanceof MultiplexingStreamV1Formatter) {
             return;
         }
         const channel = this.getOpenChannel(channelId);
@@ -746,7 +746,8 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         let errorFormatter = this.formatter as MultiplexingStreamV2Formatter;
         let errorMessage = errorFormatter.deserializeErrorMessage(payload);
         let remoteError = new Error(errorMessage);
-        throw remoteError;
+        channel.onContent(null, remoteError);
+        
     }
 
     private onContentWritingCompleted(channelId: QualifiedChannelId) {
