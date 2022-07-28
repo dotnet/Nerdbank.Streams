@@ -92,6 +92,23 @@ public class FullDuplexStreamPairTests : TestBase
     }
 
     [Fact]
+    public async Task Read_ConcurrentWrite()
+    {
+        byte[] readBuffer = new byte[5];
+        IAsyncResult beginRead = this.stream1.BeginRead(readBuffer, 0, readBuffer.Length, null, null);
+        IAsyncResult beginWrite = this.stream1.BeginWrite(this.GetBuffer(1), 0, 1, null, null);
+
+        await this.stream2.WriteAsync(Data5Bytes, 0, Data5Bytes.Length);
+
+        this.stream1.EndWrite(beginWrite);
+        int bytesRead = this.stream1.EndRead(beginRead);
+        this.stream2.ReadByte();
+
+        Assert.Equal(Data5Bytes.Length, bytesRead);
+        Assert.Equal(Data5Bytes, readBuffer);
+    }
+
+    [Fact]
     public async Task Read_ReturnsNoBytesWhenRemoteStreamClosed()
     {
         // Verify that closing the transmitting stream after reading has been requested
