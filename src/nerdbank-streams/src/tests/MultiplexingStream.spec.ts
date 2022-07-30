@@ -36,7 +36,7 @@ import * as assert from "assert";
         });
 
         it("Encountered error writing content", async() => {
-            const errorMessage = "Sending error to the remote that there was an writing error";
+            const errorMessage = "Couldn't write all the data";
             const errorToSend = new Error(errorMessage);
 
             const channels = await Promise.all([

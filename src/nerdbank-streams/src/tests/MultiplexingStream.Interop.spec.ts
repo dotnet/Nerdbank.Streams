@@ -86,6 +86,18 @@ import { ChannelOptions } from "../ChannelOptions";
             expect(recv).toEqual(`recv: ${bigdata}`);
         });
 
+        if (protocolMajorVersion > 1) {
+            it("Can send error to remote", async () => {
+                const errorMessage = "Couldn't write all the data";
+                const errorToSend = new Error(errorMessage);
+
+                const channel = await mx.offerChannelAsync("clientOffer");
+                await channel.dispose(errorToSend);
+                const recv = await readLineAsync(channel.stream);
+                expect(recv).toEqual(`Received error: ${errorMessage}`);
+            })
+        }
+
         if (protocolMajorVersion >= 3) {
             it("Can communicate over seeded channel", async () => {
                 const channel = mx.acceptChannel(0);

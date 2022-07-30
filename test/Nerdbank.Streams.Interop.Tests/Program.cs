@@ -85,7 +85,7 @@ namespace Nerdbank.Streams.Interop.Tests
             }
             else
             {
-                response = "rece: " + channel.RemoteException?.Message;
+                response = "Received error: " + channel.RemoteException?.Message;
             }
 
             await w.WriteLineAsync(response);
