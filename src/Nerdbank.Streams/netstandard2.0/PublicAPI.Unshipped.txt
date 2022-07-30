@@ -1,4 +1,5 @@
 Nerdbank.Streams.BufferWriterExtensions
+Nerdbank.Streams.MultiplexingStream.Channel.RemoteException.get -> System.Exception?
 Nerdbank.Streams.ReadOnlySequenceExtensions
 Nerdbank.Streams.StreamPipeReader
 Nerdbank.Streams.StreamPipeReader.Read() -> System.IO.Pipelines.ReadResult

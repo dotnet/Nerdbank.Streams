@@ -75,8 +75,20 @@ namespace Nerdbank.Streams.Interop.Tests
         {
             MultiplexingStream.Channel? channel = await this.mx.AcceptChannelAsync("clientOffer");
             (StreamReader r, StreamWriter w) = CreateStreamIO(channel);
-            string? line = await r.ReadLineAsync();
-            await w.WriteLineAsync($"recv: {line}");
+
+            // Determine the response to send back based on whether an exception was sent
+            string? response;
+            if (channel.RemoteException == null)
+            {
+                string? line = await r.ReadLineAsync();
+                response = "recv: " + line;
+            }
+            else
+            {
+                response = "rece: " + channel.RemoteException?.Message;
+            }
+
+            await w.WriteLineAsync(response);
         }
 
         private async Task ServerOfferAsync()

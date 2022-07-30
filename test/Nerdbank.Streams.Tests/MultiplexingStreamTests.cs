@@ -106,6 +106,10 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         }
 
         Assert.Equal(this.ProtocolMajorVersion > 1, readCompletedWithError);
+
+        // Also ensure that the remote error field gets set properly on both the channels
+        Assert.Null(ch1.RemoteException);
+        Assert.Equal(this.ProtocolMajorVersion > 1, ch2.RemoteException != null);
     }
 
     public async Task InitializeAsync()
