@@ -75,11 +75,10 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
         Assert.Equal(this.ProtocolMajorVersion > 1, errorThrown);
 
-        // Ensure that both the reader and write are completed with an error if we are using protocol version > 1
+        // Ensure that the writer of the error completes with that error, no matter what version of the protocol they are using
         string expectedWriterErrorMessage = errorMessage;
-        string expectedReaderErrorMessage = "Remote party indicated writing error: " + errorMessage;
-
         bool writeCompletedWithError = false;
+
         try
         {
             await ch1.Completion;
@@ -90,9 +89,12 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
             writeCompletedWithError = writeException.Message.Contains(expectedWriterErrorMessage);
         }
 
-        Assert.Equal(this.ProtocolMajorVersion > 1, writeCompletedWithError);
+        Assert.True(writeCompletedWithError);
 
+        // Ensure that the reader only completes with an error if we are using a protocol version > 1
+        string expectedReaderErrorMessage = "Remote party indicated writing error: " + errorMessage;
         bool readCompletedWithError = false;
+
         try
         {
             await ch2.Completion;

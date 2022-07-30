@@ -110,7 +110,8 @@ namespace Nerdbank.Streams
             private Exception? faultingException;
 
             /// <summary>
-            /// The <see cref="PipeReader"/> to use to get data to be transmitted over the <see cref="Streams.MultiplexingStream"/>.
+            /// The <see cref="PipeReader"/> to use to get data to be transmitted over the <see cref="Streams.MultiplexingStream"/>. Any errors passed to this
+            /// <see cref="PipeReader"/> are transmitted to the remote side.
             /// </summary>
             private PipeReader? mxStreamIOReader;
 
