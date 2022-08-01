@@ -1430,9 +1430,9 @@ js-yaml@^3.13.1:
     esprima "^4.0.0"
 
 jshint@^2.13.0:
-  version "2.13.4"
-  resolved "https://registry.yarnpkg.com/jshint/-/jshint-2.13.4.tgz#cee025a57c3f393d5455532d9ec7ccb018f890db"
-  integrity sha512-HO3bosL84b2qWqI0q+kpT/OpRJwo0R4ivgmxaO848+bo10rc50SkPnrtwSFXttW0ym4np8jbJvLwk5NziB7jIw==
+  version "2.13.5"
+  resolved "https://registry.yarnpkg.com/jshint/-/jshint-2.13.5.tgz#34654b44387ef112b39c205e2e70b99385376579"
+  integrity sha512-dB2n1w3OaQ35PLcBGIWXlszjbPZwsgZoxsg6G8PtNf2cFMC1l0fObkYLUuXqTTdi6tKw4sAjfUseTdmDMHQRcg==
   dependencies:
     cli "~1.0.0"
     console-browserify "1.1.x"
