@@ -272,12 +272,6 @@ namespace Nerdbank.Streams
             public Task Completion => this.completionSource.Task;
 
             /// <summary>
-            /// Gets the <see cref="Exception"/> duue to which the remote <see cref="Channel"/> shut down communication due to.
-            /// Returns null if the remote channel didn't send any errors.
-            /// </summary>
-            public Exception? RemoteException => this.GetWriterException();
-
-            /// <summary>
             /// Gets the underlying <see cref="Streams.MultiplexingStream"/> instance.
             /// </summary>
             public MultiplexingStream MultiplexingStream { get; }

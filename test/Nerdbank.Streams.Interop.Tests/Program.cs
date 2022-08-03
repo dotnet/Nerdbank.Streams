@@ -61,6 +61,7 @@ namespace Nerdbank.Streams.Interop.Tests
         private async Task RunAsync(int protocolMajorVersion)
         {
             this.ClientOfferAsync().Forget();
+            this.ClientOfferErrorAsync().Forget();
             this.ServerOfferAsync().Forget();
 
             if (protocolMajorVersion >= 3)
@@ -75,20 +76,30 @@ namespace Nerdbank.Streams.Interop.Tests
         {
             MultiplexingStream.Channel? channel = await this.mx.AcceptChannelAsync("clientOffer");
             (StreamReader r, StreamWriter w) = CreateStreamIO(channel);
+            string? line = await r.ReadLineAsync();
+            await w.WriteLineAsync($"recv: {line}");
+        }
 
-            // Determine the response to send back based on whether an exception was sent
-            string? response;
-            if (channel.RemoteException == null)
+        private async Task ClientOfferErrorAsync()
+        {
+            // Await both of the channels from the sender, one to read the error and the other to return the response
+            MultiplexingStream.Channel? incomingChannel = await this.mx.AcceptChannelAsync("clientOffer");
+            MultiplexingStream.Channel? outgoingChannel = await this.mx.AcceptChannelAsync("clientResponseOffer");
+
+            // Determine the response to send back on the whether the incoming channel completed with an exception
+            string? responseMessage = "didn't receive any errors";
+            try
             {
-                string? line = await r.ReadLineAsync();
-                response = "recv: " + line;
+                await incomingChannel.Completion;
             }
-            else
+            catch (Exception error)
             {
-                response = "Received error: " + channel.RemoteException?.Message;
+                responseMessage = "received error: " + error.Message;
             }
 
-            await w.WriteLineAsync(response);
+            // Create a writer using the outgoing channel and send the response to the sender
+            (StreamReader _, StreamWriter writer) = CreateStreamIO(outgoingChannel);
+            await writer.WriteLineAsync(responseMessage);
         }
 
         private async Task ServerOfferAsync()
