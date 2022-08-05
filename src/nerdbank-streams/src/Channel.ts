@@ -74,16 +74,16 @@ export class ChannelClass extends Channel {
     private remoteWindowSize?: number;
     private remoteError?: Error;
 
-    /**
-     * The number of bytes transmitted from here but not yet acknowledged as processed from there,
-     * and thus occupying some portion of the full AcceptanceParameters.RemoteWindowSize.
-     */
+/**
+ * The number of bytes transmitted from here but not yet acknowledged as processed from there,
+ * and thus occupying some portion of the full AcceptanceParameters.RemoteWindowSize.
+ */
     private remoteWindowFilled: number = 0;
 
     /** A signal which indicates when the <see cref="RemoteWindowRemaining"/> is non-zero. */
     private remoteWindowHasCapacity: Deferred<void>;
-
-    constructor(
+ 
+     constructor(
         multiplexingStream: MultiplexingStreamClass,
         id: QualifiedChannelId,
         offerParameters: OfferParameters) {
@@ -163,29 +163,29 @@ export class ChannelClass extends Channel {
                 // Nothing to do here since data is pushed to us.
             },
         });
-    }
-
-    public get stream(): NodeJS.ReadWriteStream {
+     }
+ 
+     public get stream(): NodeJS.ReadWriteStream {
         return this._duplex;
-    }
-
-    public get acceptance(): Promise<void> {
+     }
+ 
+     public get acceptance(): Promise<void> {
         return this._acceptance.promise;
-    }
-
-    public get isAccepted() {
+     }
+ 
+     public get isAccepted() {
         return this._acceptance.isResolved;
-    }
-
-    public get isRejectedOrCanceled() {
+     }
+ 
+     public get isRejectedOrCanceled() {
         return this._acceptance.isRejected;
-    }
-
-    public get completion(): Promise<void> {
+     }
+ 
+     public get completion(): Promise<void> {
         return this._completion.promise;
-    }
-
-    public tryAcceptOffer(options?: ChannelOptions): boolean {
+     }
+ 
+     public tryAcceptOffer(options?: ChannelOptions): boolean {
         if (this._acceptance.resolve()) {
             this.localWindowSize = options?.channelReceivingWindowSize !== undefined
                 ? Math.max(this._multiplexingStream.defaultChannelReceivingWindowSize, options?.channelReceivingWindowSize)
@@ -194,9 +194,9 @@ export class ChannelClass extends Channel {
         }
 
         return false;
-    }
-
-    public tryCancelOffer(reason: any) {
+     }
+ 
+     public tryCancelOffer(reason: any) {
         const cancellationReason = new CancellationToken.CancellationError(reason);
         this._acceptance.reject(cancellationReason);
         this._completion.reject(cancellationReason);
@@ -205,26 +205,20 @@ export class ChannelClass extends Channel {
         // or even expect it to be recognized by anyone else.
         // The acceptance promise rejection is observed by the offer channel method.
         caught(this._completion.promise);
-    }
-
-    public onAccepted(acceptanceParameter: AcceptanceParameters): boolean {
+     }
+ 
+     public onAccepted(acceptanceParameter: AcceptanceParameters): boolean {
         if (this._multiplexingStream.backpressureSupportEnabled) {
             this.remoteWindowSize = acceptanceParameter.remoteWindowSize;
             this.remoteWindowHasCapacity.resolve();
         }
 
         return this._acceptance.resolve();
-    }
+     }
+ 
+     public onContent(buffer: Buffer | null, error? : Error) {
 
-    public onContent(buffer: Buffer | null, error?: Error) {
-        // Already received remote error so don't process any future messages
-        if (this.remoteError) {
-            return;
-        }
-
-        if (error) {
-            this.remoteError = error;
-        } 
+        this.remoteError = error
 
         this._duplex.push(buffer);
 
@@ -234,9 +228,9 @@ export class ChannelClass extends Channel {
         if (this._multiplexingStream.backpressureSupportEnabled && buffer) {
             this._multiplexingStream.localContentExamined(this, buffer.length);
         }
-    }
-
-    public onContentProcessed(bytesProcessed: number) {
+     }
+ 
+     public onContentProcessed(bytesProcessed: number) {
         if (bytesProcessed < 0) {
             throw new Error("A non-negative number is required.");
         }
@@ -253,41 +247,48 @@ export class ChannelClass extends Channel {
         if (this.remoteWindowFilled < this.remoteWindowSize) {
             this.remoteWindowHasCapacity.resolve();
         }
-    }
+     }
 
     public async dispose(errorToSend? : Error) {
         if (!this.isDisposed) {
-
-            super.dispose();
-
-            if (errorToSend) {
-                await this._multiplexingStream.onChannelWritingError(this, errorToSend.message);
-            } 
-
-            this._acceptance.reject(new CancellationToken.CancellationError("disposed"));
-
-            // For the pipes, we Complete *our* ends, and leave the user's ends alone.
-            // The completion will propagate when it's ready to.
-            if (this.remoteError) {
-                this._duplex.destroy(this.remoteError);
-            } else {
-                try {
-                    this._duplex.end();
-                } catch(error) {
-                    console.log(`Caught error in call to duplex end of ${error}`)
+            try {
+                super.dispose();
+                
+                if (errorToSend) {
+                    await this._multiplexingStream.onChannelWritingError(this, errorToSend.message);
                 }
-            }
-            this._duplex.push(null);
-            
-            // Reject or Resolve the completion based on the remote error
-            if (errorToSend?? this.remoteError) {
-                this._completion.reject(errorToSend?? this.remoteError);
-            } else {
-                this._completion.resolve();
-            }
-            
-            await this._multiplexingStream.onChannelDisposed(this);
 
+                this._acceptance.reject(new CancellationToken.CancellationError("disposed"));
+
+                if (this.remoteError) {
+                    console.log(`Calling destroy on duplex in ${this.id}`);
+                    this._duplex.destroy(this.remoteError);
+                } 
+
+                /*
+                // For the pipes, we Complete *our* ends, and leave the user's ends alone.
+                // The completion will propagate when it's ready to.
+                else {
+                    try {
+                        this._duplex.end();
+                    } catch(error) {
+                        console.log(`Caught error in call to duplex end of ${error}`)
+                    }
+                }
+                this._duplex.push(null);
+                
+                // Reject or Resolve the completion based on the remote error
+                if (errorToSend?? this.remoteError) {
+                    this._completion.reject(errorToSend?? this.remoteError);
+                } else {
+                    this._completion.resolve();
+                }
+                
+                await this._multiplexingStream.onChannelDisposed(this);
+                */
+            } catch(error) {
+                console.log(`Caught error in dispose: ${error}`);
+            }
         }
     }
 
