@@ -43,36 +43,6 @@ import * as assert from "assert";
             }
         });
 
-        it("Encountered error writing content", async() => {
-            const errorMessage = "Couldn't write all the data";
-            const errorToSend = new Error(errorMessage);
-
-            try {
-                console.log(`Going to create channels`);
-                const channels = await Promise.all([
-                    mx1.offerChannelAsync("test"),
-                    mx2.acceptChannelAsync("test"),
-                ]);
-
-                console.log(`Going to dispose first channel`);
-                await channels[0].dispose(errorToSend);
-
-                // Ensure that the message is completed with an error
-                console.log(`Going to check second channel`);
-                let caughtError = false;
-                try {
-                    await channels[1].completion;
-                } catch(error) {
-                    caughtError = true;
-                }
-
-                assert.deepStrictEqual(protocolMajorVersion > 1, caughtError);
-            } catch(error) {
-                console.log(`Caught error in the main method: ${error}`)
-            }
-
-        });
-
         it("CreateAsync rejects null stream", async () => {
             expectThrow(MultiplexingStream.CreateAsync(null!));
             expectThrow(MultiplexingStream.CreateAsync(undefined!));

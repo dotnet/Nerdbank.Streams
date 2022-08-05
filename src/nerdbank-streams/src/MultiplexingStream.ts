@@ -376,11 +376,9 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      * Disposes the stream.
      */
     public dispose() {
-        console.log(`Going to dispose multiplexing stream`);
         this.disposalTokenSource.cancel();
         this._completionSource.resolve();
         this.formatter.end();
-        console.log(`Going to iterae through the channels`);
         [this.locallyOfferedOpenChannels, this.remotelyOfferedOpenChannels].forEach(cb => {
             for (const channelId in cb) {
                 if (cb.hasOwnProperty(channelId)) {
@@ -388,12 +386,8 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 
                     // Acceptance gets rejected when a channel is disposed.
                     // Avoid a node.js crash or test failure for unobserved channels (e.g. offers for channels from the other party that no one cared to receive on this side).
-                    try {
-                        caught(channel.acceptance);
-                        channel.dispose();
-                    } catch(error) {
-                        console.log(`Caught error when disposing channel ${channelId} `);
-                    }
+                    caught(channel.acceptance);
+                    channel.dispose();
                 }
             }
         });
@@ -548,24 +542,17 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         header: FrameHeader,
         payload?: Buffer,
         cancellationToken: CancellationToken = CancellationToken.CONTINUE): Promise<void> {
-        try {
-            if (!header) {
-                throw new Error("Header is required.");
-            }
-    
-            await this.sendingSemaphore.use(async () => {
-                cancellationToken.throwIfCancelled();
-                throwIfDisposed(this);
-                try {
-                    await this.formatter.writeFrameAsync(header, payload);
-                } catch(error) {
-                    console.log(`Caught error in writing using formatter: ${error}`)
-                }
-                
-            });
-        } catch(error) {
-            console.log(`Caught error in send frame async: ${error}`)
+
+        if (!header) {
+            throw new Error("Header is required.");
         }
+
+        await this.sendingSemaphore.use(async () => {
+            cancellationToken.throwIfCancelled();
+            throwIfDisposed(this);
+
+            await this.formatter.writeFrameAsync(header, payload);
+        });
     }
 
     /**
@@ -596,20 +583,6 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         if (!channel.isDisposed && this.getOpenChannel(channel.qualifiedId)) {
             this.sendFrame(ControlCode.ContentWritingCompleted, channel.qualifiedId);
         }
-    }
-
-    public async onChannelWritingError(channel : ChannelClass, errorMessage? : string) {
-        // Perform error check to ensure that we can send the frame
-        if(this.formatter instanceof MultiplexingStreamV1Formatter) {
-            return;
-        }
-        if(!this.getOpenChannel(channel.qualifiedId)) {
-            return;
-        }
-        // Convert the error message into a payload and send that
-        let errorFormatter = this.formatter as MultiplexingStreamV2Formatter;
-        let errorPayload = errorFormatter.serializeErrorMessage(errorMessage);
-        await this.sendFrameAsync(new FrameHeader(ControlCode.ContentWritingError, channel.qualifiedId), errorPayload);
     }
 
     public async onChannelDisposed(channel: ChannelClass) {
@@ -658,9 +631,6 @@ export class MultiplexingStreamClass extends MultiplexingStream {
                     break;
                 case ControlCode.ChannelTerminated:
                     this.onChannelTerminated(frame.header.requiredChannel);
-                    break;
-                case ControlCode.ContentWritingError:
-                    this.onContentWritingError(frame.header.requiredChannel, frame.payload);
                     break;
                 default:
                     break;
@@ -744,23 +714,6 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 
         const bytesProcessed = this.formatter.deserializeContentProcessed(payload);
         channel.onContentProcessed(bytesProcessed);
-    }
-
-    private onContentWritingError(channelId : QualifiedChannelId, payload : Buffer) {
-        // Ensure that we should process the enrror message
-        if (this.formatter instanceof MultiplexingStreamV1Formatter) {
-            return;
-        }
-        const channel = this.getOpenChannel(channelId);
-        if (!channel) {
-            throw new Error(`No channel with id ${channelId} found.`);
-        }
-        // Convert the payload into an error
-        let errorFormatter = this.formatter as MultiplexingStreamV2Formatter;
-        let errorMessage = errorFormatter.deserializeErrorMessage(payload);
-        let remoteError = new Error(errorMessage);
-        channel.onContent(null, remoteError);
-        
     }
 
     private onContentWritingCompleted(channelId: QualifiedChannelId) {

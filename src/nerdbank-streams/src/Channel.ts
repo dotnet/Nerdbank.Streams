@@ -56,7 +56,7 @@ export abstract class Channel implements IDisposableObservable {
     /**
      * Closes this channel.
      */
-    public dispose(error? : Error) {
+    public dispose() {
         // The interesting stuff is in the derived class.
         this._isDisposed = true;
     }
@@ -214,7 +214,7 @@ export class ChannelClass extends Channel {
         return this._acceptance.resolve();
     }
 
-    public onContent(buffer: Buffer | null, error? : Error) {
+    public onContent(buffer: Buffer | null) {
         this._duplex.push(buffer);
 
         // We should find a way to detect when we *actually* share the received buffer with the Channel's user
@@ -244,7 +244,7 @@ export class ChannelClass extends Channel {
         }
     }
 
-    public async dispose(error? : Error) {
+    public async dispose() {
         if (!this.isDisposed) {
             super.dispose();
 
