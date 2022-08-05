@@ -25,21 +25,13 @@ import * as assert from "assert";
 
         afterEach(async () => {
             if (mx1) {
-                try {
-                    mx1.dispose();
-                    await mx1.completion;
-                } catch(error) {
-                    console.log(`Multplexing Stream 1 after each error: ${error}`)
-                }
+                mx1.dispose();
+                await mx1.completion;
             }
 
             if (mx2) {
-                try {
-                    mx2.dispose();
-                    await mx2.completion;
-                } catch(error) {
-                    console.log(`Multplexing Stream 1 after each error: ${error}`)
-                }
+                mx2.dispose();
+                await mx2.completion;
             }
         });
 
@@ -229,14 +221,11 @@ import * as assert from "assert";
         });
 
         it("channel terminated", async () => {
-            console.log(`Starting channel terminated test`);
             const channels = await Promise.all([
                 mx1.offerChannelAsync("test"),
                 mx2.acceptChannelAsync("test"),
             ]);
-            console.log(`Calling dispose on created channel in channel terminated test`);
             channels[0].dispose();
-            console.log(`Finished dispose on created channel in channel terminated test`);
             expect(await getBufferFrom(channels[1].stream, 1, true)).toBeNull();
             await channels[1].completion;
         });
@@ -247,6 +236,7 @@ import * as assert from "assert";
                 mx2.acceptChannelAsync("test"),
             ]);
             mx1.dispose();
+
             // Verify that both mxstream's complete when one does.
             await mx1.completion;
             await mx2.completion;
