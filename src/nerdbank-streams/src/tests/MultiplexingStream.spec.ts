@@ -25,13 +25,21 @@ import * as assert from "assert";
 
         afterEach(async () => {
             if (mx1) {
-                mx1.dispose();
-                await mx1.completion;
+                try {
+                    mx1.dispose();
+                    await mx1.completion;
+                } catch(error) {
+                    console.log(`Multplexing Stream 1 after each error: ${error}`)
+                }
             }
 
             if (mx2) {
-                mx2.dispose();
-                await mx2.completion;
+                try {
+                    mx2.dispose();
+                    await mx2.completion;
+                } catch(error) {
+                    console.log(`Multplexing Stream 1 after each error: ${error}`)
+                }
             }
         });
 
@@ -39,22 +47,29 @@ import * as assert from "assert";
             const errorMessage = "Couldn't write all the data";
             const errorToSend = new Error(errorMessage);
 
-            const channels = await Promise.all([
-                mx1.offerChannelAsync("test"),
-                mx2.acceptChannelAsync("test"),
-            ]);
-
-            await channels[0].dispose(errorToSend);
-
-            // Ensure that the message is completed with an error
-            let caughtError = false;
             try {
-                await channels[1].completion;
-            } catch(error) {
-                caughtError = true;
-            }
+                console.log(`Going to create channels`);
+                const channels = await Promise.all([
+                    mx1.offerChannelAsync("test"),
+                    mx2.acceptChannelAsync("test"),
+                ]);
 
-            assert.deepStrictEqual(protocolMajorVersion > 1, caughtError);
+                console.log(`Going to dispose first channel`);
+                await channels[0].dispose(errorToSend);
+
+                // Ensure that the message is completed with an error
+                console.log(`Going to check second channel`);
+                let caughtError = false;
+                try {
+                    await channels[1].completion;
+                } catch(error) {
+                    caughtError = true;
+                }
+
+                assert.deepStrictEqual(protocolMajorVersion > 1, caughtError);
+            } catch(error) {
+                console.log(`Caught error in the main method: ${error}`)
+            }
 
         });
 

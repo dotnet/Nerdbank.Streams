@@ -376,9 +376,11 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      * Disposes the stream.
      */
     public dispose() {
+        console.log(`Going to dispose multiplexing stream`);
         this.disposalTokenSource.cancel();
         this._completionSource.resolve();
         this.formatter.end();
+        console.log(`Going to iterae through the channels`);
         [this.locallyOfferedOpenChannels, this.remotelyOfferedOpenChannels].forEach(cb => {
             for (const channelId in cb) {
                 if (cb.hasOwnProperty(channelId)) {
@@ -386,8 +388,12 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 
                     // Acceptance gets rejected when a channel is disposed.
                     // Avoid a node.js crash or test failure for unobserved channels (e.g. offers for channels from the other party that no one cared to receive on this side).
-                    caught(channel.acceptance);
-                    channel.dispose();
+                    try {
+                        caught(channel.acceptance);
+                        channel.dispose();
+                    } catch(error) {
+                        console.log(`Caught error when disposing channel ${channelId} `);
+                    }
                 }
             }
         });
@@ -542,17 +548,24 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         header: FrameHeader,
         payload?: Buffer,
         cancellationToken: CancellationToken = CancellationToken.CONTINUE): Promise<void> {
-
-        if (!header) {
-            throw new Error("Header is required.");
+        try {
+            if (!header) {
+                throw new Error("Header is required.");
+            }
+    
+            await this.sendingSemaphore.use(async () => {
+                cancellationToken.throwIfCancelled();
+                throwIfDisposed(this);
+                try {
+                    await this.formatter.writeFrameAsync(header, payload);
+                } catch(error) {
+                    console.log(`Caught error in writing using formatter: ${error}`)
+                }
+                
+            });
+        } catch(error) {
+            console.log(`Caught error in send frame async: ${error}`)
         }
-
-        await this.sendingSemaphore.use(async () => {
-            cancellationToken.throwIfCancelled();
-            throwIfDisposed(this);
-
-            await this.formatter.writeFrameAsync(header, payload);
-        });
     }
 
     /**

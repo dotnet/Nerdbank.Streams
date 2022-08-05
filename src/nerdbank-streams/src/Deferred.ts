@@ -66,8 +66,14 @@ export class Deferred<T> {
         if (this.isCompleted) {
             return false;
         }
-
-        this.rejectPromise(reason);
+        
+        console.log(`Entering try/catch block inside reject`);
+        try {
+            this.rejectPromise(reason);
+        } catch(error) {
+            console.log(`Reject Promise threw err inside of deffered: ${error}`);
+        }
+        
         this._error = reason;
         this._isRejected = true;
         return true;

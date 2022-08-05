@@ -271,7 +271,11 @@ export class ChannelClass extends Channel {
             if (this.remoteError) {
                 this._duplex.destroy(this.remoteError);
             } else {
-                this._duplex.end();
+                try {
+                    this._duplex.end();
+                } catch(error) {
+                    console.log(`Caught error in call to duplex end of ${error}`)
+                }
             }
             this._duplex.push(null);
             
