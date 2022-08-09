@@ -230,6 +230,28 @@ import * as assert from "assert";
             await channels[1].completion;
         });
 
+        it("channel disposes with an error", async() => {
+            const errorMessage = "couldn't send all of the data";
+            const errorToSend = new Error(errorMessage);
+
+            const channels = await Promise.all([
+                mx1.offerChannelAsync("test"),
+                mx2.acceptChannelAsync("test"),
+            ]);
+
+            await channels[0].dispose(errorToSend);
+
+            let caughtError = false;
+            try {
+                await channels[1].completion;
+            } catch(error) {
+                caughtError = true;
+            }
+
+            assert.deepStrictEqual(protocolMajorVersion > 1, caughtError);
+            
+        })
+
         it("channels complete when mxstream is disposed", async () => {
             const channels = await Promise.all([
                 mx1.offerChannelAsync("test"),
