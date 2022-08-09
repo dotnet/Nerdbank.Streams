@@ -17,6 +17,7 @@ import "./MultiplexingStreamOptions";
 import { MultiplexingStreamOptions } from "./MultiplexingStreamOptions";
 import { removeFromQueue, throwIfDisposed } from "./Utilities";
 import {
+    getFormatterVersion,
     MultiplexingStreamFormatter,
     MultiplexingStreamV1Formatter,
     MultiplexingStreamV2Formatter,
@@ -629,6 +630,9 @@ export class MultiplexingStreamClass extends MultiplexingStream {
                 case ControlCode.ContentWritingCompleted:
                     this.onContentWritingCompleted(frame.header.requiredChannel);
                     break;
+                case ControlCode.ContentWritingError:
+                    this.onContentWritingError(frame.header.requiredChannel, frame.payload);
+                    break;
                 case ControlCode.ChannelTerminated:
                     this.onChannelTerminated(frame.header.requiredChannel);
                     break;
@@ -714,6 +718,31 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 
         const bytesProcessed = this.formatter.deserializeContentProcessed(payload);
         channel.onContentProcessed(bytesProcessed);
+    }
+
+    private onContentWritingError(channelId: QualifiedChannelId, payload: Buffer) {
+        // Make sure that the channel has the proper formatter to process the output
+        const formatterVersion = getFormatterVersion(this.formatter);
+        if (formatterVersion == 1) {
+            return
+        }
+        
+        // Ensure that we received the message on an open channel
+        const channel = this.getOpenChannel(channelId);
+        if (!channel) {
+            throw new Error(`No channel with id ${channelId} found.`);
+        }
+
+        // Ensure that we are able to get a error message from a casted formatter
+        const castedFormatter = (this.formatter as MultiplexingStreamV2Formatter);
+        const errorMessage = castedFormatter.deserializeContentWritingError(payload, formatterVersion);
+        if (!errorMessage) {
+            throw new Error("Couldn't process content writing error payload received from remote");
+        }
+
+        // Create the error received from the remote and pass it to the channel
+        const remoteErr = new Error(`Received error message from remote: ${errorMessage}`);
+        channel.onContent(null, remoteErr)
     }
 
     private onContentWritingCompleted(channelId: QualifiedChannelId) {

@@ -71,6 +71,7 @@ export class ChannelClass extends Channel {
     private readonly _completion = new Deferred<void>();
     public localWindowSize?: number;
     private remoteWindowSize?: number;
+    private remoteError?: Error;
 
     /**
      * The number of bytes transmitted from here but not yet acknowledged as processed from there,
@@ -214,7 +215,12 @@ export class ChannelClass extends Channel {
         return this._acceptance.resolve();
     }
 
-    public onContent(buffer: Buffer | null) {
+    public onContent(buffer: Buffer | null, error? : Error) {
+        // If we have already received an error from remote then don't process any future messages
+        if (this.remoteError) {
+            return 
+        }
+        
         this._duplex.push(buffer);
 
         // We should find a way to detect when we *actually* share the received buffer with the Channel's user
