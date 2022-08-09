@@ -78,6 +78,15 @@ export abstract class MultiplexingStreamFormatter {
     }
 }
 
+export function getFormatterVersion(formatter : MultiplexingStreamFormatter) : number {
+    if (formatter instanceof MultiplexingStreamV3Formatter) {
+        return 3
+    } else if (formatter instanceof MultiplexingStreamV2Formatter) {
+        return 2
+    } 
+    return 1
+}
+
 // tslint:disable-next-line: max-classes-per-file
 export class MultiplexingStreamV1Formatter extends MultiplexingStreamFormatter {
     /**
@@ -291,6 +300,21 @@ export class MultiplexingStreamV2Formatter extends MultiplexingStreamFormatter {
 
     deserializeContentProcessed(payload: Buffer): number {
         return msgpack.decode(payload)[0];
+    }
+
+    serializeContentWritingEror(version: number, writingError: string) : Buffer {
+        const payload: any[] = [version, writingError];
+        return msgpack.encode([payload]);
+    }
+
+    deserializeContentWritingError(payload: Buffer, expectedVersion: number) : string | null {
+        const msgpackObject = msgpack.decode(payload);
+        const sentVersion : number = msgpackObject[0] as number;
+        if (sentVersion != expectedVersion) {
+            // For now, a channel should communicate with channels of the same version
+            return null
+        }
+        return (msgpackObject[1] as string);
     }
 
     protected async readMessagePackAsync(cancellationToken: CancellationToken): Promise<{} | [] | null> {

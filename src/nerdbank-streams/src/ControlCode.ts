@@ -32,4 +32,10 @@ export enum ControlCode {
      * Sent when a channel has finished processing data received from the remote party, allowing them to send more data.
      */
     ContentProcessed,
+
+    /**
+     * Sent when the sender is unable to send the complete message to the remote side on the given channel. This frame
+     * only gets sent where the sender and receiver are both running protocol version >= 1
+     */
+    ContentWritingError,
 }
