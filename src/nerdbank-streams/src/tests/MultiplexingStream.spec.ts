@@ -240,15 +240,34 @@ import * as assert from "assert";
             ]);
 
             await channels[0].dispose(errorToSend);
+            
+            // Ensure that the current channel disposes with the error
+            let caughtSenderError = false;
+            try {
+                await channels[0].completion;
+            } catch(error) {
+                let completionErrMsg = String(error);
+                if (error instanceof Error) {
+                    completionErrMsg = (error as Error).message;
+                }
+                caughtSenderError = completionErrMsg.includes(errorMessage);
+            }
 
-            let caughtError = false;
+            assert.deepStrictEqual(true, caughtSenderError);
+
+            // Ensure that the remote side received the error only for version >= 1
+            let caughtRemoteError = false;
             try {
                 await channels[1].completion;
             } catch(error) {
-                caughtError = true;
+                let completionErrMsg = String(error);
+                if (error instanceof Error) {
+                    completionErrMsg = (error as Error).message;
+                }
+                caughtRemoteError = completionErrMsg.includes(errorMessage);
             }
 
-            assert.deepStrictEqual(protocolMajorVersion > 1, caughtError);
+            assert.deepStrictEqual(protocolMajorVersion > 1, caughtRemoteError);
             
         })
 

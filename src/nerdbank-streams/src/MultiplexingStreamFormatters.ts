@@ -302,13 +302,13 @@ export class MultiplexingStreamV2Formatter extends MultiplexingStreamFormatter {
         return msgpack.decode(payload)[0];
     }
 
-    serializeContentWritingEror(version: number, writingError: string) : Buffer {
+    serializeContentWritingError(version: number, writingError: string) : Buffer {
         const payload: any[] = [version, writingError];
-        return msgpack.encode([payload]);
+        return msgpack.encode(payload);
     }
 
     deserializeContentWritingError(payload: Buffer, expectedVersion: number) : string {
-        const msgpackObject = msgpack.decode(payload)[0];
+        const msgpackObject = msgpack.decode(payload);
         const sentVersion : number = msgpackObject[0];
         if (sentVersion != expectedVersion) {
             // For now, a channel should communicate with channels of the same version

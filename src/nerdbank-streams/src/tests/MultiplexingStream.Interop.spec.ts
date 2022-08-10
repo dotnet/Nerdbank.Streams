@@ -4,6 +4,7 @@ import { Deferred } from "../Deferred";
 import { FullDuplexStream } from "../FullDuplexStream";
 import { MultiplexingStream } from "../MultiplexingStream";
 import { ChannelOptions } from "../ChannelOptions";
+import * as assert from "assert";
 
 [1, 2, 3].forEach(protocolMajorVersion => {
     describe(`MultiplexingStream v${protocolMajorVersion} (interop) `, () => {
@@ -85,6 +86,23 @@ import { ChannelOptions } from "../ChannelOptions";
             const recv = await readLineAsync(channel.stream);
             expect(recv).toEqual(`recv: ${bigdata}`);
         });
+
+        it("Can send error to remote", async() => {
+            const errorWriteChannel = await mx.acceptChannelAsync("clientOffer");
+            const responseReceiveChannel = await mx.acceptChannelAsync("clientResponseOffer");
+
+            const errorMessage = "couldn't send all of the data";
+            const errorToSend = new Error(errorMessage);
+            errorWriteChannel.dispose(errorToSend);
+
+            let expectedMessage = `received error: ${errorMessage}`;
+            if (protocolMajorVersion == 1) {
+                expectedMessage = "didn't receive any errors";
+            }
+
+            const receivedMessage = await readLineAsync(responseReceiveChannel.stream);
+            assert.deepStrictEqual(expectedMessage, receivedMessage);
+        })
 
         if (protocolMajorVersion >= 3) {
             it("Can communicate over seeded channel", async () => {

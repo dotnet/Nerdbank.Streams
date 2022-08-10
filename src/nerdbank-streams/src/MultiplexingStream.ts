@@ -593,7 +593,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 
         // Convert the error message into a payload into a formatter
         const castedFormatter = (this.formatter as MultiplexingStreamV2Formatter);
-        const errorPayload = castedFormatter.serializeContentWritingEror(formatterVersion, errorMessage);
+        const errorPayload = castedFormatter.serializeContentWritingError(formatterVersion, errorMessage);
 
         // Sent the payload as a frame to the sender of the error message
         await this.sendFrameAsync(new FrameHeader(ControlCode.ContentWritingError, channel.qualifiedId), errorPayload);

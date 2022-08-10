@@ -268,9 +268,14 @@ export class ChannelClass extends Channel {
             // The completion will propagate when it's ready to.
             this._duplex.end();
             this._duplex.push(null);
+            
+            let errorToUse = errorToSend;
+            if (!errorToUse) {
+                errorToUse = this.remoteError;
+            }
 
-            if (this.remoteError) {
-                this._completion.reject(this.remoteError);
+            if (errorToUse) {
+                this._completion.reject(errorToUse);
             } else {
                 this._completion.resolve();
             }
