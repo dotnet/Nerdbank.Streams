@@ -627,13 +627,16 @@ export class MultiplexingStreamClass extends MultiplexingStream {
     }
 
     private async readFromStream(cancellationToken: CancellationToken) {
+        console.log(`Call to read from stream`);
         while (!this.isDisposed) {
             const frame = await this.formatter.readFrameAsync(cancellationToken);
             if (frame === null) {
+                console.log(`Received null frame on incoming stream`);
                 break;
             }
-
             frame.header.flipChannelPerspective();
+            let sender = frame.header.channel?.id;
+            console.log(`Received frame with id ${frame.header.code} from ${sender}`);
             switch (frame.header.code) {
                 case ControlCode.Offer:
                     this.onOffer(frame.header.requiredChannel, frame.payload);
