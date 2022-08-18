@@ -511,7 +511,7 @@ namespace Nerdbank.Streams
                 return errorSequence.AsReadOnlySequence;
             }
 
-            internal WriteError? DeserializeWriteError(ReadOnlySequence<byte> serializedError)
+            internal WriteError? DeserializeWriteError(ReadOnlySequence<byte> serializedError, int expectedVersion)
             {
                 var reader = new MessagePackReader(serializedError);
                 if (reader.ReadArrayHeader() != 2)
@@ -521,7 +521,7 @@ namespace Nerdbank.Streams
                 }
 
                 int senderVersion = reader.ReadInt32();
-                if (senderVersion != ProtocolVersion.Major)
+                if (senderVersion != expectedVersion)
                 {
                     // For now a channel should only process write errors from channels with the same major version
                     return null;

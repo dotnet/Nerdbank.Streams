@@ -25,7 +25,7 @@ namespace Nerdbank.Streams.Interop.Tests
 
         private static async Task Main(string[] args)
         {
-            ////System.Diagnostics.Debugger.Launch();
+            // System.Diagnostics.Debugger.Launch();
             int protocolMajorVersion = int.Parse(args[0]);
             var options = new MultiplexingStream.Options
             {
@@ -61,6 +61,7 @@ namespace Nerdbank.Streams.Interop.Tests
         private async Task RunAsync(int protocolMajorVersion)
         {
             this.ClientOfferAsync().Forget();
+
             this.ClientOfferErrorAsync().Forget();
             this.ServerOfferAsync().Forget();
 
@@ -83,13 +84,15 @@ namespace Nerdbank.Streams.Interop.Tests
         private async Task ClientOfferErrorAsync()
         {
             // Await both of the channels from the sender, one to read the error and the other to return the response
-            MultiplexingStream.Channel? incomingChannel = await this.mx.AcceptChannelAsync("clientOffer");
+            MultiplexingStream.Channel? incomingChannel = await this.mx.AcceptChannelAsync("clientErrorOffer");
+
             MultiplexingStream.Channel? outgoingChannel = await this.mx.AcceptChannelAsync("clientResponseOffer");
 
             // Determine the response to send back on the whether the incoming channel completed with an exception
             string? responseMessage = "didn't receive any errors";
             try
             {
+                // sConsole.WriteLine("Waiting for the channel to complete");
                 await incomingChannel.Completion;
             }
             catch (Exception error)
@@ -99,6 +102,8 @@ namespace Nerdbank.Streams.Interop.Tests
 
             // Create a writer using the outgoing channel and send the response to the sender
             (StreamReader _, StreamWriter writer) = CreateStreamIO(outgoingChannel);
+
+            // Console.WriteLine("Writing response back to the caller");
             await writer.WriteLineAsync(responseMessage);
         }
 

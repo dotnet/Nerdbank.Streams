@@ -939,7 +939,7 @@ namespace Nerdbank.Streams
                 this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "OnContentWritingError received from remote party {0}", channelId);
             }
 
-            if (this.formatter is V1Formatter)
+            if (this.protocolMajorVersion == 1)
             {
                 if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                 {
@@ -994,7 +994,7 @@ namespace Nerdbank.Streams
 
             // Deserialize the payload
             V2Formatter wrappedFormatter = (V2Formatter)this.formatter;
-            WriteError? error = wrappedFormatter.DeserializeWriteError(payload);
+            WriteError? error = wrappedFormatter.DeserializeWriteError(payload, this.protocolMajorVersion);
 
             if (error == null)
             {
