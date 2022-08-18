@@ -580,9 +580,12 @@ export class MultiplexingStreamClass extends MultiplexingStream {
     }
 
     public async onChannelWritingError(channel: ChannelClass, errorMessage: string) {
+        console.log(`Got call to channel writing error with error: ${errorMessage}`);
+
         // If the formatter version is 1 then don't send the error message
         const formatterVersion = getFormatterVersion(this.formatter);   
         if (formatterVersion == 1) {
+            console.log(`Ignoring channel writing error since in v1`);
             return;
         }
 
@@ -596,6 +599,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         const errorPayload = castedFormatter.serializeContentWritingError(formatterVersion, errorMessage);
 
         // Sent the payload as a frame to the sender of the error message
+        console.log(`Sending error writing frame to remote`);
         await this.sendFrameAsync(new FrameHeader(ControlCode.ContentWritingError, channel.qualifiedId), errorPayload);
     }
 
