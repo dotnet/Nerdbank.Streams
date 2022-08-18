@@ -1226,7 +1226,7 @@ namespace Nerdbank.Streams
                 this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "onChannelWritingError called for {0} with exception {1}", channel.QualifiedId, exception.Message);
             }
 
-            if (this.formatter is V1Formatter)
+            if (this.protocolMajorVersion == 1)
             {
                 if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                 {
@@ -1243,7 +1243,7 @@ namespace Nerdbank.Streams
                 {
                     WriteError error = new WriteError(exception.Message);
                     V2Formatter wrappedFormatter = (V2Formatter)this.formatter;
-                    ReadOnlySequence<byte> serializedError = wrappedFormatter.SerializeWriteError(error);
+                    ReadOnlySequence<byte> serializedError = wrappedFormatter.SerializeWriteError(this.protocolMajorVersion, error);
 
                     if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                     {

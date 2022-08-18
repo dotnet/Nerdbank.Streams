@@ -498,14 +498,15 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Serializes an <see cref="WriteError"/> object using <see cref="MessagePack"/>.
             /// </summary>
+            /// <param name="protocolVersion">The protocol version to include in the serialized error buffer.</param>
             /// <param name="error">An instance of <see cref="WriteError"/> that we want to seralize.</param>
             /// <returns>A <see cref="Sequence{T}"/> which is the serialized version of the error.</returns>
-            internal ReadOnlySequence<byte> SerializeWriteError(WriteError error)
+            internal ReadOnlySequence<byte> SerializeWriteError(int protocolVersion, WriteError error)
             {
                 var errorSequence = new Sequence<byte>();
                 var writer = new MessagePackWriter(errorSequence);
                 writer.WriteArrayHeader(2);
-                writer.WriteInt32(ProtocolVersion.Major);
+                writer.WriteInt32(protocolVersion);
                 writer.Write(error.ErrorMessage);
                 writer.Flush();
                 return errorSequence.AsReadOnlySequence;
