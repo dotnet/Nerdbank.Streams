@@ -24,7 +24,7 @@ namespace Nerdbank.Streams
             }
 
             /// <summary>
-            /// Gets the error message that we want to send to receiver.
+            /// Gets the error message associated with this error.
             /// </summary>
             public string ErrorMessage { get; }
         }
