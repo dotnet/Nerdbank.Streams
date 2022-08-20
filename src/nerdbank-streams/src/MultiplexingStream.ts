@@ -581,7 +581,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 
     public async onChannelWritingError(channel: ChannelClass, errorMessage: string) {
         // Make sure that we are in a protocol version in which we can write errors
-        if (this.protocolMajorVersion == 1) {
+        if (this.protocolMajorVersion === 1) {
             return;
         }
 
@@ -627,16 +627,12 @@ export class MultiplexingStreamClass extends MultiplexingStream {
     }
 
     private async readFromStream(cancellationToken: CancellationToken) {
-        console.log(`Call to read from stream`);
         while (!this.isDisposed) {
             const frame = await this.formatter.readFrameAsync(cancellationToken);
             if (frame === null) {
-                console.log(`Received null frame on incoming stream`);
                 break;
             }
             frame.header.flipChannelPerspective();
-            let sender = frame.header.channel?.id;
-            console.log(`Received frame with id ${frame.header.code} from ${sender}`);
             switch (frame.header.code) {
                 case ControlCode.Offer:
                     this.onOffer(frame.header.requiredChannel, frame.payload);
@@ -745,10 +741,10 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 
     private onContentWritingError(channelId: QualifiedChannelId, payload: Buffer) {
         // Make sure that the channel has the proper formatter to process the output
-        if (this.protocolMajorVersion == 1) {
+        if (this.protocolMajorVersion === 1) {
             return;
         }
-        
+
         // Ensure that we received the message on an open channel
         const channel = this.getOpenChannel(channelId);
         if (!channel) {

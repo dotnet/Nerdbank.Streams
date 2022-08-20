@@ -84,7 +84,7 @@ export function getFormatterVersion(formatter : MultiplexingStreamFormatter) : n
         return 3
     } else if (formatter instanceof MultiplexingStreamV2Formatter) {
         return 2
-    } 
+    }
     return 1
 }
 
@@ -313,7 +313,7 @@ export class MultiplexingStreamV2Formatter extends MultiplexingStreamFormatter {
         const payloadVersion : number = msgpackObject[0];
 
         // Make sure the version of the payload matches the expected version
-        if (payloadVersion != expectedVersion) {
+        if (payloadVersion !== expectedVersion) {
             return null;
         }
 

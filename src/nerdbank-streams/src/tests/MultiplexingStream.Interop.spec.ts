@@ -29,7 +29,7 @@ import * as assert from "assert";
                     proc.once("exit", (code) => procExited.resolve(code));
                     proc.stdout!.pipe(process.stdout);
                     proc.stderr!.pipe(process.stderr);
-                    let buildExitVal = await procExited.promise;
+                    const buildExitVal = await procExited.promise;
                     expect(buildExitVal).toEqual(0);
                 } finally {
                     proc.kill();
@@ -54,7 +54,7 @@ import * as assert from "assert";
                 proc.kill();
                 proc = null;
                 throw error;
-            } 
+            }
             expectedDisposeError = false;
         }, 10000000); // leave time for dotnet to start.
 
@@ -70,7 +70,6 @@ import * as assert from "assert";
                         throw error;
                     }
                 }
-                
             }
 
             if (proc) {
@@ -114,11 +113,11 @@ import * as assert from "assert";
                 caughtCompletionErr = true;
             });
 
-            await errorWriteChannel.dispose(errorToSend); 
+            await errorWriteChannel.dispose(errorToSend);
             assert.deepStrictEqual(caughtCompletionErr, true);
 
             let expectedMessage = `received error: Remote party indicated writing error: ${errorMessage}`;
-            if (protocolMajorVersion == 1) {
+            if (protocolMajorVersion === 1) {
                 expectedMessage = "didn't receive any errors";
             }
 

@@ -55,7 +55,7 @@ export abstract class Channel implements IDisposableObservable {
 
     /**
      * Closes this channel. If the an error is passed into the method then that error
-     * gets sent to the remote before the disposing of the channel. 
+     * gets sent to the remote before the disposing of the channel.
      */
     public async dispose(error? : Error) {
         // The interesting stuff is in the derived class.
@@ -219,11 +219,10 @@ export class ChannelClass extends Channel {
     public onContent(buffer: Buffer | null, error? : Error) {
         // If we have already received an error from remote then don't process any future messages
         if (this.remoteError) {
-            return; 
+            return;
         }
 
         this.remoteError = error;
-    
         this._duplex.push(buffer);
 
         // We should find a way to detect when we *actually* share the received buffer with the Channel's user
@@ -256,8 +255,8 @@ export class ChannelClass extends Channel {
     public async dispose(errorToSend? : Error) {
         if (!this.isDisposed) {
             super.dispose();
-            
-            // If the caller passed in an error then send that error to the remote
+
+            // If the channel is disposed with an error, transmit it to the remote side
             if (errorToSend) {
                 await this._multiplexingStream.onChannelWritingError(this, errorToSend.message);
             }
@@ -266,18 +265,18 @@ export class ChannelClass extends Channel {
 
             // For the pipes, we Complete *our* ends, and leave the user's ends alone.
             // The completion will propagate when it's ready to. No need to destroy the duplex
-            // as the frame containing the error message has already been sent. 
+            // as the frame containing the error message has already been sent.
             this._duplex.end();
             this._duplex.push(null);
 
             // If we are sending an error to the remote side or received an error from the remote,
-            // relay that information to the clients. 
+            // relay that information to the clients.
             if (errorToSend ?? this.remoteError) {
                 this._completion.reject(errorToSend ?? this.remoteError);
             } else {
                 this._completion.resolve();
             }
-            
+
             await this._multiplexingStream.onChannelDisposed(this);
         }
     }

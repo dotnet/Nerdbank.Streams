@@ -240,7 +240,7 @@ import * as assert from "assert";
             ]);
 
             await channels[0].dispose(errorToSend);
-            
+
             // Ensure that the current channel disposes with the error
             let caughtSenderError = false;
             try {
@@ -268,7 +268,6 @@ import * as assert from "assert";
             }
 
             assert.deepStrictEqual(protocolMajorVersion > 1, caughtRemoteError);
-            
         })
 
         it("channels complete when mxstream is disposed", async () => {
