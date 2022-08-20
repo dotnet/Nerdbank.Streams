@@ -496,38 +496,52 @@ namespace Nerdbank.Streams
             }
 
             /// <summary>
-            /// Serializes an <see cref="WriteError"/> object using <see cref="MessagePack"/>.
+            /// Returns the serializaed representation of a <see cref="WriteError"/> object using <see cref="MessagePack"/>.
             /// </summary>
             /// <param name="protocolVersion">The protocol version to include in the serialized error buffer.</param>
             /// <param name="error">An instance of <see cref="WriteError"/> that we want to seralize.</param>
             /// <returns>A <see cref="Sequence{T}"/> which is the serialized version of the error.</returns>
             internal ReadOnlySequence<byte> SerializeWriteError(int protocolVersion, WriteError error)
             {
+                // Create the payload
                 var errorSequence = new Sequence<byte>();
                 var writer = new MessagePackWriter(errorSequence);
+
+                // Write the error message and the protocol version to the payload
                 writer.WriteArrayHeader(2);
                 writer.WriteInt32(protocolVersion);
                 writer.Write(error.ErrorMessage);
+
+                // Return the payload to the caller
                 writer.Flush();
                 return errorSequence.AsReadOnlySequence;
             }
 
+            /// <summary>
+            /// Extracts an <see cref="WriteError"/> object from the payload using <see cref="MessagePack"/>.
+            /// </summary>
+            /// <param name="serializedError">The payload we are trying to extract the error object from.</param>
+            /// <param name="expectedVersion">The protocol version we expect to be associated with the error object.</param>
+            /// <returns>A <see cref="WriteError"/> object if the payload is correctly formatted and has the expected protocol version,
+            ///          null otherwise. </returns>
             internal WriteError? DeserializeWriteError(ReadOnlySequence<byte> serializedError, int expectedVersion)
             {
                 var reader = new MessagePackReader(serializedError);
+
+                // The payload should only have the error message and the protocol version
                 if (reader.ReadArrayHeader() != 2)
                 {
-                    // For now the error sequence will only contain the major version and the error message
                     return null;
                 }
 
+                // Verify that the protocol version of the payload matches our expected value
                 int senderVersion = reader.ReadInt32();
                 if (senderVersion != expectedVersion)
                 {
-                    // For now a channel should only process write errors from channels with the same major version
                     return null;
                 }
 
+                // Extract the error message and use that to create the write error object
                 string errorMessage = reader.ReadString();
                 return new WriteError(errorMessage);
             }

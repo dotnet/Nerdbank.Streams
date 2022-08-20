@@ -934,86 +934,55 @@ namespace Nerdbank.Streams
         /// <param name="payload">The payload that the sender sent in the frame.</param>
         private void OnContentWritingError(QualifiedChannelId channelId, ReadOnlySequence<byte> payload)
         {
-            if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-            {
-                this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "OnContentWritingError received from remote party {0}", channelId);
-            }
-
+            // Make sure this MultiplexingStream is qualified to received content writing error messages
             if (this.protocolMajorVersion == 1)
             {
                 if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                 {
-                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Rejecting writing error from {0} as stream uses V1Formatter", channelId);
+                    this.TraceSource.TraceEvent(
+                        TraceEventType.Information,
+                        (int)TraceEventId.WriteError,
+                        "Rejecting writing error from channel {0} as MultiplexingStream has protocol version of {1}",
+                        channelId,
+                        this.protocolMajorVersion);
                 }
 
                 return;
             }
 
-            Channel? channel;
+            // Get the channel that send this frame
+            Channel channel;
             lock (this.syncObject)
             {
-                if (this.openChannels.ContainsKey(channelId))
-                {
-                    channel = this.openChannels[channelId];
-                }
-                else
-                {
-                    channel = null;
-                }
+                channel = this.openChannels[channelId];
             }
 
-            if (channel == null)
-            {
-                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                {
-                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Rejecting content writing error from non open channel {0}", channelId);
-                }
-
-                return;
-            }
-
+            // Verify that the channel is in a state that it can receive communication
             if (channelId.Source == ChannelSource.Local && !channel.IsAccepted)
             {
-                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                {
-                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Rejecting content writing error from non accepted channel {0}", channelId);
-                }
-
-                throw new MultiplexingProtocolException($"Remote party indicated they're done writing to channel {channelId} before accepting it.");
+                throw new MultiplexingProtocolException($"Remote party indicated they encountered errors writing to channel {channelId} before accepting it.");
             }
 
-            if (channel.IsRejectedOrCanceled || this.channelsPendingTermination.Contains(channelId))
-            {
-                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                {
-                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Rejecting content writing error from channel {0} as it is in an unwanted state", channelId);
-                }
-
-                return;
-            }
-
-            // Deserialize the payload
-            V2Formatter wrappedFormatter = (V2Formatter)this.formatter;
-            WriteError? error = wrappedFormatter.DeserializeWriteError(payload, this.protocolMajorVersion);
-
+            // Deserialize the payload and verify that it was in an expected state
+            V2Formatter errorDeserializingFormattter = (V2Formatter)this.formatter;
+            WriteError? error = errorDeserializingFormattter.DeserializeWriteError(payload, this.protocolMajorVersion);
             if (error == null)
             {
                 if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                 {
-                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Rejecting content writing error from channel {0} as can't deserialize payload {1} using {2}", channelId, payload, this.formatter);
+                    this.TraceSource.TraceEvent(
+                        TraceEventType.Information,
+                        (int)TraceEventId.WriteError,
+                        "Rejecting content writing error from channel {0} due to invalid payload",
+                        channelId);
                 }
 
                 return;
             }
 
+            // Get the error message and complete the channel using it
             string errorMessage = error.ErrorMessage;
             MultiplexingProtocolException channelClosingException = new MultiplexingProtocolException($"Remote party indicated writing error: {errorMessage}");
-
-            if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-            {
-                this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Content Writing Error closing channel {0} using error {1}", channelId, channelClosingException.Message);
-            }
-
             channel.OnContentWritingCompleted(channelClosingException);
         }
 
@@ -1221,59 +1190,50 @@ namespace Nerdbank.Streams
         {
             Requires.NotNull(channel, nameof(channel));
 
-            if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-            {
-                this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "onChannelWritingError called for {0} with exception {1}", channel.QualifiedId, exception.Message);
-            }
-
+            // Make sure that we are allowed to send error frames on this protocol version
             if (this.protocolMajorVersion == 1)
             {
                 if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                 {
-                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Not sending WriteError frame from {0} since we are using a V1 Formatter", channel.QualifiedId);
+                    this.TraceSource.TraceEvent(
+                        TraceEventType.Information,
+                        (int)TraceEventId.WriteError,
+                        "Not informing remote side of write error on channel {0} since MultiplexingStream has protocol version of {1}",
+                        channel.QualifiedId,
+                        this.protocolMajorVersion);
                 }
 
                 return;
             }
 
-            lock (this.syncObject)
+            // Verify that we are able to communicate to the remote side on this channel
+            if (this.channelsPendingTermination.Contains(channel.QualifiedId) || !this.openChannels.ContainsKey(channel.QualifiedId))
             {
-                // Only inform the remote side if this channel has not already been terminated.
-                if (!this.channelsPendingTermination.Contains(channel.QualifiedId) && this.openChannels.ContainsKey(channel.QualifiedId))
+                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                 {
-                    WriteError error = new WriteError(exception.Message);
-                    V2Formatter wrappedFormatter = (V2Formatter)this.formatter;
-                    ReadOnlySequence<byte> serializedError = wrappedFormatter.SerializeWriteError(this.protocolMajorVersion, error);
-
-                    if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                    {
-                        this.TraceSource.TraceEvent(
-                            TraceEventType.Information,
-                            (int)TraceEventId.WriteError,
-                            "Generated MessagePack object {0} for write error with message {1} in channel {2}",
-                            serializedError,
-                            error.ErrorMessage,
-                            channel.QualifiedId);
-                    }
-
-                    FrameHeader header = new FrameHeader
-                    {
-                        Code = ControlCode.ContentWritingError,
-                        ChannelId = channel.QualifiedId,
-                    };
-
-                    if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                    {
-                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Sending write error with frame header {0} in channel {1}", header, channel.QualifiedId);
-                    }
-
-                    this.SendFrame(header, serializedError, CancellationToken.None);
+                    this.TraceSource.TraceEvent(
+                        TraceEventType.Information,
+                        (int)TraceEventId.WriteError,
+                        "Not informing remote side of write error on channel {0} as it is an improper state");
                 }
-                else if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                {
-                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Not sending WriteError frame since channel {0} is terminated", channel.QualifiedId);
-                }
+
+                return;
             }
+
+            // Create the payload to send to the remote side
+            WriteError error = new WriteError(exception.Message);
+            V2Formatter errorSerializationFormatter = (V2Formatter)this.formatter;
+            ReadOnlySequence<byte> serializedError = errorSerializationFormatter.SerializeWriteError(this.protocolMajorVersion, error);
+
+            // Create the frame header indicating that we encountered a content writing error
+            FrameHeader header = new FrameHeader
+            {
+                Code = ControlCode.ContentWritingError,
+                ChannelId = channel.QualifiedId,
+            };
+
+            // Send the frame alongside the payload to the remote side
+            this.SendFrame(header, serializedError, CancellationToken.None);
         }
 
         /// <summary>

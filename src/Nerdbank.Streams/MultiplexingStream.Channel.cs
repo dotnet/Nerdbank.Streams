@@ -367,7 +367,7 @@ namespace Nerdbank.Streams
                                         mxStreamIOWriter = self.mxStreamIOWriter;
                                     }
 
-                                    mxStreamIOWriter?.Complete(self.GetWriterException());
+                                    mxStreamIOWriter?.Complete(self.GetRemoteException());
                                     self.mxStreamIOWriterCompleted.Set();
                                 }
                                 finally
@@ -408,6 +408,7 @@ namespace Nerdbank.Streams
 
                     this.disposalTokenSource.Cancel();
 
+                    // If we are disposing due to receiving or sending an exception, the relay that to our clients
                     if (this.faultingException != null)
                     {
                         this.completionSource.TrySetException(this.faultingException);
@@ -433,7 +434,7 @@ namespace Nerdbank.Streams
                     // We Complete the writer because only the writing (logical) thread should complete it
                     // to avoid race conditions, and Channel.Dispose can be called from any thread.
                     using PipeWriterRental writerRental = await this.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
-                    await writerRental.Writer.CompleteAsync(this.GetWriterException()).ConfigureAwait(false);
+                    await writerRental.Writer.CompleteAsync(this.GetRemoteException()).ConfigureAwait(false);
                 }
                 catch (ObjectDisposedException)
                 {
@@ -512,31 +513,20 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Called by the <see cref="MultiplexingStream"/> when when it will not be writing any more data to the channel.
             /// </summary>
-            /// <param name="error">Optional param used to indicate if we are stopping writing due to an error.</param>
+            /// <param name="error">Optional param used to indicate if we are stopping writing due to an error on the remote side.</param>
             internal void OnContentWritingCompleted(MultiplexingProtocolException? error = null)
             {
+                // If we have already received an error from the remote side then no need to complete the channel again
                 if (this.receivedRemoteException)
                 {
-                    if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                    {
-                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Current call to onContentWritingCompleted ignored due to previous call with error on {0}", this.QualifiedId);
-                    }
-
                     return;
                 }
 
-                if (error != null)
+                // Set the state of the channel based on whether we are completing due to an error.
+                lock (this.SyncObject)
                 {
-                    if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                    {
-                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Processed error from remote on {0} with message {1}", this.QualifiedId, error.Message);
-                    }
-
-                    lock (this.SyncObject)
-                    {
-                        this.faultingException = error;
-                        this.receivedRemoteException = true;
-                    }
+                    this.faultingException ??= error;
+                    this.receivedRemoteException = error != null;
                 }
 
                 this.DisposeSelfOnFailure(Task.Run(async delegate
@@ -545,39 +535,27 @@ namespace Nerdbank.Streams
                     {
                         try
                         {
+                            // If the channel is not disposed, then first try to close the writer used by the channel owner
                             using PipeWriterRental writerRental = await this.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
-                            await writerRental.Writer.CompleteAsync(this.GetWriterException()).ConfigureAwait(false);
-
-                            if (error != null && this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                            {
-                                this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Writing Completed closed writer rental on {0} with error {1}", this.QualifiedId, error.Message);
-                            }
+                            await writerRental.Writer.CompleteAsync(this.GetRemoteException()).ConfigureAwait(false);
                         }
                         catch (ObjectDisposedException)
                         {
+                            // If not, try to close the underlying writer.
                             if (this.mxStreamIOWriter != null)
                             {
                                 using AsyncSemaphore.Releaser releaser = await this.mxStreamIOWriterSemaphore.EnterAsync().ConfigureAwait(false);
-                                await this.mxStreamIOWriter.CompleteAsync(this.GetWriterException()).ConfigureAwait(false);
-
-                                if (error != null && this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                                {
-                                    this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Writing Completed closed mxStreamIOWriter on {0} with error {1}", this.QualifiedId, error.Message);
-                                }
+                                await this.mxStreamIOWriter.CompleteAsync(this.GetRemoteException()).ConfigureAwait(false);
                             }
                         }
                     }
                     else
                     {
+                        // If the channel has not been disposed then just close the underlying writer
                         if (this.mxStreamIOWriter != null)
                         {
                             using AsyncSemaphore.Releaser releaser = await this.mxStreamIOWriterSemaphore.EnterAsync().ConfigureAwait(false);
-                            await this.mxStreamIOWriter.CompleteAsync(this.GetWriterException()).ConfigureAwait(false);
-
-                            if (error != null && this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                            {
-                                this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Writing Completed closed mxStreamIOWriter on {0} with error {1}", this.QualifiedId, error.Message);
-                            }
+                            await this.mxStreamIOWriter.CompleteAsync(this.GetRemoteException()).ConfigureAwait(false);
                         }
                     }
 
@@ -700,10 +678,10 @@ namespace Nerdbank.Streams
             }
 
             /// <summary>
-            /// Gets the <see cref="Exception"/> to close any <see cref="PipeWriter"/> that the channel is managing.
+            /// Gets the <see cref="Exception"/> exception that we received from the remote side when completing this channel.
             /// </summary>
             /// <returns>The exception sent from the remote if there is one, null otherwise.</returns>
-            private Exception? GetWriterException()
+            private Exception? GetRemoteException()
             {
                 return this.receivedRemoteException ? this.faultingException : null;
             }
@@ -896,22 +874,20 @@ namespace Nerdbank.Streams
                 }
                 catch (Exception ex)
                 {
+                    // If the operation had been cancelled then we are expecting to receive this error so don't transmit it
                     if (ex is OperationCanceledException && this.DisposalToken.IsCancellationRequested)
                     {
                         await mxStreamIOReader!.CompleteAsync().ConfigureAwait(false);
                     }
                     else
                     {
-                        if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                        {
-                            this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Completing channel {0} with exception {1}", this.QualifiedId, ex.Message);
-                        }
-
+                        // If not record it as the error to dispose this channel with
                         lock (this.SyncObject)
                         {
                             this.faultingException = ex;
                         }
 
+                        // Since were not expecting to receive this error, transmit the error to the remote side
                         await mxStreamIOReader!.CompleteAsync(ex).ConfigureAwait(false);
                         this.MultiplexingStream.OnChannelWritingError(this, ex);
                     }
@@ -991,21 +967,10 @@ namespace Nerdbank.Streams
 
             private void Fault(Exception exception)
             {
-                if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Critical) ?? false)
-                {
-                    this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Fault called in {0} with exception message {1}", this.QualifiedId, exception.Message);
-                }
-
-                bool alreadyFaulted = false;
+                // If the reason why are faulting isn't already set then do so before disposing the channel
                 lock (this.SyncObject)
                 {
-                    alreadyFaulted = this.faultingException != null;
                     this.faultingException ??= exception;
-                }
-
-                if (!alreadyFaulted && (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Critical) ?? false))
-                {
-                    this.TraceSource.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Channel {0} closing self due to exception: {1}", this.QualifiedId, exception);
                 }
 
                 this.mxStreamIOReader?.CancelPendingRead();
