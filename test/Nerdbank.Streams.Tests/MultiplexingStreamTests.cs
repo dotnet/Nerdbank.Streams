@@ -42,34 +42,35 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         bool errorThrown = false;
         string errorMessage = "Hello World";
 
-        // Prepare a readonly pipe that is already fully populated with data but also with an error
+        // Prepare a readonly pipe that is already populated with data an an error
         var pipe = new Pipe();
         await pipe.Writer.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
         pipe.Writer.Complete(new NullReferenceException(errorMessage));
 
-        MultiplexingStream.Channel? ch1 = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(pipe.Reader) });
+        // Create a sending and receiving channel using the channel
+        MultiplexingStream.Channel? localChannel = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(pipe.Reader) });
         await this.WaitForEphemeralChannelOfferToPropagateAsync();
-        MultiplexingStream.Channel? ch2 = this.mx2.AcceptChannel(ch1.QualifiedId.Id);
+        MultiplexingStream.Channel? remoteChannel = this.mx2.AcceptChannel(localChannel.QualifiedId.Id);
 
-        bool readMoreData = true;
-        while (readMoreData)
+        bool continueReading = true;
+        while (continueReading)
         {
             try
             {
-                ReadResult readResult = await ch2.Input.ReadAsync(this.TimeoutToken);
+                // Read the latest input from the local channel and determine if we should continue reading
+                ReadResult readResult = await remoteChannel.Input.ReadAsync(this.TimeoutToken);
                 if (readResult.IsCompleted || readResult.IsCanceled)
                 {
-                    readMoreData = false;
-                    this.Logger.WriteLine("Set readMoreData to False based on readResult fields");
+                    continueReading = false;
                 }
 
-                ch2.Input.AdvanceTo(readResult.Buffer.End);
+                remoteChannel.Input.AdvanceTo(readResult.Buffer.End);
             }
             catch (Exception exception)
             {
+                // Check not only that we caught an exception but that it was the expected exception.
                 errorThrown = exception.Message.Contains(errorMessage);
-                readMoreData = !errorThrown;
-                this.Logger.WriteLine("Set readMoreData to " + readMoreData + " based on catching error with message " + exception.Message);
+                continueReading = !errorThrown;
             }
         }
 
@@ -77,35 +78,33 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
         // Ensure that the writer of the error completes with that error, no matter what version of the protocol they are using
         string expectedWriterErrorMessage = errorMessage;
-        bool writeCompletedWithError = false;
+        bool localChannelCompletedWithError = false;
 
         try
         {
-            await ch1.Completion;
+            await localChannel.Completion;
         }
         catch (Exception writeException)
         {
-            this.Logger.WriteLine($"Caught error {writeException.Message} in the completion of the writer");
-            writeCompletedWithError = writeException.Message.Contains(expectedWriterErrorMessage);
+            localChannelCompletedWithError = writeException.Message.Contains(expectedWriterErrorMessage);
         }
 
-        Assert.True(writeCompletedWithError);
+        Assert.True(localChannelCompletedWithError);
 
         // Ensure that the reader only completes with an error if we are using a protocol version > 1
         string expectedReaderErrorMessage = "Remote party indicated writing error: " + errorMessage;
-        bool readCompletedWithError = false;
+        bool remoteChannelCompletedWithError = false;
 
         try
         {
-            await ch2.Completion;
+            await remoteChannel.Completion;
         }
         catch (Exception readException)
         {
-            this.Logger.WriteLine($"Caught error {readException.Message} in the completion of the reader");
-            readCompletedWithError = readException.Message.Contains(expectedReaderErrorMessage);
+            remoteChannelCompletedWithError = readException.Message.Contains(expectedReaderErrorMessage);
         }
 
-        Assert.Equal(this.ProtocolMajorVersion > 1, readCompletedWithError);
+        Assert.Equal(this.ProtocolMajorVersion > 1, remoteChannelCompletedWithError);
     }
 
     public async Task InitializeAsync()
