@@ -8,6 +8,7 @@ import * as msgpack from 'msgpack-lite';
 import { Deferred } from "./Deferred";
 import { FrameHeader } from "./FrameHeader";
 import { ControlCode } from "./ControlCode";
+import {WriteError} from "./WriteError";
 import { ChannelSource } from "./QualifiedChannelId";
 
 export interface Version {
@@ -302,22 +303,23 @@ export class MultiplexingStreamV2Formatter extends MultiplexingStreamFormatter {
         return msgpack.decode(payload)[0];
     }
 
-    serializeContentWritingError(version: number, writingError: string) : Buffer {
-        const payload: any[] = [version, writingError];
+    serializeContentWritingError(version: number, writingError: WriteError) : Buffer {
+        const payload: any[] = [version, writingError.getErrorMessage()];
         return msgpack.encode(payload);
     }
 
-    deserializeContentWritingError(payload: Buffer, expectedVersion: number) : string {
+    deserializeContentWritingError(payload: Buffer, expectedVersion: number) : WriteError | null {
         const msgpackObject = msgpack.decode(payload);
         const payloadVersion : number = msgpackObject[0];
 
         // Make sure the version of the payload matches the expected version
         if (payloadVersion != expectedVersion) {
-            throw new Error(`Payload has version ${payloadVersion} but expected version ${expectedVersion}`);
+            return null;
         }
 
         // Return the error message to the caller
-        return (msgpackObject[1] as string);
+        const errorMsg : string = msgpackObject[1];
+        return new WriteError(errorMsg);
     }
 
     protected async readMessagePackAsync(cancellationToken: CancellationToken): Promise<{} | [] | null> {

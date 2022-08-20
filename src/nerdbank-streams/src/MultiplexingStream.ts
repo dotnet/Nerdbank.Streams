@@ -25,6 +25,7 @@ import {
 import { OfferParameters } from "./OfferParameters";
 import { Semaphore } from 'await-semaphore';
 import { QualifiedChannelId, ChannelSource } from "./QualifiedChannelId";
+import { WriteError } from "./WriteError";
 
 export abstract class MultiplexingStream implements IDisposableObservable {
     /**
@@ -590,8 +591,9 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         }
 
         // Convert the error message into a payload into a formatter
+        const writingError = new WriteError(errorMessage);
         const errorSerializingFormatter = (this.formatter as MultiplexingStreamV2Formatter);
-        const errorPayload = errorSerializingFormatter.serializeContentWritingError(this.protocolMajorVersion, errorMessage);
+        const errorPayload = errorSerializingFormatter.serializeContentWritingError(this.protocolMajorVersion, writingError);
 
         // Sent the error to the remote side
         await this.sendFrameAsync(new FrameHeader(ControlCode.ContentWritingError, channel.qualifiedId), errorPayload);
@@ -753,15 +755,15 @@ export class MultiplexingStreamClass extends MultiplexingStream {
             throw new Error(`No channel with id ${channelId} found.`);
         }
 
-        // Extract the error message from the payload
+        // Extract the error from the payload
         const errorDeserializingFormatter = (this.formatter as MultiplexingStreamV2Formatter);
-        const errorMessage = errorDeserializingFormatter.deserializeContentWritingError(payload, this.protocolMajorVersion);
-        if (!errorMessage) {
+        const writingError = errorDeserializingFormatter.deserializeContentWritingError(payload, this.protocolMajorVersion);
+        if (!writingError) {
             throw new Error("Couldn't process content writing error payload received from remote");
         }
 
         // Pass the error received from the remote to the channel
-        const remoteErr = new Error(`Received error message from remote: ${errorMessage}`);
+        const remoteErr = new Error(`Received error message from remote: ${writingError.getErrorMessage()}`);
         channel.onContent(null, remoteErr)
     }
 
