@@ -265,17 +265,15 @@ export class ChannelClass extends Channel {
             this._acceptance.reject(new CancellationToken.CancellationError("disposed"));
 
             // For the pipes, we Complete *our* ends, and leave the user's ends alone.
-            // The completion will propagate when it's ready to.
+            // The completion will propagate when it's ready to. No need to destroy the duplex
+            // as the frame containing the error message has already been sent. 
             this._duplex.end();
             this._duplex.push(null);
-            
-            let errorToUse = errorToSend;
-            if (!errorToUse) {
-                errorToUse = this.remoteError;
-            }
 
-            if (errorToUse) {
-                this._completion.reject(errorToUse);
+            // If we are sending an error to the remote side or received an error from the remote,
+            // relay that information to the clients. 
+            if (errorToSend ?? this.remoteError) {
+                this._completion.reject(errorToSend ?? this.remoteError);
             } else {
                 this._completion.resolve();
             }

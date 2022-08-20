@@ -17,7 +17,6 @@ import "./MultiplexingStreamOptions";
 import { MultiplexingStreamOptions } from "./MultiplexingStreamOptions";
 import { removeFromQueue, throwIfDisposed } from "./Utilities";
 import {
-    getFormatterVersion,
     MultiplexingStreamFormatter,
     MultiplexingStreamV1Formatter,
     MultiplexingStreamV2Formatter,
@@ -580,26 +579,21 @@ export class MultiplexingStreamClass extends MultiplexingStream {
     }
 
     public async onChannelWritingError(channel: ChannelClass, errorMessage: string) {
-        console.log(`Got call to channel writing error with error: ${errorMessage}`);
-
-        // If the formatter version is 1 then don't send the error message
-        const formatterVersion = getFormatterVersion(this.formatter);   
-        if (formatterVersion == 1) {
-            console.log(`Ignoring channel writing error since in v1`);
+        // Make sure that we are in a protocol version in which we can write errors
+        if (this.protocolMajorVersion == 1) {
             return;
         }
 
         // Make sure we can send error messages on this channel
         if (!this.getOpenChannel(channel.qualifiedId)) {
-            throw new Error(`Sending writing error from invalid channel ${channel.qualifiedId}`);
+           return;
         }
 
         // Convert the error message into a payload into a formatter
-        const castedFormatter = (this.formatter as MultiplexingStreamV2Formatter);
-        const errorPayload = castedFormatter.serializeContentWritingError(formatterVersion, errorMessage);
+        const errorSerializingFormatter = (this.formatter as MultiplexingStreamV2Formatter);
+        const errorPayload = errorSerializingFormatter.serializeContentWritingError(this.protocolMajorVersion, errorMessage);
 
-        // Sent the payload as a frame to the sender of the error message
-        console.log(`Sending error writing frame to remote`);
+        // Sent the error to the remote side
         await this.sendFrameAsync(new FrameHeader(ControlCode.ContentWritingError, channel.qualifiedId), errorPayload);
     }
 
@@ -749,9 +743,8 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 
     private onContentWritingError(channelId: QualifiedChannelId, payload: Buffer) {
         // Make sure that the channel has the proper formatter to process the output
-        const formatterVersion = getFormatterVersion(this.formatter);
-        if (formatterVersion == 1) {
-            return
+        if (this.protocolMajorVersion == 1) {
+            return;
         }
         
         // Ensure that we received the message on an open channel
@@ -760,14 +753,14 @@ export class MultiplexingStreamClass extends MultiplexingStream {
             throw new Error(`No channel with id ${channelId} found.`);
         }
 
-        // Ensure that we are able to get a error message from a casted formatter
-        const castedFormatter = (this.formatter as MultiplexingStreamV2Formatter);
-        const errorMessage = castedFormatter.deserializeContentWritingError(payload, formatterVersion);
+        // Extract the error message from the payload
+        const errorDeserializingFormatter = (this.formatter as MultiplexingStreamV2Formatter);
+        const errorMessage = errorDeserializingFormatter.deserializeContentWritingError(payload, this.protocolMajorVersion);
         if (!errorMessage) {
             throw new Error("Couldn't process content writing error payload received from remote");
         }
 
-        // Create the error received from the remote and pass it to the channel
+        // Pass the error received from the remote to the channel
         const remoteErr = new Error(`Received error message from remote: ${errorMessage}`);
         channel.onContent(null, remoteErr)
     }

@@ -15,7 +15,7 @@ import * as assert from "assert";
         const dotnetEnvBlock: NodeJS.ProcessEnv = {
             DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1", // prevent warnings in stdout that corrupt our interop stream.
         };
-        let expectedError: boolean;
+        let expectedDisposeError: boolean;
 
         beforeAll(
             async () => {
@@ -30,14 +30,7 @@ import * as assert from "assert";
                     proc.stdout!.pipe(process.stdout);
                     proc.stderr!.pipe(process.stderr);
                     let buildExitVal = await procExited.promise;
-                    console.log(`Build exited with code ${buildExitVal}`);
                     expect(buildExitVal).toEqual(0);
-                } catch(error) {
-                    let errorMessage = String(error);
-                    if (error instanceof Error) {
-                        errorMessage = (error as Error).message;
-                    }
-                    console.log(`Before all failed due to error ${errorMessage}`);
                 } finally {
                     proc.kill();
                     proc = null;
@@ -56,29 +49,24 @@ import * as assert from "assert";
                 proc.once("exit", (code) => procExited.resolve(code));
                 proc.stderr!.pipe(process.stderr);
                 const seededChannels: ChannelOptions[] | undefined = protocolMajorVersion >= 3 ? [{}] : undefined;
-                console.log(`Going to create multiplexing stream`);
                 mx = await MultiplexingStream.CreateAsync(FullDuplexStream.Splice(proc.stdout!, proc.stdin!), { protocolMajorVersion, seededChannels });
-                console.log(`Finished creating multiplexing stream`);
             } catch(error) {
-                let errorMessage = String(error);
-                if (error instanceof Error) {
-                    errorMessage = (error as Error).message;
-                }
-                console.log(`Before each failed due to error ${errorMessage}`);
                 proc.kill();
                 proc = null;
                 throw error;
             } 
-            expectedError = false;
+            expectedDisposeError = false;
         }, 10000000); // leave time for dotnet to start.
 
         afterEach(async () => {
             if (mx) {
                 mx.dispose();
+
+                // See if we encounter any errors in the multplexing stream and rethrow them if they are unexpected
                 try {
                     await mx.completion;
                 } catch(error) {
-                    if (!expectedError) {
+                    if(!expectedDisposeError) {
                         throw error;
                     }
                 }
@@ -114,7 +102,7 @@ import * as assert from "assert";
         });
 
         it("Can send error to remote", async() => {
-            expectedError = true;
+            expectedDisposeError = true;
             const errorWriteChannel = await mx.offerChannelAsync("clientErrorOffer");
             const responseReceiveChannel = await mx.offerChannelAsync("clientResponseOffer");
 
@@ -122,25 +110,11 @@ import * as assert from "assert";
             const errorToSend = new Error(errorMessage);
 
             let caughtCompletionErr = false;
-            let caughtAcceptanceErr = false;
-
             errorWriteChannel.completion.catch(err => {
-                console.log(`Caught completion rejection ${err}`);
                 caughtCompletionErr = true;
             });
 
-            errorWriteChannel.acceptance.catch(err => {
-                caughtAcceptanceErr = true;
-                console.log(`Caught acceptance rejection ${err}`);
-            });
-
-            try {
-                await errorWriteChannel.dispose(errorToSend); 
-            } catch(error) {
-                console.log(`Caught error during dispose call ${error}`);
-            }
-            
-            assert.deepStrictEqual(caughtAcceptanceErr, false);
+            await errorWriteChannel.dispose(errorToSend); 
             assert.deepStrictEqual(caughtCompletionErr, true);
 
             let expectedMessage = `received error: Remote party indicated writing error: ${errorMessage}`;
@@ -150,9 +124,7 @@ import * as assert from "assert";
 
             const receivedMessage = await readLineAsync(responseReceiveChannel.stream);
             assert.deepStrictEqual(receivedMessage?.trim(), expectedMessage);
-
-            console.log("Reached end of error sending test");
-        }, 100000000)
+        });
 
         if (protocolMajorVersion >= 3) {
             it("Can communicate over seeded channel", async () => {

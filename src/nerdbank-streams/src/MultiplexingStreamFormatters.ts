@@ -309,11 +309,14 @@ export class MultiplexingStreamV2Formatter extends MultiplexingStreamFormatter {
 
     deserializeContentWritingError(payload: Buffer, expectedVersion: number) : string {
         const msgpackObject = msgpack.decode(payload);
-        const sentVersion : number = msgpackObject[0];
-        if (sentVersion != expectedVersion) {
-            // For now, a channel should communicate with channels of the same version
-            throw new Error(`Sender has version ${sentVersion} but expected version ${expectedVersion}`);
+        const payloadVersion : number = msgpackObject[0];
+
+        // Make sure the version of the payload matches the expected version
+        if (payloadVersion != expectedVersion) {
+            throw new Error(`Payload has version ${payloadVersion} but expected version ${expectedVersion}`);
         }
+
+        // Return the error message to the caller
         return (msgpackObject[1] as string);
     }
 
