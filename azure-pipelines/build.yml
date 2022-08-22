@@ -4,6 +4,9 @@ parameters:
   default:
     vmImage: windows-2022
 - name: includeMacOS
+- name: RunTests
+  type: boolean
+  default: true
 
 jobs:
 - job: Windows
@@ -18,8 +21,12 @@ jobs:
     displayName: ⚙ Set build number
 
   - template: dotnet.yml
+    parameters:
+      RunTests: ${{ parameters.RunTests }}
   - template: node.yml
   - template: collect-artifacts.yml
+    parameters:
+      RunTests: ${{ parameters.RunTests }}
 
 - job: Linux
   pool:
@@ -30,8 +37,12 @@ jobs:
     submodules: true
   - template: install-dependencies.yml
   - template: dotnet.yml
+    parameters:
+      RunTests: ${{ parameters.RunTests }}
   - template: node.yml
   - template: collect-artifacts.yml
+    parameters:
+      RunTests: ${{ parameters.RunTests }}
 
 - job: macOS
   condition: ${{ parameters.includeMacOS }}
@@ -43,8 +54,12 @@ jobs:
     submodules: true
   - template: install-dependencies.yml
   - template: dotnet.yml
+    parameters:
+      RunTests: ${{ parameters.RunTests }}
   - template: node.yml
   - template: collect-artifacts.yml
+    parameters:
+      RunTests: ${{ parameters.RunTests }}
 
 - job: WrapUp
   dependsOn:
@@ -62,7 +77,8 @@ jobs:
   - template: publish-symbols.yml
     parameters:
       includeMacOS: ${{ parameters.includeMacOS }}
-  - template: publish-codecoverage.yml
-    parameters:
-      includeMacOS: ${{ parameters.includeMacOS }}
+  - ${{ if parameters.RunTests }}:
+    - template: publish-codecoverage.yml
+      parameters:
+        includeMacOS: ${{ parameters.includeMacOS }}
   - template: publish-deployables.yml
