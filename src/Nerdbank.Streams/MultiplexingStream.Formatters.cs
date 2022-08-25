@@ -504,7 +504,7 @@ namespace Nerdbank.Streams
             internal ReadOnlySequence<byte> SerializeWriteError(int protocolVersion, WriteError error)
             {
                 // Create the payload
-                using Sequence<byte> errorSequence = new(ArrayPool<byte>.Shared);
+                Sequence<byte> errorSequence = new();
                 MessagePackWriter writer = new(errorSequence);
 
                 // Write the error message and the protocol version to the payload
