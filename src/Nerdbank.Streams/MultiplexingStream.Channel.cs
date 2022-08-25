@@ -323,6 +323,11 @@ namespace Nerdbank.Streams
             }
 
             /// <summary>
+            /// Gets the exception sent from the remote side over this channel, null otherwise.
+            /// </summary>
+            private Exception? RemoteException => this.receivedRemoteException ? this.faultingException : null;
+
+            /// <summary>
             /// Gets a value indicating whether backpressure support is enabled.
             /// </summary>
             private bool BackpressureSupportEnabled => this.MultiplexingStream.protocolMajorVersion > 1;
@@ -367,7 +372,7 @@ namespace Nerdbank.Streams
                                         mxStreamIOWriter = self.mxStreamIOWriter;
                                     }
 
-                                    mxStreamIOWriter?.Complete(self.GetRemoteException());
+                                    mxStreamIOWriter?.Complete(self.RemoteException);
                                     self.mxStreamIOWriterCompleted.Set();
                                 }
                                 finally
@@ -434,7 +439,7 @@ namespace Nerdbank.Streams
                     // We Complete the writer because only the writing (logical) thread should complete it
                     // to avoid race conditions, and Channel.Dispose can be called from any thread.
                     using PipeWriterRental writerRental = await this.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
-                    await writerRental.Writer.CompleteAsync(this.GetRemoteException()).ConfigureAwait(false);
+                    await writerRental.Writer.CompleteAsync(this.RemoteException).ConfigureAwait(false);
                 }
                 catch (ObjectDisposedException)
                 {
@@ -537,7 +542,7 @@ namespace Nerdbank.Streams
                         {
                             // If the channel is not disposed, then first try to close the writer used by the channel owner
                             using PipeWriterRental writerRental = await this.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
-                            await writerRental.Writer.CompleteAsync(this.GetRemoteException()).ConfigureAwait(false);
+                            await writerRental.Writer.CompleteAsync(this.RemoteException).ConfigureAwait(false);
                         }
                         catch (ObjectDisposedException)
                         {
@@ -545,7 +550,7 @@ namespace Nerdbank.Streams
                             if (this.mxStreamIOWriter != null)
                             {
                                 using AsyncSemaphore.Releaser releaser = await this.mxStreamIOWriterSemaphore.EnterAsync().ConfigureAwait(false);
-                                await this.mxStreamIOWriter.CompleteAsync(this.GetRemoteException()).ConfigureAwait(false);
+                                await this.mxStreamIOWriter.CompleteAsync(this.RemoteException).ConfigureAwait(false);
                             }
                         }
                     }
@@ -555,7 +560,7 @@ namespace Nerdbank.Streams
                         if (this.mxStreamIOWriter != null)
                         {
                             using AsyncSemaphore.Releaser releaser = await this.mxStreamIOWriterSemaphore.EnterAsync().ConfigureAwait(false);
-                            await this.mxStreamIOWriter.CompleteAsync(this.GetRemoteException()).ConfigureAwait(false);
+                            await this.mxStreamIOWriter.CompleteAsync(this.RemoteException).ConfigureAwait(false);
                         }
                     }
 
@@ -675,15 +680,6 @@ namespace Nerdbank.Streams
                     releaser.Dispose();
                     throw;
                 }
-            }
-
-            /// <summary>
-            /// Gets the <see cref="Exception"/> exception that we received from the remote side when completing this channel.
-            /// </summary>
-            /// <returns>The exception sent from the remote if there is one, null otherwise.</returns>
-            private Exception? GetRemoteException()
-            {
-                return this.receivedRemoteException ? this.faultingException : null;
             }
 
             /// <summary>
@@ -884,7 +880,7 @@ namespace Nerdbank.Streams
                         // If not record it as the error to dispose this channel with
                         lock (this.SyncObject)
                         {
-                            this.faultingException = ex;
+                            this.faultingException ??= ex;
                         }
 
                         // Since we're not expecting to receive this error, transmit the error to the remote side.
@@ -974,6 +970,26 @@ namespace Nerdbank.Streams
                 }
 
                 this.mxStreamIOReader?.CancelPendingRead();
+
+                // Determine if the channel has already been disposed
+                bool alreadyDisposed = false;
+                lock (this.SyncObject)
+                {
+                    alreadyDisposed = this.isDisposed;
+                }
+
+                // If the channel has already been disposed then no need to call dispose again
+                if (alreadyDisposed)
+                {
+                    return;
+                }
+
+                // Record the fact that we are about to close the channel due to a fault
+                if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Critical) ?? false)
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Channel {0} closing self due to exception: {1}", this.QualifiedId, exception);
+                }
+
                 this.Dispose();
             }
 

@@ -5,6 +5,7 @@ namespace Nerdbank.Streams
 {
     using System;
     using System.Buffers;
+    using System.Diagnostics;
     using System.IO;
     using System.IO.Pipelines;
     using System.Threading;
@@ -300,6 +301,7 @@ namespace Nerdbank.Streams
         internal class V2Formatter : Formatter
         {
             private static readonly Version ProtocolVersion = new Version(2, 0);
+            private static readonly int WriteErrorPayloadSize = 1;
             private readonly MessagePackStreamReader reader;
             private readonly AsyncSemaphore readingSemaphore = new AsyncSemaphore(1);
 
@@ -498,18 +500,16 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Returns the serialized representation of a <see cref="WriteError"/> object using <see cref="MessagePack"/>.
             /// </summary>
-            /// <param name="protocolVersion">The protocol version to include in the serialized error buffer.</param>
             /// <param name="error">An instance of <see cref="WriteError"/> that we want to seralize.</param>
             /// <returns>A <see cref="Sequence{T}"/> which is the serialized version of the error.</returns>
-            internal ReadOnlySequence<byte> SerializeWriteError(int protocolVersion, WriteError error)
+            internal ReadOnlySequence<byte> SerializeWriteError(WriteError error)
             {
                 // Create the payload
                 Sequence<byte> errorSequence = new();
                 MessagePackWriter writer = new(errorSequence);
 
                 // Write the error message and the protocol version to the payload
-                writer.WriteArrayHeader(2);
-                writer.WriteInt32(protocolVersion);
+                writer.WriteArrayHeader(WriteErrorPayloadSize);
                 writer.Write(error.ErrorMessage);
 
                 // Return the payload to the caller
@@ -521,23 +521,24 @@ namespace Nerdbank.Streams
             /// Extracts an <see cref="WriteError"/> object from the payload using <see cref="MessagePack"/>.
             /// </summary>
             /// <param name="serializedError">The payload we are trying to extract the error object from.</param>
-            /// <param name="expectedVersion">The protocol version we expect to be associated with the error object.</param>
+            /// <param name="TraceSource">The tracer to use when tracing errors to deserialize a received payload.</param>
             /// <returns>A <see cref="WriteError"/> object if the payload is correctly formatted and has the expected protocol version,
             ///          null otherwise. </returns>
-            internal WriteError? DeserializeWriteError(ReadOnlySequence<byte> serializedError, int expectedVersion)
+            internal WriteError? DeserializeWriteError(ReadOnlySequence<byte> serializedError, TraceSource? TraceSource)
             {
                 MessagePackReader reader = new(serializedError);
+                int numElements = reader.ReadArrayHeader();
 
-                // The payload should only have the error message and the protocol version.
-                if (reader.ReadArrayHeader() != 2)
+                // If received an unexpected number of fields, report that to the users
+                if (numElements != WriteErrorPayloadSize && TraceSource!.Switch.ShouldTrace(TraceEventType.Warning))
                 {
-                    return null;
+                    TraceSource.TraceEvent(TraceEventType.Warning, 0, "Expected error payload to have {0} elements, found {1} elements", WriteErrorPayloadSize, numElements);
                 }
 
-                // Verify that the protocol version of the payload matches our expected value
-                int senderVersion = reader.ReadInt32();
-                if (senderVersion != expectedVersion)
+                // The payload should have enough elements that we can process all the critical fields
+                if (numElements < WriteErrorPayloadSize)
                 {
+
                     return null;
                 }
 
