@@ -521,24 +521,23 @@ namespace Nerdbank.Streams
             /// Extracts an <see cref="WriteError"/> object from the payload using <see cref="MessagePack"/>.
             /// </summary>
             /// <param name="serializedError">The payload we are trying to extract the error object from.</param>
-            /// <param name="TraceSource">The tracer to use when tracing errors to deserialize a received payload.</param>
+            /// <param name="traceSource">The tracer to use when tracing errors to deserialize a received payload.</param>
             /// <returns>A <see cref="WriteError"/> object if the payload is correctly formatted and has the expected protocol version,
             ///          null otherwise. </returns>
-            internal WriteError? DeserializeWriteError(ReadOnlySequence<byte> serializedError, TraceSource? TraceSource)
+            internal WriteError? DeserializeWriteError(ReadOnlySequence<byte> serializedError, TraceSource? traceSource)
             {
                 MessagePackReader reader = new(serializedError);
                 int numElements = reader.ReadArrayHeader();
 
                 // If received an unexpected number of fields, report that to the users
-                if (numElements != WriteErrorPayloadSize && TraceSource!.Switch.ShouldTrace(TraceEventType.Warning))
+                if (numElements != WriteErrorPayloadSize && traceSource!.Switch.ShouldTrace(TraceEventType.Warning))
                 {
-                    TraceSource.TraceEvent(TraceEventType.Warning, 0, "Expected error payload to have {0} elements, found {1} elements", WriteErrorPayloadSize, numElements);
+                    traceSource.TraceEvent(TraceEventType.Warning, 0, "Expected error payload to have {0} elements, found {1} elements", WriteErrorPayloadSize, numElements);
                 }
 
                 // The payload should have enough elements that we can process all the critical fields
                 if (numElements < WriteErrorPayloadSize)
                 {
-
                     return null;
                 }
 
