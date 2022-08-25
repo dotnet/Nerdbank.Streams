@@ -217,7 +217,7 @@ export class ChannelClass extends Channel {
     }
 
     public onContent(buffer: Buffer | null, error? : Error) {
-        // If we have already received an error from remote then don't process any future messages
+        // If we have already received an error from the remote party, then don't process any future messages.
         if (this.remoteError) {
             return;
         }

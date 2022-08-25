@@ -36,8 +36,7 @@ import * as assert from "assert";
                     proc = null;
                 }
             },
-            2000000); // leave time for package restore and build
-
+            20000); // leave time for package restore and build
         beforeEach(async () => {
             proc = spawn(
                 "dotnet",
@@ -50,13 +49,13 @@ import * as assert from "assert";
                 proc.stderr!.pipe(process.stderr);
                 const seededChannels: ChannelOptions[] | undefined = protocolMajorVersion >= 3 ? [{}] : undefined;
                 mx = await MultiplexingStream.CreateAsync(FullDuplexStream.Splice(proc.stdout!, proc.stdin!), { protocolMajorVersion, seededChannels });
-            } catch(error) {
+            } catch (e) {
                 proc.kill();
                 proc = null;
-                throw error;
+                throw e;
             }
             expectedDisposeError = false;
-        }, 10000000); // leave time for dotnet to start.
+        }, 10000); // leave time for dotnet to start.
 
         afterEach(async () => {
             if (mx) {
@@ -65,7 +64,7 @@ import * as assert from "assert";
                 // See if we encounter any errors in the multplexing stream and rethrow them if they are unexpected
                 try {
                     await mx.completion;
-                } catch(error) {
+                } catch (error) {
                     if(!expectedDisposeError) {
                         throw error;
                     }
@@ -100,7 +99,7 @@ import * as assert from "assert";
             expect(recv).toEqual(`recv: ${bigdata}`);
         });
 
-        it("Can send error to remote", async() => {
+        it("Can send error to remote", async () => {
             expectedDisposeError = true;
             const errorWriteChannel = await mx.offerChannelAsync("clientErrorOffer");
             const responseReceiveChannel = await mx.offerChannelAsync("clientResponseOffer");

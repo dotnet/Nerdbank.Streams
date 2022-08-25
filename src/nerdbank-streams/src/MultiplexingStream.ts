@@ -580,19 +580,19 @@ export class MultiplexingStreamClass extends MultiplexingStream {
     }
 
     public async onChannelWritingError(channel: ChannelClass, errorMessage: string) {
-        // Make sure that we are in a protocol version in which we can write errors
+        // Make sure that we are in a protocol version in which we can write errors.
         if (this.protocolMajorVersion === 1) {
             return;
         }
 
-        // Make sure we can send error messages on this channel
+        // Make sure we can send error messages on this channel.
         if (!this.getOpenChannel(channel.qualifiedId)) {
            return;
         }
 
-        // Convert the error message into a payload into a formatter
+        // Convert the error message into a payload into a formatter.
         const writingError = new WriteError(errorMessage);
-        const errorSerializingFormatter = (this.formatter as MultiplexingStreamV2Formatter);
+        const errorSerializingFormatter = this.formatter as MultiplexingStreamV2Formatter;
         const errorPayload = errorSerializingFormatter.serializeContentWritingError(this.protocolMajorVersion, writingError);
 
         // Sent the error to the remote side
@@ -632,6 +632,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
             if (frame === null) {
                 break;
             }
+
             frame.header.flipChannelPerspective();
             switch (frame.header.code) {
                 case ControlCode.Offer:
@@ -740,12 +741,12 @@ export class MultiplexingStreamClass extends MultiplexingStream {
     }
 
     private onContentWritingError(channelId: QualifiedChannelId, payload: Buffer) {
-        // Make sure that the channel has the proper formatter to process the output
+        // Make sure that the channel has the proper formatter to process the output.
         if (this.protocolMajorVersion === 1) {
             return;
         }
 
-        // Ensure that we received the message on an open channel
+        // Ensure that we received the message on an open channel.
         const channel = this.getOpenChannel(channelId);
         if (!channel) {
             throw new Error(`No channel with id ${channelId} found.`);
@@ -759,8 +760,8 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         }
 
         // Pass the error received from the remote to the channel
-        const remoteErr = new Error(`Received error message from remote: ${writingError.getErrorMessage()}`);
-        channel.onContent(null, remoteErr)
+        const remoteErr = new Error(`Received error message from remote: ${writingError.errorMessage}`);
+        channel.onContent(null, remoteErr);
     }
 
     private onContentWritingCompleted(channelId: QualifiedChannelId) {

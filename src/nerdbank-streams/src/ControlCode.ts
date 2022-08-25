@@ -34,8 +34,9 @@ export enum ControlCode {
     ContentProcessed,
 
     /**
-     * Sent when the sender is unable to send the complete message to the remote side on the given channel. This frame
-     * only gets sent where the sender and receiver are both running protocol version >= 1
+     * Sent when one party experiences an exception related to a particular channel and carries details regarding the error,
+     * when using protocol version 2 or later.
+     * This is sent right before a ContentWritingCompleted frame closes that channel.
      */
     ContentWritingError,
 }

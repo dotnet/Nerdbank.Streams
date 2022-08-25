@@ -230,7 +230,7 @@ import * as assert from "assert";
             await channels[1].completion;
         });
 
-        it("channel disposes with an error", async() => {
+        it("channel disposes with an error", async () => {
             const errorMessage = "couldn't send all of the data";
             const errorToSend = new Error(errorMessage);
 
