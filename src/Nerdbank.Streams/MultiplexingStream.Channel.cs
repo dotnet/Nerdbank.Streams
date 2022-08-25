@@ -408,7 +408,7 @@ namespace Nerdbank.Streams
 
                     this.disposalTokenSource.Cancel();
 
-                    // If we are disposing due to receiving or sending an exception, the relay that to our clients
+                    // If we are disposing due to receiving or sending an exception, relay that to our client.
                     if (this.faultingException != null)
                     {
                         this.completionSource.TrySetException(this.faultingException);
@@ -513,10 +513,10 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Called by the <see cref="MultiplexingStream"/> when when it will not be writing any more data to the channel.
             /// </summary>
-            /// <param name="error">Optional param used to indicate if we are stopping writing due to an error on the remote side.</param>
+            /// <param name="error">The error in writing that originated on the remote side, if applicable.</param>
             internal void OnContentWritingCompleted(MultiplexingProtocolException? error = null)
             {
-                // If we have already received an error from the remote side then no need to complete the channel again
+                // If we have already received an error from the remote side then no need to complete the channel again.
                 if (this.receivedRemoteException)
                 {
                     return;
@@ -874,7 +874,7 @@ namespace Nerdbank.Streams
                 }
                 catch (Exception ex)
                 {
-                    // If the operation had been cancelled then we are expecting to receive this error so don't transmit it
+                    // If the operation had been cancelled then we are expecting to receive this error so don't transmit it.
                     if (ex is OperationCanceledException && this.DisposalToken.IsCancellationRequested)
                     {
                         await mxStreamIOReader!.CompleteAsync().ConfigureAwait(false);
@@ -887,7 +887,7 @@ namespace Nerdbank.Streams
                             this.faultingException = ex;
                         }
 
-                        // Since were not expecting to receive this error, transmit the error to the remote side
+                        // Since we're not expecting to receive this error, transmit the error to the remote side.
                         await mxStreamIOReader!.CompleteAsync(ex).ConfigureAwait(false);
                         this.MultiplexingStream.OnChannelWritingError(this, ex);
                     }
@@ -967,7 +967,7 @@ namespace Nerdbank.Streams
 
             private void Fault(Exception exception)
             {
-                // If the reason why are faulting isn't already set then do so before disposing the channel
+                // Record the faulting exception unless it is not the original exception.
                 lock (this.SyncObject)
                 {
                     this.faultingException ??= exception;

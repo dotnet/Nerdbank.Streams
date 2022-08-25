@@ -496,7 +496,7 @@ namespace Nerdbank.Streams
             }
 
             /// <summary>
-            /// Returns the serializaed representation of a <see cref="WriteError"/> object using <see cref="MessagePack"/>.
+            /// Returns the serialized representation of a <see cref="WriteError"/> object using <see cref="MessagePack"/>.
             /// </summary>
             /// <param name="protocolVersion">The protocol version to include in the serialized error buffer.</param>
             /// <param name="error">An instance of <see cref="WriteError"/> that we want to seralize.</param>
@@ -504,8 +504,8 @@ namespace Nerdbank.Streams
             internal ReadOnlySequence<byte> SerializeWriteError(int protocolVersion, WriteError error)
             {
                 // Create the payload
-                var errorSequence = new Sequence<byte>();
-                var writer = new MessagePackWriter(errorSequence);
+                using Sequence<byte> errorSequence = new(ArrayPool<byte>.Shared);
+                MessagePackWriter writer = new(errorSequence);
 
                 // Write the error message and the protocol version to the payload
                 writer.WriteArrayHeader(2);
@@ -526,9 +526,9 @@ namespace Nerdbank.Streams
             ///          null otherwise. </returns>
             internal WriteError? DeserializeWriteError(ReadOnlySequence<byte> serializedError, int expectedVersion)
             {
-                var reader = new MessagePackReader(serializedError);
+                MessagePackReader reader = new(serializedError);
 
-                // The payload should only have the error message and the protocol version
+                // The payload should only have the error message and the protocol version.
                 if (reader.ReadArrayHeader() != 2)
                 {
                     return null;

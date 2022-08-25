@@ -18,7 +18,7 @@ namespace Nerdbank.Streams
             /// Initializes a new instance of the <see cref="WriteError"/> class.
             /// </summary>
             /// <param name="message">The error message we want to send to the receiver.</param>
-            public WriteError(string message)
+            internal WriteError(string message)
             {
                 this.ErrorMessage = message;
             }
@@ -26,7 +26,7 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Gets the error message associated with this error.
             /// </summary>
-            public string ErrorMessage { get; }
+            internal string ErrorMessage { get; }
         }
     }
 }

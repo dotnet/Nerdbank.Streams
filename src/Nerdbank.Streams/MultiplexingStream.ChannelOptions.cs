@@ -51,7 +51,8 @@ namespace Nerdbank.Streams
             /// the value of <see cref="ChannelReceivingWindowSize"/> and <see cref="Options.DefaultChannelReceivingWindowSize"/>.
             /// </para>
             /// <para>
-            /// If set to an pipe that was completed with an error, then that error gets sents to the remote using a <see cref="ControlCode.ContentWritingError"/> frame.
+            /// A faulted <see cref="IDuplexPipe.Input" /> (one where <see cref="PipeReader.CompleteAsync(Exception)" /> is called with an exception)
+            /// will have its exception relayed to the remote party before closing the channel.
             /// </para>
             /// </remarks>
             /// <exception cref="ArgumentException">Thrown if set to an <see cref="IDuplexPipe"/> that returns <c>null</c> for either of its properties.</exception>

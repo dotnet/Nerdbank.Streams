@@ -211,7 +211,7 @@ namespace Nerdbank.Streams
             HandshakeStarted,
 
             /// <summary>
-            /// Raised when we are tracing an event related to <see cref="MultiplexingStream.ControlCode.ContentWritingError"/>.
+            /// Raised when receiving or sending a <see cref="ControlCode.ContentWritingError"/>.
             /// </summary>
             WriteError,
         }
@@ -928,19 +928,19 @@ namespace Nerdbank.Streams
         }
 
         /// <summary>
-        /// Called when the channel receives a frame with code <see cref="ControlCode.ContentWritingError"/> from the remote.
+        /// Occurs when the channel receives a frame with code <see cref="ControlCode.ContentWritingError"/> from the remote.
         /// </summary>
         /// <param name="channelId">The channel id of the sender of the frame.</param>
         /// <param name="payload">The payload that the sender sent in the frame.</param>
         private void OnContentWritingError(QualifiedChannelId channelId, ReadOnlySequence<byte> payload)
         {
-            // Make sure this MultiplexingStream is qualified to received content writing error messages
+            // Make sure this MultiplexingStream is qualified to receive content writing error messages.
             if (this.protocolMajorVersion == 1)
             {
-                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Error))
                 {
                     this.TraceSource.TraceEvent(
-                        TraceEventType.Information,
+                        TraceEventType.Error,
                         (int)TraceEventId.WriteError,
                         "Rejecting writing error from channel {0} as MultiplexingStream has protocol version of {1}",
                         channelId,
@@ -968,10 +968,10 @@ namespace Nerdbank.Streams
             WriteError? error = errorDeserializingFormattter.DeserializeWriteError(payload, this.protocolMajorVersion);
             if (error == null)
             {
-                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Error))
                 {
                     this.TraceSource.TraceEvent(
-                        TraceEventType.Information,
+                        TraceEventType.Error,
                         (int)TraceEventId.WriteError,
                         "Rejecting content writing error from channel {0} due to invalid payload",
                         channelId);
@@ -1181,8 +1181,8 @@ namespace Nerdbank.Streams
         }
 
         /// <summary>
-        /// Called when the local end was not able to completely write all the data to this channel due to an error,
-        /// leading to the transmission of a <see cref="ControlCode.ContentWritingError"/> frame being sent for this channel.
+        /// Informs the remote party of a local error that prevents sending all the required data to this channel
+        /// by transmitting a <see cref="ControlCode.ContentWritingError"/> frame.
         /// </summary>
         /// <param name="channel">The channel whose writing was halted.</param>
         /// <param name="exception">The exception that caused the writing to be haulted.</param>
@@ -1214,14 +1214,14 @@ namespace Nerdbank.Streams
                     this.TraceSource.TraceEvent(
                         TraceEventType.Information,
                         (int)TraceEventId.WriteError,
-                        "Not informing remote side of write error on channel {0} as it is an improper state");
+                        "Not informing remote side of write error on channel {0} as it is already terminated or unknown.");
                 }
 
                 return;
             }
 
             // Create the payload to send to the remote side
-            WriteError error = new WriteError(exception.Message);
+            WriteError error = new(exception.Message);
             V2Formatter errorSerializationFormatter = (V2Formatter)this.formatter;
             ReadOnlySequence<byte> serializedError = errorSerializationFormatter.SerializeWriteError(this.protocolMajorVersion, error);
 
