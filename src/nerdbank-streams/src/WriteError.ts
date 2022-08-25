@@ -6,7 +6,7 @@
 export class WriteError {
     /**
      * Initializes a new instance of the WriteError class.
-     * @param errorMsg The error message.
+     * @param errorMessage The error message.
      */
     constructor(public readonly errorMessage: string) {
     }
