@@ -25,7 +25,7 @@ namespace Nerdbank.Streams.Interop.Tests
 
         private static async Task Main(string[] args)
         {
-            ////System.Diagnostics.Debugger.Launch();
+            // System.Diagnostics.Debugger.Launch();
             int protocolMajorVersion = int.Parse(args[0]);
             var options = new MultiplexingStream.Options
             {

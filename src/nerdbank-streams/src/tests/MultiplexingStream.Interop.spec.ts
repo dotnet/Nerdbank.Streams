@@ -112,7 +112,7 @@ import * as assert from "assert";
                 caughtCompletionErr = true;
             });
 
-            await errorWriteChannel.dispose(errorToSend);
+            await errorWriteChannel.fault(errorToSend);
             assert.deepStrictEqual(caughtCompletionErr, true);
 
             let expectedMessage = `received error: Remote party indicated writing error: ${errorMessage}`;

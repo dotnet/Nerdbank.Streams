@@ -239,7 +239,7 @@ import * as assert from "assert";
                 mx2.acceptChannelAsync("test"),
             ]);
 
-            await channels[0].dispose(errorToSend);
+            await channels[0].fault(errorToSend);
 
             // Ensure that the current channel disposes with the error
             let caughtSenderError = false;

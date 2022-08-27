@@ -53,11 +53,16 @@ export abstract class Channel implements IDisposableObservable {
         return this._isDisposed;
     }
 
+    // Sends the passed in error to the remote side and then closes the channel.
+    // dispose can be called after calling async even though it is not necessary.
+    public fault(error: Error) {
+        this._isDisposed = true;
+    }
+
     /**
-     * Closes this channel. If the an error is passed into the method then that error
-     * gets sent to the remote before the disposing of the channel.
+     * Closes this channel.
      */
-    public async dispose(error? : Error) {
+    public dispose() {
         // The interesting stuff is in the derived class.
         this._isDisposed = true;
     }
@@ -252,14 +257,26 @@ export class ChannelClass extends Channel {
         }
     }
 
-    public async dispose(errorToSend? : Error) {
+    public async fault(error: Error) {
+        // If the channel is already disposed then don't do anything
+        if(this.isDisposed) {
+            return;
+        }
+
+        // Send the error message to the remote side
+        await this._multiplexingStream.onChannelWritingError(this, error.message);
+
+        // Set the remote exception to the passed in error so that the channel is
+        // completed with this error
+        this.remoteError = error;
+
+        // Dispose of the channel
+        await this.dispose();
+    }
+
+    public async dispose() {
         if (!this.isDisposed) {
             super.dispose();
-
-            // If the channel is disposed with an error, transmit it to the remote side
-            if (errorToSend) {
-                await this._multiplexingStream.onChannelWritingError(this, errorToSend.message);
-            }
 
             this._acceptance.reject(new CancellationToken.CancellationError("disposed"));
 
@@ -271,8 +288,8 @@ export class ChannelClass extends Channel {
 
             // If we are sending an error to the remote side or received an error from the remote,
             // relay that information to the clients.
-            if (errorToSend ?? this.remoteError) {
-                this._completion.reject(errorToSend ?? this.remoteError);
+            if (this.remoteError) {
+                this._completion.reject(this.remoteError);
             } else {
                 this._completion.resolve();
             }
