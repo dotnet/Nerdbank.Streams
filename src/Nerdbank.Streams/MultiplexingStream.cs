@@ -250,6 +250,11 @@ namespace Nerdbank.Streams
         private Func<QualifiedChannelId, string, TraceSource?>? DefaultChannelTraceSourceFactory { get; }
 
         /// <summary>
+        ///  Gets a value indicating whether this stream can send or receive frames of type<see cref="ControlCode.ContentWritingError"/>.
+        /// </summary>
+        private bool ContentWritingErrorSupported => this.protocolMajorVersion > 1;
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="MultiplexingStream"/> class
         /// with <see cref="Options.ProtocolMajorVersion"/> set to 3.
         /// </summary>
@@ -934,13 +939,50 @@ namespace Nerdbank.Streams
         /// <param name="payload">The payload that the sender sent in the frame.</param>
         private void OnContentWritingError(QualifiedChannelId channelId, ReadOnlySequence<byte> payload)
         {
-            // Make sure this MultiplexingStream is qualified to receive content writing error messages.
-            if (!(this.formatter is V2Formatter errorDeserializingFormattter))
+            // Get the channel that send this frame
+            Channel channel;
+            lock (this.syncObject)
             {
-                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Error))
+                channel = this.openChannels[channelId];
+            }
+
+            // Determines if the channel is in a state to receive messages
+            bool channelInValidState = channelId.Source != ChannelSource.Local || channel.IsAccepted;
+
+            // If the channel is in a valid state and we have a valid protocol version, then process the message
+            if (channelInValidState && this.ContentWritingErrorSupported)
+            {
+                // Deserialize the payload and verify that it was in an expected state
+                V2Formatter errorDeserializingFormattter = (V2Formatter)this.formatter;
+                WriteError? error = errorDeserializingFormattter.DeserializeWriteError(payload, this.TraceSource);
+
+                if (error == null)
+                {
+                    if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Warning))
+                    {
+                        this.TraceSource.TraceEvent(
+                            TraceEventType.Warning,
+                            (int)TraceEventId.WriteError,
+                            "Rejecting content writing error from channel {0} due to invalid payload",
+                            channelId);
+                    }
+
+                    return;
+                }
+
+                // Get the error message and complete the channel using it
+                string errorMessage = error.ErrorMessage;
+                MultiplexingProtocolException channelClosingException = new MultiplexingProtocolException($"Remote party indicated writing error: {errorMessage}");
+                channel.OnContentWritingCompleted(channelClosingException);
+            }
+            else if (channelInValidState && !this.ContentWritingErrorSupported)
+            {
+                // The channel is in a valid state but we have a protocol version that doesn't support processing errrors
+                // so don't do anything.
+                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Warning))
                 {
                     this.TraceSource.TraceEvent(
-                        TraceEventType.Error,
+                        TraceEventType.Warning,
                         (int)TraceEventId.WriteError,
                         "Rejecting writing error from channel {0} as MultiplexingStream has protocol version of {1}",
                         channelId,
@@ -949,40 +991,11 @@ namespace Nerdbank.Streams
 
                 return;
             }
-
-            // Get the channel that send this frame
-            Channel channel;
-            lock (this.syncObject)
+            else
             {
-                channel = this.openChannels[channelId];
-            }
-
-            // Verify that the channel is in a state that it can receive communication
-            if (channelId.Source == ChannelSource.Local && !channel.IsAccepted)
-            {
+                // The channel is in an invalid state so throw an error indicating so
                 throw new MultiplexingProtocolException($"Remote party indicated they encountered errors writing to channel {channelId} before accepting it.");
             }
-
-            // Deserialize the payload and verify that it was in an expected state
-            WriteError? error = errorDeserializingFormattter.DeserializeWriteError(payload, this.TraceSource);
-            if (error == null)
-            {
-                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Error))
-                {
-                    this.TraceSource.TraceEvent(
-                        TraceEventType.Error,
-                        (int)TraceEventId.WriteError,
-                        "Rejecting content writing error from channel {0} due to invalid payload",
-                        channelId);
-                }
-
-                return;
-            }
-
-            // Get the error message and complete the channel using it
-            string errorMessage = error.ErrorMessage;
-            MultiplexingProtocolException channelClosingException = new MultiplexingProtocolException($"Remote party indicated writing error: {errorMessage}");
-            channel.OnContentWritingCompleted(channelClosingException);
         }
 
         private void OnContentWritingCompleted(QualifiedChannelId channelId)
@@ -1189,13 +1202,39 @@ namespace Nerdbank.Streams
         {
             Requires.NotNull(channel, nameof(channel));
 
-            // Make sure that we are allowed to send error frames on this protocol version
-            if (!(this.formatter is V2Formatter errorSerializationFormatter))
+            // Verify that we can send a message over this channel
+            bool channelInValidState = true;
+            lock (this.syncObject)
             {
-                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                channelInValidState = !this.channelsPendingTermination.Contains(channel.QualifiedId)
+                    && this.openChannels.ContainsKey(channel.QualifiedId);
+            }
+
+            // If we can send messages over this channel and we have the correct protocol version then send the error
+            if (channelInValidState && this.ContentWritingErrorSupported)
+            {
+                // Create the payload to send to the remote side
+                V2Formatter errorSerializationFormatter = (V2Formatter)this.formatter;
+                WriteError error = new(exception.Message);
+                ReadOnlySequence<byte> serializedError = errorSerializationFormatter.SerializeWriteError(error);
+
+                // Create the frame header indicating that we encountered a content writing error
+                FrameHeader header = new FrameHeader
+                {
+                    Code = ControlCode.ContentWritingError,
+                    ChannelId = channel.QualifiedId,
+                };
+
+                // Send the frame alongside the payload to the remote side
+                this.SendFrame(header, serializedError, CancellationToken.None);
+            }
+            else if (channelInValidState && !this.ContentWritingErrorSupported)
+            {
+                // The channel is in a valid state but our protocol version doesn't support writing errors so don't do anything
+                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Warning))
                 {
                     this.TraceSource.TraceEvent(
-                        TraceEventType.Information,
+                        TraceEventType.Warning,
                         (int)TraceEventId.WriteError,
                         "Not informing remote side of write error on channel {0} since MultiplexingStream has protocol version of {1}",
                         channel.QualifiedId,
@@ -1204,37 +1243,11 @@ namespace Nerdbank.Streams
 
                 return;
             }
-
-            // Verify that we are able to communicate to the remote side on this channel
-            lock (this.syncObject)
+            else
             {
-                if (this.channelsPendingTermination.Contains(channel.QualifiedId) || !this.openChannels.ContainsKey(channel.QualifiedId))
-                {
-                    if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                    {
-                        this.TraceSource.TraceEvent(
-                            TraceEventType.Information,
-                            (int)TraceEventId.WriteError,
-                            "Not informing remote side of write error on channel {0} as it is already terminated or unknown.");
-                    }
-
-                    return;
-                }
+                // The channel is not in a valid state to send any messages so throw an error indicating so
+                throw new MultiplexingProtocolException($"Can't write content writing error to channel {channel.QualifiedId} as it is terminated or isn't open");
             }
-
-            // Create the payload to send to the remote side
-            WriteError error = new(exception.Message);
-            ReadOnlySequence<byte> serializedError = errorSerializationFormatter.SerializeWriteError(error);
-
-            // Create the frame header indicating that we encountered a content writing error
-            FrameHeader header = new FrameHeader
-            {
-                Code = ControlCode.ContentWritingError,
-                ChannelId = channel.QualifiedId,
-            };
-
-            // Send the frame alongside the payload to the remote side
-            this.SendFrame(header, serializedError, CancellationToken.None);
         }
 
         /// <summary>
