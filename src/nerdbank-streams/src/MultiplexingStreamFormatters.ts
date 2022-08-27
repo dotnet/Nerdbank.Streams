@@ -303,22 +303,16 @@ export class MultiplexingStreamV2Formatter extends MultiplexingStreamFormatter {
         return msgpack.decode(payload)[0];
     }
 
-    serializeContentWritingError(version: number, writingError: WriteError) : Buffer {
-        const payload: any[] = [version, writingError.errorMessage];
+    serializeContentWritingError(writingError: WriteError) : Buffer {
+        const payload: any[] = [writingError.errorMessage];
         return msgpack.encode(payload);
     }
 
-    deserializeContentWritingError(payload: Buffer, expectedVersion: number) : WriteError | null {
+    deserializeContentWritingError(payload: Buffer) : WriteError | null {
         const msgpackObject = msgpack.decode(payload);
-        const payloadVersion : number = msgpackObject[0];
-
-        // Make sure the version of the payload matches the expected version.
-        if (payloadVersion !== expectedVersion) {
-            return null;
-        }
 
         // Return the error message to the caller.
-        const errorMsg : string = msgpackObject[1];
+        const errorMsg : string = msgpackObject[0];
         return new WriteError(errorMsg);
     }
 

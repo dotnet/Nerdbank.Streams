@@ -593,7 +593,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         // Convert the error message into a payload into a formatter.
         const writingError = new WriteError(errorMessage);
         const errorSerializingFormatter = this.formatter as MultiplexingStreamV2Formatter;
-        const errorPayload = errorSerializingFormatter.serializeContentWritingError(this.protocolMajorVersion, writingError);
+        const errorPayload = errorSerializingFormatter.serializeContentWritingError(writingError);
 
         // Sent the error to the remote side
         await this.sendFrameAsync(new FrameHeader(ControlCode.ContentWritingError, channel.qualifiedId), errorPayload);
@@ -754,7 +754,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 
         // Extract the error from the payload
         const errorDeserializingFormatter = (this.formatter as MultiplexingStreamV2Formatter);
-        const writingError = errorDeserializingFormatter.deserializeContentWritingError(payload, this.protocolMajorVersion);
+        const writingError = errorDeserializingFormatter.deserializeContentWritingError(payload);
         if (!writingError) {
             throw new Error("Couldn't process content writing error payload received from remote");
         }
