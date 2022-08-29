@@ -36,77 +36,6 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
     protected virtual int ProtocolMajorVersion { get; } = 1;
 
-    [Fact]
-    public async Task OfferPipeWithError()
-    {
-        bool errorThrown = false;
-        string errorMessage = "Hello World";
-
-        // Prepare a readonly pipe that is already populated with data an an error
-        var pipe = new Pipe();
-        await pipe.Writer.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
-        pipe.Writer.Complete(new NullReferenceException(errorMessage));
-
-        // Create a sending and receiving channel using the channel
-        MultiplexingStream.Channel? localChannel = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(pipe.Reader) });
-        await this.WaitForEphemeralChannelOfferToPropagateAsync();
-        MultiplexingStream.Channel? remoteChannel = this.mx2.AcceptChannel(localChannel.QualifiedId.Id);
-
-        bool continueReading = true;
-        while (continueReading)
-        {
-            try
-            {
-                // Read the latest input from the local channel and determine if we should continue reading
-                ReadResult readResult = await remoteChannel.Input.ReadAsync(this.TimeoutToken);
-                if (readResult.IsCompleted || readResult.IsCanceled)
-                {
-                    continueReading = false;
-                }
-
-                remoteChannel.Input.AdvanceTo(readResult.Buffer.End);
-            }
-            catch (Exception exception)
-            {
-                // Check not only that we caught an exception but that it was the expected exception.
-                errorThrown = exception.Message.Contains(errorMessage);
-                continueReading = !errorThrown;
-            }
-        }
-
-        Assert.Equal(this.ProtocolMajorVersion > 1, errorThrown);
-
-        // Ensure that the writer of the error completes with that error, no matter what version of the protocol they are using
-        string expectedWriterErrorMessage = errorMessage;
-        bool localChannelCompletedWithError = false;
-
-        try
-        {
-            await localChannel.Completion;
-        }
-        catch (Exception writeException)
-        {
-            localChannelCompletedWithError = writeException.Message.Contains(expectedWriterErrorMessage);
-        }
-
-        Assert.True(localChannelCompletedWithError);
-
-        // Ensure that the reader only completes with an error if we are using a protocol version > 1
-        string expectedReaderErrorMessage = "Remote party indicated writing error: " + errorMessage;
-        bool remoteChannelCompletedWithError = false;
-
-        try
-        {
-            await remoteChannel.Completion;
-        }
-        catch (Exception readException)
-        {
-            remoteChannelCompletedWithError = readException.Message.Contains(expectedReaderErrorMessage);
-        }
-
-        Assert.Equal(this.ProtocolMajorVersion > 1, remoteChannelCompletedWithError);
-    }
-
     public async Task InitializeAsync()
     {
         var mx1TraceSource = new TraceSource(nameof(this.mx1), SourceLevels.All);
@@ -169,6 +98,77 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     public void DefaultMajorProtocolVersion()
     {
         Assert.Equal(1, new MultiplexingStream.Options().ProtocolMajorVersion);
+    }
+
+    [Fact]
+    public async Task OfferPipeWithError()
+    {
+        bool errorThrown = false;
+        string errorMessage = "Hello World";
+
+        // Prepare a readonly pipe that is already populated with data an an error
+        var pipe = new Pipe();
+        await pipe.Writer.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
+        pipe.Writer.Complete(new Exception(errorMessage));
+
+        // Create a sending and receiving channel using the channel
+        MultiplexingStream.Channel? localChannel = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(pipe.Reader) });
+        await this.WaitForEphemeralChannelOfferToPropagateAsync();
+        MultiplexingStream.Channel? remoteChannel = this.mx2.AcceptChannel(localChannel.QualifiedId.Id);
+
+        bool continueReading = true;
+        while (continueReading)
+        {
+            try
+            {
+                // Read the latest input from the local channel and determine if we should continue reading
+                ReadResult readResult = await remoteChannel.Input.ReadAsync(this.TimeoutToken);
+                if (readResult.IsCompleted || readResult.IsCanceled)
+                {
+                    continueReading = false;
+                }
+
+                remoteChannel.Input.AdvanceTo(readResult.Buffer.End);
+            }
+            catch (Exception exception)
+            {
+                // Check not only that we caught an exception but that it was the expected exception.
+                errorThrown = exception.Message.Contains(errorMessage);
+                continueReading = !errorThrown;
+            }
+        }
+
+        Assert.Equal(this.ProtocolMajorVersion > 1, errorThrown);
+
+        // Ensure that the writer of the error completes with that error, no matter what version of the protocol they are using
+        string expectedWriterErrorMessage = errorMessage;
+        bool localChannelCompletedWithError = false;
+
+        try
+        {
+            await localChannel.Completion;
+        }
+        catch (Exception writeException)
+        {
+            localChannelCompletedWithError = writeException.Message.Contains(expectedWriterErrorMessage);
+        }
+
+        Assert.True(localChannelCompletedWithError);
+
+        // Ensure that the reader only completes with an error if we are using a protocol version > 1
+        string expectedReaderErrorMessage = "Remote party indicated writing error: " + errorMessage;
+        bool remoteChannelCompletedWithError = false;
+
+        try
+        {
+            await remoteChannel.Completion;
+        }
+        catch (Exception readException)
+        {
+            remoteChannelCompletedWithError = readException.Message.Contains(expectedReaderErrorMessage);
+        }
+
+        Assert.Equal(this.ProtocolMajorVersion > 1, remoteChannelCompletedWithError);
     }
 
     [Fact]
