@@ -12,6 +12,7 @@ internal class MockMemoryPool<T> : MemoryPool<T>
     public override int MaxBufferSize => throw new NotImplementedException();
 
     public int RentCallCount { get; private set; }
+
     public List<Memory<T>> Contents { get; } = new List<Memory<T>>();
 
     /// <summary>
