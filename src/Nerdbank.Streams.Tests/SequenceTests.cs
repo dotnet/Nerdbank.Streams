@@ -440,6 +440,24 @@ public class SequenceTests : TestBase
     }
 
     [Fact]
+    public void MinimumSpanLength_DoesNotAllocateIfThereAreBytesLeft()
+    {
+        var pool = new MockMemoryPool<byte>();
+        var seq = new Sequence<byte>(pool)
+        {
+            MinimumSpanLength = 64,
+        };
+        Span<byte> firstSpan = seq.GetSpan(1);
+        seq.Advance(1);
+        Span<byte> secondSpan = seq.GetSpan(63);
+        seq.Advance(63);
+
+        Assert.Equal(64, firstSpan.Length);
+        Assert.Equal(63, secondSpan.Length);
+        Assert.Equal(1, pool.RentCallCount);
+    }
+
+    [Fact]
     public void MinimumSpanLength_ZeroGetsPoolRecommendation()
     {
         var pool = new MockMemoryPool<int>();
