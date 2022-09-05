@@ -11,6 +11,7 @@ internal class MockMemoryPool<T> : MemoryPool<T>
 {
     public override int MaxBufferSize => throw new NotImplementedException();
 
+    public int RentCallCount { get; private set; }
     public List<Memory<T>> Contents { get; } = new List<Memory<T>>();
 
     /// <summary>
@@ -23,6 +24,8 @@ internal class MockMemoryPool<T> : MemoryPool<T>
 
     public override IMemoryOwner<T> Rent(int minBufferSize = -1)
     {
+        this.RentCallCount++;
+
         Memory<T> result;
         if (minBufferSize <= 0)
         {
