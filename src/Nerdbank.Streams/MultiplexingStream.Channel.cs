@@ -495,7 +495,7 @@ namespace Nerdbank.Streams
             }
 
             /// <summary>
-            /// Called by the <see cref="MultiplexingStream"/> when when it will not be writing any more data to the channel.
+            /// Called by the <see cref="MultiplexingStream"/> when it will not be writing any more data to the channel.
             /// </summary>
             internal void OnContentWritingCompleted()
             {
