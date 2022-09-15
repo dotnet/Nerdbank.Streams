@@ -265,10 +265,9 @@ namespace Nerdbank.Streams
             }
             else
             {
-                sizeHint = Math.Max(this.MinimumSpanLength, sizeHint);
                 if (this.last == null || this.last.WritableBytes < sizeHint)
                 {
-                    minBufferSize = sizeHint;
+                    minBufferSize = Math.Max(this.MinimumSpanLength, sizeHint);
                 }
             }
 

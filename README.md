@@ -44,4 +44,4 @@ Specialized .NET Stream classes
    read directly from any `ReadOnlySequence<byte>`, making it more reusable than `StreamReader`
    and thus allows for alloc-free reading across many sequences.
 1. [`DuplexPipe`](doc/DuplexPipe.md) is a trivial implementation of `IDuplexPipe`.
-1. [`Stream.ReadBlockAsync`](doc/ReadBlockAsync.md) reads
+1. [`Stream.ReadBlockAsync`](doc/ReadBlockAsync.md) guarantees to fill the supplied buffer except under certain documented conditions, instead of the regular `ReadAsync` guarantee of supplying at least 1 byte.
