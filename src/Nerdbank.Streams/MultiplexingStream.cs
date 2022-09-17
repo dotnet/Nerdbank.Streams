@@ -1143,12 +1143,7 @@ namespace Nerdbank.Streams
             Requires.NotNull(channel, nameof(channel));
             Requires.NotNull(options, nameof(options));
 
-            if (channel.TryAcceptOffer(options))
-            {
-                return true;
-            }
-
-            return false;
+            return channel.TryAcceptOffer(options);
         }
 
         private void AcceptChannelOrThrow(Channel channel, ChannelOptions options)
@@ -1158,6 +1153,11 @@ namespace Nerdbank.Streams
 
             if (!this.TryAcceptChannel(channel, options))
             {
+                if (System.Environment.StackTrace.Contains("OfferPipeWithError"))
+                {
+                    System.Diagnostics.Debugger.Launch();
+                }
+
                 if (channel.IsAccepted)
                 {
                     throw new InvalidOperationException("Channel is already accepted.");
@@ -1201,6 +1201,11 @@ namespace Nerdbank.Streams
         private void OnChannelWritingError(Channel channel, Exception exception)
         {
             Requires.NotNull(channel, nameof(channel));
+
+            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+            {
+                this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Local channel {0} encountered write error {1}", channel.QualifiedId, exception.Message);
+            }
 
             // Verify that we can send a message over this channel
             bool channelInValidState = true;

@@ -582,7 +582,9 @@ namespace Nerdbank.Streams
                     this.localWindowSize ??= channelOptions.ChannelReceivingWindowSize is long windowSize ? Math.Max(windowSize, this.MultiplexingStream.DefaultChannelReceivingWindowSize) : this.MultiplexingStream.DefaultChannelReceivingWindowSize;
                 }
 
+                TraceSource traceSrc = new TraceSource($"{nameof(Streams.MultiplexingStream)}.{nameof(Channel)} {this.QualifiedId} ({this.Name}) TryAcceptOffer", SourceLevels.Critical);
                 var acceptanceParameters = new AcceptanceParameters(this.localWindowSize.Value);
+
                 if (this.acceptanceSource.TrySetResult(acceptanceParameters))
                 {
                     if (this.QualifiedId.Source != ChannelSource.Seeded)
@@ -607,7 +609,15 @@ namespace Nerdbank.Streams
                     {
                         // A (harmless) race condition was hit.
                         // Swallow it and return false below.
+                        if (traceSrc.Switch.ShouldTrace(TraceEventType.Critical))
+                        {
+                            traceSrc.TraceEvent(TraceEventType.Critical, (int)TraceEventId.WriteError, "Rejecting channel offer due to ObjectDisposedException exception");
+                        }
                     }
+                }
+                else if (traceSrc.Switch.ShouldTrace(TraceEventType.Critical))
+                {
+                    traceSrc.TraceEvent(TraceEventType.Critical, (int)TraceEventId.WriteError, "Rejecting channel offer due to trySetResult failure");
                 }
 
                 return false;
@@ -870,6 +880,11 @@ namespace Nerdbank.Streams
                 }
                 catch (Exception ex)
                 {
+                    if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                    {
+                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Caught exception relaying message to remote side: {0}", ex.Message);
+                    }
+
                     // If the operation had been cancelled then we are expecting to receive this error so don't transmit it.
                     if (ex is OperationCanceledException && this.DisposalToken.IsCancellationRequested)
                     {
@@ -885,14 +900,35 @@ namespace Nerdbank.Streams
 
                         // Since we're not expecting to receive this error, transmit the error to the remote side.
                         await mxStreamIOReader!.CompleteAsync(ex).ConfigureAwait(false);
-                        this.MultiplexingStream.OnChannelWritingError(this, ex);
+
+                        // Send error message to the remote if this channel hasn't been disposed
+                        bool canSendErrorMessage;
+                        lock (this.SyncObject)
+                        {
+                            canSendErrorMessage = !this.isDisposed;
+                        }
+
+                        if (canSendErrorMessage)
+                        {
+                            this.MultiplexingStream.OnChannelWritingError(this, ex);
+                        }
                     }
 
                     throw;
                 }
                 finally
                 {
-                    this.MultiplexingStream.OnChannelWritingCompleted(this);
+                    // Send the completion message to the remote if the channel hasn't been disposed
+                    bool canSendCompletionMessage;
+                    lock (this.SyncObject)
+                    {
+                        canSendCompletionMessage = !this.isDisposed;
+                    }
+
+                    if (canSendCompletionMessage)
+                    {
+                        this.MultiplexingStream.OnChannelWritingCompleted(this);
+                    }
 
                     // Restore the PipeReader to the field.
                     lock (this.SyncObject)
