@@ -343,6 +343,16 @@ namespace Nerdbank.Streams
             {
                 if (!this.IsDisposed)
                 {
+                    TraceSource traceSrc = this.GetTraceSource();
+                    if (traceSrc.Switch.ShouldTrace(TraceEventType.Information))
+                    {
+                        traceSrc.TraceEvent(
+                            TraceEventType.Information,
+                            (int)TraceEventId.WriteError,
+                            "Calling TrySetCanceled of acceptanceSource in Dispose method of channel {0}",
+                            this.QualifiedId);
+                    }
+
                     this.acceptanceSource.TrySetCanceled();
                     this.optionsAppliedTaskSource?.TrySetCanceled();
 
@@ -583,7 +593,16 @@ namespace Nerdbank.Streams
                 }
 
                 var acceptanceParameters = new AcceptanceParameters(this.localWindowSize.Value);
-                string errorCause = "TrySetResult failure";
+                TraceSource traceSrc = this.GetTraceSource();
+
+                if (traceSrc.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    traceSrc.TraceEvent(
+                        TraceEventType.Information,
+                        (int)TraceEventId.WriteError,
+                        "Calling TrySetResult of acceptanceSource in TryAcceptOffer method of channel {0}",
+                        this.QualifiedId);
+                }
 
                 if (this.acceptanceSource.TrySetResult(acceptanceParameters))
                 {
@@ -609,18 +628,24 @@ namespace Nerdbank.Streams
                     {
                         // A (harmless) race condition was hit.
                         // Swallow it and return false below.
-                        errorCause = "Object Disposed Exception";
+                        if (traceSrc.Switch.ShouldTrace(TraceEventType.Critical))
+                        {
+                            traceSrc.TraceEvent(
+                                TraceEventType.Critical,
+                                (int)TraceEventId.WriteError,
+                                "Rejecting channel offer due to ObjectDisposedException exception");
+                        }
                     }
                 }
-
-                /*
-                if (errorCause != string.Empty && System.Environment.StackTrace.Contains("OfferPipeWithError"))
+                else if (traceSrc.Switch.ShouldTrace(TraceEventType.Critical))
                 {
-                    System.Diagnostics.Debugger.Launch();
+                    traceSrc.TraceEvent(
+                        TraceEventType.Critical,
+                        (int)TraceEventId.WriteError,
+                        "Rejecting channel offer due to trySetResult failure");
                 }
-                */
 
-                return false && errorCause.Length == 0;
+                return false;
             }
 
             /// <summary>
@@ -632,6 +657,16 @@ namespace Nerdbank.Streams
             {
                 lock (this.SyncObject)
                 {
+                    TraceSource traceSrc = this.GetTraceSource();
+                    if (traceSrc.Switch.ShouldTrace(TraceEventType.Information))
+                    {
+                        traceSrc.TraceEvent(
+                            TraceEventType.Information,
+                            (int)TraceEventId.WriteError,
+                            "Calling TrySetResult of acceptanceSource in OnAccepted method of channel {0}",
+                            this.QualifiedId);
+                    }
+
                     if (this.acceptanceSource.TrySetResult(acceptanceParameters))
                     {
                         this.remoteWindowSize = acceptanceParameters.RemoteWindowSize;
@@ -693,6 +728,17 @@ namespace Nerdbank.Streams
             }
 
             /// <summary>
+            /// GetTraceSource gets the trace source to use when emitting trace messages.
+            /// </summary>
+            /// <returns>The <see cref="TraceSource"/> to use when emitting messages.</returns>
+            private TraceSource GetTraceSource()
+            {
+                return this.TraceSource
+                       ?? this.MultiplexingStream.DefaultChannelTraceSourceFactory?.Invoke(this.QualifiedId, this.Name)
+                       ?? new TraceSource($"{nameof(Streams.MultiplexingStream)}.{nameof(Channel)} {this.QualifiedId} ({this.Name})", SourceLevels.All);
+            }
+
+            /// <summary>
             /// Apply channel options to this channel, including setting up or linking to an user-supplied pipe writer/reader pair.
             /// </summary>
             /// <param name="channelOptions">The channel options to apply.</param>
@@ -735,6 +781,16 @@ namespace Nerdbank.Streams
                 }
                 catch (Exception ex)
                 {
+                    if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Critical))
+                    {
+                        this.TraceSource.TraceEvent(
+                            TraceEventType.Critical,
+                            (int)TraceEventId.WriteError,
+                            "Caught ApplyChannelOptions error on channel {0}: {1}",
+                            this.QualifiedId,
+                            ex.Message);
+                    }
+
                     this.optionsAppliedTaskSource?.TrySetException(ex);
                     throw;
                 }
@@ -900,42 +956,21 @@ namespace Nerdbank.Streams
 
                         // Since we're not expecting to receive this error, transmit the error to the remote side.
                         await mxStreamIOReader!.CompleteAsync(ex).ConfigureAwait(false);
-
-                        // Send error message to the remote if this channel hasn't been disposed
-                        bool canSendErrorMessage;
-                        lock (this.SyncObject)
-                        {
-                            canSendErrorMessage = !this.isDisposed;
-                        }
-
-                        if (canSendErrorMessage)
-                        {
-                            this.MultiplexingStream.OnChannelWritingError(this, ex);
-                        }
+                        this.MultiplexingStream.OnChannelWritingError(this, ex);
                     }
 
                     throw;
                 }
                 finally
                 {
-                    // Send the completion message to the remote if the channel hasn't been disposed
-                    bool canSendCompletionMessage;
-                    lock (this.SyncObject)
-                    {
-                        canSendCompletionMessage = !this.isDisposed;
-                    }
-
-                    if (canSendCompletionMessage)
-                    {
-                        this.MultiplexingStream.OnChannelWritingCompleted(this);
-                    }
+                    // Send the completion message to the remote
+                    this.MultiplexingStream.OnChannelWritingCompleted(this);
 
                     // Restore the PipeReader to the field.
                     lock (this.SyncObject)
                     {
                         this.mxStreamIOReader = mxStreamIOReader;
                         mxStreamIOReader = null;
-                        canSendCompletionMessage = !this.isDisposed;
                     }
                 }
             }

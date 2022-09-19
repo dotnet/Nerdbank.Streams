@@ -225,7 +225,7 @@ namespace Nerdbank.Streams
         /// Gets the logger used by this instance.
         /// </summary>
         /// <value>Never null.</value>
-        public TraceSource TraceSource { get; }
+        public TraceSource TraceSource { get; private set; }
 
         /// <summary>
         /// Gets the default window size used for new channels that do not specify a value for <see cref="ChannelOptions.ChannelReceivingWindowSize"/>.
@@ -449,6 +449,16 @@ namespace Nerdbank.Streams
                 {
                     throw new InvalidOperationException(Strings.NoChannelFoundById);
                 }
+            }
+
+            TraceSource traceSrc = this.GetTraceSource();
+            if (traceSrc.Switch.ShouldTrace(TraceEventType.Information))
+            {
+                traceSrc.TraceEvent(
+                    TraceEventType.Information,
+                    (int)TraceEventId.WriteError,
+                    "Calling AcceptChannelOrThrow inside AcceptChannel for channel {0}",
+                    channel.QualifiedId);
             }
 
             this.AcceptChannelOrThrow(channel, options);
@@ -998,6 +1008,11 @@ namespace Nerdbank.Streams
             }
         }
 
+        private TraceSource GetTraceSource()
+        {
+            return this.TraceSource ?? new TraceSource($"{nameof(Streams.MultiplexingStream)}", SourceLevels.All);
+        }
+
         private void OnContentWritingCompleted(QualifiedChannelId channelId)
         {
             Channel channel;
@@ -1131,6 +1146,16 @@ namespace Nerdbank.Streams
 
             if (acceptingChannelAlreadyPresent)
             {
+                TraceSource traceSrc = this.GetTraceSource();
+                if (traceSrc.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    traceSrc.TraceEvent(
+                        TraceEventType.Information,
+                        (int)TraceEventId.WriteError,
+                        "Calling AcceptChannelOrThrow inside OnOffer method for channel {0}",
+                        channel.QualifiedId);
+                }
+
                 this.AcceptChannelOrThrow(channel, options);
             }
 
@@ -1328,7 +1353,7 @@ namespace Nerdbank.Streams
                             // In such cases, we should just suppress transmission of the frame because the other side does not care.
                             // ContentWritingCompleted can be sent to SendFrame after a ChannelTerminated message such that neither have been transmitted yet
                             // and thus wasn't in the termination collection until later, so forgive that too.
-                            if (header.Code is ControlCode.ContentProcessed or ControlCode.ContentWritingCompleted)
+                            if (header.Code is ControlCode.ContentProcessed or ControlCode.ContentWritingCompleted or ControlCode.ContentWritingError)
                             {
                                 this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.FrameSendSkipped, "Skipping {0} frame for channel {1} because we're about to terminate it.", header.Code, header.ChannelId);
                                 return;
