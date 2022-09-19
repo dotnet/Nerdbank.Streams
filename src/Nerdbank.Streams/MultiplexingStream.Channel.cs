@@ -779,19 +779,19 @@ namespace Nerdbank.Streams
                     this.DisposeSelfOnFailure(this.mxStreamIOReaderCompleted);
                     this.DisposeSelfOnFailure(this.AutoCloseOnPipesClosureAsync());
                 }
-                catch (Exception ex)
+                catch (Exception exception)
                 {
                     if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Critical))
                     {
                         this.TraceSource.TraceEvent(
                             TraceEventType.Critical,
                             (int)TraceEventId.WriteError,
-                            "Caught ApplyChannelOptions error on channel {0}: {1}",
+                            "Caught ApplyChannelOptions error on channel {0}:\n{1}",
                             this.QualifiedId,
-                            ex.Message);
+                            exception);
                     }
 
-                    this.optionsAppliedTaskSource?.TrySetException(ex);
+                    this.optionsAppliedTaskSource?.TrySetException(exception);
                     throw;
                 }
                 finally
