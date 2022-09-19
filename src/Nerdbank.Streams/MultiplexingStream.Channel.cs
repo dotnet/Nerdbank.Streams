@@ -583,6 +583,8 @@ namespace Nerdbank.Streams
                 }
 
                 var acceptanceParameters = new AcceptanceParameters(this.localWindowSize.Value);
+                string errorCause = "TrySetResult failure";
+
                 if (this.acceptanceSource.TrySetResult(acceptanceParameters))
                 {
                     if (this.QualifiedId.Source != ChannelSource.Seeded)
@@ -607,10 +609,18 @@ namespace Nerdbank.Streams
                     {
                         // A (harmless) race condition was hit.
                         // Swallow it and return false below.
+                        errorCause = "Object Disposed Exception";
                     }
                 }
 
-                return false;
+                /*
+                if (errorCause != string.Empty && System.Environment.StackTrace.Contains("OfferPipeWithError"))
+                {
+                    System.Diagnostics.Debugger.Launch();
+                }
+                */
+
+                return false && errorCause.Length == 0;
             }
 
             /// <summary>
@@ -910,6 +920,15 @@ namespace Nerdbank.Streams
                 {
                     // Send the completion message to the remote if the channel hasn't been disposed
                     bool canSendCompletionMessage;
+                    lock (this.SyncObject)
+                    {
+                        canSendCompletionMessage = !this.isDisposed;
+                    }
+
+                    if (canSendCompletionMessage)
+                    {
+                        this.MultiplexingStream.OnChannelWritingCompleted(this);
+                    }
 
                     // Restore the PipeReader to the field.
                     lock (this.SyncObject)
@@ -917,11 +936,6 @@ namespace Nerdbank.Streams
                         this.mxStreamIOReader = mxStreamIOReader;
                         mxStreamIOReader = null;
                         canSendCompletionMessage = !this.isDisposed;
-                    }
-
-                    if (canSendCompletionMessage)
-                    {
-                        this.MultiplexingStream.OnChannelWritingCompleted(this);
                     }
                 }
             }

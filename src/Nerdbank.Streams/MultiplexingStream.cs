@@ -1153,11 +1153,6 @@ namespace Nerdbank.Streams
 
             if (!this.TryAcceptChannel(channel, options))
             {
-                if (System.Environment.StackTrace.Contains("OfferPipeWithError"))
-                {
-                    System.Diagnostics.Debugger.Launch();
-                }
-
                 if (channel.IsAccepted)
                 {
                     throw new InvalidOperationException("Channel is already accepted.");
