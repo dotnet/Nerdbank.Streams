@@ -301,7 +301,6 @@ namespace Nerdbank.Streams
         internal class V2Formatter : Formatter
         {
             private static readonly Version ProtocolVersion = new Version(2, 0);
-            private static readonly int WriteErrorPayloadSize = 1;
             private readonly MessagePackStreamReader reader;
             private readonly AsyncSemaphore readingSemaphore = new AsyncSemaphore(1);
 
@@ -509,8 +508,8 @@ namespace Nerdbank.Streams
                 MessagePackWriter writer = new(errorSequence);
 
                 // Write the error message and the protocol version to the payload
-                writer.WriteArrayHeader(WriteErrorPayloadSize);
-                writer.Write(error.ErrorMessage);
+                writer.WriteArrayHeader(1);
+                writer.Write(error.Message);
 
                 // Return the payload to the caller
                 writer.Flush();
@@ -521,29 +520,27 @@ namespace Nerdbank.Streams
             /// Extracts an <see cref="WriteError"/> object from the payload using <see cref="MessagePack"/>.
             /// </summary>
             /// <param name="serializedError">The payload we are trying to extract the error object from.</param>
-            /// <param name="traceSource">The tracer to use when tracing errors to deserialize a received payload.</param>
-            /// <returns>A <see cref="WriteError"/> object if the payload is correctly formatted and has the expected protocol version,
-            ///          null otherwise. </returns>
-            internal WriteError? DeserializeWriteError(ReadOnlySequence<byte> serializedError, TraceSource? traceSource)
+            /// <returns>A <see cref="WriteError"/> object.</returns>
+            internal WriteError DeserializeWriteError(ReadOnlySequence<byte> serializedError)
             {
                 MessagePackReader reader = new(serializedError);
                 int numElements = reader.ReadArrayHeader();
 
-                // If received an unexpected number of fields, report that to the users
-                if (numElements != WriteErrorPayloadSize && traceSource!.Switch.ShouldTrace(TraceEventType.Warning))
+                string? errorMessage = null;
+                for (int i = 0; i < numElements; i++)
                 {
-                    traceSource.TraceEvent(TraceEventType.Warning, 0, "Expected error payload to have {0} elements, found {1} elements", WriteErrorPayloadSize, numElements);
+                    switch (i)
+                    {
+                        case 0:
+                            errorMessage = reader.ReadString();
+                            break;
+                        default:
+                            reader.Skip();
+                            break;
+                    }
                 }
 
-                // The payload should have enough elements that we can process all the critical fields
-                if (numElements < WriteErrorPayloadSize)
-                {
-                    return null;
-                }
-
-                // Extract the error message and use that to create the write error object
-                string errorMessage = reader.ReadString();
-                return new WriteError(errorMessage);
+                return new WriteError(errorMessage ?? string.Empty);
             }
 
             protected virtual (FrameHeader Header, ReadOnlySequence<byte> Payload) DeserializeFrame(ReadOnlySequence<byte> frameSequence)

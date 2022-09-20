@@ -107,9 +107,9 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      * @param options Options to customize the behavior of the stream.
      * @returns The multiplexing stream.
      */
-     public static Create(
+    public static Create(
         stream: NodeJS.ReadWriteStream,
-        options?: MultiplexingStreamOptions) : MultiplexingStream {
+        options?: MultiplexingStreamOptions): MultiplexingStream {
         options ??= { protocolMajorVersion: 3 };
         options.protocolMajorVersion ??= 3;
 
@@ -579,7 +579,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         }
     }
 
-    public async onChannelWritingError(channel: ChannelClass, errorMessage: string) {
+    public async onChannelWritingError(channel: ChannelClass, error: Error) {
         // Make sure that we are in a protocol version in which we can write errors.
         if (this.protocolMajorVersion === 1) {
             return;
@@ -587,15 +587,15 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 
         // Make sure we can send error messages on this channel.
         if (!this.getOpenChannel(channel.qualifiedId)) {
-           return;
+            return;
         }
 
         // Convert the error message into a payload into a formatter.
-        const writingError = new WriteError(errorMessage);
+        const writingError = new WriteError(error.message);
         const errorSerializingFormatter = this.formatter as MultiplexingStreamV2Formatter;
         const errorPayload = errorSerializingFormatter.serializeContentWritingError(writingError);
 
-        // Sent the error to the remote side
+        // Sent the error to the remote side.
         await this.sendFrameAsync(new FrameHeader(ControlCode.ContentWritingError, channel.qualifiedId), errorPayload);
     }
 
@@ -752,15 +752,12 @@ export class MultiplexingStreamClass extends MultiplexingStream {
             throw new Error(`No channel with id ${channelId} found.`);
         }
 
-        // Extract the error from the payload
-        const errorDeserializingFormatter = (this.formatter as MultiplexingStreamV2Formatter);
+        // Extract the error from the payload.
+        const errorDeserializingFormatter = this.formatter as MultiplexingStreamV2Formatter;
         const writingError = errorDeserializingFormatter.deserializeContentWritingError(payload);
-        if (!writingError) {
-            throw new Error("Couldn't process content writing error payload received from remote");
-        }
 
-        // Pass the error received from the remote to the channel
-        const remoteErr = new Error(`Received error message from remote: ${writingError.errorMessage}`);
+        // Pass the error received from the remote to the channel.
+        const remoteErr = new Error(`Received error message from remote: ${writingError.message}`);
         channel.onContent(null, remoteErr);
     }
 

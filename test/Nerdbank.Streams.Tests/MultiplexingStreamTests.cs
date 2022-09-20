@@ -64,21 +64,13 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        try
-        {
-            await (this.mx1?.DisposeAsync() ?? default);
-            await (this.mx2?.DisposeAsync() ?? default);
-            AssertNoFault(this.mx1);
-            AssertNoFault(this.mx2);
+        await (this.mx1?.DisposeAsync() ?? default);
+        await (this.mx2?.DisposeAsync() ?? default);
+        AssertNoFault(this.mx1);
+        AssertNoFault(this.mx2);
 
-            this.mx1?.TraceSource.Listeners.OfType<XunitTraceListener>().SingleOrDefault()?.Dispose();
-            this.mx2?.TraceSource.Listeners.OfType<XunitTraceListener>().SingleOrDefault()?.Dispose();
-        }
-        catch (Exception err)
-        {
-            this.Logger.WriteLine("Caught error in DisposeAsync: {0}", err.Message);
-            throw;
-        }
+        this.mx1?.TraceSource.Listeners.OfType<XunitTraceListener>().SingleOrDefault()?.Dispose();
+        this.mx2?.TraceSource.Listeners.OfType<XunitTraceListener>().SingleOrDefault()?.Dispose();
     }
 
     [Fact, Obsolete]
@@ -109,82 +101,71 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
+    public async Task ClosePipeWithError()
+    {
+        (MultiplexingStream.Channel channel1, MultiplexingStream.Channel channel2) = await this.EstablishChannelsAsync("test");
+        await channel1.Output.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
+        ReadResult readResult = await channel2.Input.ReadAtLeastAsync(3, this.TimeoutToken);
+        channel2.Input.AdvanceTo(readResult.Buffer.End);
+
+        // Now fail one side.
+        const string expectedErrorMessage = "Inflicted error";
+        await channel1.Output.CompleteAsync(new ApplicationException(expectedErrorMessage));
+        if (this.ProtocolMajorVersion > 1)
+        {
+            MultiplexingProtocolException ex = await Assert.ThrowsAnyAsync<MultiplexingProtocolException>(async () => await channel2.Input.ReadAsync(this.TimeoutToken));
+            Assert.Contains(expectedErrorMessage, ex.Message);
+        }
+        else
+        {
+            await channel2.Input.ReadAsync(this.TimeoutToken);
+        }
+    }
+
+    [Fact]
     public async Task OfferPipeWithError()
     {
-        try
+        string errorMessage = "Hello World";
+
+        // Prepare a readonly pipe that is already populated with data and an error.
+        var pipe = new Pipe();
+        await pipe.Writer.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
+        pipe.Writer.Complete(new ApplicationException(errorMessage));
+
+        // Create a sending and receiving channel using the channel.
+        MultiplexingStream.Channel? localChannel = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(pipe.Reader) });
+        await this.WaitForEphemeralChannelOfferToPropagateAsync();
+        MultiplexingStream.Channel? remoteChannel = this.mx2.AcceptChannel(localChannel.QualifiedId.Id);
+
+        async Task ReadAllDataAsync()
         {
-            bool errorThrown = false;
-            string errorMessage = "Hello World";
+            // Read the latest input from the local channel and determine if we should continue reading.
+            ReadResult readResult = await remoteChannel.Input.ReadAsync(this.TimeoutToken);
+            remoteChannel.Input.AdvanceTo(readResult.Buffer.End);
 
-            // Prepare a readonly pipe that is already populated with data an an error
-            var pipe = new Pipe();
-            await pipe.Writer.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
-            pipe.Writer.Complete(new Exception(errorMessage));
-
-            // Create a sending and receiving channel using the channel
-            MultiplexingStream.Channel? localChannel = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(pipe.Reader) });
-            await this.WaitForEphemeralChannelOfferToPropagateAsync();
-            MultiplexingStream.Channel? remoteChannel = this.mx2.AcceptChannel(localChannel.QualifiedId.Id);
-
-            bool continueReading = true;
-            while (continueReading)
+            if (readResult.IsCompleted || readResult.IsCanceled)
             {
-                try
-                {
-                    // Read the latest input from the local channel and determine if we should continue reading
-                    ReadResult readResult = await remoteChannel.Input.ReadAsync(this.TimeoutToken);
-                    if (readResult.IsCompleted || readResult.IsCanceled)
-                    {
-                        continueReading = false;
-                    }
-
-                    remoteChannel.Input.AdvanceTo(readResult.Buffer.End);
-                }
-                catch (Exception exception)
-                {
-                    // Check not only that we caught an exception but that it was the expected exception.
-                    errorThrown = exception.Message.Contains(errorMessage);
-                    continueReading = !errorThrown;
-                }
+                return;
             }
-
-            Assert.Equal(this.ProtocolMajorVersion > 1, errorThrown);
-
-            // Ensure that the writer of the error completes with that error, no matter what version of the protocol they are using
-            string expectedWriterErrorMessage = errorMessage;
-            bool localChannelCompletedWithError = false;
-
-            try
-            {
-                await localChannel.Completion;
-            }
-            catch (Exception writeException)
-            {
-                localChannelCompletedWithError = writeException.Message.Contains(expectedWriterErrorMessage);
-            }
-
-            Assert.True(localChannelCompletedWithError);
-
-            // Ensure that the reader only completes with an error if we are using a protocol version > 1
-            string expectedReaderErrorMessage = "Remote party indicated writing error: " + errorMessage;
-            bool remoteChannelCompletedWithError = false;
-
-            try
-            {
-                await remoteChannel.Completion;
-            }
-            catch (Exception readException)
-            {
-                remoteChannelCompletedWithError = readException.Message.Contains(expectedReaderErrorMessage);
-            }
-
-            Assert.Equal(this.ProtocolMajorVersion > 1, remoteChannelCompletedWithError);
         }
-        catch (Exception err)
+
+        if (this.ProtocolMajorVersion > 1)
         {
-            this.Logger.WriteLine("Caught error in OfferPipeWithError: {0}", err.Message);
-            throw;
+            MultiplexingProtocolException caughtException = await Assert.ThrowsAnyAsync<MultiplexingProtocolException>(ReadAllDataAsync);
+            this.Logger.WriteLine(caughtException.ToString());
+            Assert.Contains(errorMessage, caughtException.Message);
+
+            MultiplexingProtocolException remoteCompletionException = await Assert.ThrowsAnyAsync<MultiplexingProtocolException>(() => remoteChannel.Completion);
+            Assert.Contains(errorMessage, remoteCompletionException.Message);
         }
+        else
+        {
+            await ReadAllDataAsync();
+        }
+
+        // Ensure that the writer of the error completes with that error, no matter what version of the protocol they are using.
+        ApplicationException localCompletionException = await Assert.ThrowsAnyAsync<ApplicationException>(() => localChannel.Completion);
+        Assert.Contains(errorMessage, localCompletionException.Message);
     }
 
     [Fact]

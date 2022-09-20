@@ -110,8 +110,8 @@ namespace Nerdbank.Streams
             private Exception? faultingException;
 
             /// <summary>
-            /// The <see cref="PipeReader"/> to use to get data to be transmitted over the <see cref="Streams.MultiplexingStream"/>. Any errors passed to this
-            /// <see cref="PipeReader"/> are transmitted to the remote side.
+            /// The <see cref="PipeReader"/> to use to get data to be transmitted over the <see cref="Streams.MultiplexingStream"/>.
+            /// Any errors passed to this <see cref="PipeReader"/> are transmitted to the remote side.
             /// </summary>
             private PipeReader? mxStreamIOReader;
 
@@ -350,22 +350,12 @@ namespace Nerdbank.Streams
                         mxStreamIOWriter = this.mxStreamIOWriter;
                     }
 
-                    TraceSource traceSrc = this.GetTraceSource();
-                    if (traceSrc.Switch.ShouldTrace(TraceEventType.Information))
-                    {
-                        traceSrc.TraceEvent(
-                            TraceEventType.Information,
-                            (int)TraceEventId.WriteError,
-                            "Calling TrySetCanceled of acceptanceSource in Dispose method of channel {0}",
-                            this.QualifiedId);
-                    }
-
-                    // If we are disposing due to an faulting error, transition the acceptanceSource to an error state
+                    // If we are disposing due to a faulting error, transition the acceptanceSource to an error state
                     lock (this.SyncObject)
                     {
                         if (this.faultingException != null)
                         {
-                            this.acceptanceSource?.TrySetException(this.faultingException);
+                            this.acceptanceSource.TrySetException(this.faultingException);
                             this.optionsAppliedTaskSource?.TrySetException(this.faultingException);
                         }
                         else
@@ -436,16 +426,13 @@ namespace Nerdbank.Streams
                     this.disposalTokenSource.Cancel();
 
                     // If we are disposing due to receiving or sending an exception, relay that to our client.
-                    lock (this.SyncObject)
+                    if (this.faultingException is Exception faultingException)
                     {
-                        if (this.faultingException != null)
-                        {
-                            this.completionSource.TrySetException(this.faultingException);
-                        }
-                        else
-                        {
-                            this.completionSource.TrySetResult(null);
-                        }
+                        this.completionSource.TrySetException(faultingException);
+                    }
+                    else
+                    {
+                        this.completionSource.TrySetResult(null);
                     }
 
                     this.MultiplexingStream.OnChannelDisposed(this);
@@ -581,7 +568,7 @@ namespace Nerdbank.Streams
                     }
                     else
                     {
-                        // If the channel has not been disposed then just close the underlying writer
+                        // If the channel has not been disposed then just close the underlying writer.
                         if (this.mxStreamIOWriter != null)
                         {
                             using AsyncSemaphore.Releaser releaser = await this.mxStreamIOWriterSemaphore.EnterAsync().ConfigureAwait(false);
@@ -608,25 +595,15 @@ namespace Nerdbank.Streams
                 }
 
                 var acceptanceParameters = new AcceptanceParameters(this.localWindowSize.Value);
-                TraceSource traceSrc = this.GetTraceSource();
-
-                if (traceSrc.Switch.ShouldTrace(TraceEventType.Information))
-                {
-                    traceSrc.TraceEvent(
-                        TraceEventType.Information,
-                        (int)TraceEventId.WriteError,
-                        "Calling TrySetResult of acceptanceSource in TryAcceptOffer method of channel {0}",
-                        this.QualifiedId);
-                }
 
                 try
                 {
                     // Set up the channel options and ensure that the channel is still valid
-                    // before we transition to an accepted state
+                    // before we transition to an accepted state.
                     this.ApplyChannelOptions(channelOptions);
                     Verify.NotDisposed(this);
 
-                    // If we aren't a seeded channel then send an offer accepted frame
+                    // If we aren't a seeded channel then send an offer accepted frame.
                     if (this.QualifiedId.Source != ChannelSource.Seeded)
                     {
                         ReadOnlySequence<byte> payload = this.MultiplexingStream.formatter.Serialize(acceptanceParameters);
@@ -640,36 +617,16 @@ namespace Nerdbank.Streams
                             CancellationToken.None);
                     }
 
-                    // Update the acceptance source to the acceptance parameters
-                    bool setResult = this.acceptanceSource.TrySetResult(acceptanceParameters);
-                    if (traceSrc.Switch.ShouldTrace(TraceEventType.Information))
-                    {
-                        traceSrc.TraceEvent(
-                            TraceEventType.Information,
-                            (int)TraceEventId.WriteError,
-                            "Result of call to set acceptanceSource in TryAcceptOffer is {0}",
-                            setResult);
-                    }
-
-                    return setResult;
+                    // Update the acceptance source to the acceptance parameters.
+                    return this.acceptanceSource.TrySetResult(acceptanceParameters);
                 }
                 catch (Exception exception)
                 {
-                    // Record the exception in the acceptance source
+                    // Record the exception in the acceptance source.
                     this.acceptanceSource.TrySetException(exception);
 
-                    if (traceSrc.Switch.ShouldTrace(TraceEventType.Information))
-                    {
-                        traceSrc.TraceEvent(
-                            TraceEventType.Information,
-                            (int)TraceEventId.WriteError,
-                            "Caught exception in TryAcceptOffer method of channel {0}: \n {1}",
-                            this.QualifiedId,
-                            exception);
-                    }
-
                     // If we caught an disposal error due to the channel self faulting then swallow
-                    // the exception
+                    // the exception.
                     if (exception is ObjectDisposedException && this.faultingException != null)
                     {
                         return true;
@@ -688,16 +645,6 @@ namespace Nerdbank.Streams
             {
                 lock (this.SyncObject)
                 {
-                    TraceSource traceSrc = this.GetTraceSource();
-                    if (traceSrc.Switch.ShouldTrace(TraceEventType.Information))
-                    {
-                        traceSrc.TraceEvent(
-                            TraceEventType.Information,
-                            (int)TraceEventId.WriteError,
-                            "Calling TrySetResult of acceptanceSource in OnAccepted method of channel {0}",
-                            this.QualifiedId);
-                    }
-
                     if (this.acceptanceSource.TrySetResult(acceptanceParameters))
                     {
                         this.remoteWindowSize = acceptanceParameters.RemoteWindowSize;
@@ -759,17 +706,6 @@ namespace Nerdbank.Streams
             }
 
             /// <summary>
-            /// GetTraceSource gets the trace source to use when emitting trace messages.
-            /// </summary>
-            /// <returns>The <see cref="TraceSource"/> to use when emitting messages.</returns>
-            private TraceSource GetTraceSource()
-            {
-                return this.TraceSource
-                       ?? this.MultiplexingStream.DefaultChannelTraceSourceFactory?.Invoke(this.QualifiedId, this.Name)
-                       ?? new TraceSource($"{nameof(Streams.MultiplexingStream)}.{nameof(Channel)} {this.QualifiedId} ({this.Name})", SourceLevels.All);
-            }
-
-            /// <summary>
             /// Apply channel options to this channel, including setting up or linking to an user-supplied pipe writer/reader pair.
             /// </summary>
             /// <param name="channelOptions">The channel options to apply.</param>
@@ -810,20 +746,9 @@ namespace Nerdbank.Streams
                     this.DisposeSelfOnFailure(this.mxStreamIOReaderCompleted);
                     this.DisposeSelfOnFailure(this.AutoCloseOnPipesClosureAsync());
                 }
-                catch (Exception exception)
+                catch (Exception ex)
                 {
-                    if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Critical))
-                    {
-                        this.TraceSource.TraceEvent(
-                            TraceEventType.Critical,
-                            (int)TraceEventId.WriteError,
-                            "Caught ApplyChannelOptions error on channel {0}:\n{1}",
-                            this.QualifiedId,
-                            exception);
-                    }
-
-                    // Record that we caught an exception
-                    this.optionsAppliedTaskSource?.TrySetException(exception);
+                    this.optionsAppliedTaskSource?.TrySetException(ex);
                     throw;
                 }
                 finally
@@ -880,7 +805,7 @@ namespace Nerdbank.Streams
                     this.mxStreamIOReader = new UnownedPipeReader(mxStreamIOReader);
                 }
 
-                bool channelAccepted = true;
+                bool channelAccepted = false;
                 try
                 {
                     // Don't transmit data on the channel until the remote party has accepted it.
@@ -889,26 +814,26 @@ namespace Nerdbank.Streams
                     try
                     {
                         await this.Acceptance.ConfigureAwait(false);
+                        channelAccepted = true;
                     }
                     catch (Exception exception)
                     {
-                        // This await will only throw an exception if the channel has been disposed and thus we can swallow
-                        if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
+                        // This await will only throw an exception if the channel has been disposed and thus we can swallow.
+                        if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Error) ?? false)
                         {
                             this.TraceSource.TraceEvent(
-                                TraceEventType.Verbose,
-                                (int)TraceEventId.ChannelDisposed,
-                                "Channel {0} swalled acceptance exception in ProcessOutbound: {0}",
+                                TraceEventType.Error,
+                                (int)TraceEventId.NonFatalInternalError,
+                                "Channel {0} swalled acceptance exception in {1}: {2}",
                                 this.QualifiedId,
+                                nameof(this.ProcessOutboundTransmissionsAsync),
                                 exception);
                         }
-
-                        channelAccepted = false;
                     }
 
                     while (channelAccepted && !this.Completion.IsCompleted)
                     {
-                        if (!this.remoteWindowHasCapacity.IsSet && this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
+                        if (!this.remoteWindowHasCapacity.IsSet && (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Verbose) ?? false))
                         {
                             this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Remote window is full. Waiting for remote party to process data before sending more.");
                         }
@@ -916,7 +841,7 @@ namespace Nerdbank.Streams
                         await this.remoteWindowHasCapacity.WaitAsync().ConfigureAwait(false);
                         if (this.IsRemotelyTerminated)
                         {
-                            if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
+                            if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Verbose) ?? false)
                             {
                                 this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Transmission on channel {0} \"{1}\" terminated the remote party terminated the channel.", this.QualifiedId, this.Name);
                             }
@@ -929,7 +854,7 @@ namespace Nerdbank.Streams
                         if (result.IsCanceled)
                         {
                             // We've been asked to cancel. Presumably the channel has faulted or been disposed.
-                            if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
+                            if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Verbose) ?? false)
                             {
                                 this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Transmission terminated because the read was canceled.");
                             }
@@ -948,7 +873,7 @@ namespace Nerdbank.Streams
                         ReadOnlySequence<byte> bufferToRelay = result.Buffer.Slice(0, bytesToSend);
                         this.OnTransmittingBytes(bufferToRelay.Length);
                         bool isCompleted = result.IsCompleted && result.Buffer.Length == bufferToRelay.Length;
-                        if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
+                        if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Verbose) ?? false)
                         {
                             this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "{0} of {1} bytes will be transmitted.", bufferToRelay.Length, result.Buffer.Length);
                         }
@@ -974,7 +899,7 @@ namespace Nerdbank.Streams
 
                         if (isCompleted)
                         {
-                            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                            if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Information) ?? false)
                             {
                                 this.TraceSource.TraceEvent(TraceEventType.Information, 0, "Transmission terminated because the writer completed.");
                             }
@@ -987,16 +912,6 @@ namespace Nerdbank.Streams
                 }
                 catch (Exception ex)
                 {
-                    if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
-                    {
-                        this.TraceSource.TraceEvent(
-                            TraceEventType.Information,
-                            (int)TraceEventId.WriteError,
-                            "Caught exception relaying message to remote side: {0} with stack trace:\n{1}",
-                            ex,
-                            ex.StackTrace);
-                    }
-
                     // If the operation had been cancelled then we are expecting to receive this error so don't transmit it.
                     if (ex is OperationCanceledException && this.DisposalToken.IsCancellationRequested)
                     {
@@ -1106,23 +1021,16 @@ namespace Nerdbank.Streams
 
                 this.mxStreamIOReader?.CancelPendingRead();
 
-                // Determine if the channel has already been disposed
-                bool alreadyDisposed = false;
-                lock (this.SyncObject)
-                {
-                    alreadyDisposed = this.isDisposed;
-                }
-
-                // If the channel has already been disposed then no need to call dispose again
-                if (alreadyDisposed)
+                // Only dispose if not already disposed.
+                if (this.IsDisposed)
                 {
                     return;
                 }
 
-                // Record the fact that we are about to close the channel due to a fault
-                if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Critical) ?? false)
+                // Record the fact that we are about to close the channel due to a fault.
+                if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Error) ?? false)
                 {
-                    this.TraceSource.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Channel {0} closing self due to exception: {1}", this.QualifiedId, exception);
+                    this.TraceSource.TraceEvent(TraceEventType.Error, (int)TraceEventId.FatalError, "Channel {0} closing self due to exception: {1}", this.QualifiedId, exception);
                 }
 
                 this.Dispose();

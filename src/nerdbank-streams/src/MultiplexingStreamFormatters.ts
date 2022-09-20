@@ -79,15 +79,6 @@ export abstract class MultiplexingStreamFormatter {
     }
 }
 
-export function getFormatterVersion(formatter : MultiplexingStreamFormatter) : number {
-    if (formatter instanceof MultiplexingStreamV3Formatter) {
-        return 3
-    } else if (formatter instanceof MultiplexingStreamV2Formatter) {
-        return 2
-    }
-    return 1
-}
-
 // tslint:disable-next-line: max-classes-per-file
 export class MultiplexingStreamV1Formatter extends MultiplexingStreamFormatter {
     /**
@@ -303,17 +294,17 @@ export class MultiplexingStreamV2Formatter extends MultiplexingStreamFormatter {
         return msgpack.decode(payload)[0];
     }
 
-    serializeContentWritingError(writingError: WriteError) : Buffer {
-        const payload: any[] = [writingError.errorMessage];
+    serializeContentWritingError(writingError: WriteError): Buffer {
+        const payload: any[] = [writingError.message];
         return msgpack.encode(payload);
     }
 
-    deserializeContentWritingError(payload: Buffer) : WriteError | null {
+    deserializeContentWritingError(payload: Buffer): WriteError {
         const msgpackObject = msgpack.decode(payload);
 
         // Return the error message to the caller.
-        const errorMsg : string = msgpackObject[0];
-        return new WriteError(errorMsg);
+        const errorMsg: string | undefined = msgpackObject[0];
+        return new WriteError(errorMsg ?? "<unspecified>");
     }
 
     protected async readMessagePackAsync(cancellationToken: CancellationToken): Promise<{} | [] | null> {

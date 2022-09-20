@@ -53,10 +53,13 @@ export abstract class Channel implements IDisposableObservable {
         return this._isDisposed;
     }
 
-    // Sends the passed in error to the remote side and then closes the channel.
-    // dispose can be called after calling async even though it is not necessary.
-    public fault(error: Error) {
-        this._isDisposed = true;
+    /**
+     * Closes this channel after transmitting an error to the remote party.
+     * @param error The error to transmit to the remote party.
+     */
+    public fault(error: Error): Promise<void> {
+        // The interesting stuff is in the derived class.
+        return Promise.resolve();
     }
 
     /**
@@ -221,7 +224,7 @@ export class ChannelClass extends Channel {
         return this._acceptance.resolve();
     }
 
-    public onContent(buffer: Buffer | null, error? : Error) {
+    public onContent(buffer: Buffer | null, error?: Error) {
         // If we have already received an error from the remote party, then don't process any future messages.
         if (this.remoteError) {
             return;
@@ -259,12 +262,12 @@ export class ChannelClass extends Channel {
 
     public async fault(error: Error) {
         // If the channel is already disposed then don't do anything
-        if(this.isDisposed) {
+        if (this.isDisposed) {
             return;
         }
 
         // Send the error message to the remote side
-        await this._multiplexingStream.onChannelWritingError(this, error.message);
+        await this._multiplexingStream.onChannelWritingError(this, error);
 
         // Set the remote exception to the passed in error so that the channel is
         // completed with this error

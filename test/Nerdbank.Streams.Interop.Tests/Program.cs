@@ -25,7 +25,7 @@ namespace Nerdbank.Streams.Interop.Tests
 
         private static async Task Main(string[] args)
         {
-            // System.Diagnostics.Debugger.Launch();
+            ////System.Diagnostics.Debugger.Launch();
             int protocolMajorVersion = int.Parse(args[0]);
             var options = new MultiplexingStream.Options
             {
@@ -82,11 +82,11 @@ namespace Nerdbank.Streams.Interop.Tests
 
         private async Task ClientOfferErrorAsync()
         {
-            // Await both of the channels from the sender, one to read the error and the other to return the response
+            // Await both of the channels from the sender, one to read the error and the other to return the response.
             MultiplexingStream.Channel? incomingChannel = await this.mx.AcceptChannelAsync("clientErrorOffer");
             MultiplexingStream.Channel? outgoingChannel = await this.mx.AcceptChannelAsync("clientResponseOffer");
 
-            // Determine the response to send back on the whether the incoming channel completed with an exception
+            // Determine the response to send back on the whether the incoming channel completed with an exception.
             string? responseMessage = "didn't receive any errors";
             try
             {

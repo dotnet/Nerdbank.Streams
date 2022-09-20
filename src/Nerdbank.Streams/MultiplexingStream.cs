@@ -214,6 +214,11 @@ namespace Nerdbank.Streams
             /// Raised when receiving or sending a <see cref="ControlCode.ContentWritingError"/>.
             /// </summary>
             WriteError,
+
+            /// <summary>
+            /// An error occurred that is likely not fatal.
+            /// </summary>
+            NonFatalInternalError,
         }
 
         /// <summary>
@@ -449,16 +454,6 @@ namespace Nerdbank.Streams
                 {
                     throw new InvalidOperationException(Strings.NoChannelFoundById);
                 }
-            }
-
-            TraceSource traceSrc = this.GetTraceSource();
-            if (traceSrc.Switch.ShouldTrace(TraceEventType.Information))
-            {
-                traceSrc.TraceEvent(
-                    TraceEventType.Information,
-                    (int)TraceEventId.WriteError,
-                    "Calling AcceptChannelOrThrow inside AcceptChannel for channel {0}",
-                    channel.QualifiedId);
             }
 
             this.AcceptChannelOrThrow(channel, options);
@@ -964,24 +959,10 @@ namespace Nerdbank.Streams
             {
                 // Deserialize the payload and verify that it was in an expected state
                 V2Formatter errorDeserializingFormattter = (V2Formatter)this.formatter;
-                WriteError? error = errorDeserializingFormattter.DeserializeWriteError(payload, this.TraceSource);
-
-                if (error == null)
-                {
-                    if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Warning))
-                    {
-                        this.TraceSource.TraceEvent(
-                            TraceEventType.Warning,
-                            (int)TraceEventId.WriteError,
-                            "Rejecting content writing error from channel {0} due to invalid payload",
-                            channelId);
-                    }
-
-                    return;
-                }
+                WriteError error = errorDeserializingFormattter.DeserializeWriteError(payload);
 
                 // Get the error message and complete the channel using it
-                string errorMessage = error.ErrorMessage;
+                string errorMessage = error.Message ?? "<unspecified>";
                 MultiplexingProtocolException channelClosingException = new MultiplexingProtocolException($"Remote party indicated writing error: {errorMessage}");
                 channel.OnContentWritingCompleted(channelClosingException);
             }
@@ -989,7 +970,7 @@ namespace Nerdbank.Streams
             {
                 // The channel is in a valid state but we have a protocol version that doesn't support processing errrors
                 // so don't do anything.
-                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Warning))
+                if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Warning) ?? false)
                 {
                     this.TraceSource.TraceEvent(
                         TraceEventType.Warning,
@@ -998,19 +979,12 @@ namespace Nerdbank.Streams
                         channelId,
                         this.protocolMajorVersion);
                 }
-
-                return;
             }
             else
             {
                 // The channel is in an invalid state so throw an error indicating so
                 throw new MultiplexingProtocolException($"Remote party indicated they encountered errors writing to channel {channelId} before accepting it.");
             }
-        }
-
-        private TraceSource GetTraceSource()
-        {
-            return this.TraceSource ?? new TraceSource($"{nameof(Streams.MultiplexingStream)}", SourceLevels.All);
         }
 
         private void OnContentWritingCompleted(QualifiedChannelId channelId)
@@ -1146,16 +1120,6 @@ namespace Nerdbank.Streams
 
             if (acceptingChannelAlreadyPresent)
             {
-                TraceSource traceSrc = this.GetTraceSource();
-                if (traceSrc.Switch.ShouldTrace(TraceEventType.Information))
-                {
-                    traceSrc.TraceEvent(
-                        TraceEventType.Information,
-                        (int)TraceEventId.WriteError,
-                        "Calling AcceptChannelOrThrow inside OnOffer method for channel {0}",
-                        channel.QualifiedId);
-                }
-
                 this.AcceptChannelOrThrow(channel, options);
             }
 
@@ -1178,20 +1142,7 @@ namespace Nerdbank.Streams
 
             if (!this.TryAcceptChannel(channel, options))
             {
-                TraceSource traceSrc = this.GetTraceSource();
-                if (traceSrc.Switch.ShouldTrace(TraceEventType.Information))
-                {
-                    traceSrc.TraceEvent(
-                        TraceEventType.Information,
-                        (int)TraceEventId.WriteError,
-                        "State of channel {0} of tryAcceptChannel failure in AcceptChannelOrThrow: \n IsDisposed - {1}, Acceptance - {2}, Completion - {3}",
-                        channel.QualifiedId,
-                        channel.IsDisposed,
-                        channel.Acceptance.Status,
-                        channel.Completion.Status);
-                }
-
-                // If we disposed of the channel due to an user passed error then ignore the error
+                // If we disposed of the channel due to a user provided error then ignore the error.
                 if (channel.IsDisposed && (channel.Completion.IsFaulted || channel.Acceptance.IsFaulted))
                 {
                     return;
@@ -1238,14 +1189,15 @@ namespace Nerdbank.Streams
         /// <param name="exception">The exception that caused the writing to be haulted.</param>
         private void OnChannelWritingError(Channel channel, Exception exception)
         {
-            Requires.NotNull(channel, nameof(channel));
-
-            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+            if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Error))
             {
-                this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Local channel {0} encountered write error {1}", channel.QualifiedId, exception.Message);
+                this.TraceSource.TraceEvent(TraceEventType.Error, (int)TraceEventId.WriteError, "Local channel {0} encountered write error {1}", channel.QualifiedId, exception.Message);
             }
 
-            // Verify that we can send a message over this channel
+            // Verify that we can send a message over this channel.
+            // The race condition here is handled within SendFrameAsync which will drop the frame
+            // if the conditions we're checking for here change after we check them, so our check here
+            // is just an optimization to avoid work when we can predict its failure.
             bool channelInValidState = true;
             lock (this.syncObject)
             {
@@ -1270,26 +1222,6 @@ namespace Nerdbank.Streams
 
                 // Send the frame alongside the payload to the remote side
                 this.SendFrame(header, serializedError, CancellationToken.None);
-            }
-            else if (channelInValidState && !this.ContentWritingErrorSupported)
-            {
-                // The channel is in a valid state but our protocol version doesn't support writing errors so don't do anything
-                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Warning))
-                {
-                    this.TraceSource.TraceEvent(
-                        TraceEventType.Warning,
-                        (int)TraceEventId.WriteError,
-                        "Not informing remote side of write error on channel {0} since MultiplexingStream has protocol version of {1}",
-                        channel.QualifiedId,
-                        this.protocolMajorVersion);
-                }
-
-                return;
-            }
-            else
-            {
-                // The channel is not in a valid state to send any messages so throw an error indicating so
-                throw new MultiplexingProtocolException($"Can't write content writing error to channel {channel.QualifiedId} as it is terminated or isn't open");
             }
         }
 

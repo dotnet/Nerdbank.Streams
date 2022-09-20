@@ -241,11 +241,11 @@ import * as assert from "assert";
 
             await channels[0].fault(errorToSend);
 
-            // Ensure that the current channel disposes with the error
+            // Ensure that the current channel disposes with the error.
             let caughtSenderError = false;
             try {
                 await channels[0].completion;
-            } catch(error) {
+            } catch (error) {
                 let completionErrMsg = String(error);
                 if (error instanceof Error) {
                     completionErrMsg = (error as Error).message;
@@ -253,13 +253,13 @@ import * as assert from "assert";
                 caughtSenderError = completionErrMsg.includes(errorMessage);
             }
 
-            assert.deepStrictEqual(true, caughtSenderError);
+            assert.strictEqual(true, caughtSenderError);
 
             // Ensure that the remote side received the error only for version >= 1
             let caughtRemoteError = false;
             try {
                 await channels[1].completion;
-            } catch(error) {
+            } catch (error) {
                 let completionErrMsg = String(error);
                 if (error instanceof Error) {
                     completionErrMsg = (error as Error).message;
