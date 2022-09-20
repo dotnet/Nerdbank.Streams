@@ -343,6 +343,13 @@ namespace Nerdbank.Streams
             {
                 if (!this.IsDisposed)
                 {
+                    PipeWriter? mxStreamIOWriter;
+                    lock (this.SyncObject)
+                    {
+                        this.isDisposed = true;
+                        mxStreamIOWriter = this.mxStreamIOWriter;
+                    }
+
                     TraceSource traceSrc = this.GetTraceSource();
                     if (traceSrc.Switch.ShouldTrace(TraceEventType.Information))
                     {
@@ -354,22 +361,18 @@ namespace Nerdbank.Streams
                     }
 
                     // If we are disposing due to an faulting error, transition the acceptanceSource to an error state
-                    if (this.faultingException != null)
-                    {
-                        this.acceptanceSource?.TrySetException(this.faultingException);
-                        this.optionsAppliedTaskSource?.TrySetException(this.faultingException);
-                    }
-                    else
-                    {
-                        this.acceptanceSource.TrySetCanceled();
-                        this.optionsAppliedTaskSource?.TrySetCanceled();
-                    }
-
-                    PipeWriter? mxStreamIOWriter;
                     lock (this.SyncObject)
                     {
-                        this.isDisposed = true;
-                        mxStreamIOWriter = this.mxStreamIOWriter;
+                        if (this.faultingException != null)
+                        {
+                            this.acceptanceSource?.TrySetException(this.faultingException);
+                            this.optionsAppliedTaskSource?.TrySetException(this.faultingException);
+                        }
+                        else
+                        {
+                            this.acceptanceSource.TrySetCanceled();
+                            this.optionsAppliedTaskSource?.TrySetCanceled();
+                        }
                     }
 
                     // Complete writing so that the mxstream cannot write to this channel any more.
@@ -433,13 +436,16 @@ namespace Nerdbank.Streams
                     this.disposalTokenSource.Cancel();
 
                     // If we are disposing due to receiving or sending an exception, relay that to our client.
-                    if (this.faultingException != null)
+                    lock (this.SyncObject)
                     {
-                        this.completionSource.TrySetException(this.faultingException);
-                    }
-                    else
-                    {
-                        this.completionSource.TrySetResult(null);
+                        if (this.faultingException != null)
+                        {
+                            this.completionSource.TrySetException(this.faultingException);
+                        }
+                        else
+                        {
+                            this.completionSource.TrySetResult(null);
+                        }
                     }
 
                     this.MultiplexingStream.OnChannelDisposed(this);
@@ -618,6 +624,7 @@ namespace Nerdbank.Streams
                     // Set up the channel options and ensure that the channel is still valid
                     // before we transition to an accepted state
                     this.ApplyChannelOptions(channelOptions);
+                    Verify.NotDisposed(this);
 
                     // If we aren't a seeded channel then send an offer accepted frame
                     if (this.QualifiedId.Source != ChannelSource.Seeded)
@@ -873,14 +880,33 @@ namespace Nerdbank.Streams
                     this.mxStreamIOReader = new UnownedPipeReader(mxStreamIOReader);
                 }
 
+                bool channelAccepted = true;
                 try
                 {
                     // Don't transmit data on the channel until the remote party has accepted it.
                     // This is not just a courtesy: it ensure we don't transmit data from the offering party before the offer frame itself.
                     // Likewise: it may help prevent transmitting data from the accepting party before the acceptance frame itself.
-                    await this.Acceptance.ConfigureAwait(false);
+                    try
+                    {
+                        await this.Acceptance.ConfigureAwait(false);
+                    }
+                    catch (Exception exception)
+                    {
+                        // This await will only throw an exception if the channel has been disposed and thus we can swallow
+                        if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
+                        {
+                            this.TraceSource.TraceEvent(
+                                TraceEventType.Verbose,
+                                (int)TraceEventId.ChannelDisposed,
+                                "Channel {0} swalled acceptance exception in ProcessOutbound: {0}",
+                                this.QualifiedId,
+                                exception);
+                        }
 
-                    while (!this.Completion.IsCompleted)
+                        channelAccepted = false;
+                    }
+
+                    while (channelAccepted && !this.Completion.IsCompleted)
                     {
                         if (!this.remoteWindowHasCapacity.IsSet && this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
                         {
@@ -963,7 +989,12 @@ namespace Nerdbank.Streams
                 {
                     if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                     {
-                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Caught exception relaying message to remote side:\n{0}", ex);
+                        this.TraceSource.TraceEvent(
+                            TraceEventType.Information,
+                            (int)TraceEventId.WriteError,
+                            "Caught exception relaying message to remote side: {0} with stack trace:\n{1}",
+                            ex,
+                            ex.StackTrace);
                     }
 
                     // If the operation had been cancelled then we are expecting to receive this error so don't transmit it.
@@ -981,15 +1012,22 @@ namespace Nerdbank.Streams
 
                         // Since we're not expecting to receive this error, transmit the error to the remote side.
                         await mxStreamIOReader!.CompleteAsync(ex).ConfigureAwait(false);
-                        this.MultiplexingStream.OnChannelWritingError(this, ex);
+
+                        if (channelAccepted)
+                        {
+                            this.MultiplexingStream.OnChannelWritingError(this, ex);
+                        }
                     }
 
                     throw;
                 }
                 finally
                 {
-                    // Send the completion message to the remote
-                    this.MultiplexingStream.OnChannelWritingCompleted(this);
+                    // Send the completion message to the remote if the channel was accepted
+                    if (channelAccepted)
+                    {
+                        this.MultiplexingStream.OnChannelWritingCompleted(this);
+                    }
 
                     // Restore the PipeReader to the field.
                     lock (this.SyncObject)
