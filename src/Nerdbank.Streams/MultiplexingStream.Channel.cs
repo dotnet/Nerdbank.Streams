@@ -963,7 +963,7 @@ namespace Nerdbank.Streams
                 {
                     if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                     {
-                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Caught exception relaying message to remote side: {0}", ex.Message);
+                        this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.WriteError, "Caught exception relaying message to remote side:\n{0}", ex);
                     }
 
                     // If the operation had been cancelled then we are expecting to receive this error so don't transmit it.

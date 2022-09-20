@@ -1192,7 +1192,7 @@ namespace Nerdbank.Streams
                 }
 
                 // If we disposed of the channel due to an user passed error then ignore the error
-                if (channel.IsDisposed && channel.Completion.IsFaulted)
+                if (channel.IsDisposed && (channel.Completion.IsFaulted || channel.Acceptance.IsFaulted))
                 {
                     return;
                 }
