@@ -625,7 +625,18 @@ namespace Nerdbank.Streams
                             CancellationToken.None);
                     }
 
-                    return this.acceptanceSource.TrySetResult(acceptanceParameters);
+                    // Update the acceptance source to the acceptance parameters
+                    bool setResult = this.acceptanceSource.TrySetResult(acceptanceParameters);
+                    if (traceSrc.Switch.ShouldTrace(TraceEventType.Information))
+                    {
+                        traceSrc.TraceEvent(
+                            TraceEventType.Information,
+                            (int)TraceEventId.WriteError,
+                            "Result of call to set acceptanceSource in TryAcceptOffer is {0}",
+                            setResult);
+                    }
+
+                    return setResult;
                 }
                 catch (Exception exception)
                 {
@@ -641,11 +652,16 @@ namespace Nerdbank.Streams
                             this.QualifiedId,
                             exception);
                     }
+
+                    // If we caught an disposal error due to the channel self faulting then swallow
+                    // the exception
+                    if (exception is ObjectDisposedException && this.faultingException != null)
+                    {
+                        return true;
+                    }
                 }
 
-                // Swallow the exception if it is an objectDisposeException due to a self triggered
-                // fault rather than a user triggered dispose.
-                return this.IsDisposed && this.faultingException != null;
+                return false;
             }
 
             /// <summary>

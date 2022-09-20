@@ -1178,7 +1178,12 @@ namespace Nerdbank.Streams
 
             if (!this.TryAcceptChannel(channel, options))
             {
-                if (channel.IsAccepted)
+                // If we disposed of the channel due to an user passed error
+                if (channel.IsDisposed && channel.Acceptance.IsFaulted)
+                {
+                    return;
+                }
+                else if (channel.IsAccepted)
                 {
                     throw new InvalidOperationException("Channel is already accepted.");
                 }
