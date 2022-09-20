@@ -604,8 +604,13 @@ namespace Nerdbank.Streams
                         this.QualifiedId);
                 }
 
-                if (this.acceptanceSource.TrySetResult(acceptanceParameters))
+                try
                 {
+                    // Set up the channel options and ensure that the channel is still valid after applying the options
+                    this.ApplyChannelOptions(channelOptions);
+                    Verify.NotDisposed(this);
+
+                    // If we aren't a seeded channel then send an offer accepted frame
                     if (this.QualifiedId.Source != ChannelSource.Seeded)
                     {
                         ReadOnlySequence<byte> payload = this.MultiplexingStream.formatter.Serialize(acceptanceParameters);
@@ -619,32 +624,24 @@ namespace Nerdbank.Streams
                             CancellationToken.None);
                     }
 
-                    try
-                    {
-                        this.ApplyChannelOptions(channelOptions);
-                        return true;
-                    }
-                    catch (ObjectDisposedException)
-                    {
-                        // A (harmless) race condition was hit.
-                        // Swallow it and return false below.
-                        if (traceSrc.Switch.ShouldTrace(TraceEventType.Critical))
-                        {
-                            traceSrc.TraceEvent(
-                                TraceEventType.Critical,
-                                (int)TraceEventId.WriteError,
-                                "Rejecting channel offer due to ObjectDisposedException exception");
-                        }
-                    }
+                    return this.acceptanceSource.TrySetResult(acceptanceParameters);
                 }
-                else if (traceSrc.Switch.ShouldTrace(TraceEventType.Critical))
+                catch (Exception exception)
                 {
-                    traceSrc.TraceEvent(
-                        TraceEventType.Critical,
-                        (int)TraceEventId.WriteError,
-                        "Rejecting channel offer due to trySetResult failure");
+                    // Record the exception in the acceptance source
+                    this.acceptanceSource.TrySetException(exception);
+                    if (traceSrc.Switch.ShouldTrace(TraceEventType.Information))
+                    {
+                        traceSrc.TraceEvent(
+                            TraceEventType.Information,
+                            (int)TraceEventId.WriteError,
+                            "Caught exception in TryAcceptOffer method of channel {0}: \n {1}",
+                            this.QualifiedId,
+                            exception);
+                    }
                 }
 
+                // We caught an exception so return false
                 return false;
             }
 
@@ -792,7 +789,6 @@ namespace Nerdbank.Streams
                     }
 
                     this.optionsAppliedTaskSource?.TrySetException(exception);
-                    throw;
                 }
                 finally
                 {
