@@ -604,7 +604,6 @@ namespace Nerdbank.Streams
                         this.QualifiedId);
                 }
 
-                bool expectedExceptionType;
                 try
                 {
                     // Set up the channel options and ensure that the channel is still valid
@@ -632,7 +631,6 @@ namespace Nerdbank.Streams
                 {
                     // Record the exception in the acceptance source
                     this.acceptanceSource.TrySetException(exception);
-                    expectedExceptionType = exception is ObjectDisposedException;
 
                     if (traceSrc.Switch.ShouldTrace(TraceEventType.Information))
                     {
@@ -647,7 +645,7 @@ namespace Nerdbank.Streams
 
                 // Swallow the exception if it is an objectDisposeException due to a self triggered
                 // fault rather than a user triggered dispose.
-                return expectedExceptionType && this.faultingException != null;
+                return this.IsDisposed && this.faultingException != null;
             }
 
             /// <summary>
