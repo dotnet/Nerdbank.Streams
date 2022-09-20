@@ -353,8 +353,17 @@ namespace Nerdbank.Streams
                             this.QualifiedId);
                     }
 
-                    this.acceptanceSource.TrySetCanceled();
-                    this.optionsAppliedTaskSource?.TrySetCanceled();
+                    // If we are disposing due to an faulting error, transition the acceptanceSource to an error state
+                    if (this.faultingException != null)
+                    {
+                        this.acceptanceSource?.TrySetException(this.faultingException);
+                        this.optionsAppliedTaskSource?.TrySetException(this.faultingException);
+                    }
+                    else
+                    {
+                        this.acceptanceSource.TrySetCanceled();
+                        this.optionsAppliedTaskSource?.TrySetCanceled();
+                    }
 
                     PipeWriter? mxStreamIOWriter;
                     lock (this.SyncObject)
