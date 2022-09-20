@@ -606,7 +606,8 @@ namespace Nerdbank.Streams
 
                 try
                 {
-                    // Set up the channel options and ensure that the channel is still valid after applying the options
+                    // Set up the channel options and ensure that the channel is still valid
+                    // before we transition to an accepted state
                     this.ApplyChannelOptions(channelOptions);
                     Verify.NotDisposed(this);
 
@@ -641,8 +642,8 @@ namespace Nerdbank.Streams
                     }
                 }
 
-                // We caught an exception so return false
-                return false;
+                // Swallow the exception if we faulted overself rather than an a user specified dispose.
+                return this.faultingException != null;
             }
 
             /// <summary>
@@ -788,7 +789,9 @@ namespace Nerdbank.Streams
                             exception);
                     }
 
+                    // Record that we caught an exception
                     this.optionsAppliedTaskSource?.TrySetException(exception);
+                    throw;
                 }
                 finally
                 {
