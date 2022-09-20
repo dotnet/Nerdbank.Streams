@@ -643,7 +643,7 @@ namespace Nerdbank.Streams
                 }
 
                 // Swallow the exception if we faulted overself rather than an a user specified dispose.
-                return this.faultingException != null;
+                return this.IsDisposed && this.faultingException != null;
             }
 
             /// <summary>
