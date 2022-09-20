@@ -609,7 +609,6 @@ namespace Nerdbank.Streams
                     // Set up the channel options and ensure that the channel is still valid
                     // before we transition to an accepted state
                     this.ApplyChannelOptions(channelOptions);
-                    Verify.NotDisposed(this);
 
                     // If we aren't a seeded channel then send an offer accepted frame
                     if (this.QualifiedId.Source != ChannelSource.Seeded)

@@ -1178,8 +1178,21 @@ namespace Nerdbank.Streams
 
             if (!this.TryAcceptChannel(channel, options))
             {
-                // If we disposed of the channel due to an user passed error
-                if (channel.IsDisposed && channel.Acceptance.IsFaulted)
+                TraceSource traceSrc = this.GetTraceSource();
+                if (traceSrc.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    traceSrc.TraceEvent(
+                        TraceEventType.Information,
+                        (int)TraceEventId.WriteError,
+                        "State of channel {0} of tryAcceptChannel failure in AcceptChannelOrThrow: \n IsDisposed - {1}, Acceptance - {2}, Completion - {3}",
+                        channel.QualifiedId,
+                        channel.IsDisposed,
+                        channel.Acceptance.Status,
+                        channel.Completion.Status);
+                }
+
+                // If we disposed of the channel due to an user passed error then ignore the error
+                if (channel.IsDisposed && channel.Completion.IsFaulted)
                 {
                     return;
                 }
