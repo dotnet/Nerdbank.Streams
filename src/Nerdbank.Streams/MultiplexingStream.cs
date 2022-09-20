@@ -1142,10 +1142,9 @@ namespace Nerdbank.Streams
 
             if (!this.TryAcceptChannel(channel, options))
             {
-                // If we disposed of the channel due to a user provided error then ignore the error.
-                if (channel.IsDisposed && (channel.Completion.IsFaulted || channel.Acceptance.IsFaulted))
+                if (channel.Acceptance.IsFaulted)
                 {
-                    return;
+                    throw new InvalidOperationException("Channel acceptance was already faulted.", channel.Acceptance.Exception);
                 }
                 else if (channel.IsAccepted)
                 {

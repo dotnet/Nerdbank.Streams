@@ -624,13 +624,6 @@ namespace Nerdbank.Streams
                 {
                     // Record the exception in the acceptance source.
                     this.acceptanceSource.TrySetException(exception);
-
-                    // If we caught an disposal error due to the channel self faulting then swallow
-                    // the exception.
-                    if (exception is ObjectDisposedException && this.faultingException != null)
-                    {
-                        return true;
-                    }
                 }
 
                 return false;
