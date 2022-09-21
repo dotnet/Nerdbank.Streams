@@ -350,19 +350,30 @@ namespace Nerdbank.Streams
                         mxStreamIOWriter = this.mxStreamIOWriter;
                     }
 
-                    // If we are disposing due to a faulting error, transition the acceptanceSource to an error state
-                    lock (this.SyncObject)
+                    TraceSource traceSrc = new TraceSource($"{nameof(Streams.MultiplexingStream)}.{nameof(Channel)} {this.QualifiedId} ({this.Name})", SourceLevels.All);
+                    if (traceSrc.Switch.ShouldTrace(TraceEventType.Verbose))
                     {
-                        if (this.faultingException != null)
-                        {
-                            this.acceptanceSource.TrySetException(this.faultingException);
-                            this.optionsAppliedTaskSource?.TrySetException(this.faultingException);
-                        }
-                        else
-                        {
-                            this.acceptanceSource.TrySetCanceled();
-                            this.optionsAppliedTaskSource?.TrySetCanceled();
-                        }
+                        traceSrc.TraceEvent(
+                            TraceEventType.Verbose,
+                            (int)TraceEventId.ChannelDisposed,
+                            "Disposing channel {0} with faulting exception of {1}",
+                            this.QualifiedId,
+                            this.faultingException);
+                    }
+
+                    // If we are disposing due to receiving or sending an exception, relay that to our client
+                    // by update the sources of the acceptance and completion tasks
+                    if (this.faultingException is Exception faultingException)
+                    {
+                        this.completionSource.TrySetException(faultingException);
+                        this.acceptanceSource.TrySetException(this.faultingException);
+                        this.optionsAppliedTaskSource?.TrySetException(this.faultingException);
+                    }
+                    else
+                    {
+                        this.completionSource.TrySetResult(null);
+                        this.acceptanceSource.TrySetCanceled();
+                        this.optionsAppliedTaskSource?.TrySetCanceled();
                     }
 
                     // Complete writing so that the mxstream cannot write to this channel any more.
@@ -422,19 +433,7 @@ namespace Nerdbank.Streams
 
                     // Unblock the reader that might be waiting on this.
                     this.remoteWindowHasCapacity.Set();
-
                     this.disposalTokenSource.Cancel();
-
-                    // If we are disposing due to receiving or sending an exception, relay that to our client.
-                    if (this.faultingException is Exception faultingException)
-                    {
-                        this.completionSource.TrySetException(faultingException);
-                    }
-                    else
-                    {
-                        this.completionSource.TrySetResult(null);
-                    }
-
                     this.MultiplexingStream.OnChannelDisposed(this);
                 }
             }
@@ -617,19 +616,17 @@ namespace Nerdbank.Streams
                             CancellationToken.None);
                     }
 
-                    // Update the acceptance source to the acceptance parameters.
+                    // Update the acceptance source to the acceptance parameters
                     return this.acceptanceSource.TrySetResult(acceptanceParameters);
                 }
                 catch (Exception exception)
                 {
-                    // Record the exception in the acceptance source.
-                    this.acceptanceSource.TrySetException(exception);
-
-                    // If we caught an disposal error due to the channel self faulting then swallow
-                    // the exception.
-                    if (exception is ObjectDisposedException && this.faultingException != null)
+                    // Record the exception in the acceptance source if the exception
+                    // if it is not an ObjectDisposedException as that will have already
+                    // set acceptanceSource.
+                    if (exception is not ObjectDisposedException)
                     {
-                        return true;
+                        this.acceptanceSource.TrySetException(exception);
                     }
                 }
 
@@ -913,6 +910,7 @@ namespace Nerdbank.Streams
                 catch (Exception ex)
                 {
                     // If the operation had been cancelled then we are expecting to receive this error so don't transmit it.
+                    // Also swallow the error if we channel was not accepted when we received this error
                     if (ex is OperationCanceledException && this.DisposalToken.IsCancellationRequested)
                     {
                         await mxStreamIOReader!.CompleteAsync().ConfigureAwait(false);
