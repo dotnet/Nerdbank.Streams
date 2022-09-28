@@ -203,6 +203,9 @@ export class ChannelClass extends Channel {
         // or even expect it to be recognized by anyone else.
         // The acceptance promise rejection is observed by the offer channel method.
         caught(this._completion.promise);
+
+        // Inform the remote side that the offer is rescinded.
+        this.dispose();
     }
 
     public onAccepted(acceptanceParameter: AcceptanceParameters): boolean {
@@ -248,7 +251,10 @@ export class ChannelClass extends Channel {
         if (!this.isDisposed) {
             super.dispose();
 
-            this._acceptance.reject(new CancellationToken.CancellationError("disposed"));
+            if (this._acceptance.reject(new CancellationToken.CancellationError("disposed"))) {
+                // Don't crash node due to an unnoticed rejection when dispose was explicitly called.
+                caught(this.acceptance);
+            }
 
             // For the pipes, we Complete *our* ends, and leave the user's ends alone.
             // The completion will propagate when it's ready to.
