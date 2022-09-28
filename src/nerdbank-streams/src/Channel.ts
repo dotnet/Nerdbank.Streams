@@ -56,7 +56,7 @@ export abstract class Channel implements IDisposableObservable {
     /**
      * Closes this channel.
      */
-    public dispose() {
+    public dispose(): void {
         // The interesting stuff is in the derived class.
         this._isDisposed = true;
     }
@@ -247,7 +247,7 @@ export class ChannelClass extends Channel {
         }
     }
 
-    public async dispose() {
+    public dispose(): void {
         if (!this.isDisposed) {
             super.dispose();
 
@@ -262,7 +262,9 @@ export class ChannelClass extends Channel {
             this._duplex.push(null);
 
             this._completion.resolve();
-            await this._multiplexingStream.onChannelDisposed(this);
+
+            // Send the notification, but we can't await the result of this.
+            caught(this._multiplexingStream.onChannelDisposed(this));
         }
     }
 
