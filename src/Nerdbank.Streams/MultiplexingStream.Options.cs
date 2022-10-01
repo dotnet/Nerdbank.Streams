@@ -91,7 +91,7 @@ namespace Nerdbank.Streams
             /// and copies the values from another instance into this one.
             /// </summary>
             /// <param name="copyFrom">The instance to copy values from.</param>
-            /// <param name="frozen"><c>true</c> to freeze this copy.</param>
+            /// <param name="frozen"><see langword="true"/> to freeze this copy.</param>
             private Options(Options copyFrom, bool frozen)
                 : this(copyFrom)
             {
@@ -160,10 +160,10 @@ namespace Nerdbank.Streams
 
             /// <summary>
             /// Gets or sets a factory for <see cref="TraceSource"/> instances to attach to a newly opened <see cref="Channel"/>
-            /// when its <see cref="ChannelOptions.TraceSource"/> is <c>null</c>.
+            /// when its <see cref="ChannelOptions.TraceSource"/> is <see langword="null"/>.
             /// </summary>
             /// <remarks>
-            /// <para>The delegate receives a channel ID and name, and may return a <see cref="TraceSource"/> or <c>null</c>.</para>
+            /// <para>The delegate receives a channel ID and name, and may return a <see cref="TraceSource"/> or <see langword="null"/>.</para>
             /// <para>This delegate will not be invoked if <see cref="DefaultChannelTraceSourceFactoryWithQualifier"/> has been set to a non-null value.</para>
             /// </remarks>
             [Obsolete("Use " + nameof(DefaultChannelTraceSourceFactoryWithQualifier) + " instead.")]
@@ -179,10 +179,10 @@ namespace Nerdbank.Streams
 
             /// <summary>
             /// Gets or sets a factory for <see cref="TraceSource"/> instances to attach to a newly opened <see cref="Channel"/>
-            /// when its <see cref="ChannelOptions.TraceSource"/> is <c>null</c>.
+            /// when its <see cref="ChannelOptions.TraceSource"/> is <see langword="null"/>.
             /// </summary>
             /// <remarks>
-            /// <para>The delegate receives a channel ID and name, and may return a <see cref="TraceSource"/> or <c>null</c>.</para>
+            /// <para>The delegate receives a channel ID and name, and may return a <see cref="TraceSource"/> or <see langword="null"/>.</para>
             /// <para>This delegate supersedes the obsolete <see cref="DefaultChannelTraceSourceFactory"/> as this one provides detail about whether the channel was offered locally or remotely.</para>
             /// </remarks>
             public Func<QualifiedChannelId, string, TraceSource?>? DefaultChannelTraceSourceFactoryWithQualifier

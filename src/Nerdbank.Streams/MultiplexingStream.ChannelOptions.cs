@@ -38,7 +38,7 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Gets or sets an existing <see cref="IDuplexPipe"/> instance used to exchange data with the channel.
             /// </summary>
-            /// <value>The default is <c>null</c>.</value>
+            /// <value>The default is <see langword="null"/>.</value>
             /// <remarks>
             /// <para>
             /// This property supports high throughput scenarios where channel data ultimately goes to a <see cref="PipeWriter"/> and <see cref="PipeReader"/> that already exist.
@@ -51,7 +51,7 @@ namespace Nerdbank.Streams
             /// the value of <see cref="ChannelReceivingWindowSize"/> and <see cref="Options.DefaultChannelReceivingWindowSize"/>.
             /// </para>
             /// </remarks>
-            /// <exception cref="ArgumentException">Thrown if set to an <see cref="IDuplexPipe"/> that returns <c>null</c> for either of its properties.</exception>
+            /// <exception cref="ArgumentException">Thrown if set to an <see cref="IDuplexPipe"/> that returns <see langword="null"/> for either of its properties.</exception>
             public IDuplexPipe? ExistingPipe
             {
                 get => this.existingPipe;

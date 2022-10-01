@@ -579,7 +579,7 @@ namespace Nerdbank.Streams
             /// Occurs when the remote party has accepted our offer of this channel.
             /// </summary>
             /// <param name="acceptanceParameters">The channel parameters provided by the accepting party.</param>
-            /// <returns>A value indicating whether the acceptance went through; <c>false</c> if the channel is already accepted, rejected or offer rescinded.</returns>
+            /// <returns>A value indicating whether the acceptance went through; <see langword="false"/> if the channel is already accepted, rejected or offer rescinded.</returns>
             internal bool OnAccepted(AcceptanceParameters acceptanceParameters)
             {
                 lock (this.SyncObject)

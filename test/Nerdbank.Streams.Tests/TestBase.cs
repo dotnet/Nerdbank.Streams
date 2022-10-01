@@ -191,8 +191,8 @@ public abstract class TestBase : IDisposable
     /// <param name="testMethodName">The name of the test method.</param>
     /// <param name="logger">An optional logger to forward any <see cref="ITestOutputHelper"/> output to from the isolated test runner.</param>
     /// <returns>
-    /// A task whose result is <c>true</c> if test execution is already isolated and should therefore proceed with the body of the test,
-    /// or <c>false</c> after the isolated instance of the test has completed execution.
+    /// A task whose result is <see langword="true"/> if test execution is already isolated and should therefore proceed with the body of the test,
+    /// or <see langword="false"/> after the isolated instance of the test has completed execution.
     /// </returns>
     /// <exception cref="Xunit.Sdk.XunitException">Thrown if the isolated test result is a Failure.</exception>
     /// <exception cref="SkipException">Thrown if on a platform that we do not yet support test isolation on.</exception>
@@ -284,8 +284,8 @@ public abstract class TestBase : IDisposable
     /// <param name="testMethodName">The name of the test method.</param>
     /// <param name="logger">An optional logger to forward any <see cref="ITestOutputHelper"/> output to from the isolated test runner.</param>
     /// <returns>
-    /// A task whose result is <c>true</c> if test execution is already isolated and should therefore proceed with the body of the test,
-    /// or <c>false</c> after the isolated instance of the test has completed execution.
+    /// A task whose result is <see langword="true"/> if test execution is already isolated and should therefore proceed with the body of the test,
+    /// or <see langword="false"/> after the isolated instance of the test has completed execution.
     /// </returns>
     /// <exception cref="Xunit.Sdk.XunitException">Thrown if the isolated test result is a Failure.</exception>
     /// <exception cref="SkipException">Thrown if on a platform that we do not yet support test isolation on.</exception>
@@ -351,8 +351,8 @@ public abstract class TestBase : IDisposable
     /// </summary>
     /// <param name="testMethodName">The name of the test method.</param>
     /// <returns>
-    /// A task whose result is <c>true</c> if test execution is already isolated and should therefore proceed with the body of the test,
-    /// or <c>false</c> after the isolated instance of the test has completed execution.
+    /// A task whose result is <see langword="true"/> if test execution is already isolated and should therefore proceed with the body of the test,
+    /// or <see langword="false"/> after the isolated instance of the test has completed execution.
     /// </returns>
     /// <exception cref="Xunit.Sdk.XunitException">Thrown if the isolated test result is a Failure.</exception>
     /// <exception cref="SkipException">Thrown if on a platform that we do not yet support test isolation on.</exception>
@@ -367,8 +367,8 @@ public abstract class TestBase : IDisposable
     /// </summary>
     /// <param name="testMethodName">The name of the test method.</param>
     /// <returns>
-    /// <c>true</c> if test execution is already isolated and should therefore proceed with the body of the test,
-    /// or <c>false</c> after the isolated instance of the test has completed execution.
+    /// <see langword="true"/> if test execution is already isolated and should therefore proceed with the body of the test,
+    /// or <see langword="false"/> after the isolated instance of the test has completed execution.
     /// </returns>
     /// <exception cref="Xunit.Sdk.XunitException">Thrown if the isolated test result is a Failure.</exception>
     /// <exception cref="SkipException">Thrown if on a platform that we do not yet support test isolation on.</exception>

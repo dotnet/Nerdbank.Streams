@@ -88,7 +88,7 @@ namespace Nerdbank.Streams
         /// in which case the higher of the two minimums dictate the minimum array size that will be allocated.
         /// </para>
         /// <para>
-        /// If <see cref="AutoIncreaseMinimumSpanLength"/> is <c>true</c>, this value may be automatically increased as the length of a sequence grows.
+        /// If <see cref="AutoIncreaseMinimumSpanLength"/> is <see langword="true"/>, this value may be automatically increased as the length of a sequence grows.
         /// </para>
         /// </remarks>
         public int MinimumSpanLength { get; set; } = 0;
@@ -386,7 +386,7 @@ namespace Nerdbank.Streams
 
             /// <summary>
             /// Gets the tracker for the underlying array for this segment, which can be used to recycle the array when we're disposed of.
-            /// Will be <c>null</c> if using an array pool, in which case the memory is held by <see cref="array"/>.
+            /// Will be <see langword="null"/> if using an array pool, in which case the memory is held by <see cref="array"/>.
             /// </summary>
             internal IMemoryOwner<T>? MemoryOwner { get; private set; }
 
