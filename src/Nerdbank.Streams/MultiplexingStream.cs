@@ -240,7 +240,7 @@ namespace Nerdbank.Streams
 
         /// <summary>
         /// Gets a factory for <see cref="TraceSource"/> instances to attach to a newly opened <see cref="Channel"/>
-        /// when its <see cref="ChannelOptions.TraceSource"/> is <c>null</c>.
+        /// when its <see cref="ChannelOptions.TraceSource"/> is <see langword="null"/>.
         /// </summary>
         private Func<QualifiedChannelId, string, TraceSource?>? DefaultChannelTraceSourceFactory { get; }
 
@@ -715,9 +715,9 @@ namespace Nerdbank.Streams
         /// </summary>
         /// <param name="stream">The stream to read from.</param>
         /// <param name="buffer">The buffer to fill.</param>
-        /// <param name="throwOnEmpty"><c>true</c> to throw if 0 bytes are read before the stream before the end of stream is encountered; <c>false</c> to simply return <c>false</c> when that happens.</param>
+        /// <param name="throwOnEmpty"><see langword="true"/> to throw if 0 bytes are read before the stream before the end of stream is encountered; <see langword="false"/> to simply return <see langword="false"/> when that happens.</param>
         /// <param name="cancellationToken">A cancellation token.</param>
-        /// <returns><c>true</c> if the buffer was filled as required; <c>false</c> if the stream was empty and no bytes were read, if <paramref name="throwOnEmpty"/> is <c>false</c>.</returns>
+        /// <returns><see langword="true"/> if the buffer was filled as required; <see langword="false"/> if the stream was empty and no bytes were read, if <paramref name="throwOnEmpty"/> is <see langword="false"/>.</returns>
         /// <exception cref="EndOfStreamException">Thrown if the end of the stream was reached before the buffer was filled (unless <paramref name="throwOnEmpty"/> is false and 0 bytes were read).</exception>
         private static async ValueTask<bool> ReadToFillAsync(Stream stream, Memory<byte> buffer, bool throwOnEmpty, CancellationToken cancellationToken)
         {

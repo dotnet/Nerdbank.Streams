@@ -35,7 +35,7 @@ namespace Nerdbank.Streams
         /// Exposes a full-duplex pipe as a <see cref="Stream"/>.
         /// </summary>
         /// <param name="pipe">The pipe to wrap as a stream.</param>
-        /// <param name="ownsPipe"><c>true</c> to complete the underlying reader and writer when the <see cref="Stream"/> is disposed; <c>false</c> to keep them open.</param>
+        /// <param name="ownsPipe"><see langword="true"/> to complete the underlying reader and writer when the <see cref="Stream"/> is disposed; <see langword="false"/> to keep them open.</param>
         /// <returns>The wrapping stream.</returns>
         public static Stream AsStream(this IDuplexPipe pipe, bool ownsPipe) => FullDuplexStream.Splice(pipe.Input.AsStream(leaveOpen: !ownsPipe), pipe.Output.AsStream(leaveOpen: !ownsPipe));
 
