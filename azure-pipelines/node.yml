@@ -1,33 +1,33 @@
 steps:
 - task: UseNode@1
-  displayName: Use Node 16.x
+  displayName: ⚙️ Use Node 16.x
   inputs:
     version: 16.x
 
 - task: YarnInstaller@3
-  displayName: Use yarn 1.x
+  displayName: ⚙️ Use yarn 1.x
   inputs:
     versionSpec: 1.x
 
 - task: Yarn@3
-  displayName: yarn install
+  displayName: ⚙️ yarn install
   inputs:
     projectDirectory: src/nerdbank-streams
 
 - task: Yarn@3
-  displayName: yarn build
+  displayName: 🛠️ yarn build
   inputs:
     projectDirectory: src/nerdbank-streams
     arguments: build
 
 - task: Yarn@3
-  displayName: yarn test
+  displayName: 🧪 yarn test
   inputs:
     projectDirectory: src/nerdbank-streams
     arguments: test
 
 - task: Yarn@3
-  displayName: yarn tslint
+  displayName: 🧪 yarn tslint
   inputs:
     projectDirectory: src/nerdbank-streams
     arguments: tslint --project .
