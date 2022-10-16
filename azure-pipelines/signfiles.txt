@@ -1,0 +1,2 @@
+**/Nerdbank.Streams.dll
+**/*.js

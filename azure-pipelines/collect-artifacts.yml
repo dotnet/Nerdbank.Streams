@@ -1,8 +1,32 @@
+parameters:
+  SignArtifacts:
+
 steps:
 - powershell: azure-pipelines/variables/_pipelines.ps1
   failOnStderr: true
   displayName: ⚙ Update pipeline variables based on build outputs
   condition: succeededOrFailed()
+
+- ${{ if eq(parameters.SignArtifacts, 'true') }}:
+  - powershell: azure-pipelines/artifacts/_pipelines.ps1 -ArtifactNameSuffix "-$(Agent.JobName)" -Verbose -StageOnly
+    failOnStderr: true
+    displayName: 🗃️ Stage artifacts
+    condition: succeededOrFailed()
+
+  - pwsh: >
+      dotnet tool install --tool-path obj SignClient
+
+      obj/SignClient sign
+      --baseDirectory '$(Build.ArtifactStagingDirectory)/deployables-$(Agent.JobName)'
+      --input '**/*'
+      --config '$(System.DefaultWorkingDirectory)/azure-pipelines/SignClient.json'
+      --filelist '$(System.DefaultWorkingDirectory)/azure-pipelines/signfiles.txt'
+      --user '$(codesign_username)'
+      --secret '$(codesign_secret)'
+      --name 'Nerdbank.Streams'
+      --descriptionUrl 'https://github.com/dotnet/Nerdbank.Streams'
+    displayName: 🔏 Code sign
+    condition: and(succeeded(), eq(variables['System.TeamFoundationCollectionUri'], 'https://dev.azure.com/andrewarnott/'), ne(variables['Build.Reason'], 'PullRequest'))
 
 - powershell: azure-pipelines/artifacts/_pipelines.ps1 -ArtifactNameSuffix "-$(Agent.JobName)" -Verbose
   failOnStderr: true
