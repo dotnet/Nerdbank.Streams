@@ -56,7 +56,7 @@ export abstract class Channel implements IDisposableObservable {
     /**
      * Closes this channel.
      */
-    public dispose() {
+    public dispose(): void {
         // The interesting stuff is in the derived class.
         this._isDisposed = true;
     }
@@ -203,6 +203,9 @@ export class ChannelClass extends Channel {
         // or even expect it to be recognized by anyone else.
         // The acceptance promise rejection is observed by the offer channel method.
         caught(this._completion.promise);
+
+        // Inform the remote side that the offer is rescinded.
+        this.dispose();
     }
 
     public onAccepted(acceptanceParameter: AcceptanceParameters): boolean {
@@ -244,11 +247,14 @@ export class ChannelClass extends Channel {
         }
     }
 
-    public async dispose() {
+    public dispose(): void {
         if (!this.isDisposed) {
             super.dispose();
 
-            this._acceptance.reject(new CancellationToken.CancellationError("disposed"));
+            if (this._acceptance.reject(new CancellationToken.CancellationError("disposed"))) {
+                // Don't crash node due to an unnoticed rejection when dispose was explicitly called.
+                caught(this.acceptance);
+            }
 
             // For the pipes, we Complete *our* ends, and leave the user's ends alone.
             // The completion will propagate when it's ready to.
@@ -256,7 +262,9 @@ export class ChannelClass extends Channel {
             this._duplex.push(null);
 
             this._completion.resolve();
-            await this._multiplexingStream.onChannelDisposed(this);
+
+            // Send the notification, but we can't await the result of this.
+            caught(this._multiplexingStream.onChannelDisposed(this));
         }
     }
 

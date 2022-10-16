@@ -8,6 +8,7 @@ import { timeout } from "./Timeout";
 import { Channel } from "../Channel";
 import CancellationToken from "cancellationtoken";
 import * as assert from "assert";
+import { nextTick } from "process";
 
 [1, 2, 3].forEach(protocolMajorVersion => {
     describe(`MultiplexingStream v${protocolMajorVersion}`, () => {
@@ -112,6 +113,24 @@ import * as assert from "assert";
             const offer = mx1.offerChannelAsync('', undefined, cts.token);
             cts.cancel();
             await assert.rejects(offer);
+        });
+
+        it("Channel offer is canceled by sender after receiver gets it", async () => {
+            // Arrange to cancel the offer only after the remote party receives it (but before they accept it.)
+            const cts = CancellationToken.create();
+            mx2.on('channelOffered', args => {
+                cts.cancel('rescind offer');
+            });
+            const offer = mx1.offerChannelAsync("test", undefined, cts.token);
+            await expectAsync(offer).toBeRejected()
+
+            // Give time for the termination fram to arrive *before* we try to accept the channel.
+            for (let i = 0; i < 100; i++) {
+                await new Promise<void>(resolve => nextTick(() => resolve()));
+            }
+
+            // We expect this to timeout. But we need this for the test to fail if we have unobserved promise rejections.
+            await expectAsync(timeout(mx2.acceptChannelAsync('test'), 1000)).toBeRejected();
         });
 
         it("Channel offer is rejected by event handler", async () => {
