@@ -31,7 +31,7 @@ describe("FullDuplexStream.CreatePair", () => {
 
     async function writePropagation(first: Writable, second: Readable): Promise<void> {
         first.write("abc");
-        expect(second.read()).toEqual(new Buffer("abc"));
+        expect(second.read()).toEqual(Buffer.from("abc"));
     }
 
     async function endPropagatesFinishEvent(first: Writable, second: Readable): Promise<void> {
@@ -70,19 +70,19 @@ describe("FullDuplexStream.Splice", () => {
     it("Should read from readable", async () => {
         readable.end("hi");
         const buffer = await getBufferFrom(duplex, 2);
-        expect(buffer).toEqual(new Buffer("hi"));
+        expect(buffer).toEqual(Buffer.from("hi"));
     });
 
     it("Should write to writable", async () => {
         duplex.write("abc");
         const buffer = await getBufferFrom(writable, 3);
-        expect(buffer).toEqual(new Buffer("abc"));
+        expect(buffer).toEqual(Buffer.from("abc"));
     });
 
     it("Terminating writing", async () => {
         duplex.end("the end");
         let buffer: Buffer | null = await getBufferFrom(writable, 7);
-        expect(buffer).toEqual(new Buffer("the end"));
+        expect(buffer).toEqual(Buffer.from("the end"));
         buffer = await getBufferFrom(writable, 1, true);
         expect(buffer).toBeNull();
     });
