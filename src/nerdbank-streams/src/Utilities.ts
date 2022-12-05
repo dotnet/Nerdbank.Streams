@@ -77,7 +77,7 @@ export async function getBufferFrom(
         return new Buffer([]);
     }
 
-    let readBuffer: Buffer = new Buffer(size);
+    let readBuffer: Buffer | null = null;
     let index: number = 0;
     while (size > 0) {
         cancellationToken?.throwIfCancelled();
@@ -90,16 +90,34 @@ export async function getBufferFrom(
         if (availableSize > 0) {
             newBuffer = readable.read(availableSize) as Buffer;
             if (newBuffer) {
-                newBuffer.copy(newBuffer, index);
+                if (readBuffer === null) {
+                    if (availableSize === size) {
+                        // in the fast pass, we read the entire data once, and donot allocate an extra array.
+                        return newBuffer;
+                    }
+
+                    // if we read partial data, we need allocate a buffer to join all data together.
+                    readBuffer = new Buffer(size);
+                }
+
+                // now append new data to the buffer
+                newBuffer.copy(readBuffer, index);
+
                 size -= newBuffer.length;
                 index += newBuffer.length;
             }
         } else if (readable.readableEnded && readable.readableLength === 0) {
+            // stream is closed
             if (!allowEndOfStream) {
                 throw new Error("Stream terminated before required bytes were read.");
             }
 
             // Returns what has been read so far
+            if (readBuffer === null) {
+                return null;
+            }
+
+            // we need trim extra spaces
             newBuffer = new Buffer(index);
             readBuffer.copy(newBuffer, 0, 0, index);
 
