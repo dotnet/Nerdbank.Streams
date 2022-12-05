@@ -82,7 +82,7 @@ export async function getBufferFrom(
     while (size > 0) {
         cancellationToken?.throwIfCancelled();
         let availableSize = (readable as Readable).readableLength ?? size;
-        if (availableSize > size) {
+        if (availableSize > size || availableSize == 0) {
             availableSize = size;
         }
 
