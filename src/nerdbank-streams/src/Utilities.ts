@@ -130,10 +130,15 @@ export async function getBufferFrom(
 
         if (size > 0) {
             const bytesAvailable = new Deferred<void>();
-            readable.once("readable", bytesAvailable.resolve.bind(bytesAvailable));
-            readable.once("end", streamEnded.resolve.bind(streamEnded));
+            const bytesAvailableCallback = bytesAvailable.resolve.bind(bytesAvailable);
+            const streamEndedCallback = streamEnded.resolve.bind(streamEnded);
+            readable.once("readable", bytesAvailableCallback);
+            readable.once("end", streamEndedCallback);
             const endPromise = Promise.race([bytesAvailable.promise, streamEnded.promise]);
             await (cancellationToken ? cancellationToken.racePromise(endPromise) : endPromise);
+
+            readable.removeListener("readable", bytesAvailableCallback);
+            readable.removeListener("end", streamEndedCallback);
 
             if (bytesAvailable.isCompleted) {
                 continue;
