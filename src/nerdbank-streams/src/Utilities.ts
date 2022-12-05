@@ -82,7 +82,10 @@ export async function getBufferFrom(
     while (size > 0) {
         cancellationToken?.throwIfCancelled();
         let availableSize = (readable as Readable).readableLength ?? size;
-        if (availableSize > size || availableSize == 0) {
+        if (availableSize > size) {
+            availableSize = size;
+        } else if (availableSize === 0 && !(readable as Readable).readableEnded) {
+            // we retain this behavior to make existing unit tests happy (which assumes we will try to read stream when no data is ready.)
             availableSize = size;
         }
 
