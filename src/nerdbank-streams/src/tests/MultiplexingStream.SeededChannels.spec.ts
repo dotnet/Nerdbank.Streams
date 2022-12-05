@@ -39,10 +39,10 @@ import { ChannelOptions } from "../ChannelOptions";
             const ch2_1 = mx2.acceptChannel(1);
 
             ch1_0.stream.write("abc");
-            expect(await getBufferFrom(ch2_0.stream, 3)).toEqual(new Buffer("abc"));
+            expect(await getBufferFrom(ch2_0.stream, 3)).toEqual(Buffer.from("abc"));
 
             ch2_1.stream.write("abc");
-            expect(await getBufferFrom(ch1_1.stream, 3)).toEqual(new Buffer("abc"));
+            expect(await getBufferFrom(ch1_1.stream, 3)).toEqual(Buffer.from("abc"));
         });
 
         it('can be closed', async () => {

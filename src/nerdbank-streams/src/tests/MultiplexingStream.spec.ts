@@ -69,18 +69,18 @@ import { nextTick } from "process";
             const offer = mx1.createChannel();
 
             // Send a few bytes on the anonymous channel.
-            offer.stream.write(new Buffer([1, 2, 3]));
+            offer.stream.write(Buffer.from([1, 2, 3]));
 
             // await until we've confirmed the ID could have propagated
             // to the remote party.
-            rpcChannels[0].stream.write(new Buffer(1));
+            rpcChannels[0].stream.write(Buffer.alloc(1));
             await getBufferFrom(rpcChannels[1].stream, 1);
 
             const accept = mx2.acceptChannel(offer.id);
 
             // Receive the few bytes on the new channel.
             const recvOnChannel = await getBufferFrom(accept.stream, 3);
-            expect(recvOnChannel).toEqual(new Buffer([1, 2, 3]));
+            expect(recvOnChannel).toEqual(Buffer.from([1, 2, 3]));
 
             // Confirm the original party recognizes acceptance.
             await offer.acceptance;
@@ -95,11 +95,11 @@ import { nextTick } from "process";
             const offer = mx1.createChannel();
 
             // Send a few bytes on the anonymous channel.
-            offer.stream.write(new Buffer([1, 2, 3]));
+            offer.stream.write(Buffer.from([1, 2, 3]));
 
             // await until we've confirmed the ID could have propagated
             // to the remote party.
-            rpcChannels[0].stream.write(new Buffer(1));
+            rpcChannels[0].stream.write(Buffer.alloc(1));
             await getBufferFrom(rpcChannels[1].stream, 1);
 
             mx2.rejectChannel(offer.id);
@@ -212,7 +212,7 @@ import { nextTick } from "process";
                 mx2.acceptChannelAsync("test"),
             ]);
             channels[0].stream.write("abc");
-            expect(await getBufferFrom(channels[1].stream, 3)).toEqual(new Buffer("abc"));
+            expect(await getBufferFrom(channels[1].stream, 3)).toEqual(Buffer.from("abc"));
         });
 
         it("Can exchange data over two channels", async () => {
@@ -225,8 +225,8 @@ import { nextTick } from "process";
             channels[0].stream.write("abc");
             channels[3].stream.write("def");
             channels[3].stream.write("ghi");
-            expect(await getBufferFrom(channels[2].stream, 3)).toEqual(new Buffer("abc"));
-            expect(await getBufferFrom(channels[1].stream, 6)).toEqual(new Buffer("defghi"));
+            expect(await getBufferFrom(channels[2].stream, 3)).toEqual(Buffer.from("abc"));
+            expect(await getBufferFrom(channels[1].stream, 6)).toEqual(Buffer.from("defghi"));
         });
 
         it("end of channel", async () => {
@@ -235,7 +235,7 @@ import { nextTick } from "process";
                 mx2.acceptChannelAsync("test"),
             ]);
             channels[0].stream.end("finished");
-            expect(await getBufferFrom(channels[1].stream, 8)).toEqual(new Buffer("finished"));
+            expect(await getBufferFrom(channels[1].stream, 8)).toEqual(Buffer.from("finished"));
             expect(await getBufferFrom(channels[1].stream, 1, true)).toBeNull();
         });
 

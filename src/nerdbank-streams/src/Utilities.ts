@@ -97,7 +97,7 @@ export async function getBufferFrom(
         return readBuffer;
     }
 
-    return new Buffer([]);
+    return Buffer.from([]);
 }
 
 export function throwIfDisposed(value: IDisposableObservable) {

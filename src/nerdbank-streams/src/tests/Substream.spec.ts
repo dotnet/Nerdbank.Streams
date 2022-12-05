@@ -17,7 +17,7 @@ describe("Substream", () => {
         });
 
         it("a single chunk", async () => {
-            const payload = new Buffer([1, 2, 3]);
+            const payload = Buffer.from([1, 2, 3]);
 
             const thru = new PassThrough();
 
@@ -38,8 +38,8 @@ describe("Substream", () => {
         });
 
         it("two chunks", async () => {
-            const payload1 = new Buffer([1, 2, 3]);
-            const payload2 = new Buffer([4, 5, 6]);
+            const payload1 = Buffer.from([1, 2, 3]);
+            const payload2 = Buffer.from([4, 5, 6]);
 
             const thru = new PassThrough();
 
@@ -65,8 +65,8 @@ describe("Substream", () => {
         });
 
         it("two substreams", async () => {
-            const payload1 = new Buffer([1, 2, 3]);
-            const payload2 = new Buffer([4, 5, 6]);
+            const payload1 = Buffer.from([1, 2, 3]);
+            const payload2 = Buffer.from([4, 5, 6]);
 
             const thru = new PassThrough();
 
@@ -109,7 +109,7 @@ describe("Substream", () => {
 
         it("a single chunk", async () => {
             const thru = new PassThrough();
-            const payload = new Buffer([1, 2, 3]);
+            const payload = Buffer.from([1, 2, 3]);
             await writeLengthHeader(thru, payload.length);
             await writeAsync(thru, payload);
             await writeLengthHeader(thru, 0);
@@ -124,8 +124,8 @@ describe("Substream", () => {
 
         it("two chunks", async () => {
             const thru = new PassThrough();
-            const payload1 = new Buffer([1, 2, 3]);
-            const payload2 = new Buffer([4, 5, 6]);
+            const payload1 = Buffer.from([1, 2, 3]);
+            const payload2 = Buffer.from([4, 5, 6]);
 
             await writeLengthHeader(thru, payload1.length);
             await writeAsync(thru, payload1);
@@ -146,8 +146,8 @@ describe("Substream", () => {
 
         it("two substreams", async () => {
             const thru = new PassThrough();
-            const payload1 = new Buffer([1, 2, 3]);
-            const payload2 = new Buffer([4, 5, 6]);
+            const payload1 = Buffer.from([1, 2, 3]);
+            const payload2 = Buffer.from([4, 5, 6]);
 
             await writeLengthHeader(thru, payload1.length);
             await writeAsync(thru, payload1);
