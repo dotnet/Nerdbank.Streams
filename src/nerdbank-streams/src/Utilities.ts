@@ -72,11 +72,41 @@ export async function getBufferFrom(
     cancellationToken?: CancellationToken): Promise<Buffer | null> {
 
     const streamEnded = new Deferred<void>();
+
+    if (size === 0) {
+        return new Buffer([]);
+    }
+
+    let readBuffer: Buffer = new Buffer(size);
+    let index: number = 0;
     while (size > 0) {
         cancellationToken?.throwIfCancelled();
+        let availableSize = readable.readableLength;
+        if (availableSize > size) {
+            availableSize = size;
+        }
 
-        const readBuffer = readable.read(size) as Buffer;
-        if (readBuffer === null) {
+        let newBuffer: Buffer | null = null;
+        if (availableSize > 0) {
+            newBuffer = readable.read(availableSize) as Buffer;
+            if (newBuffer) {
+                newBuffer.copy(newBuffer, index);
+                size -= newBuffer.length;
+                index += newBuffer.length;
+            }
+        } else if (readable.readableEnded && readable.readableLength === 0) {
+            if (!allowEndOfStream) {
+                throw new Error("Stream terminated before required bytes were read.");
+            }
+
+            // Returns what has been read so far
+            newBuffer = new Buffer(index);
+            readBuffer.copy(newBuffer, 0, 0, index);
+
+            return newBuffer;
+        }
+
+        if (size > 0) {
             const bytesAvailable = new Deferred<void>();
             readable.once("readable", bytesAvailable.resolve.bind(bytesAvailable));
             readable.once("end", streamEnded.resolve.bind(streamEnded));
@@ -87,17 +117,9 @@ export async function getBufferFrom(
                 continue;
             }
         }
-
-        if (!allowEndOfStream) {
-            if (!readBuffer || readBuffer.length < size) {
-                throw new Error("Stream terminated before required bytes were read.");
-            }
-        }
-
-        return readBuffer;
     }
 
-    return new Buffer([]);
+    return readBuffer;
 }
 
 export function throwIfDisposed(value: IDisposableObservable) {
