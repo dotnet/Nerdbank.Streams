@@ -90,8 +90,12 @@ export async function getBufferFrom(
         if (availableSize > 0) {
             newBuffer = readable.read(availableSize) as Buffer;
             if (newBuffer) {
+                if (newBuffer.length < availableSize && !allowEndOfStream) {
+                    throw new Error("Stream terminated before required bytes were read.");
+                }
+
                 if (readBuffer === null) {
-                    if (availableSize === size) {
+                    if (availableSize === size || newBuffer.length < availableSize) {
                         // in the fast pass, we read the entire data once, and donot allocate an extra array.
                         return newBuffer;
                     }
