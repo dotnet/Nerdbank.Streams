@@ -81,7 +81,7 @@ export async function getBufferFrom(
     let index: number = 0;
     while (size > 0) {
         cancellationToken?.throwIfCancelled();
-        let availableSize = readable.readableLength;
+        let availableSize = (readable as Readable).readableLength ?? size;
         if (availableSize > size) {
             availableSize = size;
         }
@@ -106,7 +106,7 @@ export async function getBufferFrom(
                 size -= newBuffer.length;
                 index += newBuffer.length;
             }
-        } else if (readable.readableEnded && readable.readableLength === 0) {
+        } else if ((readable as Readable).readableEnded && (readable as Readable).readableLength === 0) {
             // stream is closed
             if (!allowEndOfStream) {
                 throw new Error("Stream terminated before required bytes were read.");
