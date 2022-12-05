@@ -74,7 +74,7 @@ export async function getBufferFrom(
     const streamEnded = new Deferred<void>();
 
     if (size === 0) {
-        return new Buffer([]);
+        return Buffer.from([]);
     }
 
     let readBuffer: Buffer | null = null;
@@ -97,7 +97,7 @@ export async function getBufferFrom(
                     }
 
                     // if we read partial data, we need allocate a buffer to join all data together.
-                    readBuffer = new Buffer(size);
+                    readBuffer = Buffer.alloc(size);
                 }
 
                 // now append new data to the buffer
@@ -118,7 +118,7 @@ export async function getBufferFrom(
             }
 
             // we need trim extra spaces
-            newBuffer = new Buffer(index);
+            newBuffer = Buffer.alloc(index);
             readBuffer.copy(newBuffer, 0, 0, index);
 
             return newBuffer;
