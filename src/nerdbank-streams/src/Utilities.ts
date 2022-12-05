@@ -86,9 +86,8 @@ export async function getBufferFrom(
             availableSize = size;
         }
 
-        let newBuffer: Buffer | null = null;
         if (availableSize > 0) {
-            newBuffer = readable.read(availableSize) as Buffer;
+            let newBuffer = readable.read(availableSize) as Buffer;
             if (newBuffer) {
                 if (newBuffer.length < availableSize && !allowEndOfStream) {
                     throw new Error("Stream terminated before required bytes were read.");
@@ -122,10 +121,10 @@ export async function getBufferFrom(
             }
 
             // we need trim extra spaces
-            newBuffer = Buffer.alloc(index);
-            readBuffer.copy(newBuffer, 0, 0, index);
+            let trimmedBuffer = Buffer.alloc(index);
+            readBuffer.copy(trimmedBuffer, 0, 0, index);
 
-            return newBuffer;
+            return trimmedBuffer;
         }
 
         if (size > 0) {
