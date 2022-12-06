@@ -75,6 +75,8 @@ export async function getBufferFrom(
 
     if (size === 0) {
         return Buffer.from([]);
+    } else if (size > 67108864) {
+        throw new Error("Package size excesses the limitation.");
     }
 
     let readBuffer: Buffer | null = null;

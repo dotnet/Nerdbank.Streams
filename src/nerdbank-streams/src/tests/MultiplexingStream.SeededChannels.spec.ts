@@ -39,10 +39,10 @@ import { ChannelOptions } from "../ChannelOptions";
             const ch2_1 = mx2.acceptChannel(1);
 
             ch1_0.stream.write("abc");
-            expect(await getBufferFrom(ch2_0.stream, 3)).toEqual(new Buffer("abc"));
+            expect(await getBufferFrom(ch2_0.stream, 3)).toEqual(Buffer.from("abc"));
 
             ch2_1.stream.write("abc");
-            expect(await getBufferFrom(ch1_1.stream, 3)).toEqual(new Buffer("abc"));
+            expect(await getBufferFrom(ch1_1.stream, 3)).toEqual(Buffer.from("abc"));
         });
 
         it('can be closed', async () => {
@@ -79,9 +79,13 @@ async function readAsync(readable: NodeJS.ReadableStream): Promise<Buffer | null
     if (readBuffer === null) {
         const bytesAvailable = new Deferred<void>();
         const streamEnded = new Deferred<void>();
-        readable.once("readable", bytesAvailable.resolve.bind(bytesAvailable));
-        readable.once("end", streamEnded.resolve.bind(streamEnded));
+        const bytesAvailableCallback = bytesAvailable.resolve.bind(bytesAvailable);
+        const streamEndedCallback = streamEnded.resolve.bind(streamEnded);
+        readable.once("readable", bytesAvailableCallback);
+        readable.once("end", streamEndedCallback);
         await Promise.race([bytesAvailable.promise, streamEnded.promise]);
+        readable.removeListener("readable", bytesAvailableCallback);
+        readable.removeListener("end", streamEndedCallback);
         if (bytesAvailable.isCompleted) {
             readBuffer = readable.read() as Buffer;
         } else {

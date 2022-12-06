@@ -299,10 +299,16 @@ export class MultiplexingStreamV2Formatter extends MultiplexingStreamFormatter {
             const readObject = this.reader.read();
             if (readObject === null) {
                 const bytesAvailable = new Deferred<void>();
-                this.reader.once("readable", bytesAvailable.resolve.bind(bytesAvailable));
-                this.reader.once("end", streamEnded.resolve.bind(streamEnded));
+                const bytesAvailableCallback = bytesAvailable.resolve.bind(bytesAvailable);
+                const streamEndedCallback = streamEnded.resolve.bind(streamEnded);
+
+                this.reader.once("readable", bytesAvailableCallback);
+                this.reader.once("end", streamEndedCallback);
                 const endPromise = Promise.race([bytesAvailable.promise, streamEnded.promise]);
                 await (cancellationToken ? cancellationToken.racePromise(endPromise) : endPromise);
+
+                this.reader.removeListener("readable", bytesAvailableCallback);
+                this.reader.removeListener("end", streamEndedCallback);
 
                 if (bytesAvailable.isCompleted) {
                     continue;
