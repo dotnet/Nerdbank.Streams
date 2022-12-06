@@ -143,10 +143,6 @@ export async function getBufferFrom(
 
             readable.removeListener("readable", bytesAvailableCallback);
             readable.removeListener("end", streamEndedCallback);
-
-            if (bytesAvailable.isCompleted) {
-                continue;
-            }
         }
     }
 
