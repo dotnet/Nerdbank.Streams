@@ -86,12 +86,30 @@ export async function getBufferFrom(
         let availableSize = (readable as Readable).readableLength ?? size;
         if (availableSize > size) {
             availableSize = size;
-        } else if (availableSize === 0 && !(readable as Readable).readableEnded) {
+        } else if (availableSize === 0) {
+            if ((readable as Readable).readableEnded  || streamEnded.isCompleted) {
+                // stream is closed
+                if (!allowEndOfStream) {
+                    throw new Error("Stream terminated before required bytes were read.");
+                }
+
+                // Returns what has been read so far
+                if (readBuffer === null) {
+                    return null;
+                }
+
+                // we need trim extra spaces
+                let trimmedBuffer = Buffer.alloc(index);
+                readBuffer.copy(trimmedBuffer, 0, 0, index);
+
+                return trimmedBuffer;
+            }
+
             // we retain this behavior to make existing unit tests happy (which assumes we will try to read stream when no data is ready.)
             availableSize = size;
         }
 
-        if (availableSize > 0) {
+        if (availableSize > 0) { // this is always true after taking the workaround for unit tests.
             let newBuffer = readable.read(availableSize) as Buffer;
             if (newBuffer) {
                 if (newBuffer.length < availableSize && !allowEndOfStream) {
@@ -114,22 +132,6 @@ export async function getBufferFrom(
                 size -= newBuffer.length;
                 index += newBuffer.length;
             }
-        } else if ((readable as Readable).readableEnded && (readable as Readable).readableLength === 0) {
-            // stream is closed
-            if (!allowEndOfStream) {
-                throw new Error("Stream terminated before required bytes were read.");
-            }
-
-            // Returns what has been read so far
-            if (readBuffer === null) {
-                return null;
-            }
-
-            // we need trim extra spaces
-            let trimmedBuffer = Buffer.alloc(index);
-            readBuffer.copy(trimmedBuffer, 0, 0, index);
-
-            return trimmedBuffer;
         }
 
         if (size > 0) {
