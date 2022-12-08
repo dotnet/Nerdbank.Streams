@@ -75,19 +75,19 @@ export async function getBufferFrom(
 
     if (size === 0) {
         return Buffer.from([]);
-    } else if (size > 67108864) {
-        throw new Error("Package size excesses the limitation.");
+    } else if (size > 64 * 1024 * 1024) {
+        throw new Error("Package size exceeds limit.");
     }
 
     let readBuffer: Buffer | null = null;
     let index: number = 0;
     while (size > 0) {
         cancellationToken?.throwIfCancelled();
-        let availableSize = (readable as Readable).readableLength ?? size;
+        let availableSize = (readable as Readable).readableLength || size;
         if (availableSize > size) {
             availableSize = size;
         } else if (availableSize === 0) {
-            if ((readable as Readable).readableEnded  || streamEnded.isCompleted) {
+            if ((readable as Readable).readableEnded || streamEnded.isCompleted) {
                 // stream is closed
                 if (!allowEndOfStream) {
                     throw new Error("Stream terminated before required bytes were read.");
