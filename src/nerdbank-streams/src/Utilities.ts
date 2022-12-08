@@ -99,7 +99,7 @@ export async function getBufferFrom(
                 }
 
                 // we need trim extra spaces
-                let trimmedBuffer = Buffer.alloc(index);
+                const trimmedBuffer = Buffer.alloc(index);
                 readBuffer.copy(trimmedBuffer, 0, 0, index);
 
                 return trimmedBuffer;
@@ -110,7 +110,7 @@ export async function getBufferFrom(
         }
 
         if (availableSize > 0) { // this is always true after taking the workaround for unit tests.
-            let newBuffer = readable.read(availableSize) as Buffer;
+            const newBuffer = readable.read(availableSize) as Buffer;
             if (newBuffer) {
                 if (newBuffer.length < availableSize && !allowEndOfStream) {
                     throw new Error("Stream terminated before required bytes were read.");
