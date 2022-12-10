@@ -107,9 +107,13 @@ import { ChannelOptions } from "../ChannelOptions";
             if (readBuffer === null) {
                 const bytesAvailable = new Deferred<void>();
                 const streamEnded = new Deferred<void>();
-                readable.once("readable", bytesAvailable.resolve.bind(bytesAvailable));
-                readable.once("end", streamEnded.resolve.bind(streamEnded));
+                const bytesAvailableCallback = bytesAvailable.resolve.bind(bytesAvailable);
+                const streamEndedCallback = streamEnded.resolve.bind(streamEnded);
+                readable.once("readable", bytesAvailableCallback);
+                readable.once("end", streamEndedCallback);
                 await Promise.race([bytesAvailable.promise, streamEnded.promise]);
+                readable.removeListener("readable", bytesAvailableCallback);
+                readable.removeListener("end", streamEndedCallback);
                 if (bytesAvailable.isCompleted) {
                     readBuffer = readable.read() as Buffer;
                 } else {
