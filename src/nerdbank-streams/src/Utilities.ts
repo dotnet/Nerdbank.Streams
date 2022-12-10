@@ -84,10 +84,9 @@ export async function getBufferFrom(
     let index: number = 0;
     while (size > 0) {
         cancellationToken?.throwIfCancelled();
-        let availableSize = (readable as Readable).readableLength ?? size;
-        if (availableSize > size) {
-            availableSize = size;
-        } else if (availableSize === 0) {
+        let availableSize = (readable as Readable).readableLength;
+        if (!availableSize) {
+            // Check the end of stream
             if ((readable as Readable).readableEnded || streamEnded.isCompleted) {
                 // stream is closed
                 if (!allowEndOfStream) {
@@ -103,33 +102,36 @@ export async function getBufferFrom(
                 return readBuffer.subarray(0, index)
             }
 
-            // we retain this behavior to make existing unit tests happy (which assumes we will try to read stream when no data is ready.)
+            // we retain this behavior when availableSize === false
+            // to make existing unit tests happy (which assumes we will try to read stream when no data is ready.)
             availableSize = size;
         }
 
-        if (availableSize > 0) { // this is always true after taking the workaround for unit tests.
-            const newBuffer = readable.read(availableSize) as Buffer;
-            if (newBuffer) {
-                if (newBuffer.length < availableSize && !allowEndOfStream) {
-                    throw new Error("Stream terminated before required bytes were read.");
-                }
+        if (availableSize > size) {
+            availableSize = size;
+        }
 
-                if (readBuffer === null) {
-                    if (availableSize === size || newBuffer.length < availableSize) {
-                        // in the fast pass, we read the entire data once, and donot allocate an extra array.
-                        return newBuffer;
-                    }
-
-                    // if we read partial data, we need allocate a buffer to join all data together.
-                    readBuffer = Buffer.alloc(size);
-                }
-
-                // now append new data to the buffer
-                newBuffer.copy(readBuffer, index);
-
-                size -= newBuffer.length;
-                index += newBuffer.length;
+        const newBuffer = readable.read(availableSize) as Buffer;
+        if (newBuffer) {
+            if (newBuffer.length < availableSize && !allowEndOfStream) {
+                throw new Error("Stream terminated before required bytes were read.");
             }
+
+            if (readBuffer === null) {
+                if (availableSize === size || newBuffer.length < availableSize) {
+                    // in the fast pass, we read the entire data once, and donot allocate an extra array.
+                    return newBuffer;
+                }
+
+                // if we read partial data, we need allocate a buffer to join all data together.
+                readBuffer = Buffer.alloc(size);
+            }
+
+            // now append new data to the buffer
+            newBuffer.copy(readBuffer, index);
+
+            size -= newBuffer.length;
+            index += newBuffer.length;
         }
 
         if (size > 0) {

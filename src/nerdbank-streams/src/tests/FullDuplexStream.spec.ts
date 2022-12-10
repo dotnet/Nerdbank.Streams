@@ -88,7 +88,7 @@ describe("FullDuplexStream.Splice", () => {
         expect(buffer).toBeNull();
     });
 
-    it("Should read from readable combined data without being blocked", async () => {
+    it("Read should yeild when data is not ready", async () => {
         const task = writeToStream(duplex, "abcdefgh", 4);
         const buffer = await getBufferFrom(writable, 32);
         await task;
