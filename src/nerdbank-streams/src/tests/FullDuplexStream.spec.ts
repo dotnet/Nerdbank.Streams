@@ -62,8 +62,8 @@ describe("FullDuplexStream.Splice", () => {
     let duplex: NodeJS.ReadWriteStream;
 
     beforeEach(() => {
-        readable = new PassThrough();
-        writable = new PassThrough();
+        readable = new PassThrough({ writableHighWaterMark : 8 });
+        writable = new PassThrough({ writableHighWaterMark : 8 });
         duplex = FullDuplexStream.Splice(readable, writable);
     });
 
@@ -85,5 +85,14 @@ describe("FullDuplexStream.Splice", () => {
         expect(buffer).toEqual(Buffer.from("the end"));
         buffer = await getBufferFrom(writable, 1, true);
         expect(buffer).toBeNull();
+    });
+
+    it("Should read from readable combined data without being blocked", async () => {
+        duplex.write("abcdefgh");
+        duplex.write("abcdefgh");
+        duplex.write("abcdefgh");
+        duplex.write("abcdefgh");
+        const buffer = await getBufferFrom(writable, 32);
+        expect(buffer.length).toEqual(32);
     });
 });

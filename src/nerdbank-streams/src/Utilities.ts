@@ -76,6 +76,7 @@ export async function getBufferFrom(
     if (size === 0) {
         return Buffer.from([]);
     } else if (size > 64 * 1024 * 1024) {
+        // this is a random big number to prevent us to allocate a huge buffer for an invalid parameter value.
         throw new Error("Package size exceeds limit.");
     }
 
@@ -99,10 +100,7 @@ export async function getBufferFrom(
                 }
 
                 // we need trim extra spaces
-                const trimmedBuffer = Buffer.alloc(index);
-                readBuffer.copy(trimmedBuffer, 0, 0, index);
-
-                return trimmedBuffer;
+                return readBuffer.subarray(0, index)
             }
 
             // we retain this behavior to make existing unit tests happy (which assumes we will try to read stream when no data is ready.)
