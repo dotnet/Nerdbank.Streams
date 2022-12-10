@@ -2,6 +2,7 @@ import { PassThrough, Readable, Writable } from "stream";
 import { Deferred } from "../Deferred";
 import { FullDuplexStream } from "../FullDuplexStream";
 import { getBufferFrom } from "../Utilities";
+import { delay } from "./Timeout";
 
 describe("FullDuplexStream.CreatePair", () => {
 
@@ -88,11 +89,16 @@ describe("FullDuplexStream.Splice", () => {
     });
 
     it("Should read from readable combined data without being blocked", async () => {
-        duplex.write("abcdefgh");
-        duplex.write("abcdefgh");
-        duplex.write("abcdefgh");
-        duplex.write("abcdefgh");
+        const task = writeToStream(duplex, "abcdefgh", 4);
         const buffer = await getBufferFrom(writable, 32);
+        await task;
         expect(buffer.length).toEqual(32);
     });
+
+    async function writeToStream(stream: NodeJS.ReadWriteStream, message: string, repeat: number) {
+        while (repeat--) {
+            stream.write(message);
+            await delay(2);
+        }
+    }
 });
