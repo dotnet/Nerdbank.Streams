@@ -105,9 +105,7 @@ export async function getBufferFrom(
             // we retain this behavior when availableSize === false
             // to make existing unit tests happy (which assumes we will try to read stream when no data is ready.)
             availableSize = size;
-        }
-
-        if (availableSize > size) {
+        } else if (availableSize > size) {
             availableSize = size;
         }
 
