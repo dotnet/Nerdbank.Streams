@@ -97,7 +97,7 @@ export function sliceStream(stream: NodeJS.ReadableStream, length: number): Read
     return new Readable({
         async read(_: number) {
             if (length > 0) {
-                const chunk = await readAsync(stream);
+                const chunk = stream.read() ?? await readAsync(stream);
                 if (!chunk) {
                     // We've reached the end of the source stream.
                     this.push(null);
@@ -107,7 +107,10 @@ export function sliceStream(stream: NodeJS.ReadableStream, length: number): Read
                 const countToConsume = Math.min(length, chunk.length)
                 length -= countToConsume
                 stream.unshift(chunk.slice(countToConsume))
-                this.push(chunk.slice(0, countToConsume))
+                if (this.push(chunk.slice(0, countToConsume)) && length === 0) {
+                    // Save another call later by informing immediately that we're at the end of the stream.
+                    this.push(null);
+                }
             } else {
                 this.push(null);
             }
