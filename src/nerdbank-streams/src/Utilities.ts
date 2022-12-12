@@ -1,6 +1,5 @@
 import CancellationToken from "cancellationtoken";
 import { Readable, Writable } from "stream";
-import { Deferred } from "./Deferred";
 import { IDisposableObservable } from "./IDisposableObservable";
 
 export async function writeAsync(stream: NodeJS.WritableStream, chunk: any) {
@@ -42,7 +41,11 @@ export function writeSubstream(stream: NodeJS.WritableStream): NodeJS.WritableSt
  * @returns The result of reading from the stream. This will be null if the end of the stream is reached before any more can be read.
  */
 export function readAsync(stream: NodeJS.ReadableStream, cancellationToken?: CancellationToken): Promise<string | Buffer | null> {
-    let result = stream.read()
+    if (!(stream.isPaused() || (stream as Readable).readableFlowing !== true)) {
+        throw new Error('Stream must not be in flowing mode.');
+    }
+
+    const result = stream.read()
     if (result) {
         return Promise.resolve(result)
     }
@@ -55,6 +58,7 @@ export function readAsync(stream: NodeJS.ReadableStream, cancellationToken?: Can
         stream.once('data', onData);
         stream.once('error', onError);
         stream.once('end', onEnd);
+        stream.resume()
 
         function onData(chunk) {
             cleanup();
@@ -72,6 +76,7 @@ export function readAsync(stream: NodeJS.ReadableStream, cancellationToken?: Can
         }
 
         function cleanup() {
+            stream.pause();
             stream.off('data', onData);
             stream.off('error', onError);
             stream.off('end', onEnd);
@@ -91,8 +96,8 @@ export function readAsync(stream: NodeJS.ReadableStream, cancellationToken?: Can
 export function sliceStream(stream: NodeJS.ReadableStream, length: number): Readable {
     return new Readable({
         async read(_: number) {
-            while (length > 0) {
-                const chunk = await readAsync(stream);
+            if (length > 0) {
+                const chunk = stream.read() ?? await readAsync(stream);
                 if (!chunk) {
                     // We've reached the end of the source stream.
                     this.push(null);
@@ -102,12 +107,13 @@ export function sliceStream(stream: NodeJS.ReadableStream, length: number): Read
                 const countToConsume = Math.min(length, chunk.length)
                 length -= countToConsume
                 stream.unshift(chunk.slice(countToConsume))
-                if (!this.push(chunk.slice(0, countToConsume))) {
-                    return;
+                if (this.push(chunk.slice(0, countToConsume)) && length === 0) {
+                    // Save another call later by informing immediately that we're at the end of the stream.
+                    this.push(null);
                 }
+            } else {
+                this.push(null);
             }
-
-            this.push(null);
         },
     });
 }
@@ -130,18 +136,15 @@ export function readSubstream(stream: NodeJS.ReadableStream): NodeJS.ReadableStr
                     currentSlice = sliceStream(stream, length)
                 }
 
-                while (currentSlice !== null) {
-                    const chunk = await readAsync(currentSlice);
-                    if (!chunk) {
-                        // We've reached the end of this chunk. We'll have to read the next header.
-                        currentSlice = null;
-                        break;
-                    }
-
-                    if (!this.push(chunk)) {
-                        return;
-                    }
+                const chunk = await readAsync(currentSlice);
+                if (!chunk) {
+                    // We've reached the end of this chunk. We'll have to read the next header.
+                    currentSlice = null;
+                    continue;
                 }
+
+                this.push(chunk);
+                return;
             }
         },
     });
@@ -165,81 +168,34 @@ export async function getBufferFrom(
     allowEndOfStream: boolean = false,
     cancellationToken?: CancellationToken): Promise<Buffer | null> {
 
-    const streamEnded = new Deferred<void>();
-
     if (size === 0) {
-        return Buffer.from([]);
+        return Buffer.alloc(0)
     }
 
-    let readBuffer: Buffer | null = null;
-    let index: number = 0;
-    while (size > 0) {
-        cancellationToken?.throwIfCancelled();
-        let availableSize = (readable as Readable).readableLength;
-        if (!availableSize) {
-            // Check the end of stream
-            if ((readable as Readable).readableEnded || streamEnded.isCompleted) {
-                // stream is closed
-                if (!allowEndOfStream) {
-                    throw new Error("Stream terminated before required bytes were read.");
-                }
-
-                // Returns what has been read so far
-                if (readBuffer === null) {
-                    return null;
-                }
-
-                // we need trim extra spaces
-                return readBuffer.subarray(0, index)
-            }
-
-            // we retain this behavior when availableSize === false
-            // to make existing unit tests happy (which assumes we will try to read stream when no data is ready.)
-            availableSize = size;
-        } else if (availableSize > size) {
-            availableSize = size;
-        }
-
-        const newBuffer = readable.read(availableSize) as Buffer;
-        if (newBuffer) {
-            if (newBuffer.length < availableSize && !allowEndOfStream) {
-                throw new Error("Stream terminated before required bytes were read.");
-            }
-
-            if (readBuffer === null) {
-                if (availableSize === size || newBuffer.length < availableSize) {
-                    // in the fast pass, we read the entire data once, and donot allocate an extra array.
-                    return newBuffer;
-                }
-
-                // if we read partial data, we need allocate a buffer to join all data together.
-                readBuffer = Buffer.alloc(size);
-            }
-
-            // now append new data to the buffer
-            newBuffer.copy(readBuffer, index);
-
-            size -= newBuffer.length;
-            index += newBuffer.length;
-        }
-
-        if (size > 0) {
-            const bytesAvailable = new Deferred<void>();
-            const bytesAvailableCallback = bytesAvailable.resolve.bind(bytesAvailable);
-            const streamEndedCallback = streamEnded.resolve.bind(streamEnded);
-            readable.once("readable", bytesAvailableCallback);
-            readable.once("end", streamEndedCallback);
-            try {
-                const endPromise = Promise.race([bytesAvailable.promise, streamEnded.promise]);
-                await (cancellationToken ? cancellationToken.racePromise(endPromise) : endPromise);
-            } finally {
-                readable.removeListener("readable", bytesAvailableCallback);
-                readable.removeListener("end", streamEndedCallback);
-            }
-        }
+    const initialData = readable.read(size) as Buffer | null;
+    if (initialData) {
+        return initialData;
     }
 
-    return readBuffer;
+    let totalBytesRead = 0
+    const result = Buffer.alloc(size);
+    const streamSlice = sliceStream(readable, size);
+    while (totalBytesRead < size) {
+        const chunk = await readAsync(streamSlice, cancellationToken) as Buffer | null
+        if (chunk === null) {
+            // We reached the end prematurely.
+            if (allowEndOfStream) {
+                return totalBytesRead === 0 ? null : result.subarray(0, totalBytesRead)
+            } else {
+                throw new Error(`End of stream encountered after only ${totalBytesRead} bytes when ${size} were expected.`);
+            }
+        }
+
+        chunk.copy(result, totalBytesRead);
+        totalBytesRead += chunk.length;
+    }
+
+    return result;
 }
 
 export function throwIfDisposed(value: IDisposableObservable) {

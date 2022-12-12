@@ -1,7 +1,7 @@
 import { PassThrough, Readable, Writable } from "stream";
 import { Deferred } from "../Deferred";
 import { FullDuplexStream } from "../FullDuplexStream";
-import { getBufferFrom } from "../Utilities";
+import { getBufferFrom, readAsync } from "../Utilities";
 import { delay } from "./Timeout";
 
 describe("FullDuplexStream.CreatePair", () => {
@@ -24,20 +24,20 @@ describe("FullDuplexStream.CreatePair", () => {
         await endPropagatesEndEvent(pair.second, pair.first);
     });
 
-    it("stream1 write end leads to stream2 finish event", async () => {
+    it("stream1 write end leads to stream1 finish event", async () => {
         const pair = FullDuplexStream.CreatePair();
-        await endPropagatesFinishEvent(pair.first, pair.second);
-        await endPropagatesFinishEvent(pair.second, pair.first);
+        await endRaisesFinishEvent(pair.first);
+        await endRaisesFinishEvent(pair.second);
     });
 
     async function writePropagation(first: Writable, second: Readable): Promise<void> {
         first.write("abc");
-        expect(second.read()).toEqual(Buffer.from("abc"));
+        expect(await readAsync(second)).toEqual(Buffer.from("abc"));
     }
 
-    async function endPropagatesFinishEvent(first: Writable, second: Readable): Promise<void> {
+    async function endRaisesFinishEvent(first: Writable): Promise<void> {
         const signal = new Deferred<void>();
-        second.once("finish", () => {
+        first.once("finish", () => {
             signal.resolve();
         });
         expect(signal.isCompleted).toBe(false);
@@ -63,8 +63,8 @@ describe("FullDuplexStream.Splice", () => {
     let duplex: NodeJS.ReadWriteStream;
 
     beforeEach(() => {
-        readable = new PassThrough({ writableHighWaterMark : 8 });
-        writable = new PassThrough({ writableHighWaterMark : 8 });
+        readable = new PassThrough({ writableHighWaterMark: 8 });
+        writable = new PassThrough({ writableHighWaterMark: 8 });
         duplex = FullDuplexStream.Splice(readable, writable);
     });
 
@@ -87,6 +87,12 @@ describe("FullDuplexStream.Splice", () => {
         buffer = await getBufferFrom(writable, 1, true);
         expect(buffer).toBeNull();
     });
+
+    it("unshift", async () => {
+        duplex.unshift(Buffer.from([1, 2, 3]))
+        const result = duplex.read()
+        expect(result).toEqual(Buffer.from([1, 2, 3]))
+    })
 
     it("Read should yield when data is not ready", async () => {
         const task = writeToStream(duplex, "abcdefgh", 4);

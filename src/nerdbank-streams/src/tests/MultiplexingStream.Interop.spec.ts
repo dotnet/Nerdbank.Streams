@@ -4,6 +4,7 @@ import { Deferred } from "../Deferred";
 import { FullDuplexStream } from "../FullDuplexStream";
 import { MultiplexingStream } from "../MultiplexingStream";
 import { ChannelOptions } from "../ChannelOptions";
+import { readAsync } from "../Utilities";
 
 [1, 2, 3].forEach(protocolMajorVersion => {
     describe(`MultiplexingStream v${protocolMajorVersion} (interop) `, () => {
@@ -101,34 +102,11 @@ import { ChannelOptions } from "../ChannelOptions";
             return deferred.promise;
         }
 
-        async function readAsync(readable: NodeJS.ReadableStream): Promise<Buffer | null> {
-            let readBuffer = readable.read() as Buffer;
-
-            if (readBuffer === null) {
-                const bytesAvailable = new Deferred<void>();
-                const streamEnded = new Deferred<void>();
-                const bytesAvailableCallback = bytesAvailable.resolve.bind(bytesAvailable);
-                const streamEndedCallback = streamEnded.resolve.bind(streamEnded);
-                readable.once("readable", bytesAvailableCallback);
-                readable.once("end", streamEndedCallback);
-                await Promise.race([bytesAvailable.promise, streamEnded.promise]);
-                readable.removeListener("readable", bytesAvailableCallback);
-                readable.removeListener("end", streamEndedCallback);
-                if (bytesAvailable.isCompleted) {
-                    readBuffer = readable.read() as Buffer;
-                } else {
-                    return null;
-                }
-            }
-
-            return readBuffer;
-        }
-
         async function readLineAsync(readable: NodeJS.ReadableStream): Promise<string | null> {
             const buffers: Buffer[] = [];
 
             while (true) {
-                const segment = await readAsync(readable);
+                const segment = await readAsync(readable) as Buffer | null;
                 if (segment === null) {
                     break;
                 }
