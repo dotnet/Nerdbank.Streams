@@ -30,4 +30,4 @@ steps:
   displayName: 🧪 yarn tslint
   inputs:
     projectDirectory: src/nerdbank-streams
-    arguments: tslint --project .
+    arguments: lint

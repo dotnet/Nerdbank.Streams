@@ -134,7 +134,7 @@ describe("Substream", () => {
             await endAsync(thru);
 
             const substream = readSubstream(thru);
-            let readPayload = await getBufferFrom(substream, 10, true);
+            const readPayload = await getBufferFrom(substream, 10, true);
             expect(readPayload).toEqual(Buffer.from([1, 2, 3, 4, 5, 6]));
             await expectEndOfStream(thru);
         });

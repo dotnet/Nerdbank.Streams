@@ -7,8 +7,8 @@ beforeEach(() => {
     thru = new PassThrough();
 })
 
-describe('readAsync', function () {
-    it('returns immediately with results', async function () {
+describe('readAsync', () => {
+    it('returns immediately with results', async () => {
         thru.write(Buffer.from([1, 2, 3]))
         thru.write(Buffer.from([4, 5, 6]))
 
@@ -16,7 +16,7 @@ describe('readAsync', function () {
         expect(result).toEqual(Buffer.from([1, 2, 3, 4, 5, 6]))
     })
 
-    it('to wait for data', async function () {
+    it('to wait for data', async () => {
         const resultPromise = readAsync(thru);
 
         thru.write(Buffer.from([1, 2, 3]))
@@ -26,18 +26,18 @@ describe('readAsync', function () {
         expect(result).toEqual(Buffer.from([1, 2, 3]))
     })
 
-    it('to return null at EOF', async function () {
+    it('to return null at EOF', async () => {
         thru.end()
         expect(await readAsync(thru)).toBeNull()
     })
 
-    it('to propagate errors', async function () {
+    it('to propagate errors', async () => {
         const error = new Error('Mock error')
         thru.destroy(error)
         await expectAsync(readAsync(thru)).toBeRejectedWith(error);
     })
 
-    it('bails on cancellation', async function () {
+    it('bails on cancellation', async () => {
         const cts = CancellationToken.create();
         const readPromise = readAsync(thru, cts.token);
         cts.cancel();
@@ -45,14 +45,14 @@ describe('readAsync', function () {
     })
 })
 
-describe('sliceStream', function () {
-    it('returns null on empty', async function () {
+describe('sliceStream', () => {
+    it('returns null on empty', async () => {
         thru.end()
         const slice = sliceStream(thru, 5)
         expect(slice.read()).toBeNull()
     })
 
-    it('returns subset of upper stream', async function () {
+    it('returns subset of upper stream', async () => {
         thru.push(Buffer.from([1, 2, 3, 4, 5, 6]))
         const slice = sliceStream(thru, 3)
         expect(await readAsync(slice)).toEqual(Buffer.from([1, 2, 3]))
@@ -60,7 +60,7 @@ describe('sliceStream', function () {
         expect(await readAsync(thru)).toEqual(Buffer.from([4, 5, 6]))
     })
 
-    it('handles slice that exceeds stream length', async function () {
+    it('handles slice that exceeds stream length', async () => {
         thru.end(Buffer.from([1, 2, 3]))
         const slice = sliceStream(thru, 6)
 

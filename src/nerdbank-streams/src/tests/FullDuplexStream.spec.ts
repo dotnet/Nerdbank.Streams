@@ -88,7 +88,7 @@ describe("FullDuplexStream.Splice", () => {
         expect(buffer).toBeNull();
     });
 
-    it("unshift", async function () {
+    it("unshift", async () => {
         duplex.unshift(Buffer.from([1, 2, 3]))
         const result = duplex.read()
         expect(result).toEqual(Buffer.from([1, 2, 3]))

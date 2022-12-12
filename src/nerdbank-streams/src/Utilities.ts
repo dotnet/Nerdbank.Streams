@@ -45,7 +45,7 @@ export function readAsync(stream: NodeJS.ReadableStream, cancellationToken?: Can
         throw new Error('Stream must not be in flowing mode.');
     }
 
-    let result = stream.read()
+    const result = stream.read()
     if (result) {
         return Promise.resolve(result)
     }
