@@ -134,12 +134,8 @@ describe("Substream", () => {
             await endAsync(thru);
 
             const substream = readSubstream(thru);
-            let readPayload = await getBufferFrom(substream, payload1.length);
-            expect(readPayload).toEqual(payload1);
-            readPayload = await getBufferFrom(substream, payload2.length);
-            expect(readPayload).toEqual(payload2);
-
-            await expectEndOfStream(substream);
+            let readPayload = await getBufferFrom(substream, 10, true);
+            expect(readPayload).toEqual(Buffer.from([1, 2, 3, 4, 5, 6]));
             await expectEndOfStream(thru);
         });
 
@@ -187,6 +183,8 @@ describe("Substream", () => {
     }
 
     function expectEndOfStream(stream: NodeJS.ReadableStream): Promise<void> {
+        expect(stream.read()).toBeNull()
+        stream.resume();
         return new Promise<void>((resolve, reject) => {
             stream.once("end", () => resolve());
             stream.once("data", () => reject(new Error('EOF expected.')));

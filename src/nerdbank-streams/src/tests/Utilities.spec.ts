@@ -59,4 +59,13 @@ describe('sliceStream', function () {
         expect(await readAsync(slice)).toBeNull()
         expect(await readAsync(thru)).toEqual(Buffer.from([4, 5, 6]))
     })
+
+    it('handles slice that exceeds stream length', async function () {
+        thru.end(Buffer.from([1, 2, 3]))
+        const slice = sliceStream(thru, 6)
+
+        const result = await readAsync(slice)
+        expect(result).toEqual(Buffer.from([1, 2, 3]))
+        expect(await readAsync(slice)).toBeNull()
+    })
 })
