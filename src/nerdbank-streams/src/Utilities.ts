@@ -72,32 +72,80 @@ export async function getBufferFrom(
     cancellationToken?: CancellationToken): Promise<Buffer | null> {
 
     const streamEnded = new Deferred<void>();
-    while (size > 0) {
-        cancellationToken?.throwIfCancelled();
 
-        const readBuffer = readable.read(size) as Buffer;
-        if (readBuffer === null) {
-            const bytesAvailable = new Deferred<void>();
-            readable.once("readable", bytesAvailable.resolve.bind(bytesAvailable));
-            readable.once("end", streamEnded.resolve.bind(streamEnded));
-            const endPromise = Promise.race([bytesAvailable.promise, streamEnded.promise]);
-            await (cancellationToken ? cancellationToken.racePromise(endPromise) : endPromise);
-
-            if (bytesAvailable.isCompleted) {
-                continue;
-            }
-        }
-
-        if (!allowEndOfStream) {
-            if (!readBuffer || readBuffer.length < size) {
-                throw new Error("Stream terminated before required bytes were read.");
-            }
-        }
-
-        return readBuffer;
+    if (size === 0) {
+        return Buffer.from([]);
     }
 
-    return Buffer.from([]);
+    let readBuffer: Buffer | null = null;
+    let index: number = 0;
+    while (size > 0) {
+        cancellationToken?.throwIfCancelled();
+        let availableSize = (readable as Readable).readableLength;
+        if (!availableSize) {
+            // Check the end of stream
+            if ((readable as Readable).readableEnded || streamEnded.isCompleted) {
+                // stream is closed
+                if (!allowEndOfStream) {
+                    throw new Error("Stream terminated before required bytes were read.");
+                }
+
+                // Returns what has been read so far
+                if (readBuffer === null) {
+                    return null;
+                }
+
+                // we need trim extra spaces
+                return readBuffer.subarray(0, index)
+            }
+
+            // we retain this behavior when availableSize === false
+            // to make existing unit tests happy (which assumes we will try to read stream when no data is ready.)
+            availableSize = size;
+        } else if (availableSize > size) {
+            availableSize = size;
+        }
+
+        const newBuffer = readable.read(availableSize) as Buffer;
+        if (newBuffer) {
+            if (newBuffer.length < availableSize && !allowEndOfStream) {
+                throw new Error("Stream terminated before required bytes were read.");
+            }
+
+            if (readBuffer === null) {
+                if (availableSize === size || newBuffer.length < availableSize) {
+                    // in the fast pass, we read the entire data once, and donot allocate an extra array.
+                    return newBuffer;
+                }
+
+                // if we read partial data, we need allocate a buffer to join all data together.
+                readBuffer = Buffer.alloc(size);
+            }
+
+            // now append new data to the buffer
+            newBuffer.copy(readBuffer, index);
+
+            size -= newBuffer.length;
+            index += newBuffer.length;
+        }
+
+        if (size > 0) {
+            const bytesAvailable = new Deferred<void>();
+            const bytesAvailableCallback = bytesAvailable.resolve.bind(bytesAvailable);
+            const streamEndedCallback = streamEnded.resolve.bind(streamEnded);
+            readable.once("readable", bytesAvailableCallback);
+            readable.once("end", streamEndedCallback);
+            try {
+                const endPromise = Promise.race([bytesAvailable.promise, streamEnded.promise]);
+                await (cancellationToken ? cancellationToken.racePromise(endPromise) : endPromise);
+            } finally {
+                readable.removeListener("readable", bytesAvailableCallback);
+                readable.removeListener("end", streamEndedCallback);
+            }
+        }
+    }
+
+    return readBuffer;
 }
 
 export function throwIfDisposed(value: IDisposableObservable) {
