@@ -55,8 +55,9 @@ export abstract class Channel implements IDisposableObservable {
 
     /**
      * Closes this channel.
+     * @param error An optional error to send to the remote side, if this multiplexing stream is using protocol versions >= 2.
      */
-    public dispose(): void {
+    public dispose(error?: Error | null): void {
         // The interesting stuff is in the derived class.
         this._isDisposed = true;
     }
@@ -247,7 +248,7 @@ export class ChannelClass extends Channel {
         }
     }
 
-    public dispose(): void {
+    public dispose(error?: Error | null): void {
         if (!this.isDisposed) {
             super.dispose();
 
@@ -261,10 +262,14 @@ export class ChannelClass extends Channel {
             this._duplex.end();
             this._duplex.push(null);
 
-            this._completion.resolve();
+            if (error) {
+                this._completion.reject(error);
+            } else {
+                this._completion.resolve();
+            }
 
             // Send the notification, but we can't await the result of this.
-            caught(this._multiplexingStream.onChannelDisposed(this));
+            caught(this._multiplexingStream.onChannelDisposed(this, error ?? null));
         }
     }
 

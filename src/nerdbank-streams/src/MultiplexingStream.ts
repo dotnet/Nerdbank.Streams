@@ -106,15 +106,15 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      * @param options Options to customize the behavior of the stream.
      * @returns The multiplexing stream.
      */
-     public static Create(
+    public static Create(
         stream: NodeJS.ReadWriteStream,
-        options?: MultiplexingStreamOptions) : MultiplexingStream {
+        options?: MultiplexingStreamOptions): MultiplexingStream {
         options ??= { protocolMajorVersion: 3 };
         options.protocolMajorVersion ??= 3;
 
         const formatter: MultiplexingStreamFormatter | undefined =
             options.protocolMajorVersion === 3 ? new MultiplexingStreamV3Formatter(stream) :
-            undefined;
+                undefined;
         if (!formatter) {
             throw new Error(`Protocol major version ${options.protocolMajorVersion} is not supported. Try CreateAsync instead.`);
         }
@@ -378,6 +378,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
     public dispose() {
         this.disposalTokenSource.cancel();
         this._completionSource.resolve();
+
         this.formatter.end();
         [this.locallyOfferedOpenChannels, this.remotelyOfferedOpenChannels].forEach(cb => {
             for (const channelId in cb) {
@@ -387,6 +388,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
                     // Acceptance gets rejected when a channel is disposed.
                     // Avoid a node.js crash or test failure for unobserved channels (e.g. offers for channels from the other party that no one cared to receive on this side).
                     caught(channel.acceptance);
+
                     channel.dispose();
                 }
             }
@@ -585,10 +587,15 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         }
     }
 
-    public async onChannelDisposed(channel: ChannelClass) {
+    public async onChannelDisposed(channel: ChannelClass, error: Error | null) {
         if (!this._completionSource.isCompleted) {
             try {
-                await this.sendFrame(ControlCode.ChannelTerminated, channel.qualifiedId);
+                const payload = this.protocolMajorVersion > 1 && error
+                    ? (this.formatter as MultiplexingStreamV2Formatter).serializeException(error)
+                    : Buffer.alloc(0);
+
+                const frameHeader = new FrameHeader(ControlCode.ChannelTerminated, channel.qualifiedId);
+                await this.sendFrameAsync(frameHeader, payload);
             } catch (err) {
                 // Swallow exceptions thrown about channel disposal if the whole stream has been taken down.
                 if (this.isDisposed) {
@@ -630,7 +637,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
                     this.onContentWritingCompleted(frame.header.requiredChannel);
                     break;
                 case ControlCode.ChannelTerminated:
-                    this.onChannelTerminated(frame.header.requiredChannel);
+                    this.onChannelTerminated(frame.header.requiredChannel, frame.payload);
                     break;
                 default:
                     break;
@@ -729,12 +736,18 @@ export class MultiplexingStreamClass extends MultiplexingStream {
      * Occurs when the remote party has terminated a channel (including canceling an offer).
      * @param channelId The ID of the terminated channel.
      */
-    private onChannelTerminated(channelId: QualifiedChannelId) {
+    private onChannelTerminated(channelId: QualifiedChannelId, payload: Buffer) {
         const channel = this.getOpenChannel(channelId);
         if (channel) {
             this.deleteOpenChannel(channelId);
             this.removeChannelFromOfferedQueue(channel);
-            channel.dispose();
+
+            // Extract the exception that we received from the remote side.
+            const remoteException = this.protocolMajorVersion > 1
+                ? (this.formatter as MultiplexingStreamV2Formatter).deserializeException(payload)
+                : null;
+
+            channel.dispose(remoteException);
         }
     }
 }

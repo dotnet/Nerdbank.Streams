@@ -249,6 +249,49 @@ import { nextTick } from "process";
             await channels[1].completion;
         });
 
+        it("channel terminated with error", async () => {
+            // Determine the error to complete the local channel with.
+            const errorMsg: string = "Hello world";
+            const error: Error = new Error(errorMsg);
+
+            // Get the channels to send/receive data over
+            const channels = await Promise.all([
+                mx1.offerChannelAsync("test"),
+                mx2.acceptChannelAsync("test"),
+            ]);
+            const localChannel = channels[0];
+            const remoteChannel = channels[1];
+
+            const localChannelCompleted = new Deferred<void>();
+            const remoteChannelCompleted = new Deferred<void>();
+
+            // Dispose the local channel
+            localChannel.dispose(error);
+
+            // Ensure that the local channel is always completed with the expected error
+            localChannel.completion.then(response => {
+                localChannelCompleted.reject();
+                throw new Error("Channel disposed with error didn't complete with error");
+            }).catch(localChannelErr => {
+                localChannelCompleted.resolve();
+                expect(localChannelErr.message).toContain(errorMsg);
+            });
+
+            // Ensure that the remote channel only throws an error for protocol version > 1
+            remoteChannel.completion.then(response => {
+                remoteChannelCompleted.resolve();
+                expect(protocolMajorVersion).toEqual(1);
+            }).catch(remoteChannelErr => {
+                remoteChannelCompleted.resolve();
+                expect(protocolMajorVersion).toBeGreaterThan(1);
+                expect(remoteChannelErr.message).toContain(errorMsg);
+            });
+
+            // Ensure that we don't call multiplexing dispose too soon
+            await localChannelCompleted.promise;
+            await remoteChannelCompleted.promise;
+        })
+
         it("channels complete when mxstream is disposed", async () => {
             const channels = await Promise.all([
                 mx1.offerChannelAsync("test"),

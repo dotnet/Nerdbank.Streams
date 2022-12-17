@@ -197,6 +197,74 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
+    public async Task OfferErrorCompletedPipe()
+    {
+        // Prepare a readonly pipe that is completed with an error
+        string localErrMsg = "Hello World";
+        string remoteErrMsg = $"Received error from remote side: {nameof(ApplicationException)}: {localErrMsg}";
+        var pipe = new Pipe();
+        await pipe.Writer.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
+        pipe.Writer.Complete(new ApplicationException(localErrMsg));
+
+        // Offer the error pipe to the remote side and get the remote side to try to accept the channel
+        MultiplexingStream.Channel localChannel = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(pipe.Reader) });
+        await this.WaitForEphemeralChannelOfferToPropagateAsync();
+        MultiplexingStream.Channel remoteChannel = this.mx2.AcceptChannel(localChannel.QualifiedId.Id);
+
+        // The local channel should always complete with the error
+        await VerifyChannelCompleted(localChannel, localErrMsg);
+
+        // The remote side should only receive the remote exception for protocol versions > 1
+        await VerifyChannelCompleted(remoteChannel, this.ProtocolMajorVersion > 1 ? remoteErrMsg : null);
+    }
+
+    [Fact]
+    public async Task OfferEmptyErrorCompletedPipe()
+    {
+        string localErrMsg = string.Empty;
+        string remoteErrMsg = $"Received error from remote side: {nameof(IndexOutOfRangeException)}: {localErrMsg}";
+
+        // Prepare a readonly pipe that is completed with an error
+        var pipe = new Pipe();
+        await pipe.Writer.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
+        pipe.Writer.Complete(new IndexOutOfRangeException(string.Empty));
+
+        // Offer the error pipe to the remote side and get the remote side to try to accept the channel
+        MultiplexingStream.Channel localChannel = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(pipe.Reader) });
+        await this.WaitForEphemeralChannelOfferToPropagateAsync();
+        MultiplexingStream.Channel remoteChannel = this.mx2.AcceptChannel(localChannel.QualifiedId.Id);
+
+        // The local channel should always complete with the error
+        await VerifyChannelCompleted(localChannel, localErrMsg);
+
+        // The remote side should only receive the remote exception for protocol versions > 1
+        await VerifyChannelCompleted(remoteChannel, this.ProtocolMajorVersion > 1 ? remoteErrMsg : null);
+    }
+
+    [Fact]
+    public async Task OfferNullErrorCompletedPipe()
+    {
+        string localErrMsg = "Exception of type 'System.NullReferenceException' was thrown.";
+        string remoteErrMsg = $"Received error from remote side: {nameof(NullReferenceException)}: {localErrMsg}";
+
+        // Prepare a readonly pipe that is completed with an error
+        var pipe = new Pipe();
+        await pipe.Writer.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
+        pipe.Writer.Complete(new NullReferenceException(null));
+
+        // Offer the error pipe to the remote side and get the remote side to try to accept the channel
+        MultiplexingStream.Channel localChannel = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(pipe.Reader) });
+        await this.WaitForEphemeralChannelOfferToPropagateAsync();
+        MultiplexingStream.Channel remoteChannel = this.mx2.AcceptChannel(localChannel.QualifiedId.Id);
+
+        // The local channel should always complete with the error
+        await VerifyChannelCompleted(localChannel, localErrMsg);
+
+        // The remote side should only receive the remote exception for protocol versions > 1
+        await VerifyChannelCompleted(remoteChannel, this.ProtocolMajorVersion > 1 ? remoteErrMsg : null);
+    }
+
+    [Fact]
     public async Task Dispose_CancelsOutstandingOperations()
     {
         Task offer = this.mx1.OfferChannelAsync("offer");
@@ -205,6 +273,26 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Task.WhenAll(offer, accept)).WithCancellation(this.TimeoutToken);
         Assert.True(offer.IsCanceled);
         Assert.True(accept.IsCanceled);
+    }
+
+    [Fact]
+    public async Task Dispose_CompleteWithErrorAfterwards()
+    {
+        // Create the local and remote channels using channel names
+        Task<MultiplexingStream.Channel>? localChannelTask = this.mx1.OfferChannelAsync("completeAfterwards", this.TimeoutToken);
+        Task<MultiplexingStream.Channel>? remoteChannelTask = this.mx2.AcceptChannelAsync("completeAfterwards", this.TimeoutToken);
+        MultiplexingStream.Channel remoteChannel = await remoteChannelTask;
+        MultiplexingStream.Channel localChannel = await localChannelTask;
+
+        // Dispose the local channel and then complete the writer that *we* own later with an error.
+        localChannel.Dispose();
+        await localChannel.Output.CompleteAsync(new InvalidOperationException("Complete after dispose"));
+
+        // Ensure that the local channel completed without error (because we disposed before faulting the PipeWriter).
+        await VerifyChannelCompleted(localChannel, null);
+
+        // Ensure that the remote channel similarly did not receive notice of any fault.
+        await VerifyChannelCompleted(remoteChannel, null);
     }
 
     [Fact]
@@ -220,7 +308,8 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         (MultiplexingStream.Channel channel1, MultiplexingStream.Channel channel2) = await this.EstablishChannelsAsync("A");
         await this.mx1.DisposeAsync();
         Assert.True(channel1.IsDisposed);
-        await channel1.Completion.WithCancellation(this.TimeoutToken);
+        await VerifyChannelCompleted(channel1, new ObjectDisposedException(nameof(MultiplexingStream)).Message);
+
 #pragma warning disable CS0618 // Type or member is obsolete
         await channel1.Input.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
         await channel1.Output.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken);
@@ -1177,6 +1266,19 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         // Verify communication over the good channel.
         await mx1Baseline.Output.WriteAsync(new byte[3], this.TimeoutToken);
         await this.ReadAtLeastAsync(mx2Baseline.Input, 3);
+    }
+
+    protected static async Task VerifyChannelCompleted(MultiplexingStream.Channel channel, string? expectedErrMsg)
+    {
+        if (expectedErrMsg != null)
+        {
+            Exception completionException = await Assert.ThrowsAnyAsync<Exception>(() => channel.Completion);
+            Assert.Equal(expectedErrMsg, completionException.Message);
+        }
+        else
+        {
+            await channel.Completion;
+        }
     }
 
     protected static Task CompleteChannelsAsync(params MultiplexingStream.Channel[] channels)

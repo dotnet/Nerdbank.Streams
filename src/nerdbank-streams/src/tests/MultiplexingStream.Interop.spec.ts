@@ -72,11 +72,50 @@ import { ChannelOptions } from "../ChannelOptions";
             expect(recv).toEqual("recv: theclient\n");
         });
 
+        it("Can offer error completed channel", async () => {
+            const errorMsg: string = "Hello world";
+            const error: Error = new Error(errorMsg);
+
+            const channelToCompleteWithError = await mx.offerChannelAsync("clientErrorOffer");
+            const communicationChannel = await mx.offerChannelAsync("clientErrorOfferComm");
+
+            channelToCompleteWithError.dispose(error);
+            channelToCompleteWithError.completion.then(_ => {
+                throw new Error("Channel disposed with error didn't complete with error");
+            }).catch((channelCompleteErr) => {
+                expect(channelCompleteErr.message).toContain(errorMsg);
+            });
+
+            let expectedErrMessage = `Received error from remote side: Error: ${errorMsg}`;
+            if (protocolMajorVersion <= 1) {
+                expectedErrMessage = "Completed with no error";
+            }
+
+            const response = await readLineAsync(communicationChannel.stream);
+            expect(response).toContain(expectedErrMessage);
+        })
+
         it("Can accept channel", async () => {
             const channel = await mx.acceptChannelAsync("serverOffer");
             const recv = await readLineAsync(channel.stream);
             await writeAsync(channel.stream, `recv: ${recv}`);
         });
+
+        it("Can accept error completed channel", async () => {
+            const channelCompletedWithError = await mx.acceptChannelAsync("serverErrorOffer");
+            const errorExpectedMessage: string = "Received error from remote side: Exception: Hello World";
+            const channelCompleted = new Deferred<void>();
+
+            channelCompletedWithError.completion.then(async _ => {
+                expect(protocolMajorVersion).toEqual(1);
+                channelCompleted.resolve();
+            }).catch(async error => {
+                expect(error.message).toContain(errorExpectedMessage);
+                channelCompleted.resolve();
+            })
+
+            await channelCompleted.promise;
+        })
 
         it("Exchange lots of data", async () => {
             const channel = await mx.offerChannelAsync("clientOffer", { channelReceivingWindowSize: 16 });
