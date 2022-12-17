@@ -322,7 +322,7 @@ namespace Nerdbank.Streams
             private bool BackpressureSupportEnabled => this.MultiplexingStream.protocolMajorVersion > 1;
 
             /// <summary>
-            /// Closes this channel and releases all resources associated with it.
+            /// Immediately terminates the channel and shutdowns any ongoing communication.
             /// </summary>
             /// <remarks>
             /// Because this method may terminate the channel immediately and thus can cause previously queued content to not actually be received by the remote party,
@@ -330,87 +330,121 @@ namespace Nerdbank.Streams
             /// </remarks>
             public void Dispose()
             {
-                if (!this.IsDisposed)
-                {
-                    this.acceptanceSource.TrySetCanceled();
-                    this.optionsAppliedTaskSource?.TrySetCanceled();
+                string userDisposeMsg = "User triggered disposal";
+                MultiplexingProtocolException userDisposeException = new MultiplexingProtocolException(userDisposeMsg);
 
-                    PipeWriter? mxStreamIOWriter;
-                    lock (this.SyncObject)
-                    {
-                        this.isDisposed = true;
-                        mxStreamIOWriter = this.mxStreamIOWriter;
-                    }
-
-                    // Complete writing so that the mxstream cannot write to this channel any more.
-                    // We must also cancel a pending flush since no one is guaranteed to be reading this any more
-                    // and we don't want to deadlock on a full buffer in a disposed channel's pipe.
-                    if (mxStreamIOWriter is not null)
-                    {
-                        mxStreamIOWriter.CancelPendingFlush();
-                        _ = this.mxStreamIOWriterSemaphore.EnterAsync().ContinueWith(
-                            static (releaser, state) =>
-                            {
-                                try
-                                {
-                                    Channel self = (Channel)state;
-
-                                    PipeWriter? mxStreamIOWriter;
-                                    lock (self.SyncObject)
-                                    {
-                                        mxStreamIOWriter = self.mxStreamIOWriter;
-                                    }
-
-                                    mxStreamIOWriter?.Complete();
-                                    self.mxStreamIOWriterCompleted.Set();
-                                }
-                                finally
-                                {
-                                    releaser.Result.Dispose();
-                                }
-                            },
-                            this,
-                            CancellationToken.None,
-                            TaskContinuationOptions.OnlyOnRanToCompletion,
-                            TaskScheduler.Default);
-                    }
-
-                    if (this.mxStreamIOReader is not null)
-                    {
-                        // We don't own the user's PipeWriter to complete it (so they can't write anything more to this channel).
-                        // We can't know whether there is or will be more bytes written to the user's PipeWriter,
-                        // but we need to terminate our reader for their writer as part of reclaiming resources.
-                        // Cancel the pending or next read operation so the reader loop will immediately notice and shutdown.
-                        this.mxStreamIOReader.CancelPendingRead();
-
-                        // Only Complete the reader if our async reader doesn't own it to avoid thread-safety bugs.
-                        PipeReader? mxStreamIOReader = null;
-                        lock (this.SyncObject)
-                        {
-                            if (this.mxStreamIOReader is not UnownedPipeReader)
-                            {
-                                mxStreamIOReader = this.mxStreamIOReader;
-                                this.mxStreamIOReader = null;
-                            }
-                        }
-
-                        mxStreamIOReader?.Complete();
-                    }
-
-                    // Unblock the reader that might be waiting on this.
-                    this.remoteWindowHasCapacity.Set();
-
-                    this.disposalTokenSource.Cancel();
-                    this.completionSource.TrySetResult(null);
-                    this.MultiplexingStream.OnChannelDisposed(this);
-                }
+                this.DisposeChannel(userDisposeException);
             }
 
-            internal async Task OnChannelTerminatedAsync()
+            /// <summary>
+            /// Disposes the channel by releasing all resources associated with it.
+            /// </summary>
+            /// <param name="disposeException">The exception to dispose this channel with,
+            /// defaults to null.</param>
+            internal void DisposeChannel(Exception? disposeException = null)
             {
-                if (this.IsDisposed)
+                // Ensure that we don't call dispose more than once
+                lock (this.SyncObject)
                 {
-                    return;
+                    if (this.isDisposed)
+                    {
+                        return;
+                    }
+
+                    // First call to dispose
+                    this.isDisposed = true;
+                }
+
+                this.acceptanceSource.TrySetCanceled();
+                this.optionsAppliedTaskSource?.TrySetCanceled();
+
+                PipeWriter? mxStreamIOWriter;
+                lock (this.SyncObject)
+                {
+                    mxStreamIOWriter = this.mxStreamIOWriter;
+                }
+
+                // Complete writing so that the mxstream cannot write to this channel any more.
+                // We must also cancel a pending flush since no one is guaranteed to be reading this any more
+                // and we don't want to deadlock on a full buffer in a disposed channel's pipe.
+                if (mxStreamIOWriter is not null)
+                {
+                    mxStreamIOWriter.CancelPendingFlush();
+                    _ = this.mxStreamIOWriterSemaphore.EnterAsync().ContinueWith(
+                        static (releaser, state) =>
+                        {
+                            try
+                            {
+                                Channel self = (Channel)state;
+
+                                PipeWriter? mxStreamIOWriter;
+                                lock (self.SyncObject)
+                                {
+                                    mxStreamIOWriter = self.mxStreamIOWriter;
+                                }
+
+                                mxStreamIOWriter?.Complete();
+                                self.mxStreamIOWriterCompleted.Set();
+                            }
+                            finally
+                            {
+                                releaser.Result.Dispose();
+                            }
+                        },
+                        this,
+                        CancellationToken.None,
+                        TaskContinuationOptions.OnlyOnRanToCompletion,
+                        TaskScheduler.Default);
+                }
+
+                if (this.mxStreamIOReader is not null)
+                {
+                    // We don't own the user's PipeWriter to complete it (so they can't write anything more to this channel).
+                    // We can't know whether there is or will be more bytes written to the user's PipeWriter,
+                    // but we need to terminate our reader for their writer as part of reclaiming resources.
+                    // Cancel the pending or next read operation so the reader loop will immediately notice and shutdown.
+                    this.mxStreamIOReader.CancelPendingRead();
+
+                    // Only Complete the reader if our async reader doesn't own it to avoid thread-safety bugs.
+                    PipeReader? mxStreamIOReader = null;
+                    lock (this.SyncObject)
+                    {
+                        if (this.mxStreamIOReader is not UnownedPipeReader)
+                        {
+                            mxStreamIOReader = this.mxStreamIOReader;
+                            this.mxStreamIOReader = null;
+                        }
+                    }
+
+                    mxStreamIOReader?.Complete();
+                }
+
+                // Set the completion source based on whether we are disposing due to an error
+                if (disposeException != null)
+                {
+                    this.completionSource.TrySetException(disposeException);
+                }
+                else
+                {
+                    this.completionSource.TrySetResult(null);
+                }
+
+                // Unblock the reader that might be waiting on this.
+                this.remoteWindowHasCapacity.Set();
+
+                this.disposalTokenSource.Cancel();
+                this.MultiplexingStream.OnChannelDisposed(this, disposeException);
+            }
+
+            internal async Task OnChannelTerminatedAsync(Exception? remoteError = null)
+            {
+                // Don't process the frame if the channel has already been diposed
+                lock (this.SyncObject)
+                {
+                    if (this.isDisposed)
+                    {
+                        return;
+                    }
                 }
 
                 try
@@ -424,6 +458,19 @@ namespace Nerdbank.Streams
                 {
                     // We fell victim to a race condition. It's OK to just swallow it because the writer was never created, so it needn't be completed.
                 }
+
+                // Terminate the channel
+                this.DisposeSelfOnFailure(Task.Run(async delegate
+                {
+                    // Ensure that we processed the channel before terminating it
+                    await this.OptionsApplied.ConfigureAwait(false);
+
+                    // Record that we were terminated remotely
+                    this.IsRemotelyTerminated = true;
+
+                    // Dispose of the channel
+                    this.DisposeChannel(remoteError);
+                }));
             }
 
             /// <summary>
@@ -684,15 +731,14 @@ namespace Nerdbank.Streams
                     this.mxStreamIOReaderCompleted = this.ProcessOutboundTransmissionsAsync();
                     this.DisposeSelfOnFailure(this.mxStreamIOReaderCompleted);
                     this.DisposeSelfOnFailure(this.AutoCloseOnPipesClosureAsync());
+
+                    // Record that we have applied the channel options
+                    this.optionsAppliedTaskSource?.TrySetResult(null);
                 }
                 catch (Exception ex)
                 {
                     this.optionsAppliedTaskSource?.TrySetException(ex);
                     throw;
-                }
-                finally
-                {
-                    this.optionsAppliedTaskSource?.TrySetResult(null);
                 }
             }
 
@@ -771,6 +817,7 @@ namespace Nerdbank.Streams
 
                         // We don't use a CancellationToken on this call because we prefer the exception-free cancellation path used by our Dispose method (CancelPendingRead).
                         ReadResult result = await mxStreamIOReader.ReadAsync().ConfigureAwait(false);
+
                         if (result.IsCanceled)
                         {
                             // We've been asked to cancel. Presumably the channel has faulted or been disposed.
@@ -832,13 +879,25 @@ namespace Nerdbank.Streams
                 }
                 catch (Exception ex)
                 {
-                    if (ex is OperationCanceledException && this.DisposalToken.IsCancellationRequested)
+                    await mxStreamIOReader!.CompleteAsync(ex).ConfigureAwait(false);
+
+                    // Record this as a faulting exception if the channel hasn't been disposed.
+                    lock (this.SyncObject)
                     {
-                        await mxStreamIOReader!.CompleteAsync().ConfigureAwait(false);
+                        if (!this.IsDisposed)
+                        {
+                            this.faultingException ??= ex;
+                        }
                     }
-                    else
+
+                    // Add a trace indicating that we caught an exception in ProcessOutbound
+                    if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                     {
-                        await mxStreamIOReader!.CompleteAsync(ex).ConfigureAwait(false);
+                        this.TraceSource.TraceEvent(
+                            TraceEventType.Error,
+                            0,
+                            "Rethrowing caught exception in ProcessOutboundAsync: {0}",
+                            ex.Message);
                     }
 
                     throw;
@@ -911,23 +970,30 @@ namespace Nerdbank.Streams
                     this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelAutoClosing, "Channel {0} \"{1}\" self-closing because both reader and writer are complete.", this.QualifiedId, this.Name);
                 }
 
-                this.Dispose();
+                this.DisposeChannel(null);
             }
 
             private void Fault(Exception exception)
             {
-                if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Critical) ?? false)
-                {
-                    this.TraceSource!.TraceEvent(TraceEventType.Critical, (int)TraceEventId.FatalError, "Channel Closing self due to exception: {0}", exception);
-                }
+                this.mxStreamIOReader?.CancelPendingRead();
 
+                // If the channel has already been disposed then only cancel the reader
                 lock (this.SyncObject)
                 {
+                    if (this.isDisposed)
+                    {
+                        return;
+                    }
+
                     this.faultingException ??= exception;
                 }
 
-                this.mxStreamIOReader?.CancelPendingRead();
-                this.Dispose();
+                if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Critical) ?? false)
+                {
+                    this.TraceSource!.TraceEvent(TraceEventType.Warning, 0, "Channel faulting self due to exception: {0}", this.faultingException.Message);
+                }
+
+                this.DisposeChannel(this.faultingException);
             }
 
             private void DisposeSelfOnFailure(Task task)

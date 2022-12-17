@@ -62,6 +62,8 @@ namespace Nerdbank.Streams.Interop.Tests
         {
             this.ClientOfferAsync().Forget();
             this.ServerOfferAsync().Forget();
+            this.ClientOffersErrorCompletedChannel().Forget();
+            this.ServerOffersErrorCompletedChannel().Forget();
 
             if (protocolMajorVersion >= 3)
             {
@@ -71,12 +73,38 @@ namespace Nerdbank.Streams.Interop.Tests
             await this.mx.Completion;
         }
 
+        private async Task ClientOffersErrorCompletedChannel()
+        {
+            MultiplexingStream.Channel? expectedErrorChannel = await this.mx.AcceptChannelAsync("clientErrorOffer");
+            MultiplexingStream.Channel? communicationChannel = await this.mx.AcceptChannelAsync("clientErrorOfferComm");
+            (StreamReader _, StreamWriter writer) = CreateStreamIO(communicationChannel);
+
+            string responseMessage = "Completed with no error";
+            try
+            {
+                await expectedErrorChannel.Completion;
+            }
+            catch (Exception e)
+            {
+                responseMessage = e.Message;
+            }
+
+            await writer.WriteLineAsync(responseMessage);
+        }
+
         private async Task ClientOfferAsync()
         {
             MultiplexingStream.Channel? channel = await this.mx.AcceptChannelAsync("clientOffer");
             (StreamReader r, StreamWriter w) = CreateStreamIO(channel);
             string? line = await r.ReadLineAsync();
             await w.WriteLineAsync($"recv: {line}");
+        }
+
+        private async Task ServerOffersErrorCompletedChannel()
+        {
+            MultiplexingStream.Channel? expectedErrorChannel = await this.mx.OfferChannelAsync("serverErrorOffer");
+            string errrorMessage = "Hello World";
+            await expectedErrorChannel.Output.CompleteAsync(new Exception(errrorMessage));
         }
 
         private async Task ServerOfferAsync()

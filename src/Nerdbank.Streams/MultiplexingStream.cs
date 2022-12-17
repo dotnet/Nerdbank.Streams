@@ -239,6 +239,11 @@ namespace Nerdbank.Streams
         internal CancellationToken DisposalToken => this.disposalTokenSource.Token;
 
         /// <summary>
+        /// Gets a value indicating whether channels in this stream supports sending/receiving termination exceptions.
+        /// </summary>
+        private bool SupportTerminatedExceptions => this.protocolMajorVersion > 1;
+
+        /// <summary>
         /// Gets a factory for <see cref="TraceSource"/> instances to attach to a newly opened <see cref="Channel"/>
         /// when its <see cref="ChannelOptions.TraceSource"/> is <see langword="null"/>.
         /// </summary>
@@ -835,7 +840,7 @@ namespace Nerdbank.Streams
                             this.OnContentWritingCompleted(header.RequiredChannelId);
                             break;
                         case ControlCode.ChannelTerminated:
-                            await this.OnChannelTerminatedAsync(header.RequiredChannelId).ConfigureAwait(false);
+                            await this.OnChannelTerminatedAsync(header.RequiredChannelId, frame.Value.Payload).ConfigureAwait(false);
                             break;
                         default:
                             break;
@@ -892,7 +897,8 @@ namespace Nerdbank.Streams
         /// Occurs when the remote party has terminated a channel (including canceling an offer).
         /// </summary>
         /// <param name="channelId">The ID of the terminated channel.</param>
-        private async Task OnChannelTerminatedAsync(QualifiedChannelId channelId)
+        /// <param name="payload">The payload sent from the remote side alongside the channel terminated frame.</param>
+        private async Task OnChannelTerminatedAsync(QualifiedChannelId channelId, ReadOnlySequence<byte> payload)
         {
             Channel? channel;
             lock (this.syncObject)
@@ -913,9 +919,25 @@ namespace Nerdbank.Streams
 
             if (channel is Channel)
             {
-                await channel.OnChannelTerminatedAsync().ConfigureAwait(false);
-                channel.IsRemotelyTerminated = true;
-                channel.Dispose();
+                // Try to get the exception sent from the remote side if there was one sent
+                Exception? remoteException = null;
+                if (this.SupportTerminatedExceptions && !payload.IsEmpty)
+                {
+                    V2Formatter castedFormatter = (V2Formatter)this.formatter;
+                    remoteException = castedFormatter.DeserializeException(payload);
+                }
+
+                if (remoteException != null && this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(
+                        TraceEventType.Warning,
+                        (int)TraceEventId.ChannelDisposed,
+                        "Received Channel Terminated for channel {0} with exception: {1}",
+                        channelId,
+                        remoteException.Message);
+                }
+
+                await channel.OnChannelTerminatedAsync(remoteException).ConfigureAwait(false);
             }
         }
 
@@ -1098,18 +1120,35 @@ namespace Nerdbank.Streams
         /// Raised when <see cref="Channel.Dispose"/> is called and any local transmission is completed.
         /// </summary>
         /// <param name="channel">The channel that is closing down.</param>
-        private void OnChannelDisposed(Channel channel)
+        /// <param name="exception">The exception to sent to the remote side alongside the disposal.</param>
+        private void OnChannelDisposed(Channel channel, Exception? exception = null)
         {
             Requires.NotNull(channel, nameof(channel));
 
             if (!this.Completion.IsCompleted && !this.DisposalToken.IsCancellationRequested)
             {
+                // Determine the header to send alongside the error payload
+                var header = new FrameHeader
+                {
+                    Code = ControlCode.ChannelTerminated,
+                    ChannelId = channel.QualifiedId,
+                };
+
+                // If there is an error and we support sending errors then
+                // serialize the exception and store it in the payload
+                ReadOnlySequence<byte> payload = default;
+                if (this.SupportTerminatedExceptions && exception != null)
+                {
+                    V2Formatter castedFormatter = (V2Formatter)this.formatter;
+                    payload = castedFormatter.SerializeException(exception);
+                }
+
                 if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
                 {
                     this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelDisposed, "Local channel {0} \"{1}\" stream disposed.", channel.QualifiedId, channel.Name);
                 }
 
-                this.SendFrame(ControlCode.ChannelTerminated, channel.QualifiedId);
+                this.SendFrame(header, payload, this.DisposalToken);
             }
         }
 

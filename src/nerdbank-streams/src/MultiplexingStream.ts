@@ -378,6 +378,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
     public dispose() {
         this.disposalTokenSource.cancel();
         this._completionSource.resolve();
+
         this.formatter.end();
         [this.locallyOfferedOpenChannels, this.remotelyOfferedOpenChannels].forEach(cb => {
             for (const channelId in cb) {
@@ -387,6 +388,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
                     // Acceptance gets rejected when a channel is disposed.
                     // Avoid a node.js crash or test failure for unobserved channels (e.g. offers for channels from the other party that no one cared to receive on this side).
                     caught(channel.acceptance);
+
                     channel.dispose();
                 }
             }
@@ -585,10 +587,22 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         }
     }
 
-    public async onChannelDisposed(channel: ChannelClass) {
+    public async onChannelDisposed(channel: ChannelClass, error : Error | null = null) {
         if (!this._completionSource.isCompleted) {
             try {
-                await this.sendFrame(ControlCode.ChannelTerminated, channel.qualifiedId);
+                // Determine the payload to send to the error
+                let payloadToSend : Buffer = Buffer.alloc(0);
+                if(this.protocolMajorVersion > 1 && error != null) {
+                    // Get the formatter use to serialize the error
+                    const castedFormatter = this.formatter as MultiplexingStreamV2Formatter;
+
+                    // Get the payload using the formatter
+                    payloadToSend = castedFormatter.serializeException(error);
+                }
+
+                // Create the header and send the frame to the remote side
+                const frameHeader = new FrameHeader(ControlCode.ChannelTerminated, channel.qualifiedId);
+                await this.sendFrameAsync(frameHeader, payloadToSend);
             } catch (err) {
                 // Swallow exceptions thrown about channel disposal if the whole stream has been taken down.
                 if (this.isDisposed) {
@@ -630,7 +644,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
                     this.onContentWritingCompleted(frame.header.requiredChannel);
                     break;
                 case ControlCode.ChannelTerminated:
-                    this.onChannelTerminated(frame.header.requiredChannel);
+                    this.onChannelTerminated(frame.header.requiredChannel, frame.payload);
                     break;
                 default:
                     break;
@@ -729,12 +743,24 @@ export class MultiplexingStreamClass extends MultiplexingStream {
      * Occurs when the remote party has terminated a channel (including canceling an offer).
      * @param channelId The ID of the terminated channel.
      */
-    private onChannelTerminated(channelId: QualifiedChannelId) {
+    private onChannelTerminated(channelId: QualifiedChannelId, payload: Buffer) {
         const channel = this.getOpenChannel(channelId);
         if (channel) {
             this.deleteOpenChannel(channelId);
             this.removeChannelFromOfferedQueue(channel);
-            channel.dispose();
+
+            // Extract the exception that we received from the remote side
+            let remoteException : Error | null = null;
+            if(this.protocolMajorVersion > 1 && payload.length > 0) {
+                // Get the formatter
+                const castedFormatter = this.formatter as MultiplexingStreamV2Formatter;
+
+                // Extract the error using the casted formatter
+                remoteException = castedFormatter.deserializeException(payload);
+            }
+
+            // Dispose the channel
+            channel.dispose(remoteException);
         }
     }
 }

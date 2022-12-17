@@ -54,9 +54,10 @@ export abstract class Channel implements IDisposableObservable {
     }
 
     /**
-     * Closes this channel.
+     * Closes this channel. If the channel with protocol versions > 1
+     * are disposed with an error, then the error is transmitted to the remote side.
      */
-    public dispose(): void {
+    public dispose(error : Error | null = null): void {
         // The interesting stuff is in the derived class.
         this._isDisposed = true;
     }
@@ -247,7 +248,7 @@ export class ChannelClass extends Channel {
         }
     }
 
-    public dispose(): void {
+    public dispose(error : Error | null = null): void {
         if (!this.isDisposed) {
             super.dispose();
 
@@ -261,10 +262,14 @@ export class ChannelClass extends Channel {
             this._duplex.end();
             this._duplex.push(null);
 
-            this._completion.resolve();
+            if (error) {
+                this._completion.reject(error);
+            } else {
+                this._completion.resolve();
+            }
 
             // Send the notification, but we can't await the result of this.
-            caught(this._multiplexingStream.onChannelDisposed(this));
+            caught(this._multiplexingStream.onChannelDisposed(this, error));
         }
     }
 

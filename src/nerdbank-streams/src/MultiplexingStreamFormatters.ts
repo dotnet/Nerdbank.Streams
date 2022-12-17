@@ -293,6 +293,41 @@ export class MultiplexingStreamV2Formatter extends MultiplexingStreamFormatter {
         return msgpack.decode(payload)[0];
     }
 
+    serializeException(error: Error | null) : Buffer {
+        // If the error doesn't exist then return an empty buffer
+        if (!error) {
+            return Buffer.alloc(0);
+        }
+
+        // Determine the error message to add to the payload
+        let errorMsg : string = error.message;
+        if (!errorMsg) {
+            errorMsg = `Error of type ${error.name} was thrown`;
+        }
+
+        // Return the buffer for this payload
+        const payload : any[] = [errorMsg];
+        return msgpack.encode(payload);
+    }
+
+    deserializeException(payload: Buffer) : Error | null {
+        // If the payload is empty then return null
+        if(payload.length === 0) {
+            return null;
+        }
+
+        // Make sure that the message pack object contains a message
+        const msgpackObject = msgpack.decode(payload);
+        if (!msgpackObject || msgpackObject.length === 0) {
+            return null;
+        }
+
+        // Get error message and return the error to the remote side
+        let errorMsg : string = msgpack.decode(payload)[0];
+        errorMsg = `Received error from remote side: ${errorMsg}`;
+        return new Error(errorMsg);
+    }
+
     protected async readMessagePackAsync(cancellationToken: CancellationToken): Promise<{} | [] | null> {
         const streamEnded = new Deferred<void>();
         while (true) {
