@@ -8,6 +8,7 @@ namespace IsolatedTestHost
     using System.IO;
     using System.Linq;
     using System.Reflection;
+    using System.Runtime.InteropServices;
     using System.Threading;
     using System.Threading.Tasks;
     using Xunit;
@@ -85,7 +86,11 @@ namespace IsolatedTestHost
                 {
                     result = ExecuteTest(testClass, testMethod);
                 });
-                testThread.SetApartmentState(ApartmentState.STA);
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    testThread.SetApartmentState(ApartmentState.STA);
+                }
+
                 testThread.Start();
                 testThread.Join();
                 return result;
