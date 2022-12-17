@@ -83,7 +83,7 @@ export class MultiplexingStreamV1Formatter extends MultiplexingStreamFormatter {
     /**
      * The magic number to send at the start of communication when using v1 of the protocol.
      */
-    private static readonly protocolMagicNumber = new Buffer([0x2f, 0xdf, 0x1d, 0x50]);
+    private static readonly protocolMagicNumber = Buffer.from([0x2f, 0xdf, 0x1d, 0x50]);
 
     constructor(private readonly stream: NodeJS.ReadWriteStream) {
         super();
@@ -118,7 +118,7 @@ export class MultiplexingStreamV1Formatter extends MultiplexingStreamFormatter {
     }
 
     async writeFrameAsync(header: FrameHeader, payload?: Buffer): Promise<void> {
-        const headerBuffer = new Buffer(7);
+        const headerBuffer = Buffer.alloc(7);
         headerBuffer.writeInt8(header.code, 0);
         headerBuffer.writeUInt32BE(header.channel?.id || 0, 1);
         headerBuffer.writeUInt16BE(payload?.length || 0, 5);
@@ -147,7 +147,7 @@ export class MultiplexingStreamV1Formatter extends MultiplexingStreamFormatter {
     }
 
     serializeOfferParameters(offer: OfferParameters): Buffer {
-        const payload = new Buffer(offer.name, MultiplexingStream.ControlFrameEncoding);
+        const payload = Buffer.from(offer.name, MultiplexingStream.ControlFrameEncoding);
         if (payload.length > MultiplexingStream.framePayloadMaxLength) {
             throw new Error("Name is too long.");
         }
@@ -162,7 +162,7 @@ export class MultiplexingStreamV1Formatter extends MultiplexingStreamFormatter {
     }
 
     serializeAcceptanceParameters(_: AcceptanceParameters): Buffer {
-        return new Buffer([]);
+        return Buffer.from([]);
     }
 
     deserializeAcceptanceParameters(_: Buffer): AcceptanceParameters {
@@ -334,10 +334,16 @@ export class MultiplexingStreamV2Formatter extends MultiplexingStreamFormatter {
             const readObject = this.reader.read();
             if (readObject === null) {
                 const bytesAvailable = new Deferred<void>();
-                this.reader.once("readable", bytesAvailable.resolve.bind(bytesAvailable));
-                this.reader.once("end", streamEnded.resolve.bind(streamEnded));
+                const bytesAvailableCallback = bytesAvailable.resolve.bind(bytesAvailable);
+                const streamEndedCallback = streamEnded.resolve.bind(streamEnded);
+
+                this.reader.once("readable", bytesAvailableCallback);
+                this.reader.once("end", streamEndedCallback);
                 const endPromise = Promise.race([bytesAvailable.promise, streamEnded.promise]);
                 await (cancellationToken ? cancellationToken.racePromise(endPromise) : endPromise);
+
+                this.reader.removeListener("readable", bytesAvailableCallback);
+                this.reader.removeListener("end", streamEndedCallback);
 
                 if (bytesAvailable.isCompleted) {
                     continue;

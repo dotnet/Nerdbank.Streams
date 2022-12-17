@@ -2,6 +2,7 @@ import { PassThrough, Readable, Writable } from "stream";
 import { Deferred } from "../Deferred";
 import { FullDuplexStream } from "../FullDuplexStream";
 import { getBufferFrom } from "../Utilities";
+import { delay } from "./Timeout";
 
 describe("FullDuplexStream.CreatePair", () => {
 
@@ -31,7 +32,7 @@ describe("FullDuplexStream.CreatePair", () => {
 
     async function writePropagation(first: Writable, second: Readable): Promise<void> {
         first.write("abc");
-        expect(second.read()).toEqual(new Buffer("abc"));
+        expect(second.read()).toEqual(Buffer.from("abc"));
     }
 
     async function endPropagatesFinishEvent(first: Writable, second: Readable): Promise<void> {
@@ -62,28 +63,42 @@ describe("FullDuplexStream.Splice", () => {
     let duplex: NodeJS.ReadWriteStream;
 
     beforeEach(() => {
-        readable = new PassThrough();
-        writable = new PassThrough();
+        readable = new PassThrough({ writableHighWaterMark : 8 });
+        writable = new PassThrough({ writableHighWaterMark : 8 });
         duplex = FullDuplexStream.Splice(readable, writable);
     });
 
     it("Should read from readable", async () => {
         readable.end("hi");
         const buffer = await getBufferFrom(duplex, 2);
-        expect(buffer).toEqual(new Buffer("hi"));
+        expect(buffer).toEqual(Buffer.from("hi"));
     });
 
     it("Should write to writable", async () => {
         duplex.write("abc");
         const buffer = await getBufferFrom(writable, 3);
-        expect(buffer).toEqual(new Buffer("abc"));
+        expect(buffer).toEqual(Buffer.from("abc"));
     });
 
     it("Terminating writing", async () => {
         duplex.end("the end");
         let buffer: Buffer | null = await getBufferFrom(writable, 7);
-        expect(buffer).toEqual(new Buffer("the end"));
+        expect(buffer).toEqual(Buffer.from("the end"));
         buffer = await getBufferFrom(writable, 1, true);
         expect(buffer).toBeNull();
     });
+
+    it("Read should yield when data is not ready", async () => {
+        const task = writeToStream(duplex, "abcdefgh", 4);
+        const buffer = await getBufferFrom(writable, 32);
+        await task;
+        expect(buffer.length).toEqual(32);
+    });
+
+    async function writeToStream(stream: NodeJS.ReadWriteStream, message: string, repeat: number) {
+        while (repeat--) {
+            stream.write(message);
+            await delay(2);
+        }
+    }
 });
