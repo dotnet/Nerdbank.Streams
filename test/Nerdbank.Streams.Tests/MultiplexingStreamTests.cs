@@ -201,7 +201,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     {
         // Prepare a readonly pipe that is completed with an error
         string localErrMsg = "Hello World";
-        string remoteErrMsg = "Received error from remote side: " + localErrMsg;
+        string remoteErrMsg = $"Received error from remote side: {nameof(ApplicationException)}: {localErrMsg}";
         var pipe = new Pipe();
         await pipe.Writer.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
         pipe.Writer.Complete(new ApplicationException(localErrMsg));
@@ -222,7 +222,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     public async Task OfferEmptyErrorCompletedPipe()
     {
         string localErrMsg = string.Empty;
-        string remoteErrMsg = "Received error from remote side: Exception of type 'System.IndexOutOfRangeException' was thrown";
+        string remoteErrMsg = $"Received error from remote side: {nameof(IndexOutOfRangeException)}: {localErrMsg}";
 
         // Prepare a readonly pipe that is completed with an error
         var pipe = new Pipe();
@@ -245,7 +245,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     public async Task OfferNullErrorCompletedPipe()
     {
         string localErrMsg = "Exception of type 'System.NullReferenceException' was thrown.";
-        string remoteErrMsg = "Received error from remote side: Exception of type 'System.NullReferenceException' was thrown.";
+        string remoteErrMsg = $"Received error from remote side: {nameof(NullReferenceException)}: {localErrMsg}";
 
         // Prepare a readonly pipe that is completed with an error
         var pipe = new Pipe();
@@ -278,25 +278,21 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task Dispose_CompleteWithErrorAfterwards()
     {
-        string expectedLocalErrMsg = "User triggered disposal";
-        string expectedRemoteErrMsg = "Received error from remote side: User triggered disposal";
-
         // Create the local and remote channels using channel names
         Task<MultiplexingStream.Channel>? localChannelTask = this.mx1.OfferChannelAsync("completeAfterwards", this.TimeoutToken);
         Task<MultiplexingStream.Channel>? remoteChannelTask = this.mx2.AcceptChannelAsync("completeAfterwards", this.TimeoutToken);
-        await this.WaitForEphemeralChannelOfferToPropagateAsync();
         MultiplexingStream.Channel remoteChannel = await remoteChannelTask;
         MultiplexingStream.Channel localChannel = await localChannelTask;
 
-        // Dispose the local channel and then complete it later with an error
+        // Dispose the local channel and then complete the writer that *we* own later with an error.
         localChannel.Dispose();
-        await localChannel.Output.CompleteAsync(new InvalidOperationException("Complete about dispose"));
+        await localChannel.Output.CompleteAsync(new InvalidOperationException("Complete after dispose"));
 
-        // Ensure that the local channel triggered through a user disposal
-        await VerifyChannelCompleted(localChannel, expectedLocalErrMsg);
+        // Ensure that the local channel completed without error (because we disposed before faulting the PipeWriter).
+        await VerifyChannelCompleted(localChannel, null);
 
-        // Ensure that the remote channel received the user disposal for protocol version > 1
-        await VerifyChannelCompleted(remoteChannel, this.ProtocolMajorVersion > 1 ? expectedRemoteErrMsg : null);
+        // Ensure that the remote channel similarly did not receive notice of any fault.
+        await VerifyChannelCompleted(remoteChannel, null);
     }
 
     [Fact]
@@ -312,7 +308,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         (MultiplexingStream.Channel channel1, MultiplexingStream.Channel channel2) = await this.EstablishChannelsAsync("A");
         await this.mx1.DisposeAsync();
         Assert.True(channel1.IsDisposed);
-        await VerifyChannelCompleted(channel1, "User triggered disposal");
+        await VerifyChannelCompleted(channel1, new ObjectDisposedException(nameof(MultiplexingStream)).Message);
 
 #pragma warning disable CS0618 // Type or member is obsolete
         await channel1.Input.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);

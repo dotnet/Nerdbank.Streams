@@ -106,15 +106,15 @@ export abstract class MultiplexingStream implements IDisposableObservable {
      * @param options Options to customize the behavior of the stream.
      * @returns The multiplexing stream.
      */
-     public static Create(
+    public static Create(
         stream: NodeJS.ReadWriteStream,
-        options?: MultiplexingStreamOptions) : MultiplexingStream {
+        options?: MultiplexingStreamOptions): MultiplexingStream {
         options ??= { protocolMajorVersion: 3 };
         options.protocolMajorVersion ??= 3;
 
         const formatter: MultiplexingStreamFormatter | undefined =
             options.protocolMajorVersion === 3 ? new MultiplexingStreamV3Formatter(stream) :
-            undefined;
+                undefined;
         if (!formatter) {
             throw new Error(`Protocol major version ${options.protocolMajorVersion} is not supported. Try CreateAsync instead.`);
         }
@@ -587,22 +587,15 @@ export class MultiplexingStreamClass extends MultiplexingStream {
         }
     }
 
-    public async onChannelDisposed(channel: ChannelClass, error : Error | null = null) {
+    public async onChannelDisposed(channel: ChannelClass, error: Error | null) {
         if (!this._completionSource.isCompleted) {
             try {
-                // Determine the payload to send to the error
-                let payloadToSend : Buffer = Buffer.alloc(0);
-                if(this.protocolMajorVersion > 1 && error != null) {
-                    // Get the formatter use to serialize the error
-                    const castedFormatter = this.formatter as MultiplexingStreamV2Formatter;
+                const payload = this.protocolMajorVersion > 1 && error
+                    ? (this.formatter as MultiplexingStreamV2Formatter).serializeException(error)
+                    : Buffer.alloc(0);
 
-                    // Get the payload using the formatter
-                    payloadToSend = castedFormatter.serializeException(error);
-                }
-
-                // Create the header and send the frame to the remote side
                 const frameHeader = new FrameHeader(ControlCode.ChannelTerminated, channel.qualifiedId);
-                await this.sendFrameAsync(frameHeader, payloadToSend);
+                await this.sendFrameAsync(frameHeader, payload);
             } catch (err) {
                 // Swallow exceptions thrown about channel disposal if the whole stream has been taken down.
                 if (this.isDisposed) {
@@ -749,17 +742,11 @@ export class MultiplexingStreamClass extends MultiplexingStream {
             this.deleteOpenChannel(channelId);
             this.removeChannelFromOfferedQueue(channel);
 
-            // Extract the exception that we received from the remote side
-            let remoteException : Error | null = null;
-            if(this.protocolMajorVersion > 1 && payload.length > 0) {
-                // Get the formatter
-                const castedFormatter = this.formatter as MultiplexingStreamV2Formatter;
+            // Extract the exception that we received from the remote side.
+            const remoteException = this.protocolMajorVersion > 1
+                ? (this.formatter as MultiplexingStreamV2Formatter).deserializeException(payload)
+                : null;
 
-                // Extract the error using the casted formatter
-                remoteException = castedFormatter.deserializeException(payload);
-            }
-
-            // Dispose the channel
             channel.dispose(remoteException);
         }
     }

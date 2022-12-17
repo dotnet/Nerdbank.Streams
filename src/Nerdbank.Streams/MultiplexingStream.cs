@@ -173,6 +173,10 @@ namespace Nerdbank.Streams
         {
             HandshakeSuccessful = 1,
             HandshakeFailed,
+
+            /// <summary>
+            /// A fatal error occurred at the overall multiplexing stream level, taking down the whole connection.
+            /// </summary>
             FatalError,
             UnexpectedChannelAccept,
             ChannelAutoClosing,
@@ -209,6 +213,11 @@ namespace Nerdbank.Streams
             /// Raised when the protocol handshake is starting, to annouce the major version being used.
             /// </summary>
             HandshakeStarted,
+
+            /// <summary>
+            /// A fatal exception occurred that took down one channel.
+            /// </summary>
+            ChannelFatalError,
         }
 
         /// <summary>
@@ -237,11 +246,6 @@ namespace Nerdbank.Streams
         /// Gets a token that is canceled when this instance is disposed.
         /// </summary>
         internal CancellationToken DisposalToken => this.disposalTokenSource.Token;
-
-        /// <summary>
-        /// Gets a value indicating whether channels in this stream supports sending/receiving termination exceptions.
-        /// </summary>
-        private bool SupportTerminatedExceptions => this.protocolMajorVersion > 1;
 
         /// <summary>
         /// Gets a factory for <see cref="TraceSource"/> instances to attach to a newly opened <see cref="Channel"/>
@@ -685,7 +689,7 @@ namespace Nerdbank.Streams
                 {
                     foreach (KeyValuePair<QualifiedChannelId, Channel> entry in this.openChannels)
                     {
-                        entry.Value.Dispose();
+                        entry.Value.Dispose(new ObjectDisposedException(nameof(MultiplexingStream)));
                     }
 
                     foreach (KeyValuePair<string, Queue<TaskCompletionSource<Channel>>> entry in this.acceptingChannels)
@@ -919,22 +923,18 @@ namespace Nerdbank.Streams
 
             if (channel is Channel)
             {
-                // Try to get the exception sent from the remote side if there was one sent
-                Exception? remoteException = null;
-                if (this.SupportTerminatedExceptions && !payload.IsEmpty)
-                {
-                    V2Formatter castedFormatter = (V2Formatter)this.formatter;
-                    remoteException = castedFormatter.DeserializeException(payload);
-                }
+                // Try to get the exception sent from the remote side if there was one sent.
+                Exception? remoteException = (this.formatter as V2Formatter)?.DeserializeException(payload);
 
-                if (remoteException != null && this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
+                if (remoteException != null && this.TraceSource.Switch.ShouldTrace(TraceEventType.Error))
                 {
                     this.TraceSource.TraceEvent(
-                        TraceEventType.Warning,
-                        (int)TraceEventId.ChannelDisposed,
-                        "Received Channel Terminated for channel {0} with exception: {1}",
+                        TraceEventType.Error,
+                        (int)TraceEventId.ChannelFatalError,
+                        "Received {2} for channel {0} with exception: {1}",
                         channelId,
-                        remoteException.Message);
+                        remoteException.Message,
+                        ControlCode.ChannelTerminated);
                 }
 
                 await channel.OnChannelTerminatedAsync(remoteException).ConfigureAwait(false);
@@ -1117,10 +1117,10 @@ namespace Nerdbank.Streams
         }
 
         /// <summary>
-        /// Raised when <see cref="Channel.Dispose"/> is called and any local transmission is completed.
+        /// Raised when <see cref="Channel.Dispose(Exception?)"/> is called and any local transmission is completed.
         /// </summary>
         /// <param name="channel">The channel that is closing down.</param>
-        /// <param name="exception">The exception to sent to the remote side alongside the disposal.</param>
+        /// <param name="exception">The exception to send to the remote side alongside the disposal.</param>
         private void OnChannelDisposed(Channel channel, Exception? exception = null)
         {
             Requires.NotNull(channel, nameof(channel));
@@ -1136,12 +1136,7 @@ namespace Nerdbank.Streams
 
                 // If there is an error and we support sending errors then
                 // serialize the exception and store it in the payload
-                ReadOnlySequence<byte> payload = default;
-                if (this.SupportTerminatedExceptions && exception != null)
-                {
-                    V2Formatter castedFormatter = (V2Formatter)this.formatter;
-                    payload = castedFormatter.SerializeException(exception);
-                }
+                ReadOnlySequence<byte> payload = (this.formatter as V2Formatter)?.SerializeException(exception) ?? default;
 
                 if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
                 {

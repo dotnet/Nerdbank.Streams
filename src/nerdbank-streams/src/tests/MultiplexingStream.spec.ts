@@ -249,10 +249,10 @@ import { nextTick } from "process";
             await channels[1].completion;
         });
 
-        it("channel terminated with error", async() => {
-            // Determine the error to complete the local channel with
-            const errorMsg : string = "Hello world";
-            const error : Error = new Error(errorMsg);
+        it("channel terminated with error", async () => {
+            // Determine the error to complete the local channel with.
+            const errorMsg: string = "Hello world";
+            const error: Error = new Error(errorMsg);
 
             // Get the channels to send/receive data over
             const channels = await Promise.all([
@@ -278,7 +278,7 @@ import { nextTick } from "process";
             });
 
             // Ensure that the remote channel only throws an error for protocol version > 1
-            remoteChannel.completion.then( response => {
+            remoteChannel.completion.then(response => {
                 remoteChannelCompleted.resolve();
                 expect(protocolMajorVersion).toEqual(1);
             }).catch(remoteChannelErr => {

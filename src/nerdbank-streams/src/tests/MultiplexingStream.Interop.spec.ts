@@ -73,8 +73,8 @@ import { ChannelOptions } from "../ChannelOptions";
         });
 
         it("Can offer error completed channel", async () => {
-            const errorMsg : string = "Hello world";
-            const error : Error = new Error(errorMsg);
+            const errorMsg: string = "Hello world";
+            const error: Error = new Error(errorMsg);
 
             const channelToCompleteWithError = await mx.offerChannelAsync("clientErrorOffer");
             const communicationChannel = await mx.offerChannelAsync("clientErrorOfferComm");
@@ -82,12 +82,12 @@ import { ChannelOptions } from "../ChannelOptions";
             channelToCompleteWithError.dispose(error);
             channelToCompleteWithError.completion.then(_ => {
                 throw new Error("Channel disposed with error didn't complete with error");
-            }).catch( (channelCompleteErr) => {
+            }).catch((channelCompleteErr) => {
                 expect(channelCompleteErr.message).toContain(errorMsg);
             });
 
-            let expectedErrMessage = `Received error from remote side: ${errorMsg}`;
-            if(protocolMajorVersion <= 1) {
+            let expectedErrMessage = `Received error from remote side: Error: ${errorMsg}`;
+            if (protocolMajorVersion <= 1) {
                 expectedErrMessage = "Completed with no error";
             }
 
@@ -103,7 +103,7 @@ import { ChannelOptions } from "../ChannelOptions";
 
         it("Can accept error completed channel", async () => {
             const channelCompletedWithError = await mx.acceptChannelAsync("serverErrorOffer");
-            const errorExpectedMessage : string = "Received error from remote side: Hello World";
+            const errorExpectedMessage: string = "Received error from remote side: Exception: Hello World";
             const channelCompleted = new Deferred<void>();
 
             channelCompletedWithError.completion.then(async _ => {

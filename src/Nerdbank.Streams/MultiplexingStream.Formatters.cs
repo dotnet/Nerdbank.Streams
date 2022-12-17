@@ -411,7 +411,7 @@ namespace Nerdbank.Streams
             }
 
             /// <summary>
-            /// Creates a payload to sent alongside <see cref="ControlCode.ChannelTerminated"/>.
+            /// Creates a payload for a <see cref="ControlCode.ChannelTerminated"/> frame.
             /// </summary>
             /// <param name="exception">The exception to send to the remote side if there is one.</param>
             /// <returns>The payload to send when a channel gets terminated.</returns>
@@ -428,16 +428,7 @@ namespace Nerdbank.Streams
                 writer.WriteArrayHeader(1);
 
                 // Get the exception to send to the remote side
-                string errorMessage = exception.Message;
-                if (errorMessage == null || errorMessage.Length == 0)
-                {
-                    errorMessage = string.Format(
-                        "Exception of type '{0}' was thrown",
-                        exception.GetType().ToString());
-                }
-
-                // Write the error message to the payload being sent
-                writer.Write(errorMessage);
+                writer.Write($"{exception.GetType().Name}: {exception.Message}");
                 writer.Flush();
 
                 return sequence;
@@ -450,7 +441,7 @@ namespace Nerdbank.Streams
             /// <returns>The error message in this payload if there is one, null otherwise.</returns>
             internal Exception? DeserializeException(ReadOnlySequence<byte> payload)
             {
-                // If it is empty then return null
+                // An empty payload means the remote side closed the channel without an exception.
                 if (payload.IsEmpty)
                 {
                     return null;
@@ -459,13 +450,13 @@ namespace Nerdbank.Streams
                 var reader = new MessagePackReader(payload);
                 int numElements = reader.ReadArrayHeader();
 
-                // We received an empty payload
+                // We received an empty payload.
                 if (numElements == 0)
                 {
                     return null;
                 }
 
-                // Get the exception message and return it as an exception
+                // Get the exception message and return it as an exception.
                 string remoteErrorMsg = reader.ReadString();
                 return new MultiplexingProtocolException($"Received error from remote side: {remoteErrorMsg}");
             }

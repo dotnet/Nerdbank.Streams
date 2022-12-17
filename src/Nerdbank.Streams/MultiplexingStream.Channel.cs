@@ -97,7 +97,7 @@ namespace Nerdbank.Streams
             private long? localWindowSize;
 
             /// <summary>
-            /// Indicates whether the <see cref="Dispose"/> method has been called.
+            /// Indicates whether the <see cref="Dispose(Exception)"/> method has been called.
             /// </summary>
             private bool isDisposed;
 
@@ -322,28 +322,21 @@ namespace Nerdbank.Streams
             private bool BackpressureSupportEnabled => this.MultiplexingStream.protocolMajorVersion > 1;
 
             /// <summary>
-            /// Immediately terminates the channel and shutdowns any ongoing communication.
+            /// Immediately terminates the channel and shuts down any ongoing communication.
             /// </summary>
             /// <remarks>
             /// Because this method may terminate the channel immediately and thus can cause previously queued content to not actually be received by the remote party,
             /// consider this method a "break glass" way of terminating a channel. The preferred method is that both sides "complete writing" and let the channel dispose itself.
             /// </remarks>
-            public void Dispose()
-            {
-                string userDisposeMsg = "User triggered disposal";
-                MultiplexingProtocolException userDisposeException = new MultiplexingProtocolException(userDisposeMsg);
-
-                this.DisposeChannel(userDisposeException);
-            }
+            public void Dispose() => this.Dispose(null);
 
             /// <summary>
             /// Disposes the channel by releasing all resources associated with it.
             /// </summary>
-            /// <param name="disposeException">The exception to dispose this channel with,
-            /// defaults to null.</param>
-            internal void DisposeChannel(Exception? disposeException = null)
+            /// <param name="disposeException">The exception to dispose this channel with.</param>
+            internal void Dispose(Exception? disposeException)
             {
-                // Ensure that we don't call dispose more than once
+                // Ensure that we don't call dispose more than once.
                 lock (this.SyncObject)
                 {
                     if (this.isDisposed)
@@ -438,7 +431,7 @@ namespace Nerdbank.Streams
 
             internal async Task OnChannelTerminatedAsync(Exception? remoteError = null)
             {
-                // Don't process the frame if the channel has already been diposed
+                // Don't process the frame if the channel has already been disposed.
                 lock (this.SyncObject)
                 {
                     if (this.isDisposed)
@@ -459,17 +452,14 @@ namespace Nerdbank.Streams
                     // We fell victim to a race condition. It's OK to just swallow it because the writer was never created, so it needn't be completed.
                 }
 
-                // Terminate the channel
+                // Terminate the channel.
                 this.DisposeSelfOnFailure(Task.Run(async delegate
                 {
-                    // Ensure that we processed the channel before terminating it
+                    // Ensure that we processed the channel before terminating it.
                     await this.OptionsApplied.ConfigureAwait(false);
 
-                    // Record that we were terminated remotely
                     this.IsRemotelyTerminated = true;
-
-                    // Dispose of the channel
-                    this.DisposeChannel(remoteError);
+                    this.Dispose(remoteError);
                 }));
             }
 
@@ -731,14 +721,15 @@ namespace Nerdbank.Streams
                     this.mxStreamIOReaderCompleted = this.ProcessOutboundTransmissionsAsync();
                     this.DisposeSelfOnFailure(this.mxStreamIOReaderCompleted);
                     this.DisposeSelfOnFailure(this.AutoCloseOnPipesClosureAsync());
-
-                    // Record that we have applied the channel options
-                    this.optionsAppliedTaskSource?.TrySetResult(null);
                 }
                 catch (Exception ex)
                 {
                     this.optionsAppliedTaskSource?.TrySetException(ex);
                     throw;
+                }
+                finally
+                {
+                    this.optionsAppliedTaskSource?.TrySetResult(null);
                 }
             }
 
@@ -890,13 +881,13 @@ namespace Nerdbank.Streams
                         }
                     }
 
-                    // Add a trace indicating that we caught an exception in ProcessOutbound
+                    // Add a trace indicating that we caught an exception.
                     if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
                     {
                         this.TraceSource.TraceEvent(
                             TraceEventType.Error,
                             0,
-                            "Rethrowing caught exception in ProcessOutboundAsync: {0}",
+                            "Rethrowing caught exception in " + nameof(this.ProcessOutboundTransmissionsAsync) + ": {0}",
                             ex.Message);
                     }
 
@@ -970,7 +961,7 @@ namespace Nerdbank.Streams
                     this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelAutoClosing, "Channel {0} \"{1}\" self-closing because both reader and writer are complete.", this.QualifiedId, this.Name);
                 }
 
-                this.DisposeChannel(null);
+                this.Dispose(null);
             }
 
             private void Fault(Exception exception)
@@ -988,12 +979,16 @@ namespace Nerdbank.Streams
                     this.faultingException ??= exception;
                 }
 
-                if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Critical) ?? false)
+                if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Error) ?? false)
                 {
-                    this.TraceSource!.TraceEvent(TraceEventType.Warning, 0, "Channel faulting self due to exception: {0}", this.faultingException.Message);
+                    this.TraceSource.TraceEvent(TraceEventType.Error, (int)TraceEventId.ChannelFatalError, "Channel faulted with exception: {0}", this.faultingException);
+                    if (exception != this.faultingException)
+                    {
+                        this.TraceSource.TraceEvent(TraceEventType.Error, (int)TraceEventId.ChannelFatalError, "A subsequent fault exception was reported: {0}", exception);
+                    }
                 }
 
-                this.DisposeChannel(this.faultingException);
+                this.Dispose(this.faultingException);
             }
 
             private void DisposeSelfOnFailure(Task task)

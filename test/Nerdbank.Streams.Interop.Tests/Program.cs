@@ -103,8 +103,8 @@ namespace Nerdbank.Streams.Interop.Tests
         private async Task ServerOffersErrorCompletedChannel()
         {
             MultiplexingStream.Channel? expectedErrorChannel = await this.mx.OfferChannelAsync("serverErrorOffer");
-            string errrorMessage = "Hello World";
-            await expectedErrorChannel.Output.CompleteAsync(new Exception(errrorMessage));
+            string errorMessage = "Hello World";
+            await expectedErrorChannel.Output.CompleteAsync(new Exception(errorMessage));
         }
 
         private async Task ServerOfferAsync()
