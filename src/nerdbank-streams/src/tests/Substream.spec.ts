@@ -1,6 +1,5 @@
 import "jasmine";
 import { PassThrough } from "stream";
-import { Deferred } from "../Deferred";
 import { getBufferFrom, readSubstream, writeAsync, writeSubstream } from "../Utilities";
 
 describe("Substream", () => {
@@ -135,12 +134,8 @@ describe("Substream", () => {
             await endAsync(thru);
 
             const substream = readSubstream(thru);
-            let readPayload = await getBufferFrom(substream, payload1.length);
-            expect(readPayload).toEqual(payload1);
-            readPayload = await getBufferFrom(substream, payload2.length);
-            expect(readPayload).toEqual(payload2);
-
-            await expectEndOfStream(substream);
+            const readPayload = await getBufferFrom(substream, 10, true);
+            expect(readPayload).toEqual(Buffer.from([1, 2, 3, 4, 5, 6]));
             await expectEndOfStream(thru);
         });
 
@@ -183,24 +178,16 @@ describe("Substream", () => {
         await writeAsync(stream, Buffer.from(dv.buffer, dv.byteOffset, dv.byteLength));
     }
 
-    async function endAsync(stream: NodeJS.WritableStream) {
-        const deferred = new Deferred<void>();
-        stream.end(() => deferred.resolve());
-        return deferred.promise;
+    function endAsync(stream: NodeJS.WritableStream) {
+        return new Promise<void>(resolve => stream.end(resolve));
     }
 
-    function tick(): Promise<void> {
-        const finished = new Deferred<void>();
-        process.nextTick(() => finished.resolve());
-        return finished.promise;
-    }
-
-    async function expectEndOfStream(stream: NodeJS.ReadableStream): Promise<void> {
-        const finished = new Deferred<void>();
-        stream.once("end", () => finished.resolve());
-        while (!finished.isCompleted) {
-            expect(stream.read()).toBeNull();
-            await tick();
-        }
+    function expectEndOfStream(stream: NodeJS.ReadableStream): Promise<void> {
+        expect(stream.read()).toBeNull()
+        stream.resume();
+        return new Promise<void>((resolve, reject) => {
+            stream.once("end", () => resolve());
+            stream.once("data", () => reject(new Error('EOF expected.')));
+        })
     }
 });

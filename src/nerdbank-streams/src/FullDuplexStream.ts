@@ -1,4 +1,5 @@
 import { Duplex, PassThrough } from "stream";
+import duplexer = require('plexer')
 
 export class FullDuplexStream {
     public static CreatePair(): { first: Duplex, second: Duplex } {
@@ -11,20 +12,6 @@ export class FullDuplexStream {
     }
 
     public static Splice(readable: NodeJS.ReadableStream, writable: NodeJS.WritableStream): Duplex {
-        const duplex = new Duplex({
-            write(chunk, encoding, callback) {
-                writable.write(chunk, encoding, callback);
-            },
-
-            final(callback) {
-                writable.end(callback);
-            },
-        });
-
-        // All reads and events come directly from the readable stream.
-        duplex.read = readable.read.bind(readable);
-        duplex.on = readable.on.bind(readable) as any;
-
-        return duplex;
+        return duplexer(writable, readable)
     }
 }
