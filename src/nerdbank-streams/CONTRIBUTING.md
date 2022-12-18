@@ -21,4 +21,4 @@ Run `yarn test` in this directory to run tests.
 You must have transpiled first (using `yarn build` or `yarn tsc`).
 Using `yarn watch` is a good way to ensure tsc has run with your changes automatically so you can run tests whenever you want.
 
-You can also run tests from the (Jasmine) Test Explorer in VS Code.
+You can also run tests from the (jest) Test Explorer in VS Code.
