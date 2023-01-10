@@ -410,6 +410,57 @@ namespace Nerdbank.Streams
                 }
             }
 
+            /// <summary>
+            /// Creates a payload for a <see cref="ControlCode.ChannelTerminated"/> frame.
+            /// </summary>
+            /// <param name="exception">The exception to send to the remote side if there is one.</param>
+            /// <returns>The payload to send when a channel gets terminated.</returns>
+            internal ReadOnlySequence<byte> SerializeException(Exception? exception)
+            {
+                if (exception == null)
+                {
+                    return ReadOnlySequence<byte>.Empty;
+                }
+
+                var sequence = new Sequence<byte>();
+                var writer = new MessagePackWriter(sequence);
+
+                writer.WriteArrayHeader(1);
+
+                // Get the exception to send to the remote side
+                writer.Write($"{exception.GetType().Name}: {exception.Message}");
+                writer.Flush();
+
+                return sequence;
+            }
+
+            /// <summary>
+            /// Gets the error message in the payload if there is one.
+            /// </summary>
+            /// <param name="payload">The payload that could contain an error message.</param>
+            /// <returns>The error message in this payload if there is one, null otherwise.</returns>
+            internal Exception? DeserializeException(ReadOnlySequence<byte> payload)
+            {
+                // An empty payload means the remote side closed the channel without an exception.
+                if (payload.IsEmpty)
+                {
+                    return null;
+                }
+
+                var reader = new MessagePackReader(payload);
+                int numElements = reader.ReadArrayHeader();
+
+                // We received an empty payload.
+                if (numElements == 0)
+                {
+                    return null;
+                }
+
+                // Get the exception message and return it as an exception.
+                string remoteErrorMsg = reader.ReadString();
+                return new MultiplexingProtocolException($"Received error from remote side: {remoteErrorMsg}");
+            }
+
             internal override ReadOnlySequence<byte> SerializeContentProcessed(long bytesProcessed)
             {
                 var sequence = new Sequence<byte>();

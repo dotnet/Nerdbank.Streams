@@ -47,7 +47,7 @@ namespace Nerdbank.Streams
         /// <typeparam name="T">The element to remove.</typeparam>
         /// <param name="queue">The queue to modify.</param>
         /// <param name="valueToRemove">The value to remove.</param>
-        /// <returns><c>true</c> if the value was found and removed; <c>false</c> if no match was found.</returns>
+        /// <returns><see langword="true"/> if the value was found and removed; <see langword="false"/> if no match was found.</returns>
         /// <remarks>
         /// If a value appears multiple times in the queue, only its first entry is removed.
         /// </remarks>

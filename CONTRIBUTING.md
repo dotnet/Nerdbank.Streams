@@ -37,4 +37,9 @@ to the feeds that packages for this repo come from, if any.
 
 Building, testing, and packing this repository can be done by using the standard dotnet CLI commands (e.g. `dotnet build`, `dotnet test`, `dotnet pack`, etc.).
 
+## The `nerdbank-streams` NPM package
+
+The `nerdbank-streams` NPM package builds out of the `src/nerdbank-streams` directory.
+Please review the [CONTRIBUTING.md](src/nerdbank-streams/CONTRIBUTING.md) document in that directory for instructions.
+
 [pwsh]: https://docs.microsoft.com/powershell/scripting/install/installing-powershell?view=powershell-6

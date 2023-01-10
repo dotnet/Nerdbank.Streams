@@ -143,7 +143,7 @@ namespace Nerdbank.Streams
                     else
                     {
                         relativeTo = this.readOnlySequence.Start;
-                        offset += this.Position;
+                        offset += this.Length;
                     }
 
                     break;

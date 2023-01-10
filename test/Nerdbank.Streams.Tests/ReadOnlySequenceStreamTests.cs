@@ -239,10 +239,12 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.Equal(5, stream.Position);
         Assert.Equal(stream.Position + 1, stream.ReadByte());
 
+        stream.Position = 0;
         Assert.Equal(9, stream.Seek(0, SeekOrigin.End));
         Assert.Equal(9, stream.Position);
         Assert.Equal(-1, stream.ReadByte());
 
+        stream.Position = 0;
         Assert.Equal(8, stream.Seek(-1, SeekOrigin.End));
         Assert.Equal(8, stream.Position);
         Assert.Equal(stream.Position + 1, stream.ReadByte());

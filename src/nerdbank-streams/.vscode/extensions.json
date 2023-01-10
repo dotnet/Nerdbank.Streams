@@ -1,16 +1,18 @@
 {
-	// See http://go.microsoft.com/fwlink/?LinkId=827846 to learn about workspace recommendations.
-	// Extension identifier format: ${publisher}.${name}. Example: vscode.csharp
-
-	// List of extensions which should be recommended for users of this workspace.
-	"recommendations": [
-		"ms-azure-devops.azure-pipelines",
-		"hbenl.vscode-jasmine-test-adapter",
-		"pflannery.vscode-versionlens",
-		"davidanson.vscode-markdownlint"
-	],
-	// List of extensions recommended by VS Code that should not be recommended for users of this workspace.
-	"unwantedRecommendations": [
-
-	]
+  // See http://go.microsoft.com/fwlink/?LinkId=827846 to learn about workspace recommendations.
+  // Extension identifier format: ${publisher}.${name}. Example: vscode.csharp
+  // List of extensions which should be recommended for users of this workspace.
+  "recommendations": [
+    "amodio.tsl-problem-matcher",
+    "davidanson.vscode-markdownlint",
+    "dbaeumer.vscode-eslint",
+    "firsttris.vscode-jest-runner",
+    "ms-azure-devops.azure-pipelines",
+    "Orta.vscode-jest",
+    "pflannery.vscode-versionlens",
+  ],
+  // List of extensions recommended by VS Code that should not be recommended for users of this workspace.
+  "unwantedRecommendations": [
+    "hbenl.vscode-jasmine-test-adapter"
+  ],
 }

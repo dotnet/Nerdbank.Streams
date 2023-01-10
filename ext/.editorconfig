@@ -2,3 +2,6 @@
 
 [*.{cs,csx,vb,vbx,h,cpp,idl}]
 dotnet_analyzer_diagnostic.severity = none
+
+[*.cs]
+dotnet_diagnostic.DOC104.severity = silent

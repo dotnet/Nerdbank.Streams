@@ -64,7 +64,7 @@ namespace Nerdbank.Streams
         /// </summary>
         /// <param name="stream">The stream to read from.</param>
         /// <param name="bufferSize">A hint at the size of messages that are commonly transferred. Use 0 for a commonly reasonable default.</param>
-        /// <param name="leaveOpen"><c>true</c> to leave the underlying <paramref name="stream"/> open after calling <see cref="PipeReader.Complete(Exception)"/>; <c>false</c> to close the stream.</param>
+        /// <param name="leaveOpen"><see langword="true"/> to leave the underlying <paramref name="stream"/> open after calling <see cref="PipeReader.Complete(Exception)"/>; <see langword="false"/> to close the stream.</param>
         public StreamPipeReader(Stream stream, int bufferSize, bool leaveOpen)
         {
             Requires.NotNull(stream, nameof(stream));

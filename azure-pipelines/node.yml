@@ -27,7 +27,7 @@ steps:
     arguments: test
 
 - task: Yarn@3
-  displayName: 🧪 yarn tslint
+  displayName: 🧪 yarn lint
   inputs:
     projectDirectory: src/nerdbank-streams
-    arguments: tslint --project .
+    arguments: lint

@@ -256,7 +256,7 @@ namespace Nerdbank.Streams
         /// <summary>
         /// Encodes characters written so far to a buffer provided by the underyling <see cref="bufferWriter"/>.
         /// </summary>
-        /// <param name="flushEncoder"><c>true</c> to flush the characters in the encoder; useful when finalizing the output.</param>
+        /// <param name="flushEncoder"><see langword="true"/> to flush the characters in the encoder; useful when finalizing the output.</param>
         private void EncodeCharacters(bool flushEncoder)
         {
             if (this.charBufferPosition > 0)
