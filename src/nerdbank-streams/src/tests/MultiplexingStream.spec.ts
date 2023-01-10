@@ -126,7 +126,7 @@ import { nextTick } from "process";
 
             // Give time for the termination fram to arrive *before* we try to accept the channel.
             for (let i = 0; i < 100; i++) {
-                await new Promise<void>(resolve => nextTick(() => resolve()));
+                await nextTickAsync();
             }
 
             // We expect this to timeout. But we need this for the test to fail if we have unobserved promise rejections.
@@ -322,3 +322,7 @@ import { nextTick } from "process";
         }
     }
 });
+
+function nextTickAsync() {
+    return new Promise<void>(resolve => nextTick(() => resolve()));
+}
