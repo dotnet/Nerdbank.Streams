@@ -311,6 +311,47 @@ import { nextTick } from "process";
                 ]);
             });
         }
+
+        it('nested stream does not pause', async () => {
+            const rpcChannels = await Promise.all([
+                mx1.offerChannelAsync("test"),
+                mx2.acceptChannelAsync("test"),
+            ]);
+
+            const inner1 = MultiplexingStream.Create(rpcChannels[0].stream, { protocolMajorVersion: 3 });
+            const inner2 = MultiplexingStream.Create(rpcChannels[1].stream, { protocolMajorVersion: 3 });
+            const innerRpcChannels = await Promise.all([
+                inner1.offerChannelAsync("test"),
+                inner2.acceptChannelAsync("test"),
+            ]);
+
+            const iterations = 32; // a high number to exceed high water mark levels in object streams
+
+            const fulfilled = new Promise<Buffer>(resolve => {
+                const chunks: Buffer[] = []
+                innerRpcChannels[1].stream.on('data', chunk => {
+                    chunks.push(chunk)
+                    if (chunks.length === iterations) {
+                        resolve(Buffer.concat(chunks));
+                    }
+                })
+            });
+
+            for (let i = 0; i < iterations; i++) {
+                innerRpcChannels[0].stream.write(Buffer.from([i]))
+            }
+
+            await fulfilled;
+
+            innerRpcChannels[0].stream.end();
+            innerRpcChannels[1].stream.end();
+            inner1.dispose();
+            inner2.dispose();
+            await inner1.completion;
+            await inner2.completion;
+            rpcChannels[0].stream.end();
+            rpcChannels[1].stream.end();
+        })
     });
 
     async function expectThrow<T>(promise: Promise<T>): Promise<any> {
