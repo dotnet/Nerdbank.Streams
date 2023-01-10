@@ -37,8 +37,6 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 	/** The default window size used for new channels that do not specify a value for ChannelOptions.ChannelReceivingWindowSize. */
 	readonly defaultChannelReceivingWindowSize: number
 
-	protected readonly formatter: MultiplexingStreamFormatter
-
 	protected get disposalToken() {
 		return this.disposalTokenSource.token
 	}
@@ -99,7 +97,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 		const handshakeResult = await formatter.readHandshakeAsync(writeHandshakeData, cancellationToken)
 		formatter.isOdd = handshakeResult.isOdd
 
-		return new MultiplexingStreamClass(stream, handshakeResult.isOdd, options)
+		return new MultiplexingStreamClass(formatter, handshakeResult.isOdd, options)
 	}
 
 	/**
@@ -120,7 +118,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 			throw new Error(`Protocol major version ${options.protocolMajorVersion} is not supported. Try CreateAsync instead.`)
 		}
 
-		return new MultiplexingStreamClass(stream, undefined, options)
+		return new MultiplexingStreamClass(formatter, undefined, options)
 	}
 
 	/**
@@ -176,22 +174,13 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 
 	private disposalTokenSource = CancellationToken.create()
 
-	protected constructor(stream: NodeJS.ReadWriteStream, private readonly isOdd: boolean | undefined, options: MultiplexingStreamOptions) {
+	protected constructor(
+		protected readonly formatter: MultiplexingStreamFormatter,
+		private readonly isOdd: boolean | undefined,
+		options: MultiplexingStreamOptions
+	) {
 		this.defaultChannelReceivingWindowSize = options.defaultChannelReceivingWindowSize ?? MultiplexingStream.recommendedDefaultChannelReceivingWindowSize
 		this.protocolMajorVersion = options.protocolMajorVersion ?? 1
-		const formatter: MultiplexingStreamFormatter | undefined =
-			options.protocolMajorVersion === 1
-				? new MultiplexingStreamV1Formatter(stream)
-				: options.protocolMajorVersion === 2
-				? new MultiplexingStreamV2Formatter(stream)
-				: options.protocolMajorVersion === 3
-				? new MultiplexingStreamV3Formatter(stream)
-				: undefined
-		if (formatter === undefined) {
-			throw new Error(`Unsupported major protocol version: ${options.protocolMajorVersion}`)
-		}
-		formatter.isOdd = isOdd
-		this.formatter = formatter
 
 		if (options.seededChannels) {
 			for (let i = 0; i < options.seededChannels.length; i++) {
@@ -534,8 +523,8 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 	protected lastOfferedChannelId: number
 	private readonly sendingSemaphore = new Semaphore(1)
 
-	constructor(stream: NodeJS.ReadWriteStream, isOdd: boolean | undefined, options: MultiplexingStreamOptions) {
-		super(stream, isOdd, options)
+	constructor(formatter: MultiplexingStreamFormatter, isOdd: boolean | undefined, options: MultiplexingStreamOptions) {
+		super(formatter, isOdd, options)
 
 		this.lastOfferedChannelId = isOdd ? -1 : 0 // the first channel created should be 1 or 2
 		this.lastOfferedChannelId += options.seededChannels?.length ?? 0
