@@ -31,6 +31,7 @@
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)\release.snk</AssemblyOriginatorKeyFile>
 
+    <PackageProjectUrl>https://github.com/aarnott/Nerdbank.Streams</PackageProjectUrl>
     <Company>Andrew Arnott</Company>
     <Authors>Andrew Arnott</Authors>
     <Copyright>© Andrew Arnott. All rights reserved.</Copyright>
@@ -55,7 +56,7 @@
 
   <Target Name="PrepareReleaseNotes" BeforeTargets="GenerateNuspec" DependsOnTargets="GetBuildVersion">
     <PropertyGroup>
-      <PackageReleaseNotes>https://github.com/AArnott/Nerdbank.Streams/releases/tag/v$(Version)</PackageReleaseNotes>
+      <PackageReleaseNotes Condition="'$(PackageProjectUrl)'!=''">$(PackageProjectUrl)/releases/tag/v$(Version)</PackageReleaseNotes>
     </PropertyGroup>
   </Target>
 
