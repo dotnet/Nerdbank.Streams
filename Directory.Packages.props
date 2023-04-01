@@ -22,7 +22,7 @@
     <PackageVersion Include="Moq" Version="4.18.4" />
     <PackageVersion Include="PInvoke.Kernel32" Version="0.7.124" />
     <PackageVersion Include="StreamJsonRpc" Version="2.13.33" />
-    <PackageVersion Include="System.IO.Pipelines" Version="6.0.3" />
+    <PackageVersion Include="System.IO.Pipelines" Version="7.0.0" />
     <PackageVersion Include="System.IO.Pipes" Version="4.3.0" />
     <PackageVersion Include="System.Runtime.CompilerServices.Unsafe" Version="6.0.0" />
     <PackageVersion Include="xunit.abstractions" Version="2.0.3" />
