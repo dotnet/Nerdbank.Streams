@@ -1,25 +1,27 @@
-import { ChildProcess, spawn } from 'child_process'
+import { ChildProcess, SpawnOptions, spawn } from 'child_process'
+import { ChannelOptions } from '../ChannelOptions'
 import { Deferred } from '../Deferred'
 import { FullDuplexStream } from '../FullDuplexStream'
 import { MultiplexingStream } from '../MultiplexingStream'
-import { ChannelOptions } from '../ChannelOptions'
 ;[1, 2, 3].forEach(protocolMajorVersion => {
 	describe(`MultiplexingStream v${protocolMajorVersion} (interop) `, () => {
 		const projectPath = `${__dirname}/../../../../test/Nerdbank.Streams.Interop.Tests`
 		let mx: MultiplexingStream
 		let proc: ChildProcess | null
 		let procExited: Deferred<any>
-		const dotnetEnvBlock: NodeJS.ProcessEnv = {
-			// eslint-disable-next-line @typescript-eslint/naming-convention
-			DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1', // prevent warnings in stdout that corrupt our interop stream.
+		const spawnOptions: SpawnOptions = {
+			env: {
+				// eslint-disable-next-line @typescript-eslint/naming-convention
+				DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1', // prevent warnings in stdout that corrupt our interop stream.
+			},
 		}
 		beforeAll(async () => {
-			proc = spawn('dotnet', ['build', projectPath], dotnetEnvBlock)
+			proc = spawn('dotnet', ['build', projectPath], spawnOptions.env as any)
 			try {
 				procExited = new Deferred<any>()
 				proc.once('error', err => procExited.resolve(err))
 				proc.once('exit', code => procExited.resolve(code))
-				// proc.stdout!.pipe(process.stdout);
+				// proc.stdout!.pipe(process.stdout)
 				proc.stderr!.pipe(process.stderr)
 				expect(await procExited.promise).toEqual(0)
 			} finally {
@@ -28,7 +30,7 @@ import { ChannelOptions } from '../ChannelOptions'
 			}
 		}, 20000) // leave time for package restore and build
 		beforeEach(async () => {
-			proc = spawn('dotnet', ['run', '--no-build', '--project', projectPath, '--', protocolMajorVersion.toString()], dotnetEnvBlock)
+			proc = spawn('dotnet', ['run', '--no-build', '--project', projectPath, '--', protocolMajorVersion.toString()], spawnOptions.env as any)
 			try {
 				procExited = new Deferred<any>()
 				proc.once('error', err => procExited.resolve(err))
