@@ -35,7 +35,7 @@
     "@types/jest": "^29.2.4",
     "@types/mkdirp": "^1.0.2",
     "@types/msgpack-lite": "^0.1.8",
-    "@types/node": "^15.14.5",
+    "@types/node": "^16.11.6",
     "@types/promise": "^7.1.30",
     "@typescript-eslint/eslint-plugin": "^5.38.1",
     "@typescript-eslint/parser": "^5.38.1",
@@ -53,9 +53,9 @@
     "path": "^0.12.7",
     "prettier": "^2.7.1",
     "promise": "^8.1.0",
-    "ts-jest": "^29.0.3",
+    "ts-jest": "^29.1.0",
     "ts-node": "^10.9.1",
-    "typescript": "^4.3.5",
+    "typescript": "^5.0.3",
     "vscode-jsonrpc": "^8.0.1"
   },
   "dependencies": {
