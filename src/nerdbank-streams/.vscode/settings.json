@@ -1,31 +1,33 @@
 {
-  "files.exclude": {
-    //"src/nerdbank-streams/*.js": { "when": "$(basename).ts"},
-    "*.js.map": true,
-    "**/.git": true,
-    "**/.svn": true,
-    "**/.hg": true,
-    "**/CVS": true,
-    "**/.DS_Store": true
-  },
-  // Turn off tsc task auto detection since we have the necessary tasks as npm scripts
-  "typescript.tsc.autoDetect": "off",
-  "typescript.format.insertSpaceAfterOpeningAndBeforeClosingEmptyBraces": false,
-  "[javascript]": {
-    "editor.formatOnSave": false,
-  },
-  "editor.formatOnSave": true,
-  "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true,
-    "source.organizeImports": true
-  },
-  "editor.defaultFormatter": "dbaeumer.vscode-eslint",
-  "json.format.enable": true,
-  "typescript.tsdk": "node_modules\\typescript\\lib",
-  "[jsonc]": {
-    "editor.defaultFormatter": "vscode.json-language-features"
-  },
-  "[json]": {
-    "editor.defaultFormatter": "vscode.json-language-features"
-  }
+	"files.exclude": {
+		//"src/nerdbank-streams/*.js": { "when": "$(basename).ts"},
+		"*.js.map": true,
+		"**/.git": true,
+		"**/.svn": true,
+		"**/.hg": true,
+		"**/CVS": true,
+		"**/.DS_Store": true
+	},
+	// Turn off tsc task auto detection since we have the necessary tasks as npm scripts
+	"typescript.tsc.autoDetect": "off",
+	"typescript.format.insertSpaceAfterOpeningAndBeforeClosingEmptyBraces": false,
+	"[javascript]": {
+		"editor.formatOnSave": false,
+	},
+	"[typescript]": {
+		"editor.formatOnSave": false,
+	},
+	"editor.formatOnSave": true,
+	"editor.codeActionsOnSave": {
+		"source.fixAll.eslint": true
+	},
+	"editor.defaultFormatter": "dbaeumer.vscode-eslint",
+	"json.format.enable": true,
+	"typescript.tsdk": "node_modules\\typescript\\lib",
+	"[jsonc]": {
+		"editor.defaultFormatter": "vscode.json-language-features"
+	},
+	"[json]": {
+		"editor.defaultFormatter": "vscode.json-language-features"
+	}
 }
