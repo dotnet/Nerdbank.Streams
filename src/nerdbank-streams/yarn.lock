@@ -4142,9 +4142,9 @@ natural-compare@^1.4.0:
   integrity sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==
 
 nerdbank-gitversioning@^3.4.231:
-  version "3.5.119"
-  resolved "https://registry.yarnpkg.com/nerdbank-gitversioning/-/nerdbank-gitversioning-3.5.119.tgz#3590ad5ba97f79f54a5667dd1b0b5b8f106d6fcc"
-  integrity sha512-CQ4QMtl2w9Q0AS9rjrME5FTOls69ILvyuLc7+AwkaFglre4g70zhsf6xpuJvb9su1cBBf3fy5qZt+Mc1bY2npw==
+  version "3.6.128"
+  resolved "https://registry.yarnpkg.com/nerdbank-gitversioning/-/nerdbank-gitversioning-3.6.128.tgz#09ee86c82fa2fa477fdb6fd02d00cc6e3be81e62"
+  integrity sha512-KQ8ivbe1ov1xmB/XyR07/uDzABAu7G1JtGmFTFIK+2cdSsyryjonDfsHOKECU4CgjMgahzvSghcsrSRMFbI2eg==
   dependencies:
     camel-case "^4.1.2"
 
