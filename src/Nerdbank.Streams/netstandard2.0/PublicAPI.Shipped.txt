@@ -238,7 +238,7 @@ static Nerdbank.Streams.PipeExtensions.UsePipeWriter(this System.IO.Stream! stre
 static Nerdbank.Streams.PipeExtensions.UsePipeWriter(this System.Net.WebSockets.WebSocket! webSocket, System.IO.Pipelines.PipeOptions? pipeOptions = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.IO.Pipelines.PipeWriter!
 static Nerdbank.Streams.PipeExtensions.UseStrictPipeReader(this System.IO.Stream! stream, int sizeHint = 4096) -> System.IO.Pipelines.PipeReader!
 static Nerdbank.Streams.PipeExtensions.UseStrictPipeWriter(this System.IO.Stream! stream) -> System.IO.Pipelines.PipeWriter!
-static Nerdbank.Streams.Sequence<T>.implicit operator System.Buffers.ReadOnlySequence<T>(Nerdbank.Streams.Sequence<T>! sequence) -> System.Buffers.ReadOnlySequence<T>
+static Nerdbank.Streams.Sequence<T>.implicit operator System.Buffers.ReadOnlySequence<T>(Nerdbank.Streams.Sequence<T>? sequence) -> System.Buffers.ReadOnlySequence<T>
 static Nerdbank.Streams.StreamExtensions.AsStream(this System.Buffers.IBufferWriter<byte>! writer) -> System.IO.Stream!
 static Nerdbank.Streams.StreamExtensions.AsStream(this System.Buffers.ReadOnlySequence<byte> readOnlySequence) -> System.IO.Stream!
 static Nerdbank.Streams.StreamExtensions.AsStream(this System.Net.WebSockets.WebSocket! webSocket) -> System.IO.Stream!

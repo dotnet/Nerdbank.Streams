@@ -37,7 +37,7 @@ namespace Nerdbank.Streams
         /// <param name="pipe">The pipe to wrap as a stream.</param>
         /// <param name="ownsPipe"><see langword="true"/> to complete the underlying reader and writer when the <see cref="Stream"/> is disposed; <see langword="false"/> to keep them open.</param>
         /// <returns>The wrapping stream.</returns>
-        public static Stream AsStream(this IDuplexPipe pipe, bool ownsPipe) => FullDuplexStream.Splice(pipe.Input.AsStream(leaveOpen: !ownsPipe), pipe.Output.AsStream(leaveOpen: !ownsPipe));
+        public static Stream AsStream(this IDuplexPipe pipe, bool ownsPipe) => FullDuplexStream.Splice(Requires.NotNull(pipe).Input.AsStream(leaveOpen: !ownsPipe), pipe.Output.AsStream(leaveOpen: !ownsPipe));
 
         /// <summary>
         /// Exposes a pipe reader as a <see cref="Stream"/>.
@@ -48,7 +48,7 @@ namespace Nerdbank.Streams
         /// The reader will be completed when the <see cref="Stream"/> is disposed.
         /// </remarks>
         [Obsolete("Use " + nameof(PipeReader) + "." + nameof(PipeReader.AsStream) + " instead.")]
-        public static Stream AsStream(this PipeReader pipeReader) => pipeReader.AsStream(leaveOpen: false);
+        public static Stream AsStream(this PipeReader pipeReader) => Requires.NotNull(pipeReader).AsStream(leaveOpen: false);
 
         /// <summary>
         /// Exposes a pipe reader as a <see cref="Stream"/> after asynchronously reading all content
@@ -91,7 +91,7 @@ namespace Nerdbank.Streams
         /// The writer will be completed when the <see cref="Stream"/> is disposed.
         /// </remarks>
         [Obsolete("Use " + nameof(PipeWriter) + "." + nameof(PipeWriter.AsStream) + " instead.")]
-        public static Stream AsStream(this PipeWriter pipeWriter) => pipeWriter.AsStream(leaveOpen: false);
+        public static Stream AsStream(this PipeWriter pipeWriter) => Requires.NotNull(pipeWriter).AsStream(leaveOpen: false);
 
         /// <summary>
         /// Enables efficiently reading a stream using <see cref="PipeReader"/>.
