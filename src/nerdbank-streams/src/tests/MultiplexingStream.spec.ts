@@ -113,13 +113,16 @@ import { nextTick } from 'process'
 			const offer = mx1.offerChannelAsync('test', undefined, cts.token)
 			await assert.rejects(offer)
 
-			// Give time for the termination fram to arrive *before* we try to accept the channel.
+			// Give time for the termination frame to arrive *before* we try to accept the channel.
 			for (let i = 0; i < 100; i++) {
 				await nextTickAsync()
 			}
 
-			// We expect this to timeout. But we need this for the test to fail if we have unobserved promise rejections.
-			await assert.rejects(timeout(mx2.acceptChannelAsync('test'), 1000))
+			// An attempt to accept the channel at this point should just hang, until we dispose the mx, at which point it should be rejected.
+			const acceptPromise = mx2.acceptChannelAsync('test')
+			await assert.rejects(timeout(acceptPromise, 500))
+			mx2.dispose()
+			await assert.rejects(acceptPromise)
 		})
 
 		it('Channel offer is rejected by event handler', async () => {
@@ -176,6 +179,12 @@ import { nextTick } from 'process'
 			await accept
 			await handler.promise // rethrow any failures in the handler.
 			offeredChannel.stream.end()
+		})
+
+		it('Dangling channel accept is rejected when remote disconnects', async () => {
+			const acceptPromise = mx1.acceptChannelAsync('test')
+			mx2.dispose()
+			await assert.rejects(acceptPromise)
 		})
 
 		it('Can use JSON-RPC over a channel', async () => {
