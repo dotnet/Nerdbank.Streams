@@ -377,6 +377,10 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 	 * Disposes the stream.
 	 */
 	public dispose() {
+		this.disposeCore(false)
+	}
+
+	protected disposeCore(remoteDisconnect: boolean) {
 		this.disposalTokenSource.cancel()
 		this._completionSource.resolve()
 
@@ -394,6 +398,19 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 				}
 			}
 		})
+
+		// Iterate over acceptingChannels to reject each promise
+		const errorMessage = remoteDisconnect ? 'The remote party has disconnected.' : 'The stream is being disposed locally.'
+		for (const name in this.acceptingChannels) {
+			if (this.acceptingChannels.hasOwnProperty(name)) {
+				const acceptingChannels = this.acceptingChannels[name]
+				for (const channelDeferral of acceptingChannels) {
+					channelDeferral.reject(new Error(errorMessage))
+				}
+
+				delete this.acceptingChannels[name]
+			}
+		}
 	}
 
 	public on(event: 'channelOffered', listener: (args: IChannelOfferEventArgs) => void) {
@@ -637,7 +654,7 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 			}
 		}
 
-		this.dispose()
+		this.disposeCore(true)
 	}
 
 	private onOffer(channelId: QualifiedChannelId, payload: Buffer) {
