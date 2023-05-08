@@ -453,14 +453,14 @@ namespace Nerdbank.Streams
                 }
 
                 // Terminate the channel.
-                this.DisposeSelfOnFailure(Task.Run(async delegate
+                this.DisposeSelfOnFailure(async delegate
                 {
                     // Ensure that we processed the channel before terminating it.
                     await this.OptionsApplied.ConfigureAwait(false);
 
                     this.IsRemotelyTerminated = true;
                     this.Dispose(remoteError);
-                }));
+                });
             }
 
             /// <summary>
@@ -536,7 +536,7 @@ namespace Nerdbank.Streams
             /// </summary>
             internal void OnContentWritingCompleted()
             {
-                this.DisposeSelfOnFailure(Task.Run(async delegate
+                this.DisposeSelfOnFailure(async delegate
                 {
                     if (!this.IsDisposed)
                     {
@@ -564,7 +564,7 @@ namespace Nerdbank.Streams
                     }
 
                     this.mxStreamIOWriterCompleted.Set();
-                }));
+                });
             }
 
             /// <summary>
@@ -990,6 +990,8 @@ namespace Nerdbank.Streams
 
                 this.Dispose(this.faultingException);
             }
+
+            private void DisposeSelfOnFailure(Func<Task> asyncFunc) => this.DisposeSelfOnFailure(asyncFunc());
 
             private void DisposeSelfOnFailure(Task task)
             {
