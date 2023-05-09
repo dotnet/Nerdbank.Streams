@@ -453,14 +453,14 @@ namespace Nerdbank.Streams
                 }
 
                 // Terminate the channel.
-                this.DisposeSelfOnFailure(Task.Run(async delegate
+                this.DisposeSelfOnFailure(async delegate
                 {
                     // Ensure that we processed the channel before terminating it.
                     await this.OptionsApplied.ConfigureAwait(false);
 
                     this.IsRemotelyTerminated = true;
                     this.Dispose(remoteError);
-                }));
+                });
             }
 
             /// <summary>
@@ -536,7 +536,7 @@ namespace Nerdbank.Streams
             /// </summary>
             internal void OnContentWritingCompleted()
             {
-                this.DisposeSelfOnFailure(Task.Run(async delegate
+                this.DisposeSelfOnFailure(async delegate
                 {
                     if (!this.IsDisposed)
                     {
@@ -564,7 +564,7 @@ namespace Nerdbank.Streams
                     }
 
                     this.mxStreamIOWriterCompleted.Set();
-                }));
+                });
             }
 
             /// <summary>
@@ -696,6 +696,7 @@ namespace Nerdbank.Streams
                         ?? this.MultiplexingStream.DefaultChannelTraceSourceFactory?.Invoke(this.QualifiedId, this.Name)
                         ?? new TraceSource($"{nameof(Streams.MultiplexingStream)}.{nameof(Channel)} {this.QualifiedId} ({this.Name})", SourceLevels.Critical);
 
+                    IDuplexPipe? existingPipe = null, channelIO = null;
                     lock (this.SyncObject)
                     {
                         Verify.NotDisposed(this);
@@ -706,16 +707,22 @@ namespace Nerdbank.Streams
                             this.existingPipe = channelOptions.ExistingPipe;
                             this.existingPipeGiven = true;
 
-                            // We always want to write ALL received data to the user's ExistingPipe, rather than truncating it on disposal, so don't use a cancellation token in that direction.
-                            this.DisposeSelfOnFailure(this.channelIO.Input.LinkToAsync(channelOptions.ExistingPipe.Output));
-
-                            // Upon disposal, we no longer want to continue reading from the user's ExistingPipe into our buffer since we won't be propagating it any further, so use our DisposalToken.
-                            this.DisposeSelfOnFailure(channelOptions.ExistingPipe.Input.LinkToAsync(this.channelIO.Output, this.DisposalToken));
+                            existingPipe = channelOptions.ExistingPipe;
+                            channelIO = this.channelIO;
                         }
                         else
                         {
                             this.existingPipeGiven = false;
                         }
+                    }
+
+                    if (existingPipe is not null && channelIO is not null)
+                    {
+                        // We always want to write ALL received data to the user's ExistingPipe, rather than truncating it on disposal, so don't use a cancellation token in that direction.
+                        this.DisposeSelfOnFailure(channelIO.Input.LinkToAsync(existingPipe.Output));
+
+                        // Upon disposal, we no longer want to continue reading from the user's ExistingPipe into our buffer since we won't be propagating it any further, so use our DisposalToken.
+                        this.DisposeSelfOnFailure(existingPipe.Input.LinkToAsync(channelIO.Output, this.DisposalToken));
                     }
 
                     this.mxStreamIOReaderCompleted = this.ProcessOutboundTransmissionsAsync();
@@ -990,6 +997,8 @@ namespace Nerdbank.Streams
 
                 this.Dispose(this.faultingException);
             }
+
+            private void DisposeSelfOnFailure(Func<Task> asyncFunc) => this.DisposeSelfOnFailure(asyncFunc());
 
             private void DisposeSelfOnFailure(Task task)
             {
