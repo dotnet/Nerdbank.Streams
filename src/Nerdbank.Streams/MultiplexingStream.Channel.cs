@@ -396,7 +396,7 @@ namespace Nerdbank.Streams
                     // We can't know whether there is or will be more bytes written to the user's PipeWriter,
                     // but we need to terminate our reader for their writer as part of reclaiming resources.
                     // Cancel the pending or next read operation so the reader loop will immediately notice and shutdown.
-                    this.mxStreamIOReader.CancelPendingRead();
+                    this.mxStreamIOReader?.CancelPendingRead();
 
                     // Only Complete the reader if our async reader doesn't own it to avoid thread-safety bugs.
                     PipeReader? mxStreamIOReader = null;
