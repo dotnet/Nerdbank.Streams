@@ -1,4 +1,6 @@
 Nerdbank.Streams.BufferWriterExtensions
+Nerdbank.Streams.MultiplexingStream.Options.FaultOpenChannelsOnStreamDisposal.get -> bool
+Nerdbank.Streams.MultiplexingStream.Options.FaultOpenChannelsOnStreamDisposal.set -> void
 Nerdbank.Streams.ReadOnlySequenceExtensions
 Nerdbank.Streams.StreamPipeReader
 Nerdbank.Streams.StreamPipeReader.Read() -> System.IO.Pipelines.ReadResult

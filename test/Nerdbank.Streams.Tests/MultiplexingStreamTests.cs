@@ -38,28 +38,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        var mx1TraceSource = new TraceSource(nameof(this.mx1), SourceLevels.All);
-        var mx2TraceSource = new TraceSource(nameof(this.mx2), SourceLevels.All);
-
-        mx1TraceSource.Listeners.Add(new XunitTraceListener(this.Logger, this.TestId, this.TestTimer));
-        mx2TraceSource.Listeners.Add(new XunitTraceListener(this.Logger, this.TestId, this.TestTimer));
-
-        Func<string, MultiplexingStream.QualifiedChannelId, string, TraceSource> traceSourceFactory = (string mxInstanceName, MultiplexingStream.QualifiedChannelId id, string name) =>
-        {
-            var traceSource = new TraceSource(mxInstanceName + " channel " + id, SourceLevels.All);
-            traceSource.Listeners.Clear(); // remove DefaultTraceListener
-            traceSource.Listeners.Add(new XunitTraceListener(this.Logger, this.TestId, this.TestTimer));
-            return traceSource;
-        };
-
-        Func<MultiplexingStream.QualifiedChannelId, string, TraceSource> mx1TraceSourceFactory = (MultiplexingStream.QualifiedChannelId id, string name) => traceSourceFactory(nameof(this.mx1), id, name);
-        Func<MultiplexingStream.QualifiedChannelId, string, TraceSource> mx2TraceSourceFactory = (MultiplexingStream.QualifiedChannelId id, string name) => traceSourceFactory(nameof(this.mx2), id, name);
-
-        (this.transport1, this.transport2) = FullDuplexStream.CreatePair(new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024));
-        Task<MultiplexingStream>? mx1 = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, TraceSource = mx1TraceSource, DefaultChannelTraceSourceFactoryWithQualifier = mx1TraceSourceFactory }, this.TimeoutToken);
-        Task<MultiplexingStream>? mx2 = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, TraceSource = mx2TraceSource, DefaultChannelTraceSourceFactoryWithQualifier = mx2TraceSourceFactory }, this.TimeoutToken);
-        this.mx1 = await mx1;
-        this.mx2 = await mx2;
+        await this.ReinitializeMxStreamsAsync(new MultiplexingStream.Options());
     }
 
     public async Task DisposeAsync()
@@ -302,13 +281,14 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         Assert.Throws<ObjectDisposedException>(() => this.transport1.Position);
     }
 
-    [Fact]
-    public async Task Dispose_DisposesChannels()
+    [Theory, PairwiseData]
+    public async Task Dispose_DisposesChannels(bool channelFaulted)
     {
+        await this.ReinitializeMxStreamsAsync(new MultiplexingStream.Options() { FaultOpenChannelsOnStreamDisposal = channelFaulted });
         (MultiplexingStream.Channel channel1, MultiplexingStream.Channel channel2) = await this.EstablishChannelsAsync("A");
         await this.mx1.DisposeAsync();
         Assert.True(channel1.IsDisposed);
-        await VerifyChannelCompleted(channel1, new ObjectDisposedException(nameof(MultiplexingStream)).Message);
+        await VerifyChannelCompleted(channel1, channelFaulted ? new ObjectDisposedException(nameof(MultiplexingStream)).Message : null);
 
 #pragma warning disable CS0618 // Type or member is obsolete
         await channel1.Input.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
@@ -1320,6 +1300,40 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     {
         (MultiplexingStream.Channel channel1, MultiplexingStream.Channel channel2) = await this.EstablishChannelsAsync(identifier, receivingWindowSize);
         return (channel1.AsStream(), channel2.AsStream());
+    }
+
+    private async Task ReinitializeMxStreamsAsync(MultiplexingStream.Options optionsTemplate)
+    {
+        await (this.mx1?.DisposeAsync() ?? default);
+        await (this.mx2?.DisposeAsync() ?? default);
+
+        var mx1TraceSource = new TraceSource(nameof(this.mx1), SourceLevels.All);
+        var mx2TraceSource = new TraceSource(nameof(this.mx2), SourceLevels.All);
+
+        mx1TraceSource.Listeners.Add(new XunitTraceListener(this.Logger, this.TestId, this.TestTimer));
+        mx2TraceSource.Listeners.Add(new XunitTraceListener(this.Logger, this.TestId, this.TestTimer));
+
+        Func<string, MultiplexingStream.QualifiedChannelId, string, TraceSource> traceSourceFactory = (string mxInstanceName, MultiplexingStream.QualifiedChannelId id, string name) =>
+        {
+            var traceSource = new TraceSource(mxInstanceName + " channel " + id, SourceLevels.All);
+            traceSource.Listeners.Clear(); // remove DefaultTraceListener
+            traceSource.Listeners.Add(new XunitTraceListener(this.Logger, this.TestId, this.TestTimer));
+            return traceSource;
+        };
+
+        Func<MultiplexingStream.QualifiedChannelId, string, TraceSource> mx1TraceSourceFactory = (MultiplexingStream.QualifiedChannelId id, string name) => traceSourceFactory(nameof(this.mx1), id, name);
+        Func<MultiplexingStream.QualifiedChannelId, string, TraceSource> mx2TraceSourceFactory = (MultiplexingStream.QualifiedChannelId id, string name) => traceSourceFactory(nameof(this.mx2), id, name);
+
+        optionsTemplate = new(optionsTemplate) { ProtocolMajorVersion = this.ProtocolMajorVersion };
+
+        var mx1Options = new MultiplexingStream.Options(optionsTemplate) { TraceSource = mx1TraceSource, DefaultChannelTraceSourceFactoryWithQualifier = mx1TraceSourceFactory };
+        var mx2Options = new MultiplexingStream.Options(optionsTemplate) { TraceSource = mx2TraceSource, DefaultChannelTraceSourceFactoryWithQualifier = mx2TraceSourceFactory };
+
+        (this.transport1, this.transport2) = FullDuplexStream.CreatePair(new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024));
+        Task<MultiplexingStream>? mx1 = MultiplexingStream.CreateAsync(this.transport1, mx1Options, this.TimeoutToken);
+        Task<MultiplexingStream>? mx2 = MultiplexingStream.CreateAsync(this.transport2, mx2Options, this.TimeoutToken);
+        this.mx1 = await mx1;
+        this.mx2 = await mx2;
     }
 
     protected class SlowPipeWriter : PipeWriter
