@@ -105,6 +105,12 @@ namespace Nerdbank.Streams
         private readonly int protocolMajorVersion;
 
         /// <summary>
+        /// A value indicating whether any open channels should be faulted (i.e. their <see cref="Channel.Completion"/> task will be faulted)
+        /// when the <see cref="MultiplexingStream"/> is disposed.
+        /// </summary>
+        private readonly bool faultOpenChannelsOnStreamDisposal;
+
+        /// <summary>
         /// The last number assigned to a channel.
         /// Each use of this should increment by two, if <see cref="isOdd"/> has a value.
         /// </summary>
@@ -131,6 +137,7 @@ namespace Nerdbank.Streams
             }
 
             this.TraceSource = options.TraceSource;
+            this.faultOpenChannelsOnStreamDisposal = options.FaultOpenChannelsOnStreamDisposal;
 
             this.DefaultChannelTraceSourceFactory =
                 options.DefaultChannelTraceSourceFactoryWithQualifier
@@ -689,7 +696,7 @@ namespace Nerdbank.Streams
                 {
                     foreach (KeyValuePair<QualifiedChannelId, Channel> entry in this.openChannels)
                     {
-                        entry.Value.Dispose(new ObjectDisposedException(nameof(MultiplexingStream)));
+                        entry.Value.Dispose(this.faultOpenChannelsOnStreamDisposal ? new ObjectDisposedException(nameof(MultiplexingStream)) : null);
                     }
 
                     foreach (KeyValuePair<string, Queue<TaskCompletionSource<Channel>>> entry in this.acceptingChannels)
