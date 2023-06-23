@@ -12,6 +12,7 @@
     "**/.DS_Store": true
   },
   "omnisharp.enableEditorConfigSupport": true,
-  "omnisharp.enableImportCompletion": true,
-  "omnisharp.enableRoslynAnalyzers": true
+  "omnisharp.enableRoslynAnalyzers": true,
+  "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true,
+  "dotnet.defaultSolution": "Nerdbank.Streams.sln"
 }

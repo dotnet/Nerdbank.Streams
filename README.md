@@ -1,5 +1,4 @@
-Specialized .NET Stream classes
-=========================
+# Specialized .NET Stream classes
 
 [![NuGet package](https://img.shields.io/nuget/v/Nerdbank.Streams.svg)](https://nuget.org/packages/Nerdbank.Streams)
 [![Build Status](https://dev.azure.com/andrewarnott/OSS/_apis/build/status/Nerdbank.Streams)](https://dev.azure.com/andrewarnott/OSS/_build/latest?definitionId=14)
@@ -45,3 +44,12 @@ Specialized .NET Stream classes
    and thus allows for alloc-free reading across many sequences.
 1. [`DuplexPipe`](doc/DuplexPipe.md) is a trivial implementation of `IDuplexPipe`.
 1. [`Stream.ReadBlockAsync`](doc/ReadBlockAsync.md) guarantees to fill the supplied buffer except under certain documented conditions, instead of the regular `ReadAsync` guarantee of supplying at least 1 byte.
+
+## Code of Conduct
+
+This project has adopted the code of conduct defined by the Contributor Covenant to clarify expected behavior in our community.
+For more information see the [.NET Foundation Code of Conduct](https://dotnetfoundation.org/code-of-conduct).
+
+## .NET Foundation
+
+This project is supported by the [.NET Foundation](https://dotnetfoundation.org).
