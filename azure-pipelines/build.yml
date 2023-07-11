@@ -20,7 +20,7 @@ jobs:
     submodules: true
   - template: install-dependencies.yml
 
-  - script: dotnet tool run nbgv cloud -c
+  - script: dotnet nbgv cloud -c
     displayName: ⚙ Set build number
 
   - template: dotnet.yml

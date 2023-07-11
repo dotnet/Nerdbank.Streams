@@ -84,7 +84,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             try
             {
                 reader.Rewind(1);
-                Assert.True(false, "no exception thrown");
+                Assert.Fail("no exception thrown");
             }
             catch (ArgumentOutOfRangeException)
             {
@@ -96,7 +96,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             try
             {
                 reader.Rewind(2);
-                Assert.True(false, "no exception thrown");
+                Assert.Fail("no exception thrown");
             }
             catch (ArgumentOutOfRangeException)
             {
