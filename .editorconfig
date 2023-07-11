@@ -33,6 +33,10 @@ trim_trailing_whitespace = true
 insert_final_newline = true
 indent_size = 4
 
+[*.ps1]
+indent_style = space
+indent_size = 4
+
 # Dotnet code style settings:
 [*.{cs,vb}]
 # Sort using and Import directives with System.* appearing first
