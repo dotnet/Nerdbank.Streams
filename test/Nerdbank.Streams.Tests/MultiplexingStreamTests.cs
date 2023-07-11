@@ -459,6 +459,23 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => acceptTask).WithCancellation(this.TimeoutToken);
     }
 
+    /// <summary>
+    /// Documents behavior when an anonymous channel is created and an accept of an empty named channel is attempted.
+    /// </summary>
+    [Theory, PairwiseData]
+    public async Task CreateChannel_AcceptChannelAsync(bool waitForPropagation)
+    {
+        MultiplexingStream.Channel ch1 = this.mx1.CreateChannel();
+        if (waitForPropagation)
+        {
+            await this.WaitForEphemeralChannelOfferToPropagateAsync();
+        }
+
+        MultiplexingStream.Channel ch2 = await this.mx2.AcceptChannelAsync(string.Empty, this.TimeoutToken);
+        ch1.Dispose();
+        ch2.Dispose();
+    }
+
     [Fact]
     public void ChannelExposesMultiplexingStream()
     {
