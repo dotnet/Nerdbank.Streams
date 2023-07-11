@@ -559,22 +559,17 @@ namespace Nerdbank.Streams
             }
         }
 
-        /// <summary>
-        /// Accepts a channel that the remote end has attempted or may attempt to create.
-        /// </summary>
-        /// <param name="name">The name of the channel to accept.</param>
-        /// <param name="cancellationToken">A token to indicate lost interest in accepting the channel.</param>
-        /// <returns>The <see cref="Channel"/>, after its offer has been received from the remote party and accepted.</returns>
-        /// <remarks>
-        /// If multiple offers exist with the specified <paramref name="name"/>, the first one received will be accepted.
-        /// </remarks>
-        /// <exception cref="OperationCanceledException">Thrown if <paramref name="cancellationToken"/> is canceled before a request to create the channel has been received.</exception>
+        /// <inheritdoc cref="AcceptChannelAsync(string, ChannelOptions?, CancellationToken)"/>
         public Task<Channel> AcceptChannelAsync(string name, CancellationToken cancellationToken) => this.AcceptChannelAsync(name, options: null, cancellationToken);
 
         /// <summary>
         /// Accepts a channel that the remote end has attempted or may attempt to create.
         /// </summary>
-        /// <param name="name">The name of the channel to accept.</param>
+        /// <param name="name">
+        /// The name of the channel to accept.
+        /// An empty string will match an offer made via <see cref="OfferChannelAsync(string, ChannelOptions?, CancellationToken)"/> with an empty channel name.
+        /// It will also match an anonymous channel offer made with <see cref="CreateChannel(ChannelOptions?)"/>.
+        /// </param>
         /// <param name="options">A set of options that describe local treatment of this channel.</param>
         /// <param name="cancellationToken">A token to indicate lost interest in accepting the channel.</param>
         /// <returns>The <see cref="Channel"/>, after its offer has been received from the remote party and accepted.</returns>
