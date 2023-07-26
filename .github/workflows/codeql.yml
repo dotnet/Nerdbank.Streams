@@ -1,0 +1,85 @@
+name: CodeQL
+
+on:
+  push:
+    branches:
+    - main
+    - "v*"
+  pull_request:
+    # The branches below must be a subset of the branches above
+    branches:
+    - main
+  schedule:
+  - cron: '24 17 * * 1'
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  BUILDCONFIGURATION: Release
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages/
+
+jobs:
+  analyze_csharp:
+    name: Analyze C#
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0 # avoid shallow clone so nbgv can do its work.
+        submodules: recursive
+
+    - name: ⚙️ Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      with:
+        languages: csharp
+
+    - name: ⚙️ Install prerequisites
+      run: |
+        ./init.ps1 -UpgradePrerequisites
+        dotnet --info
+
+        # Print mono version if it is present.
+        if (Get-Command mono -ErrorAction SilentlyContinue) {
+          mono --version
+        }
+      shell: pwsh
+
+    - name: 🛠️ build
+      run: dotnet build --no-restore -c ${{ env.BUILDCONFIGURATION }}
+
+    - name: 🔍 Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+      with:
+        category: /language:csharp
+
+  analyze_javascript:
+    name: Analyze Typescript
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: ⚙️ Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      with:
+        languages: javascript
+
+    - name: 🛠️ Autobuild
+      uses: github/codeql-action/autobuild@v2
+
+    - name: 🔍 Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+      with:
+        category: /language:javascript
