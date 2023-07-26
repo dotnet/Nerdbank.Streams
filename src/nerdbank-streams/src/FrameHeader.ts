@@ -10,7 +10,10 @@ export class FrameHeader {
 	 * @param code The kind of frame this is.
 	 * @param channel The channel that this frame refers to or carries a payload for.
 	 */
-	constructor(public readonly code: ControlCode, channel?: QualifiedChannelId) {
+	constructor(
+		public readonly code: ControlCode,
+		channel?: QualifiedChannelId
+	) {
 		if (channel) {
 			requireInteger('channelId', channel.id, 4, 'signed')
 		}
