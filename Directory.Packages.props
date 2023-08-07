@@ -3,7 +3,7 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
-    <BenchmarkDotNetVersion>0.13.6</BenchmarkDotNetVersion>
+    <BenchmarkDotNetVersion>0.13.7</BenchmarkDotNetVersion>
     <AspNetCoreVersion>2.2.0</AspNetCoreVersion>
     <VSThreadingVersion>17.6.40</VSThreadingVersion>
   </PropertyGroup>
