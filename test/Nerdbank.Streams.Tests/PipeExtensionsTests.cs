@@ -1,18 +1,12 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
 using System.Buffers;
-using System.IO;
 using System.IO.Pipelines;
 using System.IO.Pipes;
-using System.Linq;
 using System.Net.WebSockets;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft;
 using Microsoft.VisualStudio.Threading;
-using Moq;
 using Nerdbank.Streams;
 using Xunit;
 using Xunit.Abstractions;

@@ -17,19 +17,23 @@
     <Compile Remove="SequenceReader\*.cs" Condition=" '$(TargetFramework)' != 'net472' " />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.VisualStudio.Threading" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="NSubstitute.Analyzers.CSharp">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="PInvoke.Kernel32" />
     <PackageReference Include="StreamJsonRpc" />
+    <PackageReference Include="System.IO.Pipes" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.combinatorial" />
-    <PackageReference Include="xunit.skippablefact" />
     <PackageReference Include="xunit.runner.console" />
     <PackageReference Include="xunit.runner.visualstudio" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="Moq" />
-    <PackageReference Include="System.IO.Pipes" />
-    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
-    <PackageReference Include="Microsoft.AspNetCore" />
+    <PackageReference Include="xunit.skippablefact" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\IsolatedTestHost\IsolatedTestHost.csproj">

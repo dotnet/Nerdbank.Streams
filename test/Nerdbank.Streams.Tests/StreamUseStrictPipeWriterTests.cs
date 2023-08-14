@@ -1,16 +1,10 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.IO.Pipelines;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using Moq;
 using Nerdbank.Streams;
+using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -26,17 +20,17 @@ public class StreamUseStrictPipeWriterTests : StreamPipeWriterTestBase
     public async Task StreamFails()
     {
         var expectedException = new InvalidOperationException();
-        var unreadableStream = new Mock<Stream>(MockBehavior.Strict);
-        unreadableStream.SetupGet(s => s.CanWrite).Returns(true);
+        Stream unreadableStream = Substitute.For<Stream>();
+        unreadableStream.CanWrite.Returns(true);
 
         // Set up for either WriteAsync method to be called. We expect it will be Memory<T> on .NET Core 2.1 and byte[] on all the others.
 #if SPAN_BUILTIN
-        unreadableStream.Setup(s => s.WriteAsync(It.IsAny<ReadOnlyMemory<byte>>(), It.IsAny<CancellationToken>())).Throws(expectedException);
+        unreadableStream.WriteAsync(default, CancellationToken.None).ThrowsForAnyArgs(expectedException);
 #else
-        unreadableStream.Setup(s => s.WriteAsync(It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ThrowsAsync(expectedException);
+        unreadableStream.WriteAsync(null, 0, 0, CancellationToken.None).ThrowsAsyncForAnyArgs(expectedException);
 #endif
 
-        PipeWriter? writer = this.CreatePipeWriter(unreadableStream.Object);
+        PipeWriter? writer = this.CreatePipeWriter(unreadableStream);
         InvalidOperationException? actualException = await Assert.ThrowsAsync<InvalidOperationException>(() => writer.WriteAsync(new byte[1], this.TimeoutToken).AsTask());
         Assert.Same(expectedException, actualException);
     }
@@ -44,19 +38,18 @@ public class StreamUseStrictPipeWriterTests : StreamPipeWriterTestBase
     [Fact]
     public async Task CancelPendingFlush_WithToken()
     {
-        var streamMock = new Mock<Stream>(MockBehavior.Strict);
-        streamMock.SetupGet(s => s.CanWrite).Returns(true);
+        Stream streamMock = Substitute.For<Stream>();
+        streamMock.CanWrite.Returns(true);
         var writeCompletedSource = new TaskCompletionSource<object?>();
 
         // Set up for either WriteAsync method to be called. We expect it will be Memory<T> on .NET Core 2.1 and byte[] on all the others.
 #if SPAN_BUILTIN
-        streamMock.Setup(s => s.WriteAsync(It.IsAny<ReadOnlyMemory<byte>>(), It.IsAny<CancellationToken>())).Returns(new ValueTask(writeCompletedSource.Task));
+        streamMock.WriteAsync(null, CancellationToken.None).ReturnsForAnyArgs(new ValueTask(writeCompletedSource.Task));
 #else
-        streamMock.Setup(s => s.WriteAsync(It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).Returns(writeCompletedSource.Task);
+        streamMock.WriteAsync(null, 0, 0, CancellationToken.None).ReturnsForAnyArgs(writeCompletedSource.Task);
 #endif
 
-        Stream? stream = streamMock.Object;
-        PipeWriter? writer = this.CreatePipeWriter(stream);
+        PipeWriter? writer = this.CreatePipeWriter(streamMock);
         writer.GetMemory(1);
         writer.Advance(1);
         var cts = new CancellationTokenSource();
@@ -69,19 +62,18 @@ public class StreamUseStrictPipeWriterTests : StreamPipeWriterTestBase
     [Fact]
     public async Task CancelPendingFlush()
     {
-        var streamMock = new Mock<Stream>(MockBehavior.Strict);
-        streamMock.SetupGet(s => s.CanWrite).Returns(true);
+        Stream streamMock = Substitute.For<Stream>();
+        streamMock.CanWrite.Returns(true);
         var writeCompletedSource = new TaskCompletionSource<object?>();
 
         // Set up for either WriteAsync method to be called. We expect it will be Memory<T> on .NET Core 2.1 and byte[] on all the others.
 #if SPAN_BUILTIN
-        streamMock.Setup(s => s.WriteAsync(It.IsAny<ReadOnlyMemory<byte>>(), It.IsAny<CancellationToken>())).Returns(new ValueTask(writeCompletedSource.Task));
+        streamMock.WriteAsync(null, CancellationToken.None).ReturnsForAnyArgs(new ValueTask(writeCompletedSource.Task));
 #else
-        streamMock.Setup(s => s.WriteAsync(It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).Returns(writeCompletedSource.Task);
+        streamMock.WriteAsync(null, 0, 0, CancellationToken.None).ReturnsForAnyArgs(writeCompletedSource.Task);
 #endif
 
-        Stream? stream = streamMock.Object;
-        PipeWriter? writer = this.CreatePipeWriter(stream);
+        PipeWriter? writer = this.CreatePipeWriter(streamMock);
         writer.GetMemory(1);
         writer.Advance(1);
         ValueTask<FlushResult> flushTask = writer.FlushAsync();
