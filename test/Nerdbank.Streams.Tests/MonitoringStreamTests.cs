@@ -1,15 +1,8 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using Moq;
 using Nerdbank.Streams;
+using NSubstitute;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -354,62 +347,58 @@ public class MonitoringStreamTests : TestBase
     [Fact]
     public void CanTimeout()
     {
-        var mockedUnderlyingStream = new Mock<Stream>(MockBehavior.Strict);
-        mockedUnderlyingStream.SetupGet(s => s.CanTimeout).Returns(true);
-        var monitoringStream = new MonitoringStream(mockedUnderlyingStream.Object);
+        Stream mockedUnderlyingStream = Substitute.For<Stream>();
+        mockedUnderlyingStream.CanTimeout.Returns(true);
+        var monitoringStream = new MonitoringStream(mockedUnderlyingStream);
         Assert.True(monitoringStream.CanTimeout);
-        mockedUnderlyingStream.SetupGet(s => s.CanTimeout).Returns(false);
+        mockedUnderlyingStream.CanTimeout.Returns(false);
         Assert.False(monitoringStream.CanTimeout);
     }
 
     [Fact]
     public void ReadTimeout()
     {
-        var mockedUnderlyingStream = new Mock<Stream>(MockBehavior.Strict);
-        mockedUnderlyingStream.SetupProperty(s => s.ReadTimeout);
-        var monitoringStream = new MonitoringStream(mockedUnderlyingStream.Object);
-        Assert.Equal(mockedUnderlyingStream.Object.ReadTimeout, monitoringStream.ReadTimeout);
+        Stream mockedUnderlyingStream = Substitute.For<Stream>();
+        var monitoringStream = new MonitoringStream(mockedUnderlyingStream);
+        Assert.Equal(mockedUnderlyingStream.ReadTimeout, monitoringStream.ReadTimeout);
         monitoringStream.ReadTimeout = 13;
-        Assert.Equal(mockedUnderlyingStream.Object.ReadTimeout, monitoringStream.ReadTimeout);
-        Assert.Equal(13, mockedUnderlyingStream.Object.ReadTimeout);
+        Assert.Equal(mockedUnderlyingStream.ReadTimeout, monitoringStream.ReadTimeout);
+        Assert.Equal(13, mockedUnderlyingStream.ReadTimeout);
     }
 
     [Fact]
     public void WriteTimeout()
     {
-        var mockedUnderlyingStream = new Mock<Stream>(MockBehavior.Strict);
-        mockedUnderlyingStream.SetupProperty(s => s.WriteTimeout);
-        var monitoringStream = new MonitoringStream(mockedUnderlyingStream.Object);
-        Assert.Equal(mockedUnderlyingStream.Object.WriteTimeout, monitoringStream.WriteTimeout);
+        Stream mockedUnderlyingStream = Substitute.For<Stream>();
+        var monitoringStream = new MonitoringStream(mockedUnderlyingStream);
+        Assert.Equal(mockedUnderlyingStream.WriteTimeout, monitoringStream.WriteTimeout);
         monitoringStream.WriteTimeout = 13;
-        Assert.Equal(mockedUnderlyingStream.Object.WriteTimeout, monitoringStream.WriteTimeout);
-        Assert.Equal(13, mockedUnderlyingStream.Object.WriteTimeout);
+        Assert.Equal(mockedUnderlyingStream.WriteTimeout, monitoringStream.WriteTimeout);
+        Assert.Equal(13, mockedUnderlyingStream.WriteTimeout);
     }
 
     [Fact]
     public void Flush()
     {
-        var mockedUnderlyingStream = new Mock<Stream>(MockBehavior.Strict);
-        mockedUnderlyingStream.Setup(s => s.Flush());
-        var monitoringStream = new MonitoringStream(mockedUnderlyingStream.Object);
+        Stream mockedUnderlyingStream = Substitute.For<Stream>();
+        var monitoringStream = new MonitoringStream(mockedUnderlyingStream);
         bool didFlushRaised = false;
         monitoringStream.DidFlush += (s, e) => didFlushRaised = true;
         monitoringStream.Flush();
         Assert.True(didFlushRaised);
-        mockedUnderlyingStream.VerifyAll();
+        mockedUnderlyingStream.Received().Flush();
     }
 
     [Fact]
     public async Task FlushAsync()
     {
-        var mockedUnderlyingStream = new Mock<Stream>(MockBehavior.Strict);
-        mockedUnderlyingStream.Setup(s => s.FlushAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        var monitoringStream = new MonitoringStream(mockedUnderlyingStream.Object);
+        Stream mockedUnderlyingStream = Substitute.For<Stream>();
+        var monitoringStream = new MonitoringStream(mockedUnderlyingStream);
         bool didFlushRaised = false;
         monitoringStream.DidFlush += (s, e) => didFlushRaised = true;
         await monitoringStream.FlushAsync();
         Assert.True(didFlushRaised);
-        mockedUnderlyingStream.VerifyAll();
+        await mockedUnderlyingStream.Received().FlushAsync(CancellationToken.None);
     }
 
     [Fact]

@@ -1,15 +1,11 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
-using System.IO;
 using System.IO.Compression;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft;
 using Microsoft.VisualStudio.Threading;
-using Moq;
 using Nerdbank.Streams;
+using NSubstitute;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -37,10 +33,12 @@ public class NestedStreamTests : TestBase
         Assert.Throws<ArgumentNullException>(() => StreamExtensions.ReadSlice(null!, 1));
         Assert.Throws<ArgumentOutOfRangeException>(() => StreamExtensions.ReadSlice(new MemoryStream(), -1));
 
-        var noReadStream = new Mock<Stream>(MockBehavior.Strict);
-        noReadStream.SetupGet(s => s.CanRead).Returns(false);
-        Assert.Throws<ArgumentException>(() => StreamExtensions.ReadSlice(noReadStream.Object, 1));
-    }
+        Stream noReadStream = Substitute.For<Stream>();
+        Assert.Throws<ArgumentException>(() => StreamExtensions.ReadSlice(noReadStream, 1));
+
+        // Assert that read functions were not called.
+        Assert.Same(typeof(Stream).GetProperty(nameof(Stream.CanRead))!.GetMethod, Assert.Single(noReadStream.ReceivedCalls()).GetMethodInfo());
+   }
 
     [Fact]
     public void CanSeek()

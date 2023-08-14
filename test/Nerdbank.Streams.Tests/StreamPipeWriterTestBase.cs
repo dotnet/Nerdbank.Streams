@@ -1,17 +1,11 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.IO.Pipelines;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.VisualStudio.Threading;
-using Moq;
 using Nerdbank.Streams;
+using NSubstitute;
+using NSubstitute.ReceivedExtensions;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -31,10 +25,9 @@ public abstract class StreamPipeWriterTestBase : TestBase
     [Fact]
     public void NonReadableStream()
     {
-        var unreadableStream = new Mock<Stream>(MockBehavior.Strict);
-        unreadableStream.SetupGet(s => s.CanWrite).Returns(false);
-        Assert.Throws<ArgumentException>(() => this.CreatePipeWriter(unreadableStream.Object));
-        unreadableStream.VerifyAll();
+        Stream unreadableStream = Substitute.For<Stream>();
+        Assert.Throws<ArgumentException>(() => this.CreatePipeWriter(unreadableStream));
+        _ = unreadableStream.Received().CanWrite;
     }
 
     [Fact]
