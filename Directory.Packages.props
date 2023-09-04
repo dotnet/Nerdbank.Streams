@@ -26,7 +26,7 @@
     <PackageVersion Include="System.IO.Pipes" Version="4.3.0" />
     <PackageVersion Include="System.Runtime.CompilerServices.Unsafe" Version="6.0.0" />
     <PackageVersion Include="xunit.abstractions" Version="2.0.3" />
-    <PackageVersion Include="xunit.combinatorial" Version="1.5.25" />
+    <PackageVersion Include="xunit.combinatorial" Version="1.6.24" />
     <PackageVersion Include="xunit.extensibility.core" Version="2.5.0" />
     <PackageVersion Include="xunit.runner.console" Version="2.5.0" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.5.0" />
