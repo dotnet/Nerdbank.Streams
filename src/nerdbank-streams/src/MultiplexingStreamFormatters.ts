@@ -1,7 +1,6 @@
 import { OfferParameters } from './OfferParameters'
 import { AcceptanceParameters } from './AcceptanceParameters'
 import { MultiplexingStream } from './MultiplexingStream'
-import * as nodejsCrypto from 'crypto'
 import { getBufferFrom, writeAsync } from './Utilities'
 import CancellationToken from 'cancellationtoken'
 import * as msgpack from 'msgpack-lite'
@@ -42,15 +41,13 @@ export abstract class MultiplexingStreamFormatter {
 
 	protected static getIsOddRandomData(): Buffer {
 		const size = 16
+		const buffer = Buffer.alloc(size)
 
-		// browser crypto is available
-		if (globalThis && globalThis.crypto) {
-			const buffer = Buffer.from(new Uint8Array(size))
-			globalThis.crypto.getRandomValues(buffer)
-			return buffer
-		} else {
-			return nodejsCrypto.randomBytes(size)
+		for (let i = 0; i < size; i++) {
+			buffer[i] = Math.floor(Math.random() * 256)
 		}
+
+		return buffer
 	}
 
 	protected static isOdd(localRandom: Buffer, remoteRandom: Buffer): boolean {
