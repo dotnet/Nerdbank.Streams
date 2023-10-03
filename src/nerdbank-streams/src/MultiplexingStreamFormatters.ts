@@ -1,7 +1,6 @@
 import { OfferParameters } from './OfferParameters'
 import { AcceptanceParameters } from './AcceptanceParameters'
 import { MultiplexingStream } from './MultiplexingStream'
-import { randomBytes } from 'crypto'
 import { getBufferFrom, writeAsync } from './Utilities'
 import CancellationToken from 'cancellationtoken'
 import * as msgpack from 'msgpack-lite'
@@ -41,7 +40,14 @@ export abstract class MultiplexingStreamFormatter {
 	abstract end(): void
 
 	protected static getIsOddRandomData(): Buffer {
-		return randomBytes(16)
+		const size = 16
+		const buffer = Buffer.alloc(size)
+
+		for (let i = 0; i < size; i++) {
+			buffer[i] = Math.floor(Math.random() * 256)
+		}
+
+		return buffer
 	}
 
 	protected static isOdd(localRandom: Buffer, remoteRandom: Buffer): boolean {
