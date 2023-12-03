@@ -91,7 +91,7 @@ namespace Nerdbank.Streams
             Requires.NotNull(buffer, nameof(buffer));
             Requires.Range(offset + count <= buffer.Length, nameof(count));
             Requires.Range(offset >= 0, nameof(offset));
-            Requires.Range(count > 0, nameof(count));
+            Requires.Range(count >= 0, nameof(count));
 
             ReadResult readResult = await this.pipe.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
             int bytesRead = 0;
