@@ -38,7 +38,7 @@ public class NestedStreamTests : TestBase
 
         // Assert that read functions were not called.
         Assert.Same(typeof(Stream).GetProperty(nameof(Stream.CanRead))!.GetMethod, Assert.Single(noReadStream.ReceivedCalls()).GetMethodInfo());
-   }
+    }
 
     [Fact]
     public void CanSeek()

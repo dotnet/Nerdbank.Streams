@@ -95,10 +95,12 @@ public abstract class StreamPipeReaderTestBase : TestBase
         // and shouldn't give us any more buffer.
         ValueTask<ReadResult> resultTask = reader.ReadAsync(this.TimeoutToken);
         Assert.True(resultTask.IsCompleted);
+#pragma warning disable xUnit1031 // Do not use blocking task operations in test method
         Assert.Equal(result.Buffer.Length, resultTask.Result.Buffer.Length);
 
         // Now examine everything, but don't consume it. We should get more.
         reader.AdvanceTo(resultTask.Result.Buffer.Start, resultTask.Result.Buffer.End);
+#pragma warning restore xUnit1031 // Do not use blocking task operations in test method
         ValueTask<ReadResult> resultTask2 = reader.ReadAsync(this.TimeoutToken);
         Assert.False(resultTask2.IsCompleted);
         stream.Write(expectedBuffer, 50, 50);
