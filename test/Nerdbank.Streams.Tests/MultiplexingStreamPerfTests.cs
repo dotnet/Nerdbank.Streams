@@ -141,7 +141,7 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
                                 MultiplexingStream.Channel? channel = await mxServer.OfferChannelAsync(string.Empty, this.TimeoutToken).WithCancellation(this.TimeoutToken);
                                 for (int i = 0; i < segmentCount / ChannelCount; i++)
                                 {
-                                     await channel.Output.WriteAsync(serverBuffer, this.TimeoutToken);
+                                    await channel.Output.WriteAsync(serverBuffer, this.TimeoutToken);
                                 }
                             })));
                     }),
