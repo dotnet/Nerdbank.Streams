@@ -97,6 +97,21 @@ import { nextTick } from 'process'
 			await expectThrow(offer.acceptance)
 		})
 
+		describe('An offered anonymous channel is accepted by an empty name', () => {
+			async function helper(waiting: boolean) {
+				const ch1 = mx1.createChannel()
+				if (waiting) {
+					await waitForEphemeralChannelOfferToPropagate()
+				}
+
+				const ch2 = await mx2.acceptChannelAsync('')
+				ch1.stream.end()
+				ch2.stream.end()
+			}
+			it('without waiting', () => helper(false))
+			it('with waiting', () => helper(true))
+		})
+
 		it('Channel offer is canceled by sender', async () => {
 			const cts = CancellationToken.create()
 			const offer = mx1.offerChannelAsync('', undefined, cts.token)
@@ -367,6 +382,14 @@ import { nextTick } from 'process'
 			rpcChannels[0].stream.end()
 			rpcChannels[1].stream.end()
 		})
+
+		async function waitForEphemeralChannelOfferToPropagate() {
+			const channelName = 'EphemeralChannelWaiter'
+			const [mx1Channel, mx2Channel] = await Promise.all([mx1.offerChannelAsync(channelName), mx2.acceptChannelAsync(channelName)])
+			mx1Channel.stream.end()
+			mx2Channel.stream.end()
+			// await Promise.all([mx1Channel.completion, mx2Channel.completion])
+		}
 	})
 
 	async function expectThrow<T>(promise: Promise<T>): Promise<any> {

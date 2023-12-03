@@ -230,6 +230,21 @@ public class SimplexStreamTests : TestBase
         Assert.Equal(sendBuffer, recvBuffer);
     }
 
+    [Fact]
+    public async Task ReadAsync0LengthBufferThenWriteAsync()
+    {
+        byte[] sendBuffer = this.GetRandomBuffer(20);
+        byte[] recvBuffer = Array.Empty<byte>();
+        Task readTask = this.ReadAsync(this.stream, recvBuffer);
+        await this.stream.WriteAsync(sendBuffer, 0, sendBuffer.Length).WithCancellation(this.TimeoutToken);
+        await this.stream.FlushAsync(this.TimeoutToken);
+        await readTask.WithCancellation(this.TimeoutToken);
+
+        recvBuffer = new byte[sendBuffer.Length];
+        await this.ReadAsync(this.stream, recvBuffer);
+        Assert.Equal(sendBuffer, recvBuffer);
+    }
+
     [Theory]
     [CombinatorialData]
     public async Task CompleteWriting(bool useAsync)

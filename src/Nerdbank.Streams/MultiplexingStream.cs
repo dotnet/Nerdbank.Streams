@@ -105,6 +105,12 @@ namespace Nerdbank.Streams
         private readonly int protocolMajorVersion;
 
         /// <summary>
+        /// A value indicating whether any open channels should be faulted (i.e. their <see cref="Channel.Completion"/> task will be faulted)
+        /// when the <see cref="MultiplexingStream"/> is disposed.
+        /// </summary>
+        private readonly bool faultOpenChannelsOnStreamDisposal;
+
+        /// <summary>
         /// The last number assigned to a channel.
         /// Each use of this should increment by two, if <see cref="isOdd"/> has a value.
         /// </summary>
@@ -131,6 +137,7 @@ namespace Nerdbank.Streams
             }
 
             this.TraceSource = options.TraceSource;
+            this.faultOpenChannelsOnStreamDisposal = options.FaultOpenChannelsOnStreamDisposal;
 
             this.DefaultChannelTraceSourceFactory =
                 options.DefaultChannelTraceSourceFactoryWithQualifier
@@ -552,22 +559,17 @@ namespace Nerdbank.Streams
             }
         }
 
-        /// <summary>
-        /// Accepts a channel that the remote end has attempted or may attempt to create.
-        /// </summary>
-        /// <param name="name">The name of the channel to accept.</param>
-        /// <param name="cancellationToken">A token to indicate lost interest in accepting the channel.</param>
-        /// <returns>The <see cref="Channel"/>, after its offer has been received from the remote party and accepted.</returns>
-        /// <remarks>
-        /// If multiple offers exist with the specified <paramref name="name"/>, the first one received will be accepted.
-        /// </remarks>
-        /// <exception cref="OperationCanceledException">Thrown if <paramref name="cancellationToken"/> is canceled before a request to create the channel has been received.</exception>
+        /// <inheritdoc cref="AcceptChannelAsync(string, ChannelOptions?, CancellationToken)"/>
         public Task<Channel> AcceptChannelAsync(string name, CancellationToken cancellationToken) => this.AcceptChannelAsync(name, options: null, cancellationToken);
 
         /// <summary>
         /// Accepts a channel that the remote end has attempted or may attempt to create.
         /// </summary>
-        /// <param name="name">The name of the channel to accept.</param>
+        /// <param name="name">
+        /// The name of the channel to accept.
+        /// An empty string will match an offer made via <see cref="OfferChannelAsync(string, ChannelOptions?, CancellationToken)"/> with an empty channel name.
+        /// It will also match an anonymous channel offer made with <see cref="CreateChannel(ChannelOptions?)"/>.
+        /// </param>
         /// <param name="options">A set of options that describe local treatment of this channel.</param>
         /// <param name="cancellationToken">A token to indicate lost interest in accepting the channel.</param>
         /// <returns>The <see cref="Channel"/>, after its offer has been received from the remote party and accepted.</returns>
@@ -689,7 +691,7 @@ namespace Nerdbank.Streams
                 {
                     foreach (KeyValuePair<QualifiedChannelId, Channel> entry in this.openChannels)
                     {
-                        entry.Value.Dispose(new ObjectDisposedException(nameof(MultiplexingStream)));
+                        entry.Value.Dispose(this.faultOpenChannelsOnStreamDisposal ? new ObjectDisposedException(nameof(MultiplexingStream)) : null);
                     }
 
                     foreach (KeyValuePair<string, Queue<TaskCompletionSource<Channel>>> entry in this.acceptingChannels)

@@ -84,6 +84,9 @@ public abstract class TestBase : IDisposable
 
         if (count == 0)
         {
+            // Just read once and return.
+            int bytesJustRead = await stream.ReadAsync(buffer, offset, count.Value, this.TimeoutToken).WithCancellation(this.TimeoutToken);
+            Assert.Equal(0, bytesJustRead);
             return;
         }
 

@@ -279,3 +279,61 @@ Nerdbank.Streams.MultiplexingStream.QualifiedChannelId.QualifiedChannelId() -> v
 Nerdbank.Streams.MultiplexingStream.StartListening() -> void
 static Nerdbank.Streams.PipeExtensions.AsPrebufferedStreamAsync(this System.IO.Pipelines.PipeReader! pipeReader, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.IO.Stream!>!
 static Nerdbank.Streams.StreamExtensions.AsStream(this System.Buffers.ReadOnlySequence<byte> readOnlySequence, System.Action<object?>? disposeAction, object? disposeActionArg) -> System.IO.Stream!
+Nerdbank.Streams.BufferWriterExtensions
+Nerdbank.Streams.MultiplexingStream.Options.FaultOpenChannelsOnStreamDisposal.get -> bool
+Nerdbank.Streams.MultiplexingStream.Options.FaultOpenChannelsOnStreamDisposal.set -> void
+Nerdbank.Streams.ReadOnlySequenceExtensions
+Nerdbank.Streams.StreamPipeReader
+Nerdbank.Streams.StreamPipeReader.Read() -> System.IO.Pipelines.ReadResult
+Nerdbank.Streams.StreamPipeReader.StreamPipeReader(System.IO.Stream! stream) -> void
+Nerdbank.Streams.StreamPipeReader.StreamPipeReader(System.IO.Stream! stream, int bufferSize, bool leaveOpen) -> void
+override Nerdbank.Streams.StreamPipeReader.AdvanceTo(System.SequencePosition consumed) -> void
+override Nerdbank.Streams.StreamPipeReader.AdvanceTo(System.SequencePosition consumed, System.SequencePosition examined) -> void
+override Nerdbank.Streams.StreamPipeReader.CancelPendingRead() -> void
+override Nerdbank.Streams.StreamPipeReader.Complete(System.Exception? exception = null) -> void
+override Nerdbank.Streams.StreamPipeReader.OnWriterCompleted(System.Action<System.Exception?, object?>! callback, object? state) -> void
+override Nerdbank.Streams.StreamPipeReader.ReadAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.IO.Pipelines.ReadResult>
+override Nerdbank.Streams.StreamPipeReader.TryRead(out System.IO.Pipelines.ReadResult result) -> bool
+static Nerdbank.Streams.BufferWriterExtensions.Write<T>(this System.Buffers.IBufferWriter<T>! writer, System.Buffers.ReadOnlySequence<T> sequence) -> void
+static Nerdbank.Streams.ReadOnlySequenceExtensions.Clone<T>(this System.Buffers.ReadOnlySequence<T> template) -> System.Buffers.ReadOnlySequence<T>
+static System.Buffers.SequenceReaderExtensions.TryReadBigEndian(this ref System.Buffers.SequenceReader<byte> reader, out int value) -> bool
+static System.Buffers.SequenceReaderExtensions.TryReadBigEndian(this ref System.Buffers.SequenceReader<byte> reader, out long value) -> bool
+static System.Buffers.SequenceReaderExtensions.TryReadBigEndian(this ref System.Buffers.SequenceReader<byte> reader, out short value) -> bool
+static System.Buffers.SequenceReaderExtensions.TryReadLittleEndian(this ref System.Buffers.SequenceReader<byte> reader, out int value) -> bool
+static System.Buffers.SequenceReaderExtensions.TryReadLittleEndian(this ref System.Buffers.SequenceReader<byte> reader, out long value) -> bool
+static System.Buffers.SequenceReaderExtensions.TryReadLittleEndian(this ref System.Buffers.SequenceReader<byte> reader, out short value) -> bool
+System.Buffers.SequenceReader<T>
+System.Buffers.SequenceReader<T>.Advance(long count) -> void
+System.Buffers.SequenceReader<T>.AdvancePast(T value) -> long
+System.Buffers.SequenceReader<T>.AdvancePastAny(System.ReadOnlySpan<T> values) -> long
+System.Buffers.SequenceReader<T>.AdvancePastAny(T value0, T value1) -> long
+System.Buffers.SequenceReader<T>.AdvancePastAny(T value0, T value1, T value2) -> long
+System.Buffers.SequenceReader<T>.AdvancePastAny(T value0, T value1, T value2, T value3) -> long
+System.Buffers.SequenceReader<T>.Consumed.get -> long
+System.Buffers.SequenceReader<T>.CurrentSpan.get -> System.ReadOnlySpan<T>
+System.Buffers.SequenceReader<T>.CurrentSpanIndex.get -> int
+System.Buffers.SequenceReader<T>.End.get -> bool
+System.Buffers.SequenceReader<T>.IsNext(System.ReadOnlySpan<T> next, bool advancePast = false) -> bool
+System.Buffers.SequenceReader<T>.IsNext(T next, bool advancePast = false) -> bool
+System.Buffers.SequenceReader<T>.Length.get -> long
+System.Buffers.SequenceReader<T>.Position.get -> System.SequencePosition
+System.Buffers.SequenceReader<T>.Remaining.get -> long
+System.Buffers.SequenceReader<T>.Rewind(long count) -> void
+System.Buffers.SequenceReader<T>.Sequence.get -> System.Buffers.ReadOnlySequence<T>
+System.Buffers.SequenceReader<T>.SequenceReader() -> void
+System.Buffers.SequenceReader<T>.SequenceReader(System.Buffers.ReadOnlySequence<T> sequence) -> void
+System.Buffers.SequenceReader<T>.TryAdvanceTo(T delimiter, bool advancePastDelimiter = true) -> bool
+System.Buffers.SequenceReader<T>.TryAdvanceToAny(System.ReadOnlySpan<T> delimiters, bool advancePastDelimiter = true) -> bool
+System.Buffers.SequenceReader<T>.TryCopyTo(System.Span<T> destination) -> bool
+System.Buffers.SequenceReader<T>.TryPeek(out T value) -> bool
+System.Buffers.SequenceReader<T>.TryRead(out T value) -> bool
+System.Buffers.SequenceReader<T>.TryReadExact(int count, out System.Buffers.ReadOnlySequence<T> sequence) -> bool
+System.Buffers.SequenceReader<T>.TryReadTo(out System.Buffers.ReadOnlySequence<T> sequence, System.ReadOnlySpan<T> delimiter, bool advancePastDelimiter = true) -> bool
+System.Buffers.SequenceReader<T>.TryReadTo(out System.Buffers.ReadOnlySequence<T> sequence, T delimiter, bool advancePastDelimiter = true) -> bool
+System.Buffers.SequenceReader<T>.TryReadTo(out System.Buffers.ReadOnlySequence<T> sequence, T delimiter, T delimiterEscape, bool advancePastDelimiter = true) -> bool
+System.Buffers.SequenceReader<T>.TryReadTo(out System.ReadOnlySpan<T> span, T delimiter, bool advancePastDelimiter = true) -> bool
+System.Buffers.SequenceReader<T>.TryReadTo(out System.ReadOnlySpan<T> span, T delimiter, T delimiterEscape, bool advancePastDelimiter = true) -> bool
+System.Buffers.SequenceReader<T>.TryReadToAny(out System.Buffers.ReadOnlySequence<T> sequence, System.ReadOnlySpan<T> delimiters, bool advancePastDelimiter = true) -> bool
+System.Buffers.SequenceReader<T>.TryReadToAny(out System.ReadOnlySpan<T> span, System.ReadOnlySpan<T> delimiters, bool advancePastDelimiter = true) -> bool
+System.Buffers.SequenceReader<T>.UnreadSpan.get -> System.ReadOnlySpan<T>
+System.Buffers.SequenceReaderExtensions

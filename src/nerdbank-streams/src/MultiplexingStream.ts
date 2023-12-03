@@ -318,6 +318,8 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 	/**
 	 * Accepts a channel that the remote end has attempted or may attempt to create.
 	 * @param name The name of the channel to accept.
+	 * An empty string will match an offer made via {@link offerChannelAsync} with an empty channel name.
+	 * It will also match an anonymous channel offer made with {@link createChannel}.
 	 * @param options A set of options that describe local treatment of this channel.
 	 * @param cancellationToken A token to indicate lost interest in accepting the channel.
 	 * Do NOT let this be a long-lived token
@@ -676,14 +678,12 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 		}
 
 		if (!acceptingChannelAlreadyPresent) {
-			if (offerParameters.name) {
-				let offeredChannels: Channel[]
-				if (!(offeredChannels = this.channelsOfferedByThemByName[offerParameters.name])) {
-					this.channelsOfferedByThemByName[offerParameters.name] = offeredChannels = []
-				}
-
-				offeredChannels.push(channel)
+			let offeredChannels: Channel[]
+			if (!(offeredChannels = this.channelsOfferedByThemByName[offerParameters.name])) {
+				this.channelsOfferedByThemByName[offerParameters.name] = offeredChannels = []
 			}
+
+			offeredChannels.push(channel)
 		}
 
 		this.setOpenChannel(channel)
