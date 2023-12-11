@@ -23,7 +23,7 @@
     <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.16" />
     <PackageVersion Include="PInvoke.Kernel32" Version="0.7.124" />
     <PackageVersion Include="StreamJsonRpc" Version="2.16.36" />
-    <PackageVersion Include="System.IO.Pipelines" Version="7.0.0" />
+    <PackageVersion Include="System.IO.Pipelines" Version="8.0.0" />
     <PackageVersion Include="System.IO.Pipes" Version="4.3.0" />
     <PackageVersion Include="System.Runtime.CompilerServices.Unsafe" Version="6.0.0" />
     <PackageVersion Include="xunit.abstractions" Version="2.0.3" />
