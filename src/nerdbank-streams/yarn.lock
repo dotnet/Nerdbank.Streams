@@ -890,9 +890,9 @@
     "@types/node" "*"
 
 "@types/msgpack-lite@^0.1.8":
-  version "0.1.8"
-  resolved "https://registry.yarnpkg.com/@types/msgpack-lite/-/msgpack-lite-0.1.8.tgz#032f19609e6353b65f2898d135e1f61e3aa8b102"
-  integrity sha512-3qIhe8MH1kGcXnB5YuY6W0lLb9LEcWrhanDYfw0zKdXAv+CNKG0+6To1X8dqVyrxKb3FeAgJBJS5RdFwBQteVg==
+  version "0.1.11"
+  resolved "https://registry.yarnpkg.com/@types/msgpack-lite/-/msgpack-lite-0.1.11.tgz#f618e1fc469577f65f36c474ff3309407afef174"
+  integrity sha512-cdCZS/gw+jIN22I4SUZUFf1ZZfVv5JM1//Br/MuZcI373sxiy3eSSoiyLu0oz+BPatTbGGGBO5jrcvd0siCdTQ==
   dependencies:
     "@types/node" "*"
 
