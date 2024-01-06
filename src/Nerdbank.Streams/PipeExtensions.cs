@@ -268,6 +268,9 @@ namespace Nerdbank.Streams
         /// <param name="pipeOptions">Optional pipe options to use.</param>
         /// <param name="cancellationToken">A cancellation token that aborts reading from the <paramref name="webSocket"/>.</param>
         /// <returns>A <see cref="PipeReader"/>.</returns>
+        /// <remarks>
+        /// Because a <see cref="PipeReader"/> has no concept of message boundaries, this API should only be used when they are of no consequence, and a steady stream of bytes is all that the reader requires.
+        /// </remarks>
         public static PipeReader UsePipeReader(this WebSocket webSocket, int sizeHint = 0, PipeOptions? pipeOptions = null, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(webSocket, nameof(webSocket));
@@ -319,6 +322,13 @@ namespace Nerdbank.Streams
         /// <param name="pipeOptions">Optional pipe options to use.</param>
         /// <param name="cancellationToken">A cancellation token that aborts writing to the <paramref name="webSocket"/>.</param>
         /// <returns>A <see cref="PipeWriter"/>.</returns>
+        /// <remarks>
+        /// Because a <see cref="PipeWriter"/> has no concept of message boundaries, this API should only be used when the remote party
+        /// can process a stream of bytes, ignoring where the message boundaries may happen to land.
+        /// As implemented by this API, message boundaries may only appear at positions where <see cref="PipeWriter.FlushAsync(CancellationToken)"/>
+        /// or <see cref="PipeWriter.WriteAsync(ReadOnlyMemory{byte}, CancellationToken)"/> are called, but they are not guaranteed to be inserted
+        /// for each of these calls.
+        /// </remarks>
         public static PipeWriter UsePipeWriter(this WebSocket webSocket, PipeOptions? pipeOptions = null, CancellationToken cancellationToken = default)
         {
             return UsePipeWriter(webSocket, pipeOptions, WebSocketMessageType.Binary, cancellationToken);
@@ -332,7 +342,20 @@ namespace Nerdbank.Streams
         /// <param name="cancellationToken">A cancellation token that aborts writing to the <paramref name="webSocket"/>.</param>
         /// <returns>A <see cref="PipeWriter"/>.</returns>
         /// <remarks>
+        /// <para>
         /// Although <see cref="PipeWriter" /> itself takes bytes, it is the caller's responsibility to only write bytes that represent UTF-8 encoded characters.
+        /// </para>
+        /// <para>
+        /// Because a <see cref="PipeWriter"/> has no concept of message boundaries, this API should only be used when the remote party
+        /// can process a stream of bytes, ignoring where the message boundaries may happen to land.
+        /// As implemented by this API, message boundaries may only appear at positions where <see cref="PipeWriter.FlushAsync(CancellationToken)"/>
+        /// or <see cref="PipeWriter.WriteAsync(ReadOnlyMemory{byte}, CancellationToken)"/> are called, but they are not guaranteed to be inserted
+        /// for each of these calls.
+        /// </para>
+        /// <para>
+        /// Users should be sure to write whole UTF-8 characters to the <see cref="PipeWriter"/>.
+        /// In particular, never call <see cref="PipeWriter.FlushAsync(CancellationToken)"/> after writing only a subset of the bytes for any UTF-8 character.
+        /// </para>
         /// </remarks>
         public static PipeWriter UseUtf8TextPipeWriter(this WebSocket webSocket, PipeOptions? pipeOptions = null, CancellationToken cancellationToken = default)
         {
