@@ -32,6 +32,12 @@ public partial class PipeExtensionsTests : TestBase
     }
 
     [Fact]
+    public void UseUtf8TextPipeWriter_WebSocket_ThrowsOnNull()
+    {
+        Assert.Throws<ArgumentNullException>("webSocket", () => PipeExtensions.UseUtf8TextPipeWriter(null!));
+    }
+
+    [Fact]
     public async Task UsePipe_Stream()
     {
         var ms = new SimplexStream();
@@ -225,6 +231,23 @@ public partial class PipeExtensionsTests : TestBase
 #pragma warning restore CS0618 // Type or member is obsolete
         MockWebSocket.Message? message = webSocket.WrittenQueue.Dequeue();
         Assert.Equal(expectedBuffer, message.Buffer.ToArray());
+        Assert.Equal(WebSocketMessageType.Binary, message.MessageTypeIfKnown);
+    }
+
+    [Fact]
+    public async Task UseUtf8TextPipeWriter_WebSocket()
+    {
+        byte[]? expectedBuffer = [.. "UTF-8 only! \U0001F605"u8];
+        var webSocket = new MockWebSocket();
+        PipeWriter? pipeWriter = webSocket.UseUtf8TextPipeWriter(cancellationToken: this.TimeoutToken);
+        await pipeWriter.WriteAsync(expectedBuffer, this.TimeoutToken);
+        pipeWriter.Complete();
+#pragma warning disable CS0618 // Type or member is obsolete
+        await pipeWriter.WaitForReaderCompletionAsync();
+#pragma warning restore CS0618 // Type or member is obsolete
+        MockWebSocket.Message? message = webSocket.WrittenQueue.Dequeue();
+        Assert.Equal(expectedBuffer, message.Buffer.ToArray());
+        Assert.Equal(WebSocketMessageType.Text, message.MessageTypeIfKnown);
     }
 
     [Fact]
@@ -246,6 +269,29 @@ public partial class PipeExtensionsTests : TestBase
 #pragma warning restore CS0618 // Type or member is obsolete
         MockWebSocket.Message? message = webSocket.WrittenQueue.Dequeue();
         Assert.Equal(expectedBuffer, message.Buffer.ToArray());
+        Assert.Equal(WebSocketMessageType.Binary, message.MessageTypeIfKnown);
+    }
+
+    [Fact]
+    public async Task UseUtf8TextPipe_WebSocket()
+    {
+        byte[]? expectedBuffer = [.. "UTF-8 only! \U0001F605"u8];
+        var webSocket = new MockWebSocket();
+        webSocket.EnqueueRead(expectedBuffer);
+        IDuplexPipe? pipe = webSocket.UseUtf8TextPipe(cancellationToken: this.TimeoutToken);
+
+        ReadResult readResult = await pipe.Input.ReadAsync(this.TimeoutToken);
+        Assert.Equal(expectedBuffer, readResult.Buffer.First.Span.ToArray());
+        pipe.Input.AdvanceTo(readResult.Buffer.End);
+
+        await pipe.Output.WriteAsync(expectedBuffer, this.TimeoutToken);
+        pipe.Output.Complete();
+#pragma warning disable CS0618 // Type or member is obsolete
+        await pipe.Output.WaitForReaderCompletionAsync();
+#pragma warning restore CS0618 // Type or member is obsolete
+        MockWebSocket.Message? message = webSocket.WrittenQueue.Dequeue();
+        Assert.Equal(expectedBuffer, message.Buffer.ToArray());
+        Assert.Equal(WebSocketMessageType.Text, message.MessageTypeIfKnown);
     }
 
     [Fact]
