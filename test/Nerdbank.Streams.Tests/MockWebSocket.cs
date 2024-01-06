@@ -78,7 +78,7 @@ internal class MockWebSocket : WebSocket
         {
             byte[] bufferCopy = new byte[input.Count];
             Buffer.BlockCopy(input.Array!, input.Offset, bufferCopy, 0, input.Count);
-            this.writingInProgress = new Message { Buffer = new ArraySegment<byte>(bufferCopy) };
+            this.writingInProgress = new Message { Buffer = new ArraySegment<byte>(bufferCopy), MessageTypeIfKnown = messageType };
         }
         else
         {
@@ -105,5 +105,7 @@ internal class MockWebSocket : WebSocket
     internal class Message
     {
         internal Memory<byte> Buffer { get; set; }
+
+        internal WebSocketMessageType? MessageTypeIfKnown { get; set; }
     }
 }
