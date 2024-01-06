@@ -325,13 +325,15 @@ namespace Nerdbank.Streams
         }
 
         /// <summary>
-        /// <para>Enables efficiently writing to a <see cref="WebSocket"/> using a <see cref="PipeWriter"/>.</para>
-        /// <para>IMPORTANT: it is YOUR responsibility to make sure that your messages conform to UTF-8.</para>
+        /// Enables efficiently writing UTF-8 encoded text to a <see cref="WebSocket"/> using a <see cref="PipeWriter"/>.
         /// </summary>
         /// <param name="webSocket">The web socket to write to using a pipe.</param>
         /// <param name="pipeOptions">Optional pipe options to use.</param>
         /// <param name="cancellationToken">A cancellation token that aborts writing to the <paramref name="webSocket"/>.</param>
         /// <returns>A <see cref="PipeWriter"/>.</returns>
+        /// <remarks>
+        /// Although <see cref="PipeWriter" /> itself takes bytes, it is the caller's responsibility to only write bytes that represent UTF-8 encoded characters.
+        /// </remarks>
         public static PipeWriter UseUtf8TextPipeWriter(this WebSocket webSocket, PipeOptions? pipeOptions = null, CancellationToken cancellationToken = default)
         {
             return UsePipeWriter(webSocket, pipeOptions, WebSocketMessageType.Text, cancellationToken);
@@ -610,7 +612,7 @@ namespace Nerdbank.Streams
         /// <param name="pipeOptions">Optional pipe options to use.</param>
         /// <param name="messageType">
         /// Either <see cref="WebSocketMessageType.Binary"/> or <see cref="WebSocketMessageType.Text"/>.
-        /// Private method assumes it's one of those, nor does it validate UTF-8 for text-based.
+        /// Private method assumes it's one of those, and does not validate UTF-8 for text-based.
         /// </param>
         /// <param name="cancellationToken">A cancellation token that aborts writing to the <paramref name="webSocket"/>.</param>
         /// <returns>A <see cref="PipeWriter"/>.</returns>
