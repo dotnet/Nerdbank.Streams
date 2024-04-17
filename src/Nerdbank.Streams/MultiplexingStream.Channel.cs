@@ -368,7 +368,7 @@ namespace Nerdbank.Streams
                         {
                             try
                             {
-                                Channel self = (Channel)state;
+                                Channel self = (Channel)state!;
 
                                 PipeWriter? mxStreamIOWriter;
                                 lock (self.SyncObject)
