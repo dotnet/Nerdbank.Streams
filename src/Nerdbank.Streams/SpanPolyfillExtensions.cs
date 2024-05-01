@@ -2,6 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #pragma warning disable AvoidAsyncSuffix // Avoid Async suffix
+#pragma warning disable VSTHRD003 // Avoid awaiting foreign Tasks -- We always use .ConfigureAwait(false).
+
 #if !SPAN_BUILTIN
 
 namespace Nerdbank.Streams

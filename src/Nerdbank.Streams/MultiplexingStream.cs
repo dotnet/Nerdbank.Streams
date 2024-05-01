@@ -1,6 +1,8 @@
 // Copyright (c) Andrew Arnott. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+#pragma warning disable VSTHRD003 // Avoid awaiting foreign Tasks -- We always use .ConfigureAwait(false).
+
 namespace Nerdbank.Streams
 {
     using System;
