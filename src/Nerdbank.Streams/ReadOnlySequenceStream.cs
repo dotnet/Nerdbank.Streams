@@ -86,6 +86,7 @@ namespace Nerdbank.Streams
                 return TaskOfZero;
             }
 
+#pragma warning disable VSTHRD103 // Call async methods when in an async method - This task is guaranteed to already be complete.
             if (this.lastReadTask?.Result == bytesRead)
             {
                 return this.lastReadTask;
@@ -94,6 +95,7 @@ namespace Nerdbank.Streams
             {
                 return this.lastReadTask = Task.FromResult(bytesRead);
             }
+#pragma warning restore VSTHRD103 // Call async methods when in an async method
         }
 
         /// <inheritdoc/>
