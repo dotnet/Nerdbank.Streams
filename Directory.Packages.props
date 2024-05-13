@@ -6,7 +6,7 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
     <BenchmarkDotNetVersion>0.13.12</BenchmarkDotNetVersion>
     <AspNetCoreVersion>2.2.0</AspNetCoreVersion>
-    <VSThreadingVersion>17.8.14</VSThreadingVersion>
+    <VSThreadingVersion>17.10.48</VSThreadingVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="BenchmarkDotNet.Diagnostics.Windows" Version="$(BenchmarkDotNetVersion)" />
