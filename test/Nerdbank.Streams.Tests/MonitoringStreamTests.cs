@@ -445,6 +445,9 @@ public class MonitoringStreamTests : TestBase
             Assert.Same(this.monitoringStream, s);
             Assert.Equal(6, e.Length);
         };
+        this.monitoringStream.DidRead += (s, e) => Assert.Fail("Unexpected event.");
+        this.monitoringStream.DidReadMemory += (s, e) => Assert.Fail("Unexpected event.");
+        this.monitoringStream.DidReadByte += (s, e) => Assert.Fail("Unexpected event.");
         int bytesRead = this.monitoringStream.Read(this.buffer.AsSpan(2, 6));
         Assert.Equal(5, bytesRead);
         Assert.Equal(bytesRead, this.underlyingStream.Position);
@@ -487,6 +490,9 @@ public class MonitoringStreamTests : TestBase
             Assert.Same(this.monitoringStream, s);
             Assert.Equal(6, e.Length);
         };
+        this.monitoringStream.DidRead += (s, e) => Assert.Fail("Unexpected event.");
+        this.monitoringStream.DidReadSpan += (s, e) => Assert.Fail("Unexpected event.");
+        this.monitoringStream.DidReadByte += (s, e) => Assert.Fail("Unexpected event.");
         int bytesRead = await this.monitoringStream.ReadAsync(this.buffer.AsMemory(2, 6));
         Assert.Equal(5, bytesRead);
         Assert.Equal(bytesRead, this.underlyingStream.Position);
@@ -529,6 +535,9 @@ public class MonitoringStreamTests : TestBase
             Assert.Same(this.monitoringStream, s);
             Assert.Equal(3, e.Length);
         };
+        this.monitoringStream.DidWrite += (s, e) => Assert.Fail("Unexpected event.");
+        this.monitoringStream.DidWriteMemory += (s, e) => Assert.Fail("Unexpected event.");
+        this.monitoringStream.DidWriteByte += (s, e) => Assert.Fail("Unexpected event.");
         this.monitoringStream.Write(this.buffer.AsSpan(2, 3));
         Assert.True(willWriteInvoked);
         Assert.True(didWriteInvoked);
@@ -538,25 +547,30 @@ public class MonitoringStreamTests : TestBase
     [Fact]
     public async Task WriteAsync_Memory_RaisesEvents()
     {
-        bool willWriteInvoked = false;
-        bool didWriteInvoked = false;
+        int willWriteInvoked = 0;
+        int didWriteInvoked = 0;
         this.monitoringStream.WillWriteMemory += (s, e) =>
         {
-            willWriteInvoked = true;
-            Assert.False(didWriteInvoked);
+            Assert.Equal(0, willWriteInvoked);
+            willWriteInvoked++;
+            Assert.Equal(0, didWriteInvoked);
             Assert.Same(this.monitoringStream, s);
             Assert.Equal(3, e.Length);
         };
         this.monitoringStream.DidWriteMemory += (s, e) =>
         {
-            didWriteInvoked = true;
-            Assert.True(willWriteInvoked);
+            Assert.Equal(0, didWriteInvoked);
+            Assert.Equal(1, willWriteInvoked);
+            didWriteInvoked++;
             Assert.Same(this.monitoringStream, s);
             Assert.Equal(3, e.Length);
         };
+        this.monitoringStream.DidWrite += (s, e) => Assert.Fail("Unexpected event.");
+        this.monitoringStream.DidWriteSpan += (s, e) => Assert.Fail("Unexpected event.");
+        this.monitoringStream.DidWriteByte += (s, e) => Assert.Fail("Unexpected event.");
         await this.monitoringStream.WriteAsync(this.buffer.AsMemory(2, 3));
-        Assert.True(willWriteInvoked);
-        Assert.True(didWriteInvoked);
+        Assert.Equal(1, willWriteInvoked);
+        Assert.Equal(1, didWriteInvoked);
         Assert.Equal(new byte[] { 8, 9, 10, 4, 5 }, this.underlyingStream.ToArray());
     }
 
