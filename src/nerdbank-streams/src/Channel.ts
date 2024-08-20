@@ -220,7 +220,7 @@ export class ChannelClass extends Channel {
 
 		// We should find a way to detect when we *actually* share the received buffer with the Channel's user
 		// and only report consumption when they receive the buffer from us so that we effectively apply
-		// backpressure to the remote party based on our user's actual consumption rather than keep allocating memory.
+		// backpressure to the remote party based on our user's actual consumption rather than continually allocating memory.
 		if (this._multiplexingStream.backpressureSupportEnabled && buffer) {
 			this._multiplexingStream.localContentExamined(this, buffer.length)
 		}

@@ -92,12 +92,12 @@ export async function getBufferFrom(
 					throw new Error('Stream terminated before required bytes were read.')
 				}
 
-				// Returns what has been read so far
+				// Returns what has been read so far.
 				if (readBuffer === null) {
 					return null
 				}
 
-				// we need trim extra spaces
+				// We need to trim the trailing space.
 				return readBuffer.subarray(0, index)
 			}
 
@@ -116,11 +116,11 @@ export async function getBufferFrom(
 
 			if (readBuffer === null) {
 				if (availableSize === size || newBuffer.length < availableSize) {
-					// in the fast pass, we read the entire data once, and donot allocate an extra array.
+					// In the fast pass, we read the entire data once, and do not allocate an extra array.
 					return newBuffer
 				}
 
-				// if we read partial data, we need allocate a buffer to join all data together.
+				// If we read partial data, we need to allocate a buffer to join all data together.
 				readBuffer = Buffer.alloc(size)
 			}
 
