@@ -19,6 +19,8 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+    <!-- Temporarily upgrade Microsoft.Bcl.AsyncInterfaces while we reference StreamJsonRpc that wants 7.0.0 -->
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" VersionOverride="7.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.VisualStudio.Threading" />
     <PackageReference Include="NSubstitute" />
