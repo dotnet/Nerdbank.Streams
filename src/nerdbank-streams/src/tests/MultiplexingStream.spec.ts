@@ -8,6 +8,59 @@ import { Channel } from '../Channel'
 import CancellationToken from 'cancellationtoken'
 import * as assert from 'assert'
 import { nextTick } from 'process'
+import { Duplex } from 'stream'
+
+it('highWatermark threshold does not clog', async () => {
+	// Brokered service
+	let bytesToReceive = 0
+	let receivedAllBytes = new Deferred()
+	function receiver(pipe: Duplex) {
+		let lengths: number[] = []
+		pipe.on('data', (data: Buffer) => {
+			lengths.push(data.length)
+
+			bytesToReceive -= data.length
+			// console.log(`recv ${data.length}. ${bytesToReceive} remaining`)
+			if (bytesToReceive <= 0) {
+				receivedAllBytes.resolve(undefined)
+			}
+		})
+	}
+
+	// IServiceBroker
+	const { first: localServicePipe, second: servicePipe } = FullDuplexStream.CreatePair()
+	receiver(localServicePipe)
+
+	// MultiplexingStreamServiceBroker
+	const simulatedMxStream = FullDuplexStream.CreatePair()
+	const [mx1, mx2] = await Promise.all([MultiplexingStream.CreateAsync(simulatedMxStream.first), MultiplexingStream.CreateAsync(simulatedMxStream.second)])
+	const [local, remote] = await Promise.all([mx1.offerChannelAsync(''), mx2.acceptChannelAsync('')])
+	servicePipe.pipe(local.stream)
+	local.stream.pipe(servicePipe)
+
+	global.test_servicePipe = servicePipe
+	global.test_d = local.stream
+	global.test_localServicePipe = localServicePipe
+
+	// brokered service client
+	function writeHelper(buffer: Buffer): boolean {
+		bytesToReceive += buffer.length
+		const result = remote.stream.write(buffer)
+		// console.log('written', buffer.length, result)
+		return result
+	}
+	for (let i = 15; i < 20; i++) {
+		const buffer = Buffer.alloc(i * 1024)
+		writeHelper(buffer)
+		await nextTickAsync()
+		writeHelper(Buffer.alloc(10))
+		await nextTickAsync()
+	}
+
+	if (bytesToReceive > 0) {
+		await receivedAllBytes.promise
+	}
+})
 ;[1, 2, 3].forEach(protocolMajorVersion => {
 	describe(`MultiplexingStream v${protocolMajorVersion}`, () => {
 		let mx1: MultiplexingStream

@@ -216,7 +216,16 @@ export class ChannelClass extends Channel {
 	}
 
 	public onContent(buffer: Buffer | null) {
+		const priorReadableFlowing = this._duplex.readableFlowing
+
 		this._duplex.push(buffer)
+
+		// Large buffer pushes can switch a stream from flowing to non-flowing
+		// when it meets or exceeds the highWaterMark. We need to resume the stream
+		// in this case so that the user can continue to receive data.
+		if (priorReadableFlowing && this._duplex.readableFlowing === false) {
+			this._duplex.resume()
+		}
 
 		// We should find a way to detect when we *actually* share the received buffer with the Channel's user
 		// and only report consumption when they receive the buffer from us so that we effectively apply
