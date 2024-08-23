@@ -257,7 +257,14 @@ namespace Nerdbank.Streams
             /// <returns>This instance if already frozen, otherwise a frozen copy.</returns>
             public Options GetFrozenCopy() => this.IsFrozen ? this : new Options(this, frozen: true);
 
-            private void ThrowIfFrozen() => Verify.Operation(!this.IsFrozen, Strings.Frozen);
+            private void ThrowIfFrozen()
+            {
+                // Avoid loading string unless needed
+                if (this.IsFrozen)
+                {
+                    Verify.FailOperation(Strings.Frozen);
+                }
+            }
         }
     }
 }
