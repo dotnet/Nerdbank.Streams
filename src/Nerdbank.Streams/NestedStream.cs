@@ -120,7 +120,7 @@ namespace Nerdbank.Streams
                 return 0;
             }
 
-            int bytesRead = await this.underlyingStream.ReadAsync(buffer, offset, count).ConfigureAwaitRunInline();
+            int bytesRead = await this.underlyingStream.ReadAsync(buffer, offset, count, cancellationToken).ConfigureAwaitRunInline();
             this.remainingBytes -= bytesRead;
             return bytesRead;
         }

@@ -139,7 +139,7 @@ namespace Nerdbank.Streams
                 return Task.CompletedTask;
             }
 
-            return stream.FlushAsync();
+            return stream.FlushAsync(cancellationToken);
         }
 
         /// <summary>

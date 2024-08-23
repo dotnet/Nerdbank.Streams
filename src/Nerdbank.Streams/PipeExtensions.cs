@@ -143,42 +143,44 @@ namespace Nerdbank.Streams
             Requires.Argument(stream.CanWrite, nameof(stream), "Stream must be writable.");
 
             var pipe = new Pipe(pipeOptions ?? PipeOptions.Default);
-            Task.Run(async delegate
-            {
-                try
+            Task.Run(
+                async delegate
                 {
-                    while (true)
+                    try
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        ReadResult readResult = await pipe.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
-                        if (readResult.Buffer.Length > 0)
+                        while (true)
                         {
-                            foreach (ReadOnlyMemory<byte> segment in readResult.Buffer)
+                            cancellationToken.ThrowIfCancellationRequested();
+                            ReadResult readResult = await pipe.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                            if (readResult.Buffer.Length > 0)
                             {
-                                await stream.WriteAsync(segment, cancellationToken).ConfigureAwait(false);
+                                foreach (ReadOnlyMemory<byte> segment in readResult.Buffer)
+                                {
+                                    await stream.WriteAsync(segment, cancellationToken).ConfigureAwait(false);
+                                }
+
+                                await stream.FlushIfNecessaryAsync(cancellationToken).ConfigureAwait(false);
                             }
 
-                            await stream.FlushIfNecessaryAsync(cancellationToken).ConfigureAwait(false);
+                            pipe.Reader.AdvanceTo(readResult.Buffer.End);
+                            readResult.ScrubAfterAdvanceTo();
+
+                            if (readResult.IsCompleted)
+                            {
+                                break;
+                            }
                         }
 
-                        pipe.Reader.AdvanceTo(readResult.Buffer.End);
-                        readResult.ScrubAfterAdvanceTo();
-
-                        if (readResult.IsCompleted)
-                        {
-                            break;
-                        }
+                        await pipe.Reader.CompleteAsync().ConfigureAwait(false);
                     }
-
-                    await pipe.Reader.CompleteAsync().ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    // Propagate the exception to the writer.
-                    await pipe.Reader.CompleteAsync(ex).ConfigureAwait(false);
-                    return;
-                }
-            }).Forget();
+                    catch (Exception ex)
+                    {
+                        // Propagate the exception to the writer.
+                        await pipe.Reader.CompleteAsync(ex).ConfigureAwait(false);
+                        return;
+                    }
+                },
+                cancellationToken).Forget();
             return pipe.Writer;
         }
 
@@ -276,41 +278,43 @@ namespace Nerdbank.Streams
             Requires.NotNull(webSocket, nameof(webSocket));
 
             var pipe = new Pipe(pipeOptions ?? PipeOptions.Default);
-            Task.Run(async delegate
-            {
-                while (true)
+            Task.Run(
+                async delegate
                 {
-                    Memory<byte> memory = pipe.Writer.GetMemory(sizeHint);
-                    try
+                    while (true)
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
+                        Memory<byte> memory = pipe.Writer.GetMemory(sizeHint);
+                        try
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
 #pragma warning disable IDE0008 // Use explicit type - it varies across TFMs so we rely on duck-typing.
-                        var readResult = await webSocket.ReceiveAsync(memory, cancellationToken).ConfigureAwait(false);
+                            var readResult = await webSocket.ReceiveAsync(memory, cancellationToken).ConfigureAwait(false);
 #pragma warning restore IDE0008 // Use explicit type
-                        if (readResult.Count == 0)
+                            if (readResult.Count == 0)
+                            {
+                                break;
+                            }
+
+                            pipe.Writer.Advance(readResult.Count);
+                        }
+                        catch (Exception ex)
+                        {
+                            // Propagate the exception to the reader.
+                            await pipe.Writer.CompleteAsync(ex).ConfigureAwait(false);
+                            return;
+                        }
+
+                        FlushResult result = await pipe.Writer.FlushAsync().ConfigureAwait(false);
+                        if (result.IsCompleted)
                         {
                             break;
                         }
-
-                        pipe.Writer.Advance(readResult.Count);
-                    }
-                    catch (Exception ex)
-                    {
-                        // Propagate the exception to the reader.
-                        await pipe.Writer.CompleteAsync(ex).ConfigureAwait(false);
-                        return;
                     }
 
-                    FlushResult result = await pipe.Writer.FlushAsync().ConfigureAwait(false);
-                    if (result.IsCompleted)
-                    {
-                        break;
-                    }
-                }
-
-                // Tell the PipeReader that there's no more data coming
-                await pipe.Writer.CompleteAsync().ConfigureAwait(false);
-            }).Forget();
+                    // Tell the PipeReader that there's no more data coming
+                    await pipe.Writer.CompleteAsync().ConfigureAwait(false);
+                },
+                cancellationToken).Forget();
 
             return pipe.Reader;
         }
@@ -450,58 +454,60 @@ namespace Nerdbank.Streams
                 return Task.FromCanceled(cancellationToken);
             }
 
-            return Task.Run(async delegate
-            {
-                try
+            return Task.Run(
+                async delegate
                 {
-                    if (DuplexPipe.IsDefinitelyCompleted(reader))
+                    try
                     {
-                        await writer.CompleteAsync().ConfigureAwait(false);
-                        return;
-                    }
-
-                    while (true)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        ReadResult result = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
-                        if (result.IsCanceled)
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            throw new OperationCanceledException(Strings.PipeReaderCanceled);
-                        }
-
-                        writer.Write(result.Buffer);
-                        reader.AdvanceTo(result.Buffer.End);
-                        result.ScrubAfterAdvanceTo();
-                        FlushResult flushResult = await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
-
-                        if (flushResult.IsCanceled)
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            throw new OperationCanceledException(Strings.PipeWriterFlushCanceled);
-                        }
-
-                        if (flushResult.IsCompleted)
-                        {
-                            // Break out of copy loop. The receiver doesn't care any more.
-                            break;
-                        }
-
-                        if (result.IsCompleted)
+                        if (DuplexPipe.IsDefinitelyCompleted(reader))
                         {
                             await writer.CompleteAsync().ConfigureAwait(false);
-                            break;
+                            return;
                         }
-                    }
 
-                    await reader.CompleteAsync().ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    await writer.CompleteAsync(ex).ConfigureAwait(false);
-                    await reader.CompleteAsync(ex).ConfigureAwait(false);
-                }
-            });
+                        while (true)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            ReadResult result = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                            if (result.IsCanceled)
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                throw new OperationCanceledException(Strings.PipeReaderCanceled);
+                            }
+
+                            writer.Write(result.Buffer);
+                            reader.AdvanceTo(result.Buffer.End);
+                            result.ScrubAfterAdvanceTo();
+                            FlushResult flushResult = await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+
+                            if (flushResult.IsCanceled)
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                throw new OperationCanceledException(Strings.PipeWriterFlushCanceled);
+                            }
+
+                            if (flushResult.IsCompleted)
+                            {
+                                // Break out of copy loop. The receiver doesn't care any more.
+                                break;
+                            }
+
+                            if (result.IsCompleted)
+                            {
+                                await writer.CompleteAsync().ConfigureAwait(false);
+                                break;
+                            }
+                        }
+
+                        await reader.CompleteAsync().ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        await writer.CompleteAsync(ex).ConfigureAwait(false);
+                        await reader.CompleteAsync(ex).ConfigureAwait(false);
+                    }
+                },
+                cancellationToken);
         }
 
         /// <summary>
@@ -585,46 +591,48 @@ namespace Nerdbank.Streams
             }
 #pragma warning restore CS0618 // Type or member is obsolete
 
-            Task.Run(async delegate
-            {
-                while (!combinedTokenSource.Token.IsCancellationRequested)
+            Task.Run(
+                async delegate
                 {
-                    Memory<byte> memory = pipe.Writer.GetMemory(sizeHint);
-                    try
+                    while (!combinedTokenSource.Token.IsCancellationRequested)
                     {
-                        int bytesRead = await stream.ReadAsync(memory, combinedTokenSource.Token).ConfigureAwait(false);
-                        if (bytesRead == 0)
+                        Memory<byte> memory = pipe.Writer.GetMemory(sizeHint);
+                        try
+                        {
+                            int bytesRead = await stream.ReadAsync(memory, combinedTokenSource.Token).ConfigureAwait(false);
+                            if (bytesRead == 0)
+                            {
+                                break;
+                            }
+
+                            pipe.Writer.Advance(bytesRead);
+                        }
+                        catch (OperationCanceledException)
                         {
                             break;
                         }
+                        catch (ObjectDisposedException)
+                        {
+                            break;
+                        }
+                        catch (Exception ex)
+                        {
+                            // Propagate the exception to the reader.
+                            await pipe.Writer.CompleteAsync(ex).ConfigureAwait(false);
+                            return;
+                        }
 
-                        pipe.Writer.Advance(bytesRead);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        break;
-                    }
-                    catch (ObjectDisposedException)
-                    {
-                        break;
-                    }
-                    catch (Exception ex)
-                    {
-                        // Propagate the exception to the reader.
-                        await pipe.Writer.CompleteAsync(ex).ConfigureAwait(false);
-                        return;
+                        FlushResult result = await pipe.Writer.FlushAsync().ConfigureAwait(false);
+                        if (result.IsCompleted)
+                        {
+                            break;
+                        }
                     }
 
-                    FlushResult result = await pipe.Writer.FlushAsync().ConfigureAwait(false);
-                    if (result.IsCompleted)
-                    {
-                        break;
-                    }
-                }
-
-                // Tell the PipeReader that there's no more data coming
-                await pipe.Writer.CompleteAsync().ConfigureAwait(false);
-            }).Forget();
+                    // Tell the PipeReader that there's no more data coming
+                    await pipe.Writer.CompleteAsync().ConfigureAwait(false);
+                },
+                cancellationToken).Forget();
             return pipe.Reader;
         }
 
@@ -644,40 +652,42 @@ namespace Nerdbank.Streams
             Requires.NotNull(webSocket, nameof(webSocket));
 
             var pipe = new Pipe(pipeOptions ?? PipeOptions.Default);
-            Task.Run(async delegate
-            {
-                try
+            Task.Run(
+                async delegate
                 {
-                    while (true)
+                    try
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        ReadResult readResult = await pipe.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
-                        if (readResult.Buffer.Length > 0)
+                        while (true)
                         {
-                            foreach (ReadOnlyMemory<byte> segment in readResult.Buffer)
+                            cancellationToken.ThrowIfCancellationRequested();
+                            ReadResult readResult = await pipe.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                            if (readResult.Buffer.Length > 0)
                             {
-                                await webSocket.SendAsync(segment, messageType, endOfMessage: true, cancellationToken).ConfigureAwait(false);
+                                foreach (ReadOnlyMemory<byte> segment in readResult.Buffer)
+                                {
+                                    await webSocket.SendAsync(segment, messageType, endOfMessage: true, cancellationToken).ConfigureAwait(false);
+                                }
+                            }
+
+                            pipe.Reader.AdvanceTo(readResult.Buffer.End);
+                            readResult.ScrubAfterAdvanceTo();
+
+                            if (readResult.IsCompleted)
+                            {
+                                break;
                             }
                         }
 
-                        pipe.Reader.AdvanceTo(readResult.Buffer.End);
-                        readResult.ScrubAfterAdvanceTo();
-
-                        if (readResult.IsCompleted)
-                        {
-                            break;
-                        }
+                        await pipe.Reader.CompleteAsync().ConfigureAwait(false);
                     }
-
-                    await pipe.Reader.CompleteAsync().ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    // Propagate the exception to the writer.
-                    await pipe.Reader.CompleteAsync(ex).ConfigureAwait(false);
-                    return;
-                }
-            }).Forget();
+                    catch (Exception ex)
+                    {
+                        // Propagate the exception to the writer.
+                        await pipe.Reader.CompleteAsync(ex).ConfigureAwait(false);
+                        return;
+                    }
+                },
+                cancellationToken).Forget();
             return pipe.Writer;
         }
 

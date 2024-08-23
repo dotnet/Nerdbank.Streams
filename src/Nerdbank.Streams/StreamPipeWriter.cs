@@ -112,7 +112,7 @@ namespace Nerdbank.Streams
                             cts.Token.ThrowIfCancellationRequested();
                             System.Buffers.ReadOnlySequence<byte> readOnlySeq = this.buffer.AsReadOnlySequence;
                             ReadOnlyMemory<byte> segment = readOnlySeq.First;
-                            await this.stream.WriteAsync(segment).ConfigureAwait(false);
+                            await this.stream.WriteAsync(segment, CancellationToken.None).ConfigureAwait(false);
                             this.buffer.AdvanceTo(readOnlySeq.GetPosition(segment.Length));
                         }
 
