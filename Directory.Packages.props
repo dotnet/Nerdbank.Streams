@@ -13,7 +13,7 @@
     <PackageVersion Include="BenchmarkDotNet" Version="$(BenchmarkDotNetVersion)" />
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="$(AspNetCoreVersion)" />
     <PackageVersion Include="Microsoft.AspNetCore" Version="$(AspNetCoreVersion)" />
-    <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="6.0.0" />
+    <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="7.0.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.3.4" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
     <PackageVersion Include="Microsoft.VisualStudio.Threading.Analyzers" Version="$(VSThreadingVersion)" />
@@ -29,7 +29,7 @@
     <PackageVersion Include="xunit.abstractions" Version="2.0.3" />
     <PackageVersion Include="xunit.combinatorial" Version="1.6.24" />
     <PackageVersion Include="xunit.extensibility.core" Version="2.7.1" />
-    <PackageVersion Include="xunit.runner.console" Version="2.6.4" />
+    <PackageVersion Include="xunit.runner.console" Version="2.9.1" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.5.7" />
     <PackageVersion Include="xunit.skippablefact" Version="1.4.13" />
     <PackageVersion Include="xunit" Version="2.7.1" />
