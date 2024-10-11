@@ -158,8 +158,8 @@ new // https://github.com/dotnet/csharplang/issues/3613: There's no way to *over
             {
                 int totalCount = this.count + count;
                 await this.WriteLengthHeaderAsync(totalCount, cancellationToken).ConfigureAwait(false);
-                await this.underlyingStream.WriteAsync(this.buffer, 0, this.count).ConfigureAwait(false);
-                await this.underlyingStream.WriteAsync(buffer, offset, count).ConfigureAwait(false);
+                await this.underlyingStream.WriteAsync(this.buffer, 0, this.count, cancellationToken).ConfigureAwait(false);
+                await this.underlyingStream.WriteAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
                 this.count = 0;
             }
         }
