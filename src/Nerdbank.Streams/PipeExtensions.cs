@@ -287,9 +287,9 @@ namespace Nerdbank.Streams
                         try
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-    #pragma warning disable IDE0008 // Use explicit type - it varies across TFMs so we rely on duck-typing.
+#pragma warning disable IDE0008 // Use explicit type - it varies across TFMs so we rely on duck-typing.
                             var readResult = await webSocket.ReceiveAsync(memory, cancellationToken).ConfigureAwait(false);
-    #pragma warning restore IDE0008 // Use explicit type
+#pragma warning restore IDE0008 // Use explicit type
                             if (readResult.Count == 0)
                             {
                                 break;
