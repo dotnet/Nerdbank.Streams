@@ -671,7 +671,11 @@ namespace Nerdbank.Streams
                 return;
             }
 
+#if NET8_0_OR_GREATER
+            await this.disposalTokenSource.CancelAsync().ConfigureAwait(false);
+#else
             this.disposalTokenSource.Cancel();
+#endif
             try
             {
                 if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))

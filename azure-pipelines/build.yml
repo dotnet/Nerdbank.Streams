@@ -27,6 +27,7 @@ jobs:
   - template: dotnet.yml
     parameters:
       RunTests: ${{ parameters.RunTests }}
+      osRID: win
   - template: node.yml
   - template: collect-artifacts.yml
     parameters:
@@ -45,6 +46,7 @@ jobs:
   - template: dotnet.yml
     parameters:
       RunTests: ${{ parameters.RunTests }}
+      osRID: linux
   - script: dotnet format --verify-no-changes --no-restore
     displayName: 💅 Verify formatted code
   - template: node.yml
@@ -65,6 +67,7 @@ jobs:
   - template: dotnet.yml
     parameters:
       RunTests: ${{ parameters.RunTests }}
+      osRID: osx
   - template: node.yml
   - template: collect-artifacts.yml
     parameters:
