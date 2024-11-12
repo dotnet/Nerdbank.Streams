@@ -1,12 +1,12 @@
 # Full-duplex streams
 
 This class offers functionality to:
-1. create a pair of bidirectional streams for in-proc two-way communication (`CreatePair`)
-1. create a single bidirectional stream from two unidirectional streams (`Splice`)
+1. create a pair of bidirectional streams for in-proc two-way communication (@"Nerdbank.Streams.FullDuplexStream.CreatePair*?displayProperty=nameWithType")
+1. create a single bidirectional stream from two unidirectional streams (@"Nerdbank.Streams.FullDuplexStream.Splice*?displayProperty=nameWithType")
 
 ## `CreatePair`
 
-The `FullDuplexStream.CreatePair` method provides a pair of streams, each of which can be handed to one of two parties.
+The @Nerdbank.Streams.FullDuplexStream.CreatePair*?displayProperty=nameWithType method provides a pair of streams, each of which can be handed to one of two parties.
 Each stream can be read from and written to, and these operations are used to exchange messages with the party
 holding the other stream in the pair.
 The two stream instances communicate with each other to facilitate this bidirectional message passing.
@@ -25,7 +25,7 @@ who uses their own stream. The two streams in the returned Tuple are interconnec
 
 ## `Splice`
 
-The `FullDuplexStream.Splice` method wraps a readable stream withand a writable stream
+The @Nerdbank.Streams.FullDuplexStream.Splice*?displayProperty=nameWithType method wraps a readable stream withand a writable stream
 to produce a single, bidirectional stream.
 
 ```cs
