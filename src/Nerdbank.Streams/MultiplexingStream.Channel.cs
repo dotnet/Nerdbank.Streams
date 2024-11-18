@@ -210,7 +210,7 @@ namespace Nerdbank.Streams
             /// <summary>
             /// Gets the mechanism used for tracing activity related to this channel.
             /// </summary>
-            /// <value>A non-null value, once <see cref="ApplyChannelOptions(ChannelOptions)"/> has been called.</value>
+            /// <devvalue>A non-null value, once <see cref="ApplyChannelOptions(ChannelOptions)"/> has been called.</devvalue>
             public TraceSource? TraceSource { get; private set; }
 
             /// <inheritdoc />

@@ -1,6 +1,6 @@
 # Exposing I/O as a Stream
 
-Exposing various I/O classes as a `Stream` is trivial. Simply call the `AsStream()` extension method.
+Exposing various I/O classes as a @System.IO.Stream is trivial. Simply call the `AsStream()` extension method.
 
 ## WebSockets
 
@@ -24,10 +24,10 @@ as a .NET Stream only when message boundaries are not important to your network 
 
 ## Pipes
 
-When you have a `System.IO.Pipelines.PipeReader`, a
-`System.IO.Pipelines.PipeWriter` or a `System.IO.Pipelines.IDuplexPipe`,
-you may find that you want to read/write data using `System.IO.Stream` APIs.
-The `AsStream()` extension method for each of these types will return a `Stream` object
+When you have a @System.IO.Pipelines.PipeReader, a
+@System.IO.Pipelines.PipeWriter or a @System.IO.Pipelines.IDuplexPipe,
+you may find that you want to read/write data using @System.IO.Stream APIs.
+The `AsStream()` extension method for each of these types will return a @System.IO.Stream object
 whose I/O methods will leverage the underlying pipe.
 
 The following demonstrates wrapping a `PipeReader` in a `Stream` and reading from it:
@@ -39,7 +39,7 @@ byte[] buffer = new byte[10];
 int bytesRead = await readerStream.ReadAsync(buffer, 0, buffer.Length);
 ```
 
-The following demonstrates wrapping a `PipeWriter` in a `Stream` and writing to it:
+The following demonstrates wrapping a @System.IO.Pipelines.PipeWriter in a @System.IO.Stream and writing to it:
 
 ```cs
 PipeWriter writer; // obtained some other way
@@ -48,7 +48,7 @@ byte[] buffer = { 0x1, 0x2, 0x3 };
 await writerStream.WriteAsync(buffer, 0, buffer.Length);
 ```
 
-Given an `IDuplexPipe` (which allows two-way communication over a `PipeReader`/`PipeWriter` pair),
+Given an @System.IO.Pipelines.IDuplexPipe (which allows two-way communication over a @System.IO.Pipelines.PipeReader/@System.IO.Pipelines.PipeWriter pair),
 we can wrap that as a `Stream` and use both the read and write methods on that too:
 
 ```cs
@@ -66,7 +66,7 @@ int bytesRead = await readerStream.ReadAsync(readBuffer, 0, buffer.Length);
 
 ## `ReadOnlySequence<byte>`
 
-A `ReadOnlySequence<byte>` can be exposed as a seekable, read-only `Stream`.
+A @"System.Buffers.ReadOnlySequence`1?text=ReadOnlySequence<byte>" can be exposed as a seekable, read-only @System.IO.Stream.
 This enables progressive decoding or deserializing data without allocating a single
 array for the entire sequence.
 
@@ -82,7 +82,7 @@ while ((string line = reader.ReadLine()) != null)
 
 ## `IBufferWriter<byte>`
 
-If you're building up a `ReadOnlySequence<byte>` using `Sequence<byte>`, or have another `IBufferWriter<byte>` instance,
+If you're building up a @"System.Buffers.ReadOnlySequence`1?text=ReadOnlySequence<byte>" using @"Nerdbank.Streams.Sequence`1?text=Sequence<byte>", or have another @"System.Buffers.IBufferWriter`1?text=IBufferWriter<byte>" instance,
 you can add to that sequence with `Stream` APIs using `AsStream()`:
 
 ```cs
