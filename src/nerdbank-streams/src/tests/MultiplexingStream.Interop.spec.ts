@@ -6,6 +6,7 @@ import { MultiplexingStream } from '../MultiplexingStream'
 ;[1, 2, 3].forEach(protocolMajorVersion => {
 	describe(`MultiplexingStream v${protocolMajorVersion} (interop) `, () => {
 		const projectPath = `${__dirname}/../../../../test/Nerdbank.Streams.Interop.Tests`
+		const exePath = `${__dirname}/../../../../bin/Nerdbank.Streams.Interop.Tests/Debug/net8.0/Nerdbank.Streams.Interop.Tests.exe`
 		let mx: MultiplexingStream
 		let proc: ChildProcess | null
 		let procExited: Deferred<any>
@@ -30,7 +31,7 @@ import { MultiplexingStream } from '../MultiplexingStream'
 			}
 		}, 20000) // leave time for package restore and build
 		beforeEach(async () => {
-			proc = spawn('dotnet', ['run', '--no-build', '--project', projectPath, '--', protocolMajorVersion.toString()], spawnOptions.env as any)
+			proc = spawn(exePath, [protocolMajorVersion.toString()], spawnOptions.env as any)
 			try {
 				procExited = new Deferred<any>()
 				proc.once('error', err => procExited.resolve(err))
