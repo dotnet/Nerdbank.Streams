@@ -16,6 +16,9 @@
     "dotjoshjohnson.xml",
     "ms-vscode-remote.remote-containers",
     "ms-azuretools.vscode-docker",
-    "tintoy.msbuild-project-tools"
+    "tintoy.msbuild-project-tools",
+    "amodio.tsl-problem-matcher",
+    "firsttris.vscode-jest-runner",
+    "Orta.vscode-jest"
   ]
 }

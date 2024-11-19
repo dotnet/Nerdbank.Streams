@@ -12,3 +12,8 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0.100-noble
 # See https://github.com/dotnet/dotnet-docker/issues/2790 for a discussion on this, where the prioritized use case
 # was *not* devcontainers, sadly.
 ENV NUGET_XMLDOC_MODE=
+
+# Install Node.js 16
+RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash - \
+    && apt-get install -y nodejs
+RUN npm i -g yarn
