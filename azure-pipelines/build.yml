@@ -49,6 +49,8 @@ jobs:
       osRID: linux
   - script: dotnet format --verify-no-changes --no-restore
     displayName: 💅 Verify formatted code
+    env:
+      MSBUILDTERMINALLOGGER: off
   - template: node.yml
   - template: collect-artifacts.yml
     parameters:
