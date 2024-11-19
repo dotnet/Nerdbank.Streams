@@ -47,8 +47,10 @@ jobs:
     parameters:
       RunTests: ${{ parameters.RunTests }}
       osRID: linux
-  - script: dotnet format --verify-no-changes --no-restore
+  - script: dotnet format --verify-no-changes
     displayName: 💅 Verify formatted code
+    env:
+      dotnetformat: true # part of a workaround for https://github.com/dotnet/sdk/issues/44951
   - template: node.yml
   - template: collect-artifacts.yml
     parameters:
