@@ -10,11 +10,15 @@
     "ms-dotnettools.csharp",
     "k--kato.docomment",
     "editorconfig.editorconfig",
+    "esbenp.prettier-vscode",
     "pflannery.vscode-versionlens",
     "davidanson.vscode-markdownlint",
     "dotjoshjohnson.xml",
     "ms-vscode-remote.remote-containers",
     "ms-azuretools.vscode-docker",
-    "ms-vscode.powershell"
+    "tintoy.msbuild-project-tools",
+    "amodio.tsl-problem-matcher",
+    "firsttris.vscode-jest-runner",
+    "Orta.vscode-jest"
   ]
 }
