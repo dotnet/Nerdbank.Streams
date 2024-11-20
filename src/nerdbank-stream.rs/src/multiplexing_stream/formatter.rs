@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use super::{
     channel_source::ChannelSource,
     control_code::ControlCode,
@@ -14,10 +12,7 @@ use async_trait::async_trait;
 use bytes::BytesMut;
 use msgpack_simple::MsgPack;
 use tokio::{
-    io::{
-        split, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream, ReadHalf,
-        WriteHalf,
-    },
+    io::{split, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream},
     sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
     task::{self, JoinHandle},
 };
