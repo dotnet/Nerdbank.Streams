@@ -1,5 +1,8 @@
 use super::{channel_source::ChannelSource, control_code::ControlCode};
 
+/// The maximum length of a frame's payload.
+pub const FRAME_PAYLOAD_MAX_LENGTH: usize = 20 * 1024;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct QualifiedChannelId {
     pub id: u64,

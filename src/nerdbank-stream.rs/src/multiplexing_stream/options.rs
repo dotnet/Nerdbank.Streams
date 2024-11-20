@@ -1,11 +1,9 @@
-use super::ProtocolMajorVersion;
+use super::{frame::FRAME_PAYLOAD_MAX_LENGTH, ProtocolMajorVersion};
 
-/// The maximum length of a frame's payload.
-const FRAME_PAYLOAD_MAX_LENGTH: u64 = 20 * 1024;
-const RECOMMENDED_DEFAULT_CHANNEL_RECEIVING_WINDOW_SIZE: u64 = 5 * FRAME_PAYLOAD_MAX_LENGTH;
+const RECOMMENDED_DEFAULT_CHANNEL_RECEIVING_WINDOW_SIZE: usize = 5 * FRAME_PAYLOAD_MAX_LENGTH;
 
 pub struct Options {
-    pub default_channel_receiving_window_size: u64,
+    pub default_channel_receiving_window_size: usize,
     pub protocol_major_version: ProtocolMajorVersion,
     pub seeded_channels: Vec<ChannelOptions>,
 }
@@ -23,5 +21,5 @@ impl Default for Options {
 
 #[derive(Clone)]
 pub struct ChannelOptions {
-    pub channel_receiving_window_size: u64,
+    pub channel_receiving_window_size: usize,
 }

@@ -6,5 +6,7 @@ rust-version = "1.81"
 
 [dependencies]
 async-trait = "0.1.82"
+bytes = "1.8.0"
 msgpack_simple = "1.0.2"
+rmp = "0.8"
 tokio = { version = "1", features = ["full"] }

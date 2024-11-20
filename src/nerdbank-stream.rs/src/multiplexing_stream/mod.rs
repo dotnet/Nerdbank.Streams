@@ -5,19 +5,20 @@ mod formatter;
 mod frame;
 mod options;
 
-use std::{collections::HashMap, default, future::Pending, sync::Arc};
+use std::{collections::HashMap, default, future::Pending, ops::DerefMut, sync::Arc};
 
 use channel_source::ChannelSource;
 use control_code::ControlCode;
 use error::MultiplexingStreamError;
 use formatter::{FrameIO, V3Formatter};
 pub use frame::QualifiedChannelId;
-use frame::{FrameHeader, OfferParameters};
+use frame::{AcceptanceParameters, ContentProcessed, Frame, FrameHeader, OfferParameters};
 use options::ChannelOptions;
 use tokio::{io::DuplexStream, sync::Mutex, task::JoinHandle};
 
 pub use options::Options;
 
+#[derive(Copy, Clone, Debug)]
 pub enum ProtocolMajorVersion {
     //V1,
     //V2,
@@ -30,10 +31,12 @@ struct ChannelCore {
 }
 
 struct MultiplexingStreamCore {
-    formatter: Box<dyn FrameIO>,
+    formatter: Arc<Box<dyn FrameIO>>,
     open_channels: HashMap<QualifiedChannelId, Channel>,
     offered_channels: HashMap<QualifiedChannelId, PendingChannel>,
 }
+
+impl MultiplexingStreamCore {}
 
 // TODO: dropping this should send a channel closed notice to the remote party
 pub struct Channel {
@@ -75,6 +78,7 @@ impl PendingChannel {
 
 pub struct MultiplexingStream {
     core: Arc<Mutex<MultiplexingStreamCore>>,
+    formatter: Arc<Box<dyn FrameIO>>,
     options: Options,
     listening: Option<JoinHandle<Result<(), MultiplexingStreamError>>>,
     next_unreserved_channel_id: u64,
@@ -86,10 +90,11 @@ impl MultiplexingStream {
     }
 
     pub fn create_with_options(duplex: DuplexStream, options: Options) -> Self {
+        let formatter: Arc<Box<dyn FrameIO>> = match options.protocol_major_version {
+            ProtocolMajorVersion::V3 => Arc::new(Box::new(V3Formatter::new(duplex))),
+        };
         let core = MultiplexingStreamCore {
-            formatter: match options.protocol_major_version {
-                ProtocolMajorVersion::V3 => Box::new(V3Formatter::new(duplex)),
-            },
+            formatter: formatter.clone(),
             open_channels: HashMap::new(),
             offered_channels: HashMap::new(),
         };
@@ -97,6 +102,7 @@ impl MultiplexingStream {
         let core = Arc::new(Mutex::new(core));
         MultiplexingStream {
             core,
+            formatter,
             options,
             listening: None,
             next_unreserved_channel_id,
@@ -129,10 +135,16 @@ impl MultiplexingStream {
                     .clone()
                     .map_or(self.options.default_channel_receiving_window_size, |o| {
                         o.channel_receiving_window_size
-                    }),
+                    }) as u64,
             ),
         };
-        let payload = self.core.lock().await.formatter.serializer().serialize_offer(&offer_parameters);
+        let payload = self
+            .core
+            .lock()
+            .await
+            .formatter
+            .serializer()
+            .serialize_offer(&offer_parameters);
         let qualified_id = QualifiedChannelId {
             source: ChannelSource::Local,
             id: self.reserved_unused_channel_id(),
@@ -153,7 +165,7 @@ impl MultiplexingStream {
             channel_id: Some(qualified_id),
         };
 
-        self.core.lock().await.formatter.write_frame(header, payload).await;
+        self.formatter.write_frame(Frame { header, payload })?;
 
         // TODO: If the promise we return is dropped, we should cancel the offer.
 
@@ -209,33 +221,35 @@ impl MultiplexingStream {
     // }
 
     async fn listen(&self) -> Result<(), MultiplexingStreamError> {
+        let formatter = self.core.lock().await.formatter.clone();
+        let serializer = formatter.serializer();
         loop {
-            let frame = self.core.lock().await.formatter.read_frame().await?;
-            match frame {
-                None => return Ok(()),
-                Some((header, payload)) => {
-                    let channel_id = header.channel_id.ok_or_else(|| {
-                        MultiplexingStreamError::ProtocolViolation(
-                            "Missing ID in channel offer.".to_string(),
-                        )
-                    })?;
-                    match header.code {
-                        ControlCode::Offer => self.on_offer(channel_id, payload)?,
-                        ControlCode::OfferAccepted => {
-                            self.on_offer_accepted(channel_id, payload)?
-                        }
-                        ControlCode::Content => self.on_content(channel_id, payload)?,
-                        ControlCode::ContentWritingCompleted => {
-                            self.on_content_writing_completed(channel_id)?
-                        }
-                        ControlCode::ChannelTerminated => {
-                            self.on_channel_terminated(channel_id, payload)?
-                        }
-                        ControlCode::ContentProcessed => {
-                            self.on_content_processed(channel_id, payload)?
-                        }
-                    };
-                }
+            while let Some(frame) = self.core.lock().await.formatter.read_frame().await? {
+                let channel_id = frame.header.channel_id.ok_or_else(|| {
+                    MultiplexingStreamError::ProtocolViolation(
+                        "Missing ID in channel offer.".to_string(),
+                    )
+                })?;
+                match frame.header.code {
+                    ControlCode::Offer => {
+                        self.on_offer(channel_id, serializer.deserialize_offer(&frame.payload)?)?
+                    }
+                    ControlCode::OfferAccepted => self.on_offer_accepted(
+                        channel_id,
+                        serializer.deserialize_acceptance(&frame.payload)?,
+                    )?,
+                    ControlCode::Content => self.on_content(channel_id, frame.payload)?,
+                    ControlCode::ContentWritingCompleted => {
+                        self.on_content_writing_completed(channel_id)?
+                    }
+                    ControlCode::ChannelTerminated => {
+                        self.on_channel_terminated(channel_id, frame.payload)?
+                    }
+                    ControlCode::ContentProcessed => self.on_content_processed(
+                        channel_id,
+                        serializer.deserialize_content_processed(&frame.payload)?,
+                    )?,
+                };
             }
         }
     }
@@ -243,7 +257,7 @@ impl MultiplexingStream {
     fn on_offer(
         &self,
         channel_id: QualifiedChannelId,
-        payload: Vec<u8>,
+        offer: OfferParameters,
     ) -> Result<(), MultiplexingStreamError> {
         todo!()
     }
@@ -251,7 +265,7 @@ impl MultiplexingStream {
     fn on_offer_accepted(
         &self,
         channel_id: QualifiedChannelId,
-        payload: Vec<u8>,
+        acceptance: AcceptanceParameters,
     ) -> Result<(), MultiplexingStreamError> {
         todo!()
     }
@@ -282,7 +296,7 @@ impl MultiplexingStream {
     fn on_content_processed(
         &self,
         channel_id: QualifiedChannelId,
-        payload: Vec<u8>,
+        payload: ContentProcessed,
     ) -> Result<(), MultiplexingStreamError> {
         todo!()
     }
@@ -294,8 +308,8 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn simple_v3() {
+    #[tokio::test]
+    async fn simple_v3() {
         let duplexes = duplex(4096);
         let (mx1, mx2) = (
             MultiplexingStream::create(duplexes.0),

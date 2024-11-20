@@ -1,18 +1,28 @@
+use std::sync::Arc;
+
 use super::{
     channel_source::ChannelSource,
     control_code::ControlCode,
     error::MultiplexingStreamError,
-    frame::{AcceptanceParameters, ContentProcessed, Frame, FrameHeader, OfferParameters},
+    frame::{
+        AcceptanceParameters, ContentProcessed, Frame, FrameHeader, OfferParameters,
+        FRAME_PAYLOAD_MAX_LENGTH,
+    },
     ProtocolMajorVersion, QualifiedChannelId,
 };
 use async_trait::async_trait;
+use bytes::BytesMut;
 use msgpack_simple::MsgPack;
-use tokio::io::DuplexStream;
+use tokio::{
+    io::{
+        split, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream, ReadHalf,
+        WriteHalf,
+    },
+    sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
+    task::{self, JoinHandle},
+};
 
 pub trait Serializer: Sync {
-    fn serialize_frame(&self, frame: Frame) -> Vec<u8>;
-    fn deserialize_frame(&self, frame: &[u8]) -> Result<Frame, MultiplexingStreamError>;
-
     fn serialize_offer(&self, offer: &OfferParameters) -> Vec<u8>;
     fn deserialize_offer(&self, offer: &[u8]) -> Result<OfferParameters, MultiplexingStreamError>;
 
@@ -29,75 +39,26 @@ pub trait Serializer: Sync {
     ) -> Result<ContentProcessed, MultiplexingStreamError>;
 }
 
+#[async_trait]
+pub trait FrameSerializer: Sync {
+    async fn write_frame<W: AsyncWrite + Send + Unpin>(
+        &self,
+        writer: &mut W,
+        frame: Frame,
+    ) -> Result<(), MultiplexingStreamError>;
+
+    async fn read_frame<R: AsyncRead + Send + Unpin>(
+        &self,
+        reader: &mut R,
+    ) -> Result<Option<Frame>, MultiplexingStreamError>;
+}
+
+#[derive(Clone)]
 struct MsgPackSerializer {
     major_version: ProtocolMajorVersion,
 }
 
 impl Serializer for MsgPackSerializer {
-    fn serialize_frame(&self, frame: Frame) -> Vec<u8> {
-        let mut elements = Vec::new();
-
-        elements.push(MsgPack::Uint(u8::from(frame.header.code) as u64));
-        if frame.header.channel_id.is_some() || frame.payload.len() > 0 {
-            if let Some(channel_id) = frame.header.channel_id {
-                elements.push(MsgPack::Uint(channel_id.id));
-                match self.major_version {
-                    ProtocolMajorVersion::V3 => {
-                        elements.push(MsgPack::Int(i8::from(channel_id.source) as i64));
-                    }
-                }
-            } else {
-                panic!("Frames with payloads must include a channel id.");
-            }
-
-            if frame.payload.len() > 0 {
-                elements.push(MsgPack::Binary(frame.payload));
-            }
-        }
-
-        return MsgPack::Array(elements).encode();
-    }
-
-    fn deserialize_frame(&self, frame: &[u8]) -> Result<Frame, MultiplexingStreamError> {
-        let frame = MsgPack::parse(frame)?;
-        let array = frame.as_array()?;
-        let code = ControlCode::try_from(
-            array
-                .get(0)
-                .ok_or(MultiplexingStreamError::ProtocolViolation(
-                    "Missing frame code".to_string(),
-                ))?
-                .clone()
-                .as_uint()?,
-        )?;
-        let channel_id = match self.major_version {
-            ProtocolMajorVersion::V3 => {
-                if array.len() >= 3 {
-                    Some(QualifiedChannelId {
-                        id: array.get(1).unwrap().clone().as_uint()?,
-                        source: ChannelSource::try_from(array.get(2).unwrap().clone().as_int()?)?,
-                    })
-                } else {
-                    if array.len() == 2 {
-                        return Err(MultiplexingStreamError::ProtocolViolation(
-                            "Unexpected array length.".to_string(),
-                        ));
-                    }
-                    None
-                }
-            }
-        };
-        let payload = array.get(3).map_or_else(
-            || Ok::<_, MultiplexingStreamError>(Vec::new()),
-            |v| Ok(v.clone().as_binary()?),
-        )?;
-
-        Ok(Frame {
-            header: FrameHeader { code, channel_id },
-            payload,
-        })
-    }
-
     fn serialize_offer(&self, offer: &OfferParameters) -> Vec<u8> {
         let mut vec = Vec::new();
         vec.push(MsgPack::String(offer.name.clone()));
@@ -168,6 +129,61 @@ impl Serializer for MsgPackSerializer {
     }
 }
 
+#[async_trait]
+impl FrameSerializer for MsgPackSerializer {
+    async fn write_frame<W: AsyncWrite + Send + Unpin>(
+        &self,
+        writer: &mut W,
+        frame: Frame,
+    ) -> Result<(), MultiplexingStreamError> {
+        let element_count = match (frame.header.channel_id.is_some(), frame.payload.is_empty()) {
+            (false, true) => panic!("Frames with payloads must include a channel id."),
+            (true, true) => 4,
+            (true, false) => 3,
+            (false, false) => 1,
+        };
+
+        let mut frame_header_writer = rmp::encode::ByteBuf::new();
+        rmp::encode::write_array_len(&mut frame_header_writer, element_count)?;
+
+        rmp::encode::write_uint(&mut frame_header_writer, u8::from(frame.header.code) as u64)?;
+
+        if let Some(channel_id) = frame.header.channel_id {
+            rmp::encode::write_uint(&mut frame_header_writer, channel_id.id)?;
+            rmp::encode::write_sint(&mut frame_header_writer, i8::from(channel_id.source) as i64)?;
+
+            if !frame.payload.is_empty() {
+                rmp::encode::write_bin_len(
+                    &mut frame_header_writer,
+                    u32::try_from(frame.payload.len()).map_err(|e| {
+                        MultiplexingStreamError::PayloadTooLarge(frame.payload.len())
+                    })?,
+                )?;
+            }
+        }
+
+        writer.write_all(frame_header_writer.as_slice()).await?;
+        if !frame.payload.is_empty() {
+            writer.write_all(&frame.payload).await?;
+        }
+
+        Ok(())
+    }
+
+    async fn read_frame<R: AsyncRead + Send + Unpin>(
+        &self,
+        reader: &mut R,
+    ) -> Result<Option<Frame>, MultiplexingStreamError> {
+        const FRAME_HEADER_MAX_LENGTH: usize = 50; // this is an over-estimate.
+        const MAX_FRAME_SIZE: usize = FRAME_HEADER_MAX_LENGTH + FRAME_PAYLOAD_MAX_LENGTH;
+        let mut frame_buffer = BytesMut::with_capacity(MAX_FRAME_SIZE);
+
+        reader.read_buf(&mut frame_buffer).await?;
+
+        todo!()
+    }
+}
+
 // used for v1-v2
 fn create_frame_header(
     code: ControlCode,
@@ -196,26 +212,56 @@ fn create_frame_header(
 pub trait FrameIO: Sync {
     fn serializer(&self) -> &Box<dyn Serializer>;
 
-    async fn write_frame(
-        &self,
-        header: FrameHeader,
-        payload: Vec<u8>,
-    ) -> Result<(), MultiplexingStreamError>;
-
-    async fn read_frame(&self) -> Result<Option<(FrameHeader, Vec<u8>)>, MultiplexingStreamError>;
+    fn write_frame(&self, frame: Frame) -> Result<(), MultiplexingStreamError>;
+    async fn read_frame(&self) -> Result<Option<Frame>, MultiplexingStreamError>;
 }
+
 pub struct V3Formatter {
+    outgoing_frames: UnboundedSender<Frame>,
+    incoming_frames: UnboundedReceiver<Frame>,
+    reader: JoinHandle<Result<(), MultiplexingStreamError>>,
+    writer: JoinHandle<Result<(), MultiplexingStreamError>>,
     serializer: Box<dyn Serializer>,
-    duplex: DuplexStream,
 }
 
 impl V3Formatter {
     pub fn new(duplex: DuplexStream) -> Self {
+        let (mut reader, mut writer) = split(duplex);
+
+        let serializer = MsgPackSerializer {
+            major_version: ProtocolMajorVersion::V3,
+        };
+
+        let outbound_serializer = serializer.clone();
+        let (outbound_sender, mut outbound_receiver) = mpsc::unbounded_channel();
+        let outbound_runner: JoinHandle<Result<(), MultiplexingStreamError>> =
+            task::spawn(async move {
+                while let Some(frame) = outbound_receiver.recv().await {
+                    outbound_serializer.write_frame(&mut writer, frame).await?;
+                }
+
+                Ok(())
+            });
+
+        let inbound_serializer = serializer.clone();
+        let (inbound_sender, inbound_receiver) = mpsc::unbounded_channel();
+        let inbound_runner: JoinHandle<Result<(), MultiplexingStreamError>> =
+            task::spawn(async move {
+                while let Some(frame) = inbound_serializer.read_frame(&mut reader).await? {
+                    inbound_sender
+                        .send(frame)
+                        .map_err(|_| MultiplexingStreamError::ChannelFailure)?;
+                }
+
+                Ok(())
+            });
+
         V3Formatter {
-            duplex,
-            serializer: Box::new(MsgPackSerializer {
-                major_version: ProtocolMajorVersion::V3,
-            }),
+            serializer: Box::new(serializer),
+            writer: outbound_runner,
+            reader: inbound_runner,
+            outgoing_frames: outbound_sender,
+            incoming_frames: inbound_receiver,
         }
     }
 }
@@ -226,22 +272,24 @@ impl FrameIO for V3Formatter {
         &self.serializer
     }
 
-    async fn write_frame(
-        &self,
-        header: FrameHeader,
-        payload: Vec<u8>,
-    ) -> Result<(), MultiplexingStreamError> {
-        self.serializer.serialize_frame(Frame { header, payload });
-        todo!()
+    fn write_frame(&self, frame: Frame) -> Result<(), MultiplexingStreamError> {
+        self.outgoing_frames
+            .send(frame)
+            .map_err(|_| MultiplexingStreamError::ChannelFailure)?;
+        Ok(())
     }
 
-    async fn read_frame(&self) -> Result<Option<(FrameHeader, Vec<u8>)>, MultiplexingStreamError> {
+    async fn read_frame(&self) -> Result<Option<Frame>, MultiplexingStreamError> {
         todo!()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::io::BufWriter;
+
+    use tokio::io::duplex;
+
     use super::*;
 
     #[test]
@@ -317,8 +365,15 @@ mod tests {
         );
     }
 
-    #[test]
-    fn frame_all_fields() {
+    async fn roundtrip_frame<S: FrameSerializer>(f: S, frame: Frame) {
+        let (mut writer, mut reader) = duplex(64);
+        f.write_frame(&mut writer, frame.clone()).await.unwrap();
+        let deserialized_frame = f.read_frame(&mut reader).await.unwrap();
+        assert!(matches!(deserialized_frame, Some(f) if f.eq(&frame)));
+    }
+
+    #[tokio::test]
+    async fn frame_all_fields() {
         let f = MsgPackSerializer {
             major_version: ProtocolMajorVersion::V3,
         };
@@ -332,11 +387,8 @@ mod tests {
             },
             payload: vec![1, 2, 3],
         };
-        assert_eq!(
-            frame,
-            f.deserialize_frame(&f.serialize_frame(frame.clone()))
-                .unwrap()
-        );
+
+        roundtrip_frame(f, frame);
     }
 
     #[test]
@@ -354,11 +406,7 @@ mod tests {
             },
             payload: vec![],
         };
-        assert_eq!(
-            frame,
-            f.deserialize_frame(&f.serialize_frame(frame.clone()))
-                .unwrap()
-        );
+        roundtrip_frame(f, frame);
     }
 
     #[test]
@@ -373,10 +421,6 @@ mod tests {
             },
             payload: vec![],
         };
-        assert_eq!(
-            frame,
-            f.deserialize_frame(&f.serialize_frame(frame.clone()))
-                .unwrap()
-        );
+        roundtrip_frame(f, frame);
     }
 }
