@@ -3,6 +3,7 @@ mod codec_v3;
 mod control_code;
 mod error;
 mod frame;
+mod message_codec;
 mod options;
 
 use std::{collections::HashMap, sync::Arc};
@@ -17,6 +18,7 @@ use futures::{
     StreamExt,
 };
 use futures_util::SinkExt;
+use message_codec::MultiplexingMessageCodec;
 use options::ChannelOptions;
 use tokio::{
     io::{duplex, DuplexStream},
@@ -28,7 +30,7 @@ pub use options::Options;
 use tokio_util::codec::{Decoder, Encoder, Framed};
 
 // Define a trait for the constraints we'll use in many places.
-trait MultiplexingStreamCodec:
+trait MultiplexingFrameCodec:
     FrameCodec
     + Decoder<Item = Frame, Error = MultiplexingStreamError>
     + Encoder<Frame, Error = MultiplexingStreamError>
@@ -36,7 +38,7 @@ trait MultiplexingStreamCodec:
 }
 
 // Make it an auto-trait, so that any complying codec will Just Work.
-impl<T> MultiplexingStreamCodec for T where
+impl<T> MultiplexingFrameCodec for T where
     T: FrameCodec
         + Decoder<Item = Frame, Error = MultiplexingStreamError>
         + Encoder<Frame, Error = MultiplexingStreamError>
@@ -50,20 +52,20 @@ pub enum ProtocolMajorVersion {
     V3,
 }
 
-struct ChannelCore<Codec: MultiplexingStreamCodec> {
+struct ChannelCore<Codec: MultiplexingFrameCodec> {
     offer_parameters: OfferParameters,
     options: ChannelOptions,
     stream_core: Arc<Mutex<MultiplexingStreamCore<Codec>>>,
 }
 
-struct MultiplexingStreamCore<Codec: MultiplexingStreamCodec> {
-    writer: SplitSink<Framed<DuplexStream, Codec>, Frame>,
+struct MultiplexingStreamCore<FrameCodec: MultiplexingFrameCodec> {
+    writer: SplitSink<Framed<DuplexStream, MultiplexingMessageCodec<FrameCodec>>, Message>,
     listening: Option<JoinHandle<Result<(), MultiplexingStreamError>>>,
-    open_channels: HashMap<QualifiedChannelId, Channel<Codec>>,
-    offered_channels: HashMap<QualifiedChannelId, PendingChannel<Codec>>,
+    open_channels: HashMap<QualifiedChannelId, Channel<FrameCodec>>,
+    offered_channels: HashMap<QualifiedChannelId, PendingChannel<FrameCodec>>,
 }
 
-impl<Codec: MultiplexingStreamCodec> MultiplexingStreamCore<Codec> {
+impl<Codec: MultiplexingFrameCodec> MultiplexingStreamCore<Codec> {
     // pub fn start_listening(&mut self) -> Result<(), MultiplexingStreamError> {
     //     if self.listening.is_some() {
     //         return Err(MultiplexingStreamError::ListeningAlreadyStarted);
@@ -76,12 +78,12 @@ impl<Codec: MultiplexingStreamCodec> MultiplexingStreamCore<Codec> {
 
     async fn listen(
         this: Arc<Mutex<MultiplexingStreamCore<Codec>>>,
-        mut stream: SplitStream<Framed<DuplexStream, Codec>>,
+        mut stream: SplitStream<Framed<DuplexStream, MultiplexingMessageCodec<Codec>>>,
     ) -> Result<(), MultiplexingStreamError> {
         loop {
-            while let Some(frame) = stream.next().await.transpose()? {
+            while let Some(message) = stream.next().await.transpose()? {
                 let me = this.lock().await;
-                match Codec::decode_frame(frame)? {
+                match message {
                     frame::Message::Offer(channel_id, offer_parameters) => {
                         me.on_offer(channel_id, offer_parameters)?
                     }
@@ -154,7 +156,7 @@ impl<Codec: MultiplexingStreamCodec> MultiplexingStreamCore<Codec> {
 }
 
 // TODO: dropping this should send a channel closed notice to the remote party
-pub struct Channel<Codec: MultiplexingStreamCodec> {
+pub struct Channel<Codec: MultiplexingFrameCodec> {
     core: Arc<Mutex<ChannelCore<Codec>>>,
     id: QualifiedChannelId,
     name: Option<String>,
@@ -162,7 +164,7 @@ pub struct Channel<Codec: MultiplexingStreamCodec> {
     channel_duplex: DuplexStream,
 }
 
-impl<Codec: MultiplexingStreamCodec> Channel<Codec> {
+impl<Codec: MultiplexingFrameCodec> Channel<Codec> {
     pub fn id(&self) -> QualifiedChannelId {
         self.id
     }
@@ -176,13 +178,13 @@ impl<Codec: MultiplexingStreamCodec> Channel<Codec> {
     }
 }
 // TODO: dropping this should send a cancellation notice to the remote party
-pub struct PendingChannel<Codec: MultiplexingStreamCodec> {
+pub struct PendingChannel<Codec: MultiplexingFrameCodec> {
     id: QualifiedChannelId,
     mxstream: Arc<Mutex<MultiplexingStreamCore<Codec>>>,
     central_duplex: DuplexStream,
 }
 
-impl<Codec: MultiplexingStreamCodec> PendingChannel<Codec> {
+impl<Codec: MultiplexingFrameCodec> PendingChannel<Codec> {
     pub fn id(&self) -> QualifiedChannelId {
         self.id
     }
@@ -193,7 +195,7 @@ impl<Codec: MultiplexingStreamCodec> PendingChannel<Codec> {
     }
 }
 
-pub struct MultiplexingStream<Codec: MultiplexingStreamCodec> {
+pub struct MultiplexingStream<Codec: MultiplexingFrameCodec> {
     core: Arc<Mutex<MultiplexingStreamCore<Codec>>>,
     options: Options,
     next_unreserved_channel_id: u64,
@@ -210,7 +212,10 @@ pub fn create_v3_with_options(
     let next_unreserved_channel_id = options.seeded_channels.len() as u64;
 
     let framed = match options.protocol_major_version {
-        ProtocolMajorVersion::V3 => Framed::new(duplex, MultiplexingFrameV3Codec::new()),
+        ProtocolMajorVersion::V3 => Framed::new(
+            duplex,
+            MultiplexingMessageCodec::new(MultiplexingFrameV3Codec::new()),
+        ),
     };
 
     let (writer, reader) = framed.split();
@@ -235,7 +240,7 @@ pub fn create_v3_with_options(
     }
 }
 
-impl<Codec: MultiplexingStreamCodec> MultiplexingStream<Codec> {
+impl<Codec: MultiplexingFrameCodec> MultiplexingStream<Codec> {
     pub fn create_channel(
         options: Option<ChannelOptions>,
     ) -> Result<PendingChannel<Codec>, MultiplexingStreamError> {
@@ -275,7 +280,7 @@ impl<Codec: MultiplexingStreamCodec> MultiplexingStream<Codec> {
         };
         let mut core = self.core.lock().await;
         core.offered_channels.insert(qualified_id, pending_channel);
-        core.writer.send(Codec::encode_frame(message)?).await?;
+        core.writer.send(message).await?;
 
         // TODO: If the promise we return is dropped, we should cancel the offer.
 
