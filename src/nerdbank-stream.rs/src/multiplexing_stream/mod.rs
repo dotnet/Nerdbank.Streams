@@ -1,23 +1,43 @@
 mod channel_source;
+mod codec_v3;
 mod control_code;
 mod error;
-mod formatter;
 mod frame;
 mod options;
-mod frame_duplex;
 
-use std::{collections::HashMap, default, future::Pending, ops::DerefMut, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use channel_source::ChannelSource;
-use control_code::ControlCode;
+use codec_v3::MultiplexingFrameV3Codec;
 use error::MultiplexingStreamError;
-use formatter::{FrameIO, V3Formatter};
 pub use frame::QualifiedChannelId;
-use frame::{AcceptanceParameters, ContentProcessed, Frame, FrameHeader, OfferParameters};
+use frame::{AcceptanceParameters, ContentProcessed, Frame, FrameCodec, Message, OfferParameters};
+use futures::{
+    stream::{SplitSink, SplitStream},
+    StreamExt,
+};
+use futures_util::SinkExt;
 use options::ChannelOptions;
 use tokio::{io::DuplexStream, sync::Mutex, task::JoinHandle};
 
 pub use options::Options;
+use tokio_util::codec::{Decoder, Encoder, Framed};
+
+// Define a trait for the constraints we'll use in many places.
+trait MultiplexingStreamCodec:
+    FrameCodec
+    + Decoder<Item = Frame, Error = MultiplexingStreamError>
+    + Encoder<Frame, Error = MultiplexingStreamError>
+{
+}
+
+// Make it an auto-trait, so that any complying codec will Just Work.
+impl<T> MultiplexingStreamCodec for T where
+    T: FrameCodec
+        + Decoder<Item = Frame, Error = MultiplexingStreamError>
+        + Encoder<Frame, Error = MultiplexingStreamError>
+{
+}
 
 #[derive(Copy, Clone, Debug)]
 pub enum ProtocolMajorVersion {
@@ -31,13 +51,11 @@ struct ChannelCore {
     options: ChannelOptions,
 }
 
-struct MultiplexingStreamCore {
-    formatter: Arc<Box<dyn FrameIO>>,
+struct MultiplexingStreamCore<Codec: MultiplexingStreamCodec> {
+    writer: SplitSink<Framed<DuplexStream, Codec>, Frame>,
     open_channels: HashMap<QualifiedChannelId, Channel>,
-    offered_channels: HashMap<QualifiedChannelId, PendingChannel>,
+    offered_channels: HashMap<QualifiedChannelId, PendingChannel<Codec>>,
 }
-
-impl MultiplexingStreamCore {}
 
 // TODO: dropping this should send a channel closed notice to the remote party
 pub struct Channel {
@@ -61,12 +79,12 @@ impl Channel {
     }
 }
 // TODO: dropping this should send a cancellation notice to the remote party
-pub struct PendingChannel {
+pub struct PendingChannel<Codec: MultiplexingStreamCodec> {
     id: QualifiedChannelId,
-    mxstream: Arc<Mutex<MultiplexingStreamCore>>,
+    mxstream: Arc<Mutex<MultiplexingStreamCore<Codec>>>,
 }
 
-impl PendingChannel {
+impl<Codec: MultiplexingStreamCodec> PendingChannel<Codec> {
     pub fn id(&self) -> QualifiedChannelId {
         self.id
     }
@@ -77,42 +95,47 @@ impl PendingChannel {
     }
 }
 
-pub struct MultiplexingStream {
-    core: Arc<Mutex<MultiplexingStreamCore>>,
-    formatter: Arc<Box<dyn FrameIO>>,
+pub struct MultiplexingStream<Codec: MultiplexingStreamCodec> {
+    core: Arc<Mutex<MultiplexingStreamCore<Codec>>>,
     options: Options,
     listening: Option<JoinHandle<Result<(), MultiplexingStreamError>>>,
     next_unreserved_channel_id: u64,
 }
 
-impl MultiplexingStream {
-    pub fn create(duplex: DuplexStream) -> Self {
-        Self::create_with_options(duplex, Options::default())
-    }
+pub fn create_v3(duplex: DuplexStream) -> MultiplexingStream<MultiplexingFrameV3Codec> {
+    create_v3_with_options(duplex, Options::default())
+}
 
-    pub fn create_with_options(duplex: DuplexStream, options: Options) -> Self {
-        let formatter: Arc<Box<dyn FrameIO>> = match options.protocol_major_version {
-            ProtocolMajorVersion::V3 => Arc::new(Box::new(V3Formatter::new(duplex))),
-        };
-        let core = MultiplexingStreamCore {
-            formatter: formatter.clone(),
-            open_channels: HashMap::new(),
-            offered_channels: HashMap::new(),
-        };
-        let next_unreserved_channel_id = options.seeded_channels.len() as u64;
-        let core = Arc::new(Mutex::new(core));
-        MultiplexingStream {
-            core,
-            formatter,
-            options,
-            listening: None,
-            next_unreserved_channel_id,
-        }
-    }
+pub fn create_v3_with_options(
+    duplex: DuplexStream,
+    options: Options,
+) -> MultiplexingStream<MultiplexingFrameV3Codec> {
+    let next_unreserved_channel_id = options.seeded_channels.len() as u64;
 
+    let framed = match options.protocol_major_version {
+        ProtocolMajorVersion::V3 => Framed::new(duplex, MultiplexingFrameV3Codec::new()),
+    };
+
+    let (writer, reader) = framed.split();
+
+    let core = MultiplexingStreamCore::<MultiplexingFrameV3Codec> {
+        writer,
+        open_channels: HashMap::new(),
+        offered_channels: HashMap::new(),
+    };
+    let core = Arc::new(Mutex::new(core));
+    MultiplexingStream {
+        core,
+        options,
+        listening: None,
+        next_unreserved_channel_id,
+    }
+}
+
+impl<Codec: MultiplexingStreamCodec> MultiplexingStream<Codec> {
     pub fn create_channel(
         options: Option<ChannelOptions>,
-    ) -> Result<PendingChannel, MultiplexingStreamError> {
+    ) -> Result<PendingChannel<Codec>, MultiplexingStreamError> {
         todo!()
     }
 
@@ -128,6 +151,10 @@ impl MultiplexingStream {
         if self.listening.is_none() {
             return Err(MultiplexingStreamError::NotListening);
         }
+        let qualified_id = QualifiedChannelId {
+            source: ChannelSource::Local,
+            id: self.reserved_unused_channel_id(),
+        };
 
         let offer_parameters = OfferParameters {
             name,
@@ -139,34 +166,15 @@ impl MultiplexingStream {
                     }) as u64,
             ),
         };
-        let payload = self
-            .core
-            .lock()
-            .await
-            .formatter
-            .serializer()
-            .serialize_offer(&offer_parameters);
-        let qualified_id = QualifiedChannelId {
-            source: ChannelSource::Local,
-            id: self.reserved_unused_channel_id(),
-        };
+        let message = Message::Offer(qualified_id, offer_parameters.clone());
 
         let pending_channel = PendingChannel {
             id: qualified_id,
             mxstream: self.core.clone(),
         };
-        self.core
-            .lock()
-            .await
-            .offered_channels
-            .insert(qualified_id, pending_channel);
-
-        let header = FrameHeader {
-            code: ControlCode::Offer,
-            channel_id: Some(qualified_id),
-        };
-
-        self.formatter.write_frame(Frame { header, payload })?;
+        let mut core = self.core.lock().await;
+        core.offered_channels.insert(qualified_id, pending_channel);
+        core.writer.send(Codec::encode_frame(message)?).await?;
 
         // TODO: If the promise we return is dropped, we should cancel the offer.
 
@@ -221,36 +229,33 @@ impl MultiplexingStream {
     //     Ok(())
     // }
 
-    async fn listen(&self) -> Result<(), MultiplexingStreamError> {
-        let formatter = self.core.lock().await.formatter.clone();
-        let serializer = formatter.serializer();
+    async fn listen(
+        this: Arc<Mutex<MultiplexingStream<Codec>>>,
+        mut stream: SplitStream<Framed<DuplexStream, Codec>>,
+    ) -> Result<(), MultiplexingStreamError> {
         loop {
-            while let Some(frame) = self.core.lock().await.formatter.read_frame().await? {
-                let channel_id = frame.header.channel_id.ok_or_else(|| {
-                    MultiplexingStreamError::ProtocolViolation(
-                        "Missing ID in channel offer.".to_string(),
-                    )
-                })?;
-                match frame.header.code {
-                    ControlCode::Offer => {
-                        self.on_offer(channel_id, serializer.deserialize_offer(&frame.payload)?)?
+            while let Some(frame) = stream.next().await.transpose()? {
+                let me = this.lock().await;
+                match Codec::decode_frame(frame)? {
+                    frame::Message::Offer(channel_id, offer_parameters) => {
+                        me.on_offer(channel_id, offer_parameters)?
                     }
-                    ControlCode::OfferAccepted => self.on_offer_accepted(
-                        channel_id,
-                        serializer.deserialize_acceptance(&frame.payload)?,
-                    )?,
-                    ControlCode::Content => self.on_content(channel_id, frame.payload)?,
-                    ControlCode::ContentWritingCompleted => {
-                        self.on_content_writing_completed(channel_id)?
+                    frame::Message::Acceptance(channel_id, acceptance_parameters) => {
+                        me.on_offer_accepted(channel_id, acceptance_parameters)?
                     }
-                    ControlCode::ChannelTerminated => {
-                        self.on_channel_terminated(channel_id, frame.payload)?
+                    frame::Message::Content(channel_id, payload) => {
+                        me.on_content(channel_id, payload)?
                     }
-                    ControlCode::ContentProcessed => self.on_content_processed(
-                        channel_id,
-                        serializer.deserialize_content_processed(&frame.payload)?,
-                    )?,
-                };
+                    frame::Message::ContentProcessed(channel_id, content_processed) => {
+                        me.on_content_processed(channel_id, content_processed)?
+                    }
+                    frame::Message::ContentWritingCompleted(channel_id) => {
+                        me.on_content_writing_completed(channel_id)?
+                    }
+                    frame::Message::ChannelTerminated(channel_id) => {
+                        me.on_channel_terminated(channel_id, Vec::new())?
+                    }
+                }
             }
         }
     }
@@ -313,8 +318,8 @@ mod tests {
     async fn simple_v3() {
         let duplexes = duplex(4096);
         let (mx1, mx2) = (
-            MultiplexingStream::create(duplexes.0),
-            MultiplexingStream::create(duplexes.1),
+            create_v3(duplexes.0),
+            create_v3(duplexes.1),
         );
     }
 }

@@ -1,4 +1,13 @@
-use super::{channel_source::ChannelSource, control_code::ControlCode};
+use std::io::ErrorKind;
+
+use bytes::{Buf, BufMut};
+use msgpack_simple::MsgPack;
+use rmp::decode::{NumValueReadError, RmpRead, ValueReadError};
+use tokio_util::codec::{Decoder, Encoder};
+
+use super::{
+    channel_source::ChannelSource, control_code::ControlCode, error::MultiplexingStreamError, ProtocolMajorVersion,
+};
 
 /// The maximum length of a frame's payload.
 pub const FRAME_PAYLOAD_MAX_LENGTH: usize = 20 * 1024;
@@ -43,7 +52,7 @@ impl FrameHeader {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OfferParameters {
     /// The maximum number of bytes that may be transmitted and not yet acknowledged as processed by the remote party.
     pub remote_window_size: Option<u64>,
@@ -52,10 +61,26 @@ pub struct OfferParameters {
     pub name: String,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AcceptanceParameters {
     pub remote_window_size: Option<u64>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ContentProcessed(pub u64);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Message {
+    Offer(QualifiedChannelId, OfferParameters),
+    Acceptance(QualifiedChannelId, AcceptanceParameters),
+    Content(QualifiedChannelId, Vec<u8>),
+    ContentProcessed(QualifiedChannelId, ContentProcessed),
+    ContentWritingCompleted(QualifiedChannelId),
+    ChannelTerminated(QualifiedChannelId),
+}
+
+pub trait FrameCodec {
+    const MAJOR_VERSION: ProtocolMajorVersion;
+    fn decode_frame(frame: Frame) -> Result<Message, MultiplexingStreamError>;
+    fn encode_frame(message: Message) -> Result<Frame, MultiplexingStreamError>;
+}

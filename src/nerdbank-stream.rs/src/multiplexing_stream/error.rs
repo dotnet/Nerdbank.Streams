@@ -29,7 +29,7 @@ impl std::fmt::Display for MultiplexingStreamError {
             MultiplexingStreamError::WriteFailure(e) => {
                 write!(f, "Error writing frame: {}", e)
             }
-            MultiplexingStreamError::ReadFailure(e) =>  {
+            MultiplexingStreamError::ReadFailure(e) => {
                 write!(f, "Error reading frame: {}", e)
             }
             MultiplexingStreamError::Io(error) => {
@@ -68,5 +68,17 @@ impl<E: rmp::encode::RmpWriteErr> From<rmp::encode::ValueWriteError<E>>
 {
     fn from(value: rmp::encode::ValueWriteError<E>) -> Self {
         MultiplexingStreamError::WriteFailure(format!("Msgpack write error: {}", value))
+    }
+}
+
+impl From<rmp::decode::ValueReadError> for MultiplexingStreamError {
+    fn from(value: rmp::decode::ValueReadError) -> Self {
+        MultiplexingStreamError::ReadFailure(format!("msgpack decode failure: {}", value))
+    }
+}
+
+impl From<rmp::decode::NumValueReadError> for MultiplexingStreamError {
+    fn from(value: rmp::decode::NumValueReadError) -> Self {
+        MultiplexingStreamError::ReadFailure(format!("msgpack numeric decode failure: {}", value))
     }
 }
