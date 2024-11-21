@@ -26,10 +26,10 @@ impl From<ChannelSource> for i8 {
     }
 }
 
-impl TryFrom<i64> for ChannelSource {
+impl TryFrom<i8> for ChannelSource {
     type Error = MultiplexingStreamError;
 
-    fn try_from(value: i64) -> Result<Self, Self::Error> {
+    fn try_from(value: i8) -> Result<Self, Self::Error> {
         match value {
             1 => Ok(ChannelSource::Local),
             -1 => Ok(ChannelSource::Remote),

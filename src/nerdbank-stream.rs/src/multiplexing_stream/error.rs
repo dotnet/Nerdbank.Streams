@@ -6,6 +6,7 @@ pub enum MultiplexingStreamError {
     PayloadTooLarge(usize),
     ChannelFailure,
     WriteFailure(String),
+    ReadFailure(String),
     ProtocolViolation(String),
     ListeningAlreadyStarted,
     NotListening,
@@ -27,6 +28,9 @@ impl std::fmt::Display for MultiplexingStreamError {
             }
             MultiplexingStreamError::WriteFailure(e) => {
                 write!(f, "Error writing frame: {}", e)
+            }
+            MultiplexingStreamError::ReadFailure(e) =>  {
+                write!(f, "Error reading frame: {}", e)
             }
             MultiplexingStreamError::Io(error) => {
                 write!(f, "IO error: {}", error)

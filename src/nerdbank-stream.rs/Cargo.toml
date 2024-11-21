@@ -7,6 +7,9 @@ rust-version = "1.81"
 [dependencies]
 async-trait = "0.1.82"
 bytes = "1.8.0"
+futures-util = { version = "0.3.31", features = ["sink"] }
 msgpack_simple = "1.0.2"
 rmp = "0.8"
 tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1.16"
+tokio-util = { version = "0.7", features = ["codec"] }

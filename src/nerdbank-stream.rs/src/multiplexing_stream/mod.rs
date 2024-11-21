@@ -4,6 +4,7 @@ mod error;
 mod formatter;
 mod frame;
 mod options;
+mod frame_duplex;
 
 use std::{collections::HashMap, default, future::Pending, ops::DerefMut, sync::Arc};
 
