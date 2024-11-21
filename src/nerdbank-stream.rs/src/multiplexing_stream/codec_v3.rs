@@ -440,6 +440,7 @@ mod tests {
         roundtrip_message(Message::ContentProcessed(
             qualified_channel(),
             ContentProcessed(13),
-        ));
+        ))
+        .await;
     }
 }
