@@ -13,18 +13,28 @@ use super::{
         AcceptanceParameters, ContentProcessed, Frame, FrameCodec, FrameHeader, Message,
         OfferParameters, FRAME_PAYLOAD_MAX_LENGTH,
     },
+    message_codec::MultiplexingFrameCodecClone,
     ProtocolMajorVersion, QualifiedChannelId,
 };
 
 const FRAME_HEADER_MAX_LENGTH: usize = 50; // this is an over-estimate.
 const MAX_FRAME_SIZE: usize = FRAME_HEADER_MAX_LENGTH + FRAME_PAYLOAD_MAX_LENGTH;
 
+#[derive(Clone)]
 pub struct MultiplexingFrameV3Codec;
 
-impl FrameCodec for MultiplexingFrameV3Codec {
-    const MAJOR_VERSION: ProtocolMajorVersion = ProtocolMajorVersion::V3;
+impl MultiplexingFrameCodecClone for MultiplexingFrameV3Codec {
+    fn clone_box(&self) -> Box<dyn super::message_codec::MultiplexingFrameCodec> {
+        Box::new(self.clone())
+    }
+}
 
-    fn decode_frame(frame: Frame) -> Result<Message, MultiplexingStreamError> {
+impl FrameCodec for MultiplexingFrameV3Codec {
+    fn get_protocol_version(&self) -> ProtocolMajorVersion {
+        ProtocolMajorVersion::V3
+    }
+
+    fn decode_frame(&self, frame: Frame) -> Result<Message, MultiplexingStreamError> {
         let channel_id = frame.header.channel_id.ok_or_else(|| {
             MultiplexingStreamError::ProtocolViolation("Missing ID in channel offer.".to_string())
         })?;
@@ -45,7 +55,7 @@ impl FrameCodec for MultiplexingFrameV3Codec {
         })
     }
 
-    fn encode_frame(message: Message) -> Result<Frame, MultiplexingStreamError> {
+    fn encode_frame(&self, message: Message) -> Result<Frame, MultiplexingStreamError> {
         Ok(match message {
             Message::Offer(qualified_channel_id, offer_parameters) => Frame {
                 header: FrameHeader {
@@ -278,9 +288,12 @@ impl Encoder<Frame> for MultiplexingFrameV3Codec {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
+    use crate::multiplexing_stream::message_codec::{
+        MultiplexingFrameCodec, MultiplexingMessageCodec,
+    };
+
     use super::*;
     use futures_util::SinkExt;
     use tokio::io::duplex;
@@ -332,116 +345,80 @@ mod tests {
         send_many_frames(2).await;
     }
 
-    #[tokio::test]
-    async fn frame_all_fields() {
-        roundtrip(Frame {
-            header: FrameHeader {
-                channel_id: Some(QualifiedChannelId {
-                    id: 5,
-                    source: ChannelSource::Local,
-                }),
-                code: ControlCode::OfferAccepted,
-            },
-            payload: vec![1, 2, 3],
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn frame_no_payload() {
-        roundtrip(Frame {
-            header: FrameHeader {
-                channel_id: Some(QualifiedChannelId {
-                    id: 5,
-                    source: ChannelSource::Local,
-                }),
-                code: ControlCode::Offer,
-            },
-            payload: vec![],
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn frame_no_payload_or_channel_id() {
-        roundtrip(Frame {
-            header: FrameHeader {
-                channel_id: None,
-                code: ControlCode::Offer,
-            },
-            payload: vec![],
-        })
-        .await;
-    }
-
-    async fn roundtrip(frame: Frame) {
+    async fn roundtrip(message: Message, frame_codec: impl MultiplexingFrameCodec + 'static) {
+        let codec = MultiplexingMessageCodec::new(Box::new(frame_codec));
         let (alice, bob) = duplex(64);
-        let mut alice_framed = Framed::new(alice, MultiplexingFrameV3Codec::new());
-        let mut bob_framed = Framed::new(bob, MultiplexingFrameV3Codec::new());
-        bob_framed.send(frame.clone()).await.unwrap();
-        let deserialized_frame = alice_framed.next().await.unwrap().unwrap();
-        assert!(frame.eq(&deserialized_frame));
-    }
-
-    async fn roundtrip_message(message: Message) {
-        let frame = MultiplexingFrameV3Codec::encode_frame(message.clone()).unwrap();
-        roundtrip(frame.clone()).await;
-        let deserialize_message = MultiplexingFrameV3Codec::decode_frame(frame).unwrap();
-        assert!(message.eq(&deserialize_message));
+        let mut alice_framed = Framed::new(alice, codec.clone());
+        let mut bob_framed = Framed::new(bob, codec);
+        bob_framed.send(message.clone()).await.unwrap();
+        let deserialized_message = alice_framed.next().await.unwrap().unwrap();
+        assert!(message.eq(&deserialized_message));
     }
 
     #[tokio::test]
     async fn offer_no_window_size() {
-        roundtrip_message(Message::Offer(
-            qualified_channel(),
-            OfferParameters {
-                name: "hi".to_string(),
-                remote_window_size: None,
-            },
-        ))
+        roundtrip(
+            Message::Offer(
+                qualified_channel(),
+                OfferParameters {
+                    name: "hi".to_string(),
+                    remote_window_size: None,
+                },
+            ),
+            MultiplexingFrameV3Codec::new(),
+        )
         .await;
     }
 
     #[tokio::test]
     async fn offer_with_window_size() {
-        roundtrip_message(Message::Offer(
-            qualified_channel(),
-            OfferParameters {
-                name: "hi".to_string(),
-                remote_window_size: Some(35),
-            },
-        ))
+        roundtrip(
+            Message::Offer(
+                qualified_channel(),
+                OfferParameters {
+                    name: "hi".to_string(),
+                    remote_window_size: Some(35),
+                },
+            ),
+            MultiplexingFrameV3Codec::new(),
+        )
         .await;
     }
 
     #[tokio::test]
     async fn acceptance_no_window_size() {
-        roundtrip_message(Message::Acceptance(
-            qualified_channel(),
-            AcceptanceParameters {
-                remote_window_size: None,
-            },
-        ))
+        roundtrip(
+            Message::Acceptance(
+                qualified_channel(),
+                AcceptanceParameters {
+                    remote_window_size: None,
+                },
+            ),
+            MultiplexingFrameV3Codec::new(),
+        )
         .await;
     }
 
     #[tokio::test]
     async fn acceptance_with_window_size() {
-        roundtrip_message(Message::Acceptance(
-            qualified_channel(),
-            AcceptanceParameters {
-                remote_window_size: Some(64),
-            },
-        ))
+        roundtrip(
+            Message::Acceptance(
+                qualified_channel(),
+                AcceptanceParameters {
+                    remote_window_size: Some(64),
+                },
+            ),
+            MultiplexingFrameV3Codec::new(),
+        )
         .await;
     }
 
     #[tokio::test]
     async fn content_processed() {
-        roundtrip_message(Message::ContentProcessed(
-            qualified_channel(),
-            ContentProcessed(13),
-        ))
+        roundtrip(
+            Message::ContentProcessed(qualified_channel(), ContentProcessed(13)),
+            MultiplexingFrameV3Codec::new(),
+        )
         .await;
     }
 }

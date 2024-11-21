@@ -18,7 +18,7 @@ use futures::{
     StreamExt,
 };
 use futures_util::SinkExt;
-use message_codec::MultiplexingMessageCodec;
+use message_codec::{MultiplexingFrameCodec, MultiplexingMessageCodec};
 use options::ChannelOptions;
 use tokio::{
     io::{duplex, DuplexStream},
@@ -29,22 +29,6 @@ use tokio::{
 pub use options::Options;
 use tokio_util::codec::{Decoder, Encoder, Framed};
 
-// Define a trait for the constraints we'll use in many places.
-trait MultiplexingFrameCodec:
-    FrameCodec
-    + Decoder<Item = Frame, Error = MultiplexingStreamError>
-    + Encoder<Frame, Error = MultiplexingStreamError>
-{
-}
-
-// Make it an auto-trait, so that any complying codec will Just Work.
-impl<T> MultiplexingFrameCodec for T where
-    T: FrameCodec
-        + Decoder<Item = Frame, Error = MultiplexingStreamError>
-        + Encoder<Frame, Error = MultiplexingStreamError>
-{
-}
-
 #[derive(Copy, Clone, Debug)]
 pub enum ProtocolMajorVersion {
     //V1,
@@ -52,33 +36,36 @@ pub enum ProtocolMajorVersion {
     V3,
 }
 
-struct ChannelCore<Codec: MultiplexingFrameCodec> {
+struct ChannelCore {
     offer_parameters: OfferParameters,
     options: ChannelOptions,
-    stream_core: Arc<Mutex<MultiplexingStreamCore<Codec>>>,
+    stream_core: Arc<Mutex<MultiplexingStreamCore>>,
 }
 
-struct MultiplexingStreamCore<FrameCodec: MultiplexingFrameCodec> {
-    writer: SplitSink<Framed<DuplexStream, MultiplexingMessageCodec<FrameCodec>>, Message>,
+struct MultiplexingStreamCore {
+    writer: SplitSink<Framed<DuplexStream, MultiplexingMessageCodec>, Message>,
     listening: Option<JoinHandle<Result<(), MultiplexingStreamError>>>,
-    open_channels: HashMap<QualifiedChannelId, Channel<FrameCodec>>,
-    offered_channels: HashMap<QualifiedChannelId, PendingChannel<FrameCodec>>,
+    open_channels: HashMap<QualifiedChannelId, Channel>,
+    offered_channels: HashMap<QualifiedChannelId, PendingChannel>,
 }
 
-impl<Codec: MultiplexingFrameCodec> MultiplexingStreamCore<Codec> {
-    // pub fn start_listening(&mut self) -> Result<(), MultiplexingStreamError> {
-    //     if self.listening.is_some() {
-    //         return Err(MultiplexingStreamError::ListeningAlreadyStarted);
-    //     }
+impl MultiplexingStreamCore {
+    pub fn start_listening(
+        self,
+        stream: SplitStream<Framed<DuplexStream, MultiplexingMessageCodec>>,
+    ) -> Result<Arc<Mutex<Self>>, MultiplexingStreamError> {
+        if self.listening.is_some() {
+            return Err(MultiplexingStreamError::ListeningAlreadyStarted);
+        }
 
-    //     self.listening = Some(tokio::spawn(self.listen()));
+        //self.listening = Some(tokio::spawn(Self::listen(mutex, stream)));
 
-    //     Ok(())
-    // }
+        Ok(Arc::new(Mutex::new(self)))
+    }
 
     async fn listen(
-        this: Arc<Mutex<MultiplexingStreamCore<Codec>>>,
-        mut stream: SplitStream<Framed<DuplexStream, MultiplexingMessageCodec<Codec>>>,
+        this: Arc<Mutex<MultiplexingStreamCore>>,
+        mut stream: SplitStream<Framed<DuplexStream, MultiplexingMessageCodec>>,
     ) -> Result<(), MultiplexingStreamError> {
         loop {
             while let Some(message) = stream.next().await.transpose()? {
@@ -156,15 +143,15 @@ impl<Codec: MultiplexingFrameCodec> MultiplexingStreamCore<Codec> {
 }
 
 // TODO: dropping this should send a channel closed notice to the remote party
-pub struct Channel<Codec: MultiplexingFrameCodec> {
-    core: Arc<Mutex<ChannelCore<Codec>>>,
+pub struct Channel {
+    core: Arc<Mutex<ChannelCore>>,
     id: QualifiedChannelId,
     name: Option<String>,
     // central_duplex: DuplexStream,
     channel_duplex: DuplexStream,
 }
 
-impl<Codec: MultiplexingFrameCodec> Channel<Codec> {
+impl Channel {
     pub fn id(&self) -> QualifiedChannelId {
         self.id
     }
@@ -178,72 +165,67 @@ impl<Codec: MultiplexingFrameCodec> Channel<Codec> {
     }
 }
 // TODO: dropping this should send a cancellation notice to the remote party
-pub struct PendingChannel<Codec: MultiplexingFrameCodec> {
+pub struct PendingChannel {
     id: QualifiedChannelId,
-    mxstream: Arc<Mutex<MultiplexingStreamCore<Codec>>>,
+    mxstream: Arc<Mutex<MultiplexingStreamCore>>,
     central_duplex: DuplexStream,
 }
 
-impl<Codec: MultiplexingFrameCodec> PendingChannel<Codec> {
+impl PendingChannel {
     pub fn id(&self) -> QualifiedChannelId {
         self.id
     }
 
-    pub async fn get_channel(self) -> Result<Channel<Codec>, MultiplexingStreamError> {
+    pub async fn get_channel(self) -> Result<Channel, MultiplexingStreamError> {
         // This method intentionally *consumes* self.
         todo!()
     }
 }
 
-pub struct MultiplexingStream<Codec: MultiplexingFrameCodec> {
-    core: Arc<Mutex<MultiplexingStreamCore<Codec>>>,
+pub struct MultiplexingStream {
+    core: Arc<Mutex<MultiplexingStreamCore>>,
     options: Options,
     next_unreserved_channel_id: u64,
 }
 
-pub fn create_v3(duplex: DuplexStream) -> MultiplexingStream<MultiplexingFrameV3Codec> {
+pub fn create_v3(duplex: DuplexStream) -> Result<MultiplexingStream, MultiplexingStreamError> {
     create_v3_with_options(duplex, Options::default())
 }
 
 pub fn create_v3_with_options(
     duplex: DuplexStream,
     options: Options,
-) -> MultiplexingStream<MultiplexingFrameV3Codec> {
+) -> Result<MultiplexingStream, MultiplexingStreamError> {
     let next_unreserved_channel_id = options.seeded_channels.len() as u64;
 
     let framed = match options.protocol_major_version {
         ProtocolMajorVersion::V3 => Framed::new(
             duplex,
-            MultiplexingMessageCodec::new(MultiplexingFrameV3Codec::new()),
+            MultiplexingMessageCodec::new(Box::new(MultiplexingFrameV3Codec::new())),
         ),
     };
 
     let (writer, reader) = framed.split();
 
-    let core = MultiplexingStreamCore::<MultiplexingFrameV3Codec> {
+    let core = MultiplexingStreamCore {
         writer,
         open_channels: HashMap::new(),
         offered_channels: HashMap::new(),
         listening: None,
     };
-    let core = Arc::new(Mutex::new(core));
+    let core_mutex = core.start_listening(reader)?;
 
-    let listener = task::spawn(MultiplexingStreamCore::<MultiplexingFrameV3Codec>::listen(
-        core.clone(),
-        reader,
-    ));
-
-    MultiplexingStream {
-        core,
+    Ok(MultiplexingStream {
+        core: core_mutex,
         options,
         next_unreserved_channel_id,
-    }
+    })
 }
 
-impl<Codec: MultiplexingFrameCodec> MultiplexingStream<Codec> {
+impl MultiplexingStream {
     pub fn create_channel(
         options: Option<ChannelOptions>,
-    ) -> Result<PendingChannel<Codec>, MultiplexingStreamError> {
+    ) -> Result<PendingChannel, MultiplexingStreamError> {
         todo!()
     }
 
@@ -255,7 +237,7 @@ impl<Codec: MultiplexingFrameCodec> MultiplexingStream<Codec> {
         &mut self,
         name: String,
         options: Option<ChannelOptions>,
-    ) -> Result<Channel<Codec>, MultiplexingStreamError> {
+    ) -> Result<Channel, MultiplexingStreamError> {
         let qualified_id = QualifiedChannelId {
             source: ChannelSource::Local,
             id: self.reserved_unused_channel_id(),
@@ -284,7 +266,7 @@ impl<Codec: MultiplexingFrameCodec> MultiplexingStream<Codec> {
 
         // TODO: If the promise we return is dropped, we should cancel the offer.
 
-        let channel_core = ChannelCore::<Codec> {
+        let channel_core = ChannelCore {
             offer_parameters,
             options: options.unwrap_or_else(|| self.default_channel_options()),
             stream_core: self.core.clone(),
@@ -304,7 +286,7 @@ impl<Codec: MultiplexingFrameCodec> MultiplexingStream<Codec> {
         &self,
         id: u64,
         options: Option<ChannelOptions>,
-    ) -> Result<Channel<Codec>, MultiplexingStreamError> {
+    ) -> Result<Channel, MultiplexingStreamError> {
         todo!()
     }
 
@@ -312,7 +294,7 @@ impl<Codec: MultiplexingFrameCodec> MultiplexingStream<Codec> {
         &self,
         name: String,
         options: Option<ChannelOptions>,
-    ) -> Result<Channel<Codec>, MultiplexingStreamError> {
+    ) -> Result<Channel, MultiplexingStreamError> {
         todo!()
     }
 

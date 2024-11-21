@@ -6,7 +6,8 @@ use rmp::decode::{NumValueReadError, RmpRead, ValueReadError};
 use tokio_util::codec::{Decoder, Encoder};
 
 use super::{
-    channel_source::ChannelSource, control_code::ControlCode, error::MultiplexingStreamError, ProtocolMajorVersion,
+    channel_source::ChannelSource, control_code::ControlCode, error::MultiplexingStreamError,
+    ProtocolMajorVersion,
 };
 
 /// The maximum length of a frame's payload.
@@ -80,7 +81,7 @@ pub enum Message {
 }
 
 pub trait FrameCodec {
-    const MAJOR_VERSION: ProtocolMajorVersion;
-    fn decode_frame(frame: Frame) -> Result<Message, MultiplexingStreamError>;
-    fn encode_frame(message: Message) -> Result<Frame, MultiplexingStreamError>;
+    fn get_protocol_version(&self) -> ProtocolMajorVersion;
+    fn decode_frame(&self, frame: Frame) -> Result<Message, MultiplexingStreamError>;
+    fn encode_frame(&self, message: Message) -> Result<Frame, MultiplexingStreamError>;
 }
