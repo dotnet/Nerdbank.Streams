@@ -25,12 +25,11 @@ use message_codec::MultiplexingMessageCodec;
 use options::ChannelOptions;
 use tokio::{
     io::{duplex, DuplexStream},
-    sync::{mpsc::UnboundedSender, oneshot, Mutex},
+    sync::{oneshot, Mutex},
     task::JoinHandle,
 };
 
 pub use options::Options;
-use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_util::codec::Framed;
 
 #[derive(Copy, Clone, Debug)]
@@ -49,8 +48,8 @@ struct MultiplexingStreamCore {
     listening: Option<JoinHandle<Result<(), MultiplexingStreamError>>>,
     open_channels: HashMap<QualifiedChannelId, Channel>,
     offered_channels: HashMap<QualifiedChannelId, PendingChannel>,
-    offered_channels_by_them_by_name: HashMap<String, VecDeque<PendingChannel>>,
-    accepting_channels: HashMap<String, VecDeque<oneshot::Sender<Channel>>>,
+    offered_channels_by_them_by_name: HashMap<String, VecDeque<PendingChannelWithId>>,
+    accepting_channels: HashMap<String, VecDeque<PendingChannelWithName>>,
 }
 
 impl MultiplexingStreamCore {
@@ -168,20 +167,31 @@ impl Channel {
         &mut self.channel_duplex
     }
 }
-// TODO: dropping this should send a cancellation notice to the remote party
-pub struct PendingChannel {
-    id: QualifiedChannelId,
-    mxstream: Arc<Mutex<MultiplexingStreamCore>>,
+
+enum PendingChannel {
+    Name(PendingChannelWithName),
+    Id(PendingChannelWithId),
 }
 
-impl PendingChannel {
+pub struct PendingChannelBase {
+    mxstream: Arc<Mutex<MultiplexingStreamCore>>,
+    matured_signal: oneshot::Sender<Channel>,
+}
+
+// TODO: dropping this should send a cancellation notice to the remote party
+pub struct PendingChannelWithId {
+    id: QualifiedChannelId,
+    base: PendingChannelBase,
+}
+
+pub struct PendingChannelWithName {
+    name: String,
+    base: PendingChannelBase,
+}
+
+impl PendingChannelWithId {
     pub fn id(&self) -> QualifiedChannelId {
         self.id
-    }
-
-    pub async fn get_channel(self) -> Result<Channel, MultiplexingStreamError> {
-        // This method intentionally *consumes* self.
-        todo!()
     }
 }
 
@@ -259,29 +269,22 @@ impl MultiplexingStream {
         };
         let message = Message::Offer(qualified_id, offer_parameters.clone());
 
-        let (central_duplex, channel_duplex) = duplex(window_size);
-        let pending_channel = PendingChannel {
+        let (sender, receiver) = oneshot::channel();
+        let pending_channel = PendingChannelWithId {
             id: qualified_id,
-            mxstream: self.core.clone(),
+            base: PendingChannelBase {
+                mxstream: self.core.clone(),
+                matured_signal: sender,
+            },
         };
         let mut core = self.core.lock().await;
-        core.offered_channels.insert(qualified_id, pending_channel);
+        core.offered_channels
+            .insert(qualified_id, PendingChannel::Id(pending_channel));
         core.writer.send(message).await?;
 
-        // TODO: If the promise we return is dropped, we should cancel the offer.
-
-        let channel_core = ChannelCore {
-            stream_core: self.core.clone(),
-        };
-        let channel_core = Arc::new(Mutex::new(channel_core));
-
-        Ok(Channel {
-            core: channel_core,
-            id: qualified_id,
-            name: Some(name),
-            central_duplex,
-            channel_duplex,
-        })
+        Ok(receiver
+            .await
+            .map_err(|e| MultiplexingStreamError::ChannelConnectionFailure(e.to_string()))?)
     }
 
     pub fn accept_channel_by_id(
@@ -308,13 +311,15 @@ impl MultiplexingStream {
         // First see if there's an existing offer to accept.
         if let Some(vec) = core.offered_channels_by_them_by_name.get_mut(&name) {
             if let Some(pending_channel) = vec.pop_front() {
+                let id = pending_channel.id;
                 core.writer
-                    .send(Message::Acceptance(
-                        pending_channel.id(),
-                        acceptance_parameters,
-                    ))
+                    .send(Message::Acceptance(id, acceptance_parameters))
                     .await?;
-                return Ok(self.mature_pending_channel(pending_channel, Some(name)));
+                return Ok(self.mature_pending_channel(
+                    PendingChannel::Id(pending_channel),
+                    id,
+                    Some(name),
+                ));
             }
         }
 
@@ -322,9 +327,16 @@ impl MultiplexingStream {
         let (sender, receiver) = oneshot::channel();
         let by_name_deque = core
             .accepting_channels
-            .entry(name)
+            .entry(name.clone())
             .or_insert(VecDeque::new());
-        by_name_deque.push_back(sender);
+        let pending_channel = PendingChannelWithName {
+            name: name,
+            base: PendingChannelBase {
+                mxstream: self.core.clone(),
+                matured_signal: sender,
+            },
+        };
+        by_name_deque.push_back(pending_channel);
 
         // Release our lock on the shared state and wait for an incoming offer to resolve the accept request.
         drop(core);
@@ -339,6 +351,7 @@ impl MultiplexingStream {
     fn mature_pending_channel(
         &self,
         pending_channel: PendingChannel,
+        channel_id: QualifiedChannelId,
         name: Option<String>,
     ) -> Channel {
         let channel_core = ChannelCore {
@@ -348,7 +361,7 @@ impl MultiplexingStream {
         let channel_mutex = Arc::new(Mutex::new(channel_core));
         Channel {
             core: channel_mutex,
-            id: pending_channel.id(),
+            id: channel_id,
             name: name,
             channel_duplex,
             central_duplex,
@@ -375,8 +388,20 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn simple_v3() {
+    async fn create_v3() {
         let duplexes = duplex(4096);
-        let (mx1, mx2) = (create(duplexes.0), create(duplexes.1));
+        let (mx1, mx2) = (create(duplexes.0).unwrap(), create(duplexes.1).unwrap());
+    }
+
+    #[tokio::test]
+    async fn offer_accept_by_name() {
+        let (alice, bob) = duplex(4096);
+        let (mut alice, bob) = (create(alice).unwrap(), create(bob).unwrap());
+        const NAME: &str = "test_channel";
+        let alice_channel = alice.offer_channel(NAME.to_string(), None).await.unwrap();
+        let bob_channel = bob
+            .accept_channel_by_name(NAME.to_string(), None)
+            .await
+            .unwrap();
     }
 }
