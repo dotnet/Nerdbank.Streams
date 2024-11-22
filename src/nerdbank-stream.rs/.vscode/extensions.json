@@ -1,0 +1,6 @@
+{
+    "recommendations": [
+		"swellaby.rust-pack",
+        "swellaby.vscode-rust-test-adapter"
+    ]
+}
