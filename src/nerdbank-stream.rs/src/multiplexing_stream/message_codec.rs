@@ -36,11 +36,25 @@ impl Clone for Box<dyn MultiplexingFrameCodec> {
 #[derive(Clone)]
 pub struct MultiplexingMessageCodec {
     frame_codec: Box<dyn MultiplexingFrameCodec>,
+    #[cfg(test)]
+    flip_perspective: bool,
 }
 
 impl MultiplexingMessageCodec {
     pub fn new(codec: Box<dyn MultiplexingFrameCodec>) -> Self {
-        Self { frame_codec: codec }
+        Self {
+            frame_codec: codec,
+            #[cfg(test)]
+            flip_perspective: true,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_no_flip_perspective(codec: Box<dyn MultiplexingFrameCodec>) -> Self {
+        Self {
+            frame_codec: codec,
+            flip_perspective: false,
+        }
     }
 }
 
@@ -60,10 +74,17 @@ impl Decoder for MultiplexingMessageCodec {
     fn decode(&mut self, src: &mut bytes::BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         self.frame_codec
             .decode(src)?
-            .map(|f| {
-                Ok(self
-                    .frame_codec
-                    .decode_frame(f/*.flip_channel_perspective()*/)?)
+            .map(|mut f| {
+                // Always flip the channel perspective, even during tests so we exercise that code.
+                f = f.flip_channel_perspective();
+
+                // During a test that doesn't want the perspective flipped, flip it back.
+                #[cfg(test)]
+                if !self.flip_perspective {
+                    f = f.flip_channel_perspective()
+                }
+
+                Ok(self.frame_codec.decode_frame(f)?)
             })
             .transpose()
     }

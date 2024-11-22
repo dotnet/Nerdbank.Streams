@@ -345,8 +345,8 @@ mod tests {
         send_many_frames(2).await;
     }
 
-    async fn send(message: Message, frame_codec: impl MultiplexingFrameCodec + 'static) {
-        let codec = MultiplexingMessageCodec::new(Box::new(frame_codec));
+    async fn roundtrip(message: Message, frame_codec: impl MultiplexingFrameCodec + 'static) {
+        let codec = MultiplexingMessageCodec::new_no_flip_perspective(Box::new(frame_codec));
         let (alice, bob) = duplex(64);
         let mut alice_framed = Framed::new(alice, codec.clone());
         let mut bob_framed = Framed::new(bob, codec);
@@ -355,9 +355,19 @@ mod tests {
         assert!(message.eq(&deserialized_message));
     }
 
+    async fn send(message: Message, frame_codec: impl MultiplexingFrameCodec + 'static) -> Message {
+        let codec = MultiplexingMessageCodec::new(Box::new(frame_codec));
+        let (alice, bob) = duplex(64);
+        let mut alice_framed = Framed::new(alice, codec.clone());
+        let mut bob_framed = Framed::new(bob, codec);
+        bob_framed.send(message.clone()).await.unwrap();
+        let deserialized_message = alice_framed.next().await.unwrap().unwrap();
+        deserialized_message
+    }
+
     #[tokio::test]
     async fn offer_no_window_size() {
-        send(
+        roundtrip(
             Message::Offer(
                 qualified_channel(),
                 OfferParameters {
@@ -372,7 +382,7 @@ mod tests {
 
     #[tokio::test]
     async fn offer_with_window_size() {
-        send(
+        roundtrip(
             Message::Offer(
                 qualified_channel(),
                 OfferParameters {
@@ -387,7 +397,7 @@ mod tests {
 
     #[tokio::test]
     async fn acceptance_no_window_size() {
-        send(
+        roundtrip(
             Message::Acceptance(
                 qualified_channel(),
                 AcceptanceParameters {
@@ -401,7 +411,7 @@ mod tests {
 
     #[tokio::test]
     async fn acceptance_with_window_size() {
-        send(
+        roundtrip(
             Message::Acceptance(
                 qualified_channel(),
                 AcceptanceParameters {
@@ -415,10 +425,22 @@ mod tests {
 
     #[tokio::test]
     async fn content_processed() {
-        send(
+        roundtrip(
             Message::ContentProcessed(qualified_channel(), ContentProcessed(13)),
             MultiplexingFrameV3Codec::new(),
         )
         .await;
+    }
+
+    #[tokio::test]
+    async fn verify_perspective_flipped() {
+        let recvd = send(
+            Message::ContentProcessed(qualified_channel(), ContentProcessed(13)),
+            MultiplexingFrameV3Codec::new(),
+        )
+        .await;
+        assert!(
+            matches!(recvd, Message::ContentProcessed(id, _) if id.source.eq(&qualified_channel().source.flip()))
+        );
     }
 }
