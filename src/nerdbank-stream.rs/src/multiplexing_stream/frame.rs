@@ -1,10 +1,3 @@
-use std::io::ErrorKind;
-
-use bytes::{Buf, BufMut};
-use msgpack_simple::MsgPack;
-use rmp::decode::{NumValueReadError, RmpRead, ValueReadError};
-use tokio_util::codec::{Decoder, Encoder};
-
 use super::{
     channel_source::ChannelSource, control_code::ControlCode, error::MultiplexingStreamError,
     ProtocolMajorVersion,
@@ -34,21 +27,30 @@ pub struct FrameHeader {
     pub channel_id: Option<QualifiedChannelId>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Frame {
-    pub header: FrameHeader,
-    pub payload: Vec<u8>,
-}
-
 impl FrameHeader {
     /// Flips a qualified channel ID from being considered Remove<=>Local.
-    fn flip_channel_perspective(&self) -> Self {
+    pub fn flip_channel_perspective(&self) -> Self {
         Self {
             code: self.code,
             channel_id: match self.channel_id {
                 None => None,
                 Some(id) => Some(id.flip_perspective()),
             },
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Frame {
+    pub header: FrameHeader,
+    pub payload: Vec<u8>,
+}
+
+impl Frame {
+    pub fn flip_channel_perspective(self) -> Self {
+        Self {
+            header: self.header.flip_channel_perspective(),
+            payload: self.payload,
         }
     }
 }

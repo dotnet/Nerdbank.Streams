@@ -60,7 +60,11 @@ impl Decoder for MultiplexingMessageCodec {
     fn decode(&mut self, src: &mut bytes::BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         self.frame_codec
             .decode(src)?
-            .map(|f| Ok(self.frame_codec.decode_frame(f)?))
+            .map(|f| {
+                Ok(self
+                    .frame_codec
+                    .decode_frame(f.flip_channel_perspective())?)
+            })
             .transpose()
     }
 }

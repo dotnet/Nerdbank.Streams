@@ -12,22 +12,22 @@ use channel_source::ChannelSource;
 use codec_v3::MultiplexingFrameV3Codec;
 use error::MultiplexingStreamError;
 pub use frame::QualifiedChannelId;
-use frame::{AcceptanceParameters, ContentProcessed, Frame, FrameCodec, Message, OfferParameters};
+use frame::{AcceptanceParameters, ContentProcessed, Message, OfferParameters};
 use futures::{
     stream::{SplitSink, SplitStream},
     StreamExt,
 };
 use futures_util::SinkExt;
-use message_codec::{MultiplexingFrameCodec, MultiplexingMessageCodec};
+use message_codec::MultiplexingMessageCodec;
 use options::ChannelOptions;
 use tokio::{
     io::{duplex, DuplexStream},
     sync::Mutex,
-    task::{self, JoinHandle},
+    task::JoinHandle,
 };
 
 pub use options::Options;
-use tokio_util::codec::{Decoder, Encoder, Framed};
+use tokio_util::codec::Framed;
 
 #[derive(Copy, Clone, Debug)]
 pub enum ProtocolMajorVersion {
@@ -188,11 +188,11 @@ pub struct MultiplexingStream {
     next_unreserved_channel_id: u64,
 }
 
-pub fn create_v3(duplex: DuplexStream) -> Result<MultiplexingStream, MultiplexingStreamError> {
-    create_v3_with_options(duplex, Options::default())
+pub fn create(duplex: DuplexStream) -> Result<MultiplexingStream, MultiplexingStreamError> {
+    create_with_options(duplex, Options::default())
 }
 
-pub fn create_v3_with_options(
+pub fn create_with_options(
     duplex: DuplexStream,
     options: Options,
 ) -> Result<MultiplexingStream, MultiplexingStreamError> {
@@ -320,6 +320,6 @@ mod tests {
     #[tokio::test]
     async fn simple_v3() {
         let duplexes = duplex(4096);
-        let (mx1, mx2) = (create_v3(duplexes.0), create_v3(duplexes.1));
+        let (mx1, mx2) = (create(duplexes.0), create(duplexes.1));
     }
 }
