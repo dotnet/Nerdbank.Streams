@@ -345,7 +345,7 @@ mod tests {
         send_many_frames(2).await;
     }
 
-    async fn roundtrip(message: Message, frame_codec: impl MultiplexingFrameCodec + 'static) {
+    async fn send(message: Message, frame_codec: impl MultiplexingFrameCodec + 'static) {
         let codec = MultiplexingMessageCodec::new(Box::new(frame_codec));
         let (alice, bob) = duplex(64);
         let mut alice_framed = Framed::new(alice, codec.clone());
@@ -357,7 +357,7 @@ mod tests {
 
     #[tokio::test]
     async fn offer_no_window_size() {
-        roundtrip(
+        send(
             Message::Offer(
                 qualified_channel(),
                 OfferParameters {
@@ -372,7 +372,7 @@ mod tests {
 
     #[tokio::test]
     async fn offer_with_window_size() {
-        roundtrip(
+        send(
             Message::Offer(
                 qualified_channel(),
                 OfferParameters {
@@ -387,7 +387,7 @@ mod tests {
 
     #[tokio::test]
     async fn acceptance_no_window_size() {
-        roundtrip(
+        send(
             Message::Acceptance(
                 qualified_channel(),
                 AcceptanceParameters {
@@ -401,7 +401,7 @@ mod tests {
 
     #[tokio::test]
     async fn acceptance_with_window_size() {
-        roundtrip(
+        send(
             Message::Acceptance(
                 qualified_channel(),
                 AcceptanceParameters {
@@ -415,7 +415,7 @@ mod tests {
 
     #[tokio::test]
     async fn content_processed() {
-        roundtrip(
+        send(
             Message::ContentProcessed(qualified_channel(), ContentProcessed(13)),
             MultiplexingFrameV3Codec::new(),
         )

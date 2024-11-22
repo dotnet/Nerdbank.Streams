@@ -6,7 +6,10 @@ mod frame;
 mod message_codec;
 mod options;
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+};
 
 use channel_source::ChannelSource;
 use codec_v3::MultiplexingFrameV3Codec;
@@ -22,11 +25,12 @@ use message_codec::MultiplexingMessageCodec;
 use options::ChannelOptions;
 use tokio::{
     io::{duplex, DuplexStream},
-    sync::Mutex,
+    sync::{mpsc::UnboundedSender, oneshot, Mutex},
     task::JoinHandle,
 };
 
 pub use options::Options;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_util::codec::Framed;
 
 #[derive(Copy, Clone, Debug)]
@@ -37,8 +41,6 @@ pub enum ProtocolMajorVersion {
 }
 
 struct ChannelCore {
-    offer_parameters: OfferParameters,
-    options: ChannelOptions,
     stream_core: Arc<Mutex<MultiplexingStreamCore>>,
 }
 
@@ -47,6 +49,8 @@ struct MultiplexingStreamCore {
     listening: Option<JoinHandle<Result<(), MultiplexingStreamError>>>,
     open_channels: HashMap<QualifiedChannelId, Channel>,
     offered_channels: HashMap<QualifiedChannelId, PendingChannel>,
+    offered_channels_by_them_by_name: HashMap<String, VecDeque<PendingChannel>>,
+    accepting_channels: HashMap<String, VecDeque<oneshot::Sender<Channel>>>,
 }
 
 impl MultiplexingStreamCore {
@@ -147,7 +151,7 @@ pub struct Channel {
     core: Arc<Mutex<ChannelCore>>,
     id: QualifiedChannelId,
     name: Option<String>,
-    // central_duplex: DuplexStream,
+    central_duplex: DuplexStream,
     channel_duplex: DuplexStream,
 }
 
@@ -168,7 +172,6 @@ impl Channel {
 pub struct PendingChannel {
     id: QualifiedChannelId,
     mxstream: Arc<Mutex<MultiplexingStreamCore>>,
-    central_duplex: DuplexStream,
 }
 
 impl PendingChannel {
@@ -211,6 +214,8 @@ pub fn create_with_options(
         writer,
         open_channels: HashMap::new(),
         offered_channels: HashMap::new(),
+        offered_channels_by_them_by_name: HashMap::new(),
+        accepting_channels: HashMap::new(),
         listening: None,
     };
     let core_mutex = core.start_listening(reader)?;
@@ -258,7 +263,6 @@ impl MultiplexingStream {
         let pending_channel = PendingChannel {
             id: qualified_id,
             mxstream: self.core.clone(),
-            central_duplex,
         };
         let mut core = self.core.lock().await;
         core.offered_channels.insert(qualified_id, pending_channel);
@@ -267,8 +271,6 @@ impl MultiplexingStream {
         // TODO: If the promise we return is dropped, we should cancel the offer.
 
         let channel_core = ChannelCore {
-            offer_parameters,
-            options: options.unwrap_or_else(|| self.default_channel_options()),
             stream_core: self.core.clone(),
         };
         let channel_core = Arc::new(Mutex::new(channel_core));
@@ -277,7 +279,7 @@ impl MultiplexingStream {
             core: channel_core,
             id: qualified_id,
             name: Some(name),
-            // central_duplex,
+            central_duplex,
             channel_duplex,
         })
     }
@@ -295,7 +297,62 @@ impl MultiplexingStream {
         name: String,
         options: Option<ChannelOptions>,
     ) -> Result<Channel, MultiplexingStreamError> {
-        todo!()
+        let mut core = self.core.lock().await;
+
+        let options = options.unwrap_or_else(|| self.default_channel_options());
+        let local_window_size = options.channel_receiving_window_size as u64;
+        let acceptance_parameters = AcceptanceParameters {
+            remote_window_size: Some(local_window_size),
+        };
+
+        // First see if there's an existing offer to accept.
+        if let Some(vec) = core.offered_channels_by_them_by_name.get_mut(&name) {
+            if let Some(pending_channel) = vec.pop_front() {
+                core.writer
+                    .send(Message::Acceptance(
+                        pending_channel.id(),
+                        acceptance_parameters,
+                    ))
+                    .await?;
+                return Ok(self.mature_pending_channel(pending_channel, Some(name)));
+            }
+        }
+
+        // Add our interest in this channel to the shared state
+        let (sender, receiver) = oneshot::channel();
+        let by_name_deque = core
+            .accepting_channels
+            .entry(name)
+            .or_insert(VecDeque::new());
+        by_name_deque.push_back(sender);
+
+        // Release our lock on the shared state and wait for an incoming offer to resolve the accept request.
+        drop(core);
+        Ok(receiver.await.map_err(|e| {
+            MultiplexingStreamError::ChannelConnectionFailure(format!(
+                "Failure while accepting a channel by name: {}",
+                e
+            ))
+        })?)
+    }
+
+    fn mature_pending_channel(
+        &self,
+        pending_channel: PendingChannel,
+        name: Option<String>,
+    ) -> Channel {
+        let channel_core = ChannelCore {
+            stream_core: self.core.clone(),
+        };
+        let (channel_duplex, central_duplex) = duplex(4096); // TODO: use the right window size here.
+        let channel_mutex = Arc::new(Mutex::new(channel_core));
+        Channel {
+            core: channel_mutex,
+            id: pending_channel.id(),
+            name: name,
+            channel_duplex,
+            central_duplex,
+        }
     }
 
     fn default_channel_options(&self) -> ChannelOptions {

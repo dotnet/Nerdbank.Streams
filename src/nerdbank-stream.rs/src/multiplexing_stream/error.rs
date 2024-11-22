@@ -4,6 +4,7 @@ use msgpack_simple;
 pub enum MultiplexingStreamError {
     Io(std::io::Error),
     PayloadTooLarge(usize),
+    ChannelConnectionFailure(String),
     ChannelFailure,
     WriteFailure(String),
     ReadFailure(String),
@@ -40,6 +41,9 @@ impl std::fmt::Display for MultiplexingStreamError {
             }
             MultiplexingStreamError::ChannelFailure => {
                 write!(f, "Failure sending frame to channel")
+            }
+            MultiplexingStreamError::ChannelConnectionFailure(msg) => {
+                write!(f, "Channel failed to connect: {}", msg)
             }
         }
     }

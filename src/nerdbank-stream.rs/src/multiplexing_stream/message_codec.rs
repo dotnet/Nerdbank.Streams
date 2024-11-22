@@ -63,7 +63,7 @@ impl Decoder for MultiplexingMessageCodec {
             .map(|f| {
                 Ok(self
                     .frame_codec
-                    .decode_frame(f.flip_channel_perspective())?)
+                    .decode_frame(f/*.flip_channel_perspective()*/)?)
             })
             .transpose()
     }
