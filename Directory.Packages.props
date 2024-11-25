@@ -22,7 +22,7 @@
     <PackageVersion Include="NSubstitute" Version="5.3.0" />
     <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.17" />
     <PackageVersion Include="PInvoke.Kernel32" Version="0.7.124" />
-    <PackageVersion Include="PolySharp" Version="1.14.1" />
+    <PackageVersion Include="PolySharp" Version="1.15.0" />
     <PackageVersion Include="StreamJsonRpc" Version="2.20.17" />
     <PackageVersion Include="System.IO.Pipelines" Version="8.0.0" />
     <PackageVersion Include="System.IO.Pipes" Version="4.3.0" />
