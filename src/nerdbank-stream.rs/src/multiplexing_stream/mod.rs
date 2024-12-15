@@ -61,9 +61,10 @@ impl MultiplexingStreamCore {
             return Err(MultiplexingStreamError::ListeningAlreadyStarted);
         }
 
+        let mutex = Arc::new(Mutex::new(self));
         //self.listening = Some(tokio::spawn(Self::listen(mutex, stream)));
 
-        Ok(Arc::new(Mutex::new(self)))
+        Ok(mutex.clone())
     }
 
     async fn listen(
