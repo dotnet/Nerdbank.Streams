@@ -398,10 +398,11 @@ mod tests {
         let (alice, bob) = duplex(4096);
         let (mut alice, bob) = (create(alice).unwrap(), create(bob).unwrap());
         const NAME: &str = "test_channel";
-        let alice_channel = alice.offer_channel(NAME.to_string(), None).await.unwrap();
-        let bob_channel = bob
-            .accept_channel_by_name(NAME.to_string(), None)
-            .await
-            .unwrap();
+        let alice_channel = alice.offer_channel(NAME.to_string(), None);
+        let bob_channel = bob.accept_channel_by_name(NAME.to_string(), None);
+
+        let (alice_channel, bob_channel) = tokio::join!(alice_channel, bob_channel);
+        let alice_channel = alice_channel.unwrap();
+        let bob_channel = bob_channel.unwrap();
     }
 }
