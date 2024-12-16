@@ -45,7 +45,6 @@ struct ChannelCore {
 
 struct MultiplexingStreamCore {
     writer: SplitSink<Framed<DuplexStream, MultiplexingMessageCodec>, Message>,
-    listening: Option<JoinHandle<Result<(), MultiplexingStreamError>>>,
     open_channels: HashMap<QualifiedChannelId, Channel>,
     offered_channels: HashMap<QualifiedChannelId, PendingChannel>,
     offered_channels_by_them_by_name: HashMap<String, VecDeque<PendingChannelWithId>>,
@@ -53,51 +52,6 @@ struct MultiplexingStreamCore {
 }
 
 impl MultiplexingStreamCore {
-    pub fn start_listening(
-        self,
-        stream: SplitStream<Framed<DuplexStream, MultiplexingMessageCodec>>,
-    ) -> Result<Arc<Mutex<Self>>, MultiplexingStreamError> {
-        if self.listening.is_some() {
-            return Err(MultiplexingStreamError::ListeningAlreadyStarted);
-        }
-
-        let mutex = Arc::new(Mutex::new(self));
-        //self.listening = Some(tokio::spawn(Self::listen(mutex, stream)));
-
-        Ok(mutex.clone())
-    }
-
-    async fn listen(
-        this: Arc<Mutex<MultiplexingStreamCore>>,
-        mut stream: SplitStream<Framed<DuplexStream, MultiplexingMessageCodec>>,
-    ) -> Result<(), MultiplexingStreamError> {
-        loop {
-            while let Some(message) = stream.next().await.transpose()? {
-                let me = this.lock().await;
-                match message {
-                    frame::Message::Offer(channel_id, offer_parameters) => {
-                        me.on_offer(channel_id, offer_parameters)?
-                    }
-                    frame::Message::Acceptance(channel_id, acceptance_parameters) => {
-                        me.on_offer_accepted(channel_id, acceptance_parameters)?
-                    }
-                    frame::Message::Content(channel_id, payload) => {
-                        me.on_content(channel_id, payload)?
-                    }
-                    frame::Message::ContentProcessed(channel_id, content_processed) => {
-                        me.on_content_processed(channel_id, content_processed)?
-                    }
-                    frame::Message::ContentWritingCompleted(channel_id) => {
-                        me.on_content_writing_completed(channel_id)?
-                    }
-                    frame::Message::ChannelTerminated(channel_id) => {
-                        me.on_channel_terminated(channel_id, Vec::new())?
-                    }
-                }
-            }
-        }
-    }
-
     fn on_offer(
         &self,
         channel_id: QualifiedChannelId,
@@ -198,6 +152,7 @@ impl PendingChannelWithId {
 
 pub struct MultiplexingStream {
     core: Arc<Mutex<MultiplexingStreamCore>>,
+    listening: Option<JoinHandle<Result<(), MultiplexingStreamError>>>,
     options: Options,
     next_unreserved_channel_id: u64,
 }
@@ -227,15 +182,17 @@ pub fn create_with_options(
         offered_channels: HashMap::new(),
         offered_channels_by_them_by_name: HashMap::new(),
         accepting_channels: HashMap::new(),
-        listening: None,
     };
-    let core_mutex = core.start_listening(reader)?;
 
-    Ok(MultiplexingStream {
-        core: core_mutex,
+    let mut mxstream = MultiplexingStream {
+        core: Arc::new(Mutex::new(core)),
         options,
         next_unreserved_channel_id,
-    })
+        listening: None,
+    };
+    mxstream.start_listening(reader)?;
+
+    Ok(mxstream)
 }
 
 impl MultiplexingStream {
@@ -379,6 +336,51 @@ impl MultiplexingStream {
         let channel_id = self.next_unreserved_channel_id;
         self.next_unreserved_channel_id += 1;
         channel_id
+    }
+
+    pub fn start_listening(
+        &mut self,
+        stream: SplitStream<Framed<DuplexStream, MultiplexingMessageCodec>>,
+    ) -> Result<(), MultiplexingStreamError> {
+        if self.listening.is_some() {
+            return Err(MultiplexingStreamError::ListeningAlreadyStarted);
+        }
+
+        let mutex = self.core.clone();
+        self.listening = Some(tokio::spawn(Self::listen(self.core.clone(), stream)));
+
+        Ok(())
+    }
+
+    async fn listen(
+        this: Arc<Mutex<MultiplexingStreamCore>>,
+        mut stream: SplitStream<Framed<DuplexStream, MultiplexingMessageCodec>>,
+    ) -> Result<(), MultiplexingStreamError> {
+        loop {
+            while let Some(message) = stream.next().await.transpose()? {
+                let me = this.lock().await;
+                match message {
+                    frame::Message::Offer(channel_id, offer_parameters) => {
+                        me.on_offer(channel_id, offer_parameters)?
+                    }
+                    frame::Message::Acceptance(channel_id, acceptance_parameters) => {
+                        me.on_offer_accepted(channel_id, acceptance_parameters)?
+                    }
+                    frame::Message::Content(channel_id, payload) => {
+                        me.on_content(channel_id, payload)?
+                    }
+                    frame::Message::ContentProcessed(channel_id, content_processed) => {
+                        me.on_content_processed(channel_id, content_processed)?
+                    }
+                    frame::Message::ContentWritingCompleted(channel_id) => {
+                        me.on_content_writing_completed(channel_id)?
+                    }
+                    frame::Message::ChannelTerminated(channel_id) => {
+                        me.on_channel_terminated(channel_id, Vec::new())?
+                    }
+                }
+            }
+        }
     }
 }
 
