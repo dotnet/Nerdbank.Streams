@@ -346,7 +346,6 @@ impl MultiplexingStream {
             return Err(MultiplexingStreamError::ListeningAlreadyStarted);
         }
 
-        let mutex = self.core.clone();
         self.listening = Some(tokio::spawn(Self::listen(self.core.clone(), stream)));
 
         Ok(())

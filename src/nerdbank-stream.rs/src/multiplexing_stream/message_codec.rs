@@ -15,6 +15,7 @@ pub trait MultiplexingFrameCodec:
     + MultiplexingFrameCodecClone
     + Decoder<Item = Frame, Error = MultiplexingStreamError>
     + Encoder<Frame, Error = MultiplexingStreamError>
+    + Send
 {
 }
 
@@ -24,6 +25,7 @@ impl<T> MultiplexingFrameCodec for T where
         + MultiplexingFrameCodecClone
         + Decoder<Item = Frame, Error = MultiplexingStreamError>
         + Encoder<Frame, Error = MultiplexingStreamError>
+        + Send
 {
 }
 
