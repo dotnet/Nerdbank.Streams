@@ -10,6 +10,7 @@ permissions:
   actions: read
   pages: write
   id-token: write
+  contents: read
 
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 # However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
@@ -26,6 +27,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
+        fetch-depth: 0 # avoid shallow clone so nbgv can do its work.
         submodules: true
     - name: ⚙ Install prerequisites
       run: ./init.ps1 -UpgradePrerequisites
