@@ -7,7 +7,9 @@ mod message_codec;
 mod options;
 
 use std::{
+    cmp::max,
     collections::{HashMap, VecDeque},
+    ops::DerefMut,
     sync::Arc,
 };
 
@@ -46,26 +48,107 @@ struct ChannelCore {
 struct MultiplexingStreamCore {
     writer: SplitSink<Framed<DuplexStream, MultiplexingMessageCodec>, Message>,
     open_channels: HashMap<QualifiedChannelId, Channel>,
-    offered_channels: HashMap<QualifiedChannelId, PendingChannel>,
-    offered_channels_by_them_by_name: HashMap<String, VecDeque<PendingChannelWithId>>,
-    accepting_channels: HashMap<String, VecDeque<PendingChannelWithName>>,
+    offered_channels_by_them_by_name: HashMap<String, VecDeque<PendingInboundChannel>>,
+    offered_channels_by_them_by_id: HashMap<QualifiedChannelId, PendingInboundChannel>,
+    offered_channels_by_us: HashMap<QualifiedChannelId, PendingOutboundChannel>,
+    accepting_channels: HashMap<String, VecDeque<AwaitingChannel>>,
 }
 
 impl MultiplexingStreamCore {
-    fn on_offer(
-        &self,
+    fn new(writer: SplitSink<Framed<DuplexStream, MultiplexingMessageCodec>, Message>) -> Self {
+        Self {
+            writer,
+            open_channels: HashMap::new(),
+            offered_channels_by_them_by_id: HashMap::new(),
+            offered_channels_by_them_by_name: HashMap::new(),
+            offered_channels_by_us: HashMap::new(),
+            accepting_channels: HashMap::new(),
+        }
+    }
+
+    async fn on_offer(
+        &mut self,
+        self_mutex: &Arc<Mutex<Self>>,
         channel_id: QualifiedChannelId,
         offer: OfferParameters,
     ) -> Result<(), MultiplexingStreamError> {
-        todo!()
+        if !offer.name.is_empty() {
+            if let Some(queue) = self.accepting_channels.get_mut(&offer.name) {
+                let mut success = false;
+                while let Some(waiter) = queue.pop_front() {
+                    let acceptance_parameters = AcceptanceParameters {
+                        remote_window_size: Some(
+                            waiter.options.channel_receiving_window_size as u64,
+                        ),
+                    };
+                    let max_buf_size = offer
+                        .remote_window_size
+                        .map_or(waiter.options.channel_receiving_window_size, |r| {
+                            max(r as usize, waiter.options.channel_receiving_window_size)
+                        });
+                    let channel = Channel::new(self_mutex.clone(), channel_id, max_buf_size);
+                    if waiter.matured_signal.send(channel).is_ok() {
+                        self.writer
+                            .send(Message::Acceptance(channel_id, acceptance_parameters))
+                            .await?;
+                        success = true;
+                        break;
+                    };
+                }
+
+                // Recover memory in the map from an empty queue.
+                if queue.is_empty() {
+                    self.accepting_channels.remove(&offer.name);
+                }
+
+                if success {
+                    return Ok(());
+                }
+            }
+        }
+
+        // No one is waiting on this offer, so queue it for future interested folks.
+        let pending_offer_queue = self
+            .offered_channels_by_them_by_name
+            .entry(offer.name.clone())
+            .or_insert_with(|| VecDeque::new());
+
+        let pending_offer = PendingInboundChannel {
+            offer_parameters: offer,
+            id: channel_id,
+        };
+
+        pending_offer_queue.push_back(pending_offer);
+
+        // Raise on_channel_offered event.
+
+        Ok(())
     }
 
-    fn on_offer_accepted(
-        &self,
+    async fn on_offer_accepted(
+        &mut self,
+        self_mutex: &Arc<Mutex<Self>>,
         channel_id: QualifiedChannelId,
         acceptance: AcceptanceParameters,
     ) -> Result<(), MultiplexingStreamError> {
-        todo!()
+        if let Some(pending_channel) = self.offered_channels_by_us.remove(&channel_id) {
+            let max_buf_size = acceptance
+                .remote_window_size
+                .map_or(pending_channel.local_window_size, |r| {
+                    max(r as usize, pending_channel.local_window_size)
+                });
+            let channel = Channel::new(self_mutex.clone(), channel_id, max_buf_size);
+            if pending_channel.matured_signal.send(channel).is_err() {
+                // The party that offered the channel in the first place is gone.
+                // Terminate the channel.
+                self.writer
+                    .send(Message::ChannelTerminated(channel_id))
+                    .await?;
+            }
+            Ok(())
+        } else {
+            Err(MultiplexingStreamError::ProtocolViolation(format!("Remote party accepted offer for channel {}, but we have no record of having offered it.", channel_id)))
+        }
     }
 
     fn on_content(
@@ -104,18 +187,33 @@ impl MultiplexingStreamCore {
 pub struct Channel {
     core: Arc<Mutex<ChannelCore>>,
     id: QualifiedChannelId,
-    name: Option<String>,
+
+    ///The duplex used by the mxstream processor to send and receive messages on the channel.
     central_duplex: DuplexStream,
+
+    /// The duplex to expose to the user of the channel.
     channel_duplex: DuplexStream,
 }
 
 impl Channel {
-    pub fn id(&self) -> QualifiedChannelId {
-        self.id
+    fn new(
+        stream_core: Arc<Mutex<MultiplexingStreamCore>>,
+        id: QualifiedChannelId,
+        max_buf_size: usize,
+    ) -> Self {
+        let channel_core = ChannelCore { stream_core };
+        let (channel_duplex, central_duplex) = duplex(max_buf_size);
+        let channel_mutex = Arc::new(Mutex::new(channel_core));
+        Channel {
+            core: channel_mutex,
+            id,
+            channel_duplex,
+            central_duplex,
+        }
     }
 
-    pub fn name(&self) -> &Option<String> {
-        &self.name
+    pub fn id(&self) -> QualifiedChannelId {
+        self.id
     }
 
     pub fn duplex(&mut self) -> &mut DuplexStream {
@@ -123,31 +221,41 @@ impl Channel {
     }
 }
 
+// Kinds of pending channels:
+// Offered by them:
+//    (map-by-name->queue)
+//       OfferParameters
+//       id
+//    (map-by-id)
+//       OfferParameters
+//       (id)
+// Offered by us: (map-by-id)
+//    OneTimeChannel<Channel>
+// Acceptance pending by us: (map-by-name->queue)
+//    OneTimeChannel<Channel>
+
 enum PendingChannel {
-    Name(PendingChannelWithName),
-    Id(PendingChannelWithId),
+    OfferedByThem(PendingInboundChannel),
+    OfferedByUs(PendingOutboundChannel),
+    AcceptingByUs(AwaitingChannel),
 }
 
-pub struct PendingChannelBase {
-    mxstream: Arc<Mutex<MultiplexingStreamCore>>,
+/// A channel offered by the remote party that we have not yet accepted.
+struct PendingInboundChannel {
+    offer_parameters: OfferParameters,
+    id: QualifiedChannelId,
+}
+
+/// A channel we have offered that the remote party has not yet accepted.
+struct PendingOutboundChannel {
+    local_window_size: usize,
     matured_signal: oneshot::Sender<Channel>,
 }
 
-// TODO: dropping this should send a cancellation notice to the remote party
-pub struct PendingChannelWithId {
-    id: QualifiedChannelId,
-    base: PendingChannelBase,
-}
-
-pub struct PendingChannelWithName {
-    name: String,
-    base: PendingChannelBase,
-}
-
-impl PendingChannelWithId {
-    pub fn id(&self) -> QualifiedChannelId {
-        self.id
-    }
+/// We're waiting to accept a channel by name that the remote party has not yet offered.
+struct AwaitingChannel {
+    matured_signal: oneshot::Sender<Channel>,
+    options: ChannelOptions,
 }
 
 pub struct MultiplexingStream {
@@ -176,13 +284,7 @@ pub fn create_with_options(
 
     let (writer, reader) = framed.split();
 
-    let core = MultiplexingStreamCore {
-        writer,
-        open_channels: HashMap::new(),
-        offered_channels: HashMap::new(),
-        offered_channels_by_them_by_name: HashMap::new(),
-        accepting_channels: HashMap::new(),
-    };
+    let core = MultiplexingStreamCore::new(writer);
 
     let mut mxstream = MultiplexingStream {
         core: Arc::new(Mutex::new(core)),
@@ -216,29 +318,27 @@ impl MultiplexingStream {
             id: self.reserved_unused_channel_id(),
         };
 
-        let window_size = options
+        let local_window_size = options
             .clone()
             .map_or(self.options.default_channel_receiving_window_size, |o| {
                 o.channel_receiving_window_size
             });
         let offer_parameters = OfferParameters {
             name: name.clone(),
-            remote_window_size: Some(window_size as u64),
+            remote_window_size: Some(local_window_size as u64),
         };
         let message = Message::Offer(qualified_id, offer_parameters.clone());
 
         let (sender, receiver) = oneshot::channel();
-        let pending_channel = PendingChannelWithId {
-            id: qualified_id,
-            base: PendingChannelBase {
-                mxstream: self.core.clone(),
-                matured_signal: sender,
-            },
+        let pending_channel = PendingOutboundChannel {
+            local_window_size,
+            matured_signal: sender,
         };
         let mut core = self.core.lock().await;
-        core.offered_channels
-            .insert(qualified_id, PendingChannel::Id(pending_channel));
+        core.offered_channels_by_us
+            .insert(qualified_id, pending_channel);
         core.writer.send(message).await?;
+        drop(core);
 
         Ok(receiver
             .await
@@ -273,11 +373,11 @@ impl MultiplexingStream {
                 core.writer
                     .send(Message::Acceptance(id, acceptance_parameters))
                     .await?;
-                return Ok(self.mature_pending_channel(
-                    PendingChannel::Id(pending_channel),
-                    id,
-                    Some(name),
-                ));
+                let max_buf_size = pending_channel
+                    .offer_parameters
+                    .remote_window_size
+                    .map_or(local_window_size, |r| max(local_window_size, r));
+                return Ok(Channel::new(self.core.clone(), id, max_buf_size as usize));
             }
         }
 
@@ -285,14 +385,11 @@ impl MultiplexingStream {
         let (sender, receiver) = oneshot::channel();
         let by_name_deque = core
             .accepting_channels
-            .entry(name.clone())
-            .or_insert(VecDeque::new());
-        let pending_channel = PendingChannelWithName {
-            name: name,
-            base: PendingChannelBase {
-                mxstream: self.core.clone(),
-                matured_signal: sender,
-            },
+            .entry(name)
+            .or_insert_with(|| VecDeque::new());
+        let pending_channel = AwaitingChannel {
+            matured_signal: sender,
+            options,
         };
         by_name_deque.push_back(pending_channel);
 
@@ -304,26 +401,6 @@ impl MultiplexingStream {
                 e
             ))
         })?)
-    }
-
-    fn mature_pending_channel(
-        &self,
-        pending_channel: PendingChannel,
-        channel_id: QualifiedChannelId,
-        name: Option<String>,
-    ) -> Channel {
-        let channel_core = ChannelCore {
-            stream_core: self.core.clone(),
-        };
-        let (channel_duplex, central_duplex) = duplex(4096); // TODO: use the right window size here.
-        let channel_mutex = Arc::new(Mutex::new(channel_core));
-        Channel {
-            core: channel_mutex,
-            id: channel_id,
-            name: name,
-            channel_duplex,
-            central_duplex,
-        }
     }
 
     fn default_channel_options(&self) -> ChannelOptions {
@@ -357,13 +434,14 @@ impl MultiplexingStream {
     ) -> Result<(), MultiplexingStreamError> {
         loop {
             while let Some(message) = stream.next().await.transpose()? {
-                let me = this.lock().await;
+                let mut me = this.lock().await;
                 match message {
                     frame::Message::Offer(channel_id, offer_parameters) => {
-                        me.on_offer(channel_id, offer_parameters)?
+                        me.on_offer(&this, channel_id, offer_parameters).await?
                     }
                     frame::Message::Acceptance(channel_id, acceptance_parameters) => {
-                        me.on_offer_accepted(channel_id, acceptance_parameters)?
+                        me.on_offer_accepted(&this, channel_id, acceptance_parameters)
+                            .await?
                     }
                     frame::Message::Content(channel_id, payload) => {
                         me.on_content(channel_id, payload)?

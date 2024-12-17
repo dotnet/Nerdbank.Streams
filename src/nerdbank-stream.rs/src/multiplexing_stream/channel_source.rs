@@ -14,6 +14,20 @@ pub enum ChannelSource {
     Seeded,
 }
 
+impl std::fmt::Display for ChannelSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                ChannelSource::Local => "local",
+                ChannelSource::Remote => "remote",
+                ChannelSource::Seeded => "seeded",
+            }
+        )
+    }
+}
+
 impl From<ChannelSource> for i8 {
     fn from(value: ChannelSource) -> Self {
         // The ordinal values are chosen so as to make flipping the perspective as easy as negating the value,

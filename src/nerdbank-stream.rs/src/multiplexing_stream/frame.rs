@@ -12,6 +12,12 @@ pub struct QualifiedChannelId {
     pub source: ChannelSource,
 }
 
+impl std::fmt::Display for QualifiedChannelId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({})", self.id, self.source)
+    }
+}
+
 impl QualifiedChannelId {
     fn flip_perspective(&self) -> Self {
         QualifiedChannelId {
@@ -74,11 +80,17 @@ pub struct ContentProcessed(pub u64);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Message {
+    /// Extends an offer to establish a channel.
     Offer(QualifiedChannelId, OfferParameters),
+    /// Accepts a channel offer.
     Acceptance(QualifiedChannelId, AcceptanceParameters),
+    /// Carries a content payload for a particular channel.
     Content(QualifiedChannelId, Vec<u8>),
+    /// Notifies the remote party that content they previously sent has been read, allowing them to send more data.
     ContentProcessed(QualifiedChannelId, ContentProcessed),
+    /// Notifies the remote party that the local party will not be sending any more data for a particular channel.
     ContentWritingCompleted(QualifiedChannelId),
+    /// Notifies the remote party that the local party has terminated a channel. It will not send data nor does it expect to receive any more data.
     ChannelTerminated(QualifiedChannelId),
 }
 
