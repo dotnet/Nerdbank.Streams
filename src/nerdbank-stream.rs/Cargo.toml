@@ -7,8 +7,10 @@ rust-version = "1.81"
 [dependencies]
 async-trait = "0.1.82"
 bytes = "1.8.0"
+env_logger = "0.11.5"
 futures = "0.3.31"
 futures-util = { version = "0.3.31", features = ["sink"] }
+log = "0.4.22"
 msgpack_simple = "1.0.2"
 rmp = "0.8"
 tokio = { version = "1", features = ["full"] }

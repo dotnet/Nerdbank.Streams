@@ -6,10 +6,10 @@ mod frame;
 mod message_codec;
 mod options;
 
+use log::info;
 use std::{
     cmp::max,
     collections::{HashMap, VecDeque},
-    ops::DerefMut,
     sync::Arc,
 };
 
@@ -79,6 +79,7 @@ impl MultiplexingStreamCore {
         let mut outgoing_messages = Vec::new();
         while queue.recv_many(&mut outgoing_messages, 5).await > 0 {
             for message in outgoing_messages.drain(..) {
+                info!("Sending {}", message);
                 stream.feed(message).await?;
             }
 
@@ -513,6 +514,7 @@ impl MultiplexingStream {
         loop {
             while let Some(message) = stream.next().await.transpose()? {
                 let mut me = this.lock().await;
+                info!("Received {}", message);
                 match message {
                     frame::Message::Offer(channel_id, offer_parameters) => {
                         me.on_offer(&this, channel_id, offer_parameters).await?
@@ -553,6 +555,8 @@ mod tests {
 
     #[tokio::test]
     async fn offer_accept_by_name_then_drop() {
+        env_logger::init();
+
         let (alice, bob) = duplex(4096);
         let (mut alice, bob) = (create(alice).unwrap(), create(bob).unwrap());
         const NAME: &str = "test_channel";

@@ -91,6 +91,33 @@ pub enum Message {
     ChannelTerminated(QualifiedChannelId),
 }
 
+impl std::fmt::Display for Message {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Message::Offer(qualified_channel_id, _offer_parameters) => {
+                write!(f, "Offer channel {}", qualified_channel_id)
+            }
+            Message::Acceptance(qualified_channel_id, _acceptance_parameters) => {
+                write!(f, "Accept channel {}", qualified_channel_id)
+            }
+            Message::Content(qualified_channel_id, _vec) => {
+                write!(f, "Content for channel {}", qualified_channel_id)
+            }
+            Message::ContentProcessed(qualified_channel_id, _content_processed) => {
+                write!(f, "Content processed for channel {}", qualified_channel_id)
+            }
+            Message::ContentWritingCompleted(qualified_channel_id) => write!(
+                f,
+                "Content writing completed for channel {}",
+                qualified_channel_id
+            ),
+            Message::ChannelTerminated(qualified_channel_id) => {
+                write!(f, "Channel terminated {0}", qualified_channel_id)
+            }
+        }
+    }
+}
+
 pub trait FrameCodec {
     fn get_protocol_version(&self) -> ProtocolMajorVersion;
     fn decode_frame(&self, frame: Frame) -> Result<Message, MultiplexingStreamError>;
