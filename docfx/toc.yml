@@ -2,5 +2,7 @@
   href: docs/
 - name: API
   href: api/
+- name: Protocols
+  href: protocols/
 - name: GitHub
   href: https://github.com/dotnet/Nerdbank.Streams
