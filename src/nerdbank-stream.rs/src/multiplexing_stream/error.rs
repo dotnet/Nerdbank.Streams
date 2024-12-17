@@ -86,3 +86,9 @@ impl From<rmp::decode::NumValueReadError> for MultiplexingStreamError {
         MultiplexingStreamError::ReadFailure(format!("msgpack numeric decode failure: {}", value))
     }
 }
+
+impl<T> From<tokio::sync::mpsc::error::SendError<T>> for MultiplexingStreamError {
+    fn from(e: tokio::sync::mpsc::error::SendError<T>) -> Self {
+        MultiplexingStreamError::WriteFailure(format!("Error posting message to outbound queue: {}", e))
+    }
+}

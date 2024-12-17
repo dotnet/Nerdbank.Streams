@@ -26,8 +26,8 @@ use futures_util::SinkExt;
 use message_codec::MultiplexingMessageCodec;
 use options::ChannelOptions;
 use tokio::{
-    io::{duplex, DuplexStream},
-    sync::{oneshot, Mutex},
+    io::{duplex, AsyncWriteExt, DuplexStream},
+    sync::{mpsc, oneshot, Mutex},
     task::JoinHandle,
 };
 
@@ -47,7 +47,9 @@ struct ChannelCore {
 }
 
 struct MultiplexingStreamCore {
-    writer: SplitSink<Framed<DuplexStream, MultiplexingMessageCodec>, Message>,
+    /// A synchronous drop box for transmitting messages where the caller has no interest in awaiting transmission.
+    message_sink: mpsc::UnboundedSender<Message>,
+    processor_task: JoinHandle<Result<(), MultiplexingStreamError>>,
     open_channels: HashMap<QualifiedChannelId, Arc<Mutex<ChannelCore>>>,
     offered_channels_by_them_by_name: HashMap<String, VecDeque<PendingInboundChannel>>,
     offered_channels_by_them_by_id: HashMap<QualifiedChannelId, PendingInboundChannel>,
@@ -57,14 +59,33 @@ struct MultiplexingStreamCore {
 
 impl MultiplexingStreamCore {
     fn new(writer: SplitSink<Framed<DuplexStream, MultiplexingMessageCodec>, Message>) -> Self {
+        let (sink, processor) = mpsc::unbounded_channel::<Message>();
+        let processor_task = tokio::spawn(Self::outbound_message_processor(processor, writer));
         Self {
-            writer,
+            message_sink: sink,
+            processor_task,
             open_channels: HashMap::new(),
             offered_channels_by_them_by_id: HashMap::new(),
             offered_channels_by_them_by_name: HashMap::new(),
             offered_channels_by_us: HashMap::new(),
             accepting_channels: HashMap::new(),
         }
+    }
+
+    async fn outbound_message_processor(
+        mut queue: mpsc::UnboundedReceiver<Message>,
+        mut stream: SplitSink<Framed<DuplexStream, MultiplexingMessageCodec>, Message>,
+    ) -> Result<(), MultiplexingStreamError> {
+        let mut outgoing_messages = Vec::new();
+        while queue.recv_many(&mut outgoing_messages, 5).await > 0 {
+            for message in outgoing_messages.drain(..) {
+                stream.feed(message).await?;
+            }
+
+            stream.flush().await?;
+        }
+
+        Ok(())
     }
 
     async fn on_offer(
@@ -87,12 +108,16 @@ impl MultiplexingStreamCore {
                         .map_or(waiter.options.channel_receiving_window_size, |r| {
                             max(r as usize, waiter.options.channel_receiving_window_size)
                         });
-                    let channel = Channel::new(self_mutex.clone(), channel_id, max_buf_size);
+                    let channel = Channel::new(
+                        self_mutex.clone(),
+                        self.message_sink.clone(),
+                        channel_id,
+                        max_buf_size,
+                    );
                     self.open_channels.insert(channel_id, channel.core.clone());
                     if waiter.matured_signal.send(channel).is_ok() {
-                        self.writer
-                            .send(Message::Acceptance(channel_id, acceptance_parameters))
-                            .await?;
+                        self.message_sink
+                            .send(Message::Acceptance(channel_id, acceptance_parameters))?;
                         success = true;
                         break;
                     };
@@ -139,14 +164,18 @@ impl MultiplexingStreamCore {
                 .map_or(pending_channel.local_window_size, |r| {
                     max(r as usize, pending_channel.local_window_size)
                 });
-            let channel = Channel::new(self_mutex.clone(), channel_id, max_buf_size);
+            let channel = Channel::new(
+                self_mutex.clone(),
+                self.message_sink.clone(),
+                channel_id,
+                max_buf_size,
+            );
             self.open_channels.insert(channel_id, channel.core.clone());
             if pending_channel.matured_signal.send(channel).is_err() {
                 // The party that offered the channel in the first place is gone.
                 // Terminate the channel.
-                self.writer
-                    .send(Message::ChannelTerminated(channel_id))
-                    .await?;
+                self.message_sink
+                    .send(Message::ChannelTerminated(channel_id))?;
             }
             Ok(())
         } else {
@@ -169,12 +198,19 @@ impl MultiplexingStreamCore {
         todo!()
     }
 
-    fn on_channel_terminated(
-        &self,
+    async fn on_channel_terminated(
+        &mut self,
         channel_id: QualifiedChannelId,
-        payload: Vec<u8>,
+        _payload: Vec<u8>,
     ) -> Result<(), MultiplexingStreamError> {
-        todo!()
+        if let Some(channel) = self.open_channels.remove(&channel_id) {
+            let mut channel = channel.lock().await;
+            channel.central_duplex.shutdown().await?;
+            self.message_sink
+                .send(Message::ChannelTerminated(channel_id));
+        }
+
+        Ok(())
     }
 
     fn on_content_processed(
@@ -184,12 +220,39 @@ impl MultiplexingStreamCore {
     ) -> Result<(), MultiplexingStreamError> {
         todo!()
     }
+
+    fn notify_channel_dropped(
+        id: QualifiedChannelId,
+        core: Arc<Mutex<MultiplexingStreamCore>>,
+    ) -> () {
+        tokio::spawn(async move {
+            let mut core_stream = core.lock().await;
+
+            // Ignore any errors
+            let _ = core_stream.terminate_channel(id).await;
+        });
+    }
+
+    async fn terminate_channel(
+        &mut self,
+        id: QualifiedChannelId,
+    ) -> Result<bool, MultiplexingStreamError> {
+        if let Some(channel_core) = self.open_channels.remove(&id) {
+            let mut channel_core = channel_core.lock().await;
+            channel_core.central_duplex.shutdown().await?;
+            let _ = self.message_sink.send(Message::ChannelTerminated(id));
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
 }
 
 // TODO: dropping this should send a channel closed notice to the remote party
 pub struct Channel {
     stream_core: Arc<Mutex<MultiplexingStreamCore>>,
     core: Arc<Mutex<ChannelCore>>,
+    message_sink: mpsc::UnboundedSender<Message>,
     id: QualifiedChannelId,
 
     /// The duplex to expose to the user of the channel.
@@ -198,13 +261,14 @@ pub struct Channel {
 
 impl Drop for Channel {
     fn drop(&mut self) {
-        // TODO: notify mxstream that the channel is terminated.
+        MultiplexingStreamCore::notify_channel_dropped(self.id, self.stream_core.clone());
     }
 }
 
 impl Channel {
     fn new(
         stream_core: Arc<Mutex<MultiplexingStreamCore>>,
+        message_sink: mpsc::UnboundedSender<Message>,
         id: QualifiedChannelId,
         max_buf_size: usize,
     ) -> Self {
@@ -213,6 +277,7 @@ impl Channel {
         let core = Arc::new(Mutex::new(channel_core));
         Channel {
             core,
+            message_sink,
             id,
             channel_duplex,
             stream_core,
@@ -344,7 +409,7 @@ impl MultiplexingStream {
         let mut core = self.core.lock().await;
         core.offered_channels_by_us
             .insert(qualified_id, pending_channel);
-        core.writer.send(message).await?;
+        core.message_sink.send(message)?;
         drop(core);
 
         Ok(receiver
@@ -377,14 +442,18 @@ impl MultiplexingStream {
         if let Some(vec) = core.offered_channels_by_them_by_name.get_mut(&name) {
             if let Some(pending_channel) = vec.pop_front() {
                 let id = pending_channel.id;
-                core.writer
-                    .send(Message::Acceptance(id, acceptance_parameters))
-                    .await?;
+                core.message_sink
+                    .send(Message::Acceptance(id, acceptance_parameters))?;
                 let max_buf_size = pending_channel
                     .offer_parameters
                     .remote_window_size
                     .map_or(local_window_size, |r| max(local_window_size, r));
-                let channel = Channel::new(self.core.clone(), id, max_buf_size as usize);
+                let channel = Channel::new(
+                    self.core.clone(),
+                    core.message_sink.clone(),
+                    id,
+                    max_buf_size as usize,
+                );
                 core.open_channels.insert(id, channel.core.clone());
                 return Ok(channel);
             }
@@ -462,7 +531,7 @@ impl MultiplexingStream {
                         me.on_content_writing_completed(channel_id)?
                     }
                     frame::Message::ChannelTerminated(channel_id) => {
-                        me.on_channel_terminated(channel_id, Vec::new())?
+                        me.on_channel_terminated(channel_id, Vec::new()).await?
                     }
                 }
             }
@@ -472,7 +541,7 @@ impl MultiplexingStream {
 
 #[cfg(test)]
 mod tests {
-    use tokio::io::duplex;
+    use tokio::io::{duplex, AsyncReadExt};
 
     use super::*;
 
@@ -483,7 +552,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn offer_accept_by_name() {
+    async fn offer_accept_by_name_then_drop() {
         let (alice, bob) = duplex(4096);
         let (mut alice, bob) = (create(alice).unwrap(), create(bob).unwrap());
         const NAME: &str = "test_channel";
@@ -492,6 +561,12 @@ mod tests {
 
         let (alice_channel, bob_channel) = tokio::join!(alice_channel, bob_channel);
         let alice_channel = alice_channel.unwrap();
-        let bob_channel = bob_channel.unwrap();
+        let mut bob_channel = bob_channel.unwrap();
+
+        // Verify that dropping one end of the channel is communicated with the other side.
+        drop(alice_channel);
+        let mut buf = [0u8; 1];
+        let count = bob_channel.channel_duplex.read(&mut buf).await.unwrap();
+        assert_eq!(count, 0);
     }
 }
