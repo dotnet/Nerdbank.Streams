@@ -30,7 +30,7 @@ impl QualifiedChannelId {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrameHeader {
     pub code: ControlCode,
-    pub channel_id: Option<QualifiedChannelId>,
+    pub channel_id: QualifiedChannelId,
 }
 
 impl FrameHeader {
@@ -38,10 +38,7 @@ impl FrameHeader {
     pub fn flip_channel_perspective(&self) -> Self {
         Self {
             code: self.code,
-            channel_id: match self.channel_id {
-                None => None,
-                Some(id) => Some(id.flip_perspective()),
-            },
+            channel_id: self.channel_id.flip_perspective(),
         }
     }
 }

@@ -35,21 +35,22 @@ impl FrameCodec for MultiplexingFrameV3Codec {
     }
 
     fn decode_frame(&self, frame: Frame) -> Result<Message, MultiplexingStreamError> {
-        let channel_id = frame.header.channel_id.ok_or_else(|| {
-            MultiplexingStreamError::ProtocolViolation("Missing ID in channel offer.".to_string())
-        })?;
         Ok(match frame.header.code {
-            ControlCode::Offer => {
-                Message::Offer(channel_id, Self::deserialize_offer(&frame.payload)?)
+            ControlCode::Offer => Message::Offer(
+                frame.header.channel_id,
+                Self::deserialize_offer(&frame.payload)?,
+            ),
+            ControlCode::OfferAccepted => Message::Acceptance(
+                frame.header.channel_id,
+                Self::deserialize_acceptance(&frame.payload)?,
+            ),
+            ControlCode::Content => Message::Content(frame.header.channel_id, frame.payload),
+            ControlCode::ContentWritingCompleted => {
+                Message::ContentWritingCompleted(frame.header.channel_id)
             }
-            ControlCode::OfferAccepted => {
-                Message::Acceptance(channel_id, Self::deserialize_acceptance(&frame.payload)?)
-            }
-            ControlCode::Content => Message::Content(channel_id, frame.payload),
-            ControlCode::ContentWritingCompleted => Message::ContentWritingCompleted(channel_id),
-            ControlCode::ChannelTerminated => Message::ChannelTerminated(channel_id),
+            ControlCode::ChannelTerminated => Message::ChannelTerminated(frame.header.channel_id),
             ControlCode::ContentProcessed => Message::ContentProcessed(
-                channel_id,
+                frame.header.channel_id,
                 Self::deserialize_content_processed(&frame.payload)?,
             ),
         })
@@ -60,42 +61,42 @@ impl FrameCodec for MultiplexingFrameV3Codec {
             Message::Offer(qualified_channel_id, offer_parameters) => Frame {
                 header: FrameHeader {
                     code: ControlCode::Offer,
-                    channel_id: Some(qualified_channel_id),
+                    channel_id: qualified_channel_id,
                 },
                 payload: Self::serialize_offer(&offer_parameters),
             },
             Message::Acceptance(qualified_channel_id, acceptance_parameters) => Frame {
                 header: FrameHeader {
                     code: ControlCode::OfferAccepted,
-                    channel_id: Some(qualified_channel_id),
+                    channel_id: qualified_channel_id,
                 },
                 payload: Self::serialize_acceptance(&acceptance_parameters),
             },
             Message::Content(qualified_channel_id, payload) => Frame {
                 header: FrameHeader {
                     code: ControlCode::Content,
-                    channel_id: Some(qualified_channel_id),
+                    channel_id: qualified_channel_id,
                 },
                 payload,
             },
             Message::ContentProcessed(qualified_channel_id, content_processed) => Frame {
                 header: FrameHeader {
                     code: ControlCode::ContentProcessed,
-                    channel_id: Some(qualified_channel_id),
+                    channel_id: qualified_channel_id,
                 },
                 payload: Self::serialize_content_processed(&content_processed),
             },
             Message::ContentWritingCompleted(qualified_channel_id) => Frame {
                 header: FrameHeader {
                     code: ControlCode::ContentWritingCompleted,
-                    channel_id: Some(qualified_channel_id),
+                    channel_id: qualified_channel_id,
                 },
                 payload: Vec::new(),
             },
             Message::ChannelTerminated(qualified_channel_id) => Frame {
                 header: FrameHeader {
                     code: ControlCode::ChannelTerminated,
-                    channel_id: Some(qualified_channel_id),
+                    channel_id: qualified_channel_id,
                 },
                 payload: Vec::new(),
             },
@@ -189,7 +190,7 @@ impl Decoder for MultiplexingFrameV3Codec {
             Err(e) if is_eof(&e) => return report_more_bytes_needed(src),
             Err(e) => return Err(MultiplexingStreamError::from(e)),
         };
-        if array_len < 1 || array_len == 2 {
+        if array_len < 3 {
             return Err(MultiplexingStreamError::ProtocolViolation(format!(
                 "Unexpected array length {} reading frame.",
                 array_len
@@ -201,7 +202,7 @@ impl Decoder for MultiplexingFrameV3Codec {
             Err(e) if is_eof_value(&e) => return report_more_bytes_needed(src),
             Err(e) => return Err(MultiplexingStreamError::from(e)),
         })?;
-        let channel_id = if array_len >= 3 {
+        let channel_id = {
             let id = match rmp::decode::read_int(&mut reader) {
                 Ok(v) => v,
                 Err(e) if is_eof_value(&e) => return report_more_bytes_needed(src),
@@ -213,9 +214,7 @@ impl Decoder for MultiplexingFrameV3Codec {
                     Err(e) if is_eof_value(&e) => return report_more_bytes_needed(src),
                     Err(e) => return Err(MultiplexingStreamError::from(e)),
                 })?;
-            Some(QualifiedChannelId { id, source })
-        } else {
-            None
+            QualifiedChannelId { id, source }
         };
         let payload = if array_len >= 4 {
             let payload_len = match rmp::decode::read_bin_len(&mut reader) {
@@ -263,25 +262,18 @@ impl Encoder<Frame> for MultiplexingFrameV3Codec {
     type Error = MultiplexingStreamError;
 
     fn encode(&mut self, frame: Frame, dst: &mut bytes::BytesMut) -> Result<(), Self::Error> {
-        let element_count = match (frame.header.channel_id.is_some(), !frame.payload.is_empty()) {
-            (false, true) => panic!("Frames with payloads must include a channel id."),
-            (true, true) => 4,
-            (true, false) => 3,
-            (false, false) => 1,
-        };
+        let element_count = if frame.payload.is_empty() { 3 } else { 4 };
 
         let mut writer = dst.writer();
         rmp::encode::write_array_len(&mut writer, element_count)?;
 
         rmp::encode::write_uint(&mut writer, u8::from(frame.header.code) as u64)?;
 
-        if let Some(channel_id) = frame.header.channel_id {
-            rmp::encode::write_uint(&mut writer, channel_id.id)?;
-            rmp::encode::write_sint(&mut writer, i8::from(channel_id.source) as i64)?;
+        rmp::encode::write_uint(&mut writer, frame.header.channel_id.id)?;
+        rmp::encode::write_sint(&mut writer, i8::from(frame.header.channel_id.source) as i64)?;
 
-            if !frame.payload.is_empty() {
-                rmp::encode::write_bin(&mut writer, &frame.payload)?;
-            }
+        if !frame.payload.is_empty() {
+            rmp::encode::write_bin(&mut writer, &frame.payload)?;
         }
 
         Ok(())
@@ -310,7 +302,10 @@ mod tests {
     fn minimal_frame() -> Frame {
         Frame {
             header: FrameHeader {
-                channel_id: None,
+                channel_id: QualifiedChannelId {
+                    id: 1,
+                    source: ChannelSource::Local,
+                },
                 code: ControlCode::Offer,
             },
             payload: Vec::new(),
