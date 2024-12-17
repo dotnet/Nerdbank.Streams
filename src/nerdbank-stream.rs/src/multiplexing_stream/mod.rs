@@ -42,12 +42,13 @@ pub enum ProtocolMajorVersion {
 }
 
 struct ChannelCore {
-    stream_core: Arc<Mutex<MultiplexingStreamCore>>,
+    /// The duplex used by the mxstream processor to send and receive messages on the channel.
+    central_duplex: DuplexStream,
 }
 
 struct MultiplexingStreamCore {
     writer: SplitSink<Framed<DuplexStream, MultiplexingMessageCodec>, Message>,
-    open_channels: HashMap<QualifiedChannelId, Channel>,
+    open_channels: HashMap<QualifiedChannelId, Arc<Mutex<ChannelCore>>>,
     offered_channels_by_them_by_name: HashMap<String, VecDeque<PendingInboundChannel>>,
     offered_channels_by_them_by_id: HashMap<QualifiedChannelId, PendingInboundChannel>,
     offered_channels_by_us: HashMap<QualifiedChannelId, PendingOutboundChannel>,
@@ -87,6 +88,7 @@ impl MultiplexingStreamCore {
                             max(r as usize, waiter.options.channel_receiving_window_size)
                         });
                     let channel = Channel::new(self_mutex.clone(), channel_id, max_buf_size);
+                    self.open_channels.insert(channel_id, channel.core.clone());
                     if waiter.matured_signal.send(channel).is_ok() {
                         self.writer
                             .send(Message::Acceptance(channel_id, acceptance_parameters))
@@ -138,6 +140,7 @@ impl MultiplexingStreamCore {
                     max(r as usize, pending_channel.local_window_size)
                 });
             let channel = Channel::new(self_mutex.clone(), channel_id, max_buf_size);
+            self.open_channels.insert(channel_id, channel.core.clone());
             if pending_channel.matured_signal.send(channel).is_err() {
                 // The party that offered the channel in the first place is gone.
                 // Terminate the channel.
@@ -185,14 +188,18 @@ impl MultiplexingStreamCore {
 
 // TODO: dropping this should send a channel closed notice to the remote party
 pub struct Channel {
+    stream_core: Arc<Mutex<MultiplexingStreamCore>>,
     core: Arc<Mutex<ChannelCore>>,
     id: QualifiedChannelId,
 
-    ///The duplex used by the mxstream processor to send and receive messages on the channel.
-    central_duplex: DuplexStream,
-
     /// The duplex to expose to the user of the channel.
     channel_duplex: DuplexStream,
+}
+
+impl Drop for Channel {
+    fn drop(&mut self) {
+        // TODO: notify mxstream that the channel is terminated.
+    }
 }
 
 impl Channel {
@@ -201,14 +208,14 @@ impl Channel {
         id: QualifiedChannelId,
         max_buf_size: usize,
     ) -> Self {
-        let channel_core = ChannelCore { stream_core };
         let (channel_duplex, central_duplex) = duplex(max_buf_size);
-        let channel_mutex = Arc::new(Mutex::new(channel_core));
+        let channel_core = ChannelCore { central_duplex };
+        let core = Arc::new(Mutex::new(channel_core));
         Channel {
-            core: channel_mutex,
+            core,
             id,
             channel_duplex,
-            central_duplex,
+            stream_core,
         }
     }
 
@@ -377,7 +384,9 @@ impl MultiplexingStream {
                     .offer_parameters
                     .remote_window_size
                     .map_or(local_window_size, |r| max(local_window_size, r));
-                return Ok(Channel::new(self.core.clone(), id, max_buf_size as usize));
+                let channel = Channel::new(self.core.clone(), id, max_buf_size as usize);
+                core.open_channels.insert(id, channel.core.clone());
+                return Ok(channel);
             }
         }
 
