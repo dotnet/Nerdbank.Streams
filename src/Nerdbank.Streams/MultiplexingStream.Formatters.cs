@@ -111,22 +111,19 @@ namespace Nerdbank.Streams
                 return isOdd.Value;
             }
 
-            protected FrameHeader CreateFrameHeader(ControlCode code, ulong? channelId, ChannelSource? channelSource)
+            protected FrameHeader CreateFrameHeader(ControlCode code, ulong channelId, ChannelSource? channelSource)
             {
-                QualifiedChannelId? qualifiedId = null;
-                if (channelId.HasValue)
+                QualifiedChannelId qualifiedId;
+                if (!channelSource.HasValue)
                 {
-                    if (!channelSource.HasValue)
-                    {
-                        Assumes.True(this.IsOddEndpoint.HasValue);
-                        bool channelIsOdd = channelId.Value % 2 == 1;
+                    Assumes.True(this.IsOddEndpoint.HasValue);
+                    bool channelIsOdd = channelId % 2 == 1;
 
-                        // Remember that this is from the remote sender's point of view.
-                        channelSource = channelIsOdd == this.IsOddEndpoint.Value ? ChannelSource.Remote : ChannelSource.Local;
-                    }
-
-                    qualifiedId = new QualifiedChannelId(channelId.Value, channelSource.Value);
+                    // Remember that this is from the remote sender's point of view.
+                    channelSource = channelIsOdd == this.IsOddEndpoint.Value ? ChannelSource.Remote : ChannelSource.Local;
                 }
+
+                qualifiedId = new QualifiedChannelId(channelId, channelSource.Value);
 
                 return new FrameHeader
                 {
@@ -214,7 +211,7 @@ namespace Nerdbank.Streams
 
                 Span<byte> span = this.PipeWriter.GetSpan(checked(HeaderLength + (int)payload.Length));
                 span[0] = (byte)header.Code;
-                Utilities.Write(span.Slice(1, 4), checked((int)(header.ChannelId?.Id ?? 0)));
+                Utilities.Write(span.Slice(1, 4), checked((int)header.ChannelId.Id));
                 Utilities.Write(span.Slice(5, 2), (ushort)payload.Length);
 
                 span = span.Slice(HeaderLength);
@@ -371,25 +368,15 @@ namespace Nerdbank.Streams
 
                 var writer = new MessagePackWriter(this.PipeWriter);
 
-                int elementCount = !payload.IsEmpty ? 3 : header.ChannelId.HasValue ? 2 : 1;
+                int elementCount = !payload.IsEmpty ? 3 : 2;
                 writer.WriteArrayHeader(elementCount);
 
                 writer.Write((int)header.Code);
-                if (elementCount > 1)
-                {
-                    if (header.ChannelId.HasValue)
-                    {
-                        writer.Write(header.ChannelId.Value.Id);
-                    }
-                    else
-                    {
-                        writer.WriteNil();
-                    }
+                writer.Write(header.ChannelId.Id);
 
-                    if (elementCount > 2)
-                    {
-                        writer.Write(payload);
-                    }
+                if (elementCount > 2)
+                {
+                    writer.Write(payload);
                 }
 
                 writer.Flush();
@@ -550,31 +537,19 @@ namespace Nerdbank.Streams
             {
                 var reader = new MessagePackReader(frameSequence);
                 int headerElementCount = reader.ReadArrayHeader();
-                if (headerElementCount < 1)
+                if (headerElementCount < 2)
                 {
                     throw new MultiplexingProtocolException("Not enough elements in frame header.");
                 }
 
                 FrameHeader header;
                 var code = (ControlCode)reader.ReadInt32();
-                ulong? channelId = null;
-                if (headerElementCount > 1)
+                ulong channelId = reader.ReadUInt64();
+                if (headerElementCount > 2)
                 {
-                    if (reader.IsNil)
-                    {
-                        reader.ReadNil();
-                    }
-                    else
-                    {
-                        channelId = reader.ReadUInt64();
-                    }
-
-                    if (headerElementCount > 2)
-                    {
-                        ReadOnlySequence<byte> payload = reader.ReadBytes() ?? default;
-                        header = this.CreateFrameHeader(code, channelId, null);
-                        return (header, payload);
-                    }
+                    ReadOnlySequence<byte> payload = reader.ReadBytes() ?? default;
+                    header = this.CreateFrameHeader(code, channelId, null);
+                    return (header, payload);
                 }
 
                 header = this.CreateFrameHeader(code, channelId, null);
@@ -651,26 +626,16 @@ namespace Nerdbank.Streams
 
                 var writer = new MessagePackWriter(this.PipeWriter);
 
-                int elementCount = !payload.IsEmpty ? 4 : header.ChannelId.HasValue ? 3 : 1;
+                int elementCount = !payload.IsEmpty ? 4 : 3;
                 writer.WriteArrayHeader(elementCount);
 
                 writer.Write((int)header.Code);
-                if (elementCount > 1)
-                {
-                    if (header.ChannelId is { } channelId)
-                    {
-                        writer.Write(channelId.Id);
-                        writer.Write((sbyte)channelId.Source);
-                    }
-                    else
-                    {
-                        throw new NotSupportedException("A frame may not contain payload without a channel ID.");
-                    }
+                writer.Write(header.ChannelId.Id);
+                writer.Write((sbyte)header.ChannelId.Source);
 
-                    if (!payload.IsEmpty)
-                    {
-                        writer.Write(payload);
-                    }
+                if (!payload.IsEmpty)
+                {
+                    writer.Write(payload);
                 }
 
                 writer.Flush();

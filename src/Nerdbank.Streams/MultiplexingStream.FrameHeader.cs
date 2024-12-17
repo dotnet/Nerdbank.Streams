@@ -20,25 +20,19 @@ namespace Nerdbank.Streams
             /// </summary>
             internal ControlCode Code { get; set; }
 
-            internal QualifiedChannelId? ChannelId { get; set; }
-
             /// <summary>
-            /// Gets the ID of the channel that this frame refers to or carries a payload for.
+            /// Gets or sets the ID of the channel that this frame refers to or carries a payload for.
             /// </summary>
-            /// <exception cref="MultiplexingProtocolException">Thrown if <see cref="ChannelId"/> is null.</exception>
-            internal QualifiedChannelId RequiredChannelId => this.ChannelId ?? throw new MultiplexingProtocolException("Expected ChannelId not present in frame header.");
+            internal QualifiedChannelId ChannelId { get; set; }
 
             /// <summary>
             /// Gets the text to display in the debugger when an instance of this struct is displayed.
             /// </summary>
-            private string DebuggerDisplay => $"{this.Code} {this.ChannelId?.DebuggerDisplay}";
+            private string DebuggerDisplay => $"{this.Code} {this.ChannelId.DebuggerDisplay}";
 
             internal void FlipChannelPerspective()
             {
-                if (this.ChannelId.HasValue)
-                {
-                    this.ChannelId = new QualifiedChannelId(this.ChannelId.Value.Id, (ChannelSource)(-(int)this.ChannelId.Value.Source));
-                }
+                this.ChannelId = new QualifiedChannelId(this.ChannelId.Id, (ChannelSource)(-(int)this.ChannelId.Source));
             }
         }
     }

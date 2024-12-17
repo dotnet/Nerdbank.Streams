@@ -837,7 +837,7 @@ namespace Nerdbank.Streams
                     switch (header.Code)
                     {
                         case ControlCode.Offer:
-                            this.OnOffer(header.RequiredChannelId, frame.Value.Payload);
+                            this.OnOffer(header.ChannelId, frame.Value.Payload);
                             break;
                         case ControlCode.OfferAccepted:
                             this.OnOfferAccepted(header, frame.Value.Payload);
@@ -849,10 +849,10 @@ namespace Nerdbank.Streams
                             this.OnContentProcessed(header, frame.Value.Payload);
                             break;
                         case ControlCode.ContentWritingCompleted:
-                            this.OnContentWritingCompleted(header.RequiredChannelId);
+                            this.OnContentWritingCompleted(header.ChannelId);
                             break;
                         case ControlCode.ChannelTerminated:
-                            await this.OnChannelTerminatedAsync(header.RequiredChannelId, frame.Value.Payload).ConfigureAwait(false);
+                            await this.OnChannelTerminatedAsync(header.ChannelId, frame.Value.Payload).ConfigureAwait(false);
                             break;
                         default:
                             break;
@@ -968,7 +968,7 @@ namespace Nerdbank.Streams
         private async ValueTask OnContentAsync(FrameHeader header, ReadOnlySequence<byte> payload, CancellationToken cancellationToken)
         {
             Channel channel;
-            QualifiedChannelId channelId = header.RequiredChannelId;
+            QualifiedChannelId channelId = header.ChannelId;
             lock (this.syncObject)
             {
                 channel = this.openChannels[channelId];
@@ -988,7 +988,7 @@ namespace Nerdbank.Streams
         private void OnOfferAccepted(FrameHeader header, ReadOnlySequence<byte> payloadBuffer)
         {
             Channel.AcceptanceParameters acceptanceParameters = this.formatter.DeserializeAcceptanceParameters(payloadBuffer);
-            QualifiedChannelId channelId = header.RequiredChannelId;
+            QualifiedChannelId channelId = header.ChannelId;
             Channel? channel;
             lock (this.syncObject)
             {
@@ -1016,7 +1016,7 @@ namespace Nerdbank.Streams
             Channel? channel;
             lock (this.syncObject)
             {
-                this.openChannels.TryGetValue(header.RequiredChannelId, out channel);
+                this.openChannels.TryGetValue(header.ChannelId, out channel);
             }
 
             if (channel is null)
@@ -1205,7 +1205,7 @@ namespace Nerdbank.Streams
             {
                 Verify.NotDisposed(this);
 
-                QualifiedChannelId qualifiedChannelId = header.RequiredChannelId;
+                QualifiedChannelId qualifiedChannelId = header.ChannelId;
                 lock (this.syncObject)
                 {
                     if (header.Code == ControlCode.ChannelTerminated)
