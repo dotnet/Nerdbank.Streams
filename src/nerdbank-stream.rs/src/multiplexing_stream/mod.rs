@@ -17,7 +17,9 @@ use channel_source::ChannelSource;
 use codec_v3::MultiplexingFrameV3Codec;
 use error::MultiplexingStreamError;
 pub use frame::QualifiedChannelId;
-use frame::{AcceptanceParameters, ContentProcessed, Message, OfferParameters};
+use frame::{
+    AcceptanceParameters, ContentProcessed, Message, OfferParameters, FRAME_PAYLOAD_MAX_LENGTH,
+};
 use futures::{
     stream::{SplitSink, SplitStream},
     StreamExt,
@@ -26,7 +28,7 @@ use futures_util::SinkExt;
 use message_codec::MultiplexingMessageCodec;
 use options::ChannelOptions;
 use tokio::{
-    io::{duplex, AsyncWriteExt, DuplexStream},
+    io::{duplex, split, AsyncReadExt, AsyncWriteExt, DuplexStream, ReadHalf, WriteHalf},
     sync::{mpsc, oneshot, Mutex},
     task::JoinHandle,
 };
@@ -42,8 +44,9 @@ pub enum ProtocolMajorVersion {
 }
 
 struct ChannelCore {
-    /// The duplex used by the mxstream processor to send and receive messages on the channel.
-    central_duplex: DuplexStream,
+    /// The writer to use to forward inbound messages received over the mxstream
+    /// to this channel so the channel owner receives them.
+    inbound_writer: WriteHalf<DuplexStream>,
 }
 
 struct MultiplexingStreamCore {
@@ -184,19 +187,29 @@ impl MultiplexingStreamCore {
         }
     }
 
-    fn on_content(
+    async fn on_content(
         &self,
         channel_id: QualifiedChannelId,
         payload: Vec<u8>,
     ) -> Result<(), MultiplexingStreamError> {
-        todo!()
+        if let Some(channel_core) = self.open_channels.get(&channel_id) {
+            let mut channel_core = channel_core.lock().await;
+            channel_core.inbound_writer.write_all(&payload).await?;
+        }
+
+        Ok(())
     }
 
-    fn on_content_writing_completed(
+    async fn on_content_writing_completed(
         &self,
         channel_id: QualifiedChannelId,
     ) -> Result<(), MultiplexingStreamError> {
-        todo!()
+        if let Some(channel_core) = self.open_channels.get(&channel_id) {
+            let mut channel_core = channel_core.lock().await;
+            channel_core.inbound_writer.shutdown().await?;
+        }
+
+        Ok(())
     }
 
     async fn on_channel_terminated(
@@ -206,8 +219,9 @@ impl MultiplexingStreamCore {
     ) -> Result<(), MultiplexingStreamError> {
         if let Some(channel) = self.open_channels.remove(&channel_id) {
             let mut channel = channel.lock().await;
-            channel.central_duplex.shutdown().await?;
-            self.message_sink
+            channel.inbound_writer.shutdown().await?;
+            let _ = self
+                .message_sink
                 .send(Message::ChannelTerminated(channel_id));
         }
 
@@ -240,7 +254,7 @@ impl MultiplexingStreamCore {
     ) -> Result<bool, MultiplexingStreamError> {
         if let Some(channel_core) = self.open_channels.remove(&id) {
             let mut channel_core = channel_core.lock().await;
-            channel_core.central_duplex.shutdown().await?;
+            channel_core.inbound_writer.shutdown().await?;
             let _ = self.message_sink.send(Message::ChannelTerminated(id));
             Ok(true)
         } else {
@@ -253,11 +267,11 @@ impl MultiplexingStreamCore {
 pub struct Channel {
     stream_core: Arc<Mutex<MultiplexingStreamCore>>,
     core: Arc<Mutex<ChannelCore>>,
-    message_sink: mpsc::UnboundedSender<Message>,
     id: QualifiedChannelId,
 
     /// The duplex to expose to the user of the channel.
     channel_duplex: DuplexStream,
+    outbound_processor: JoinHandle<Result<(), MultiplexingStreamError>>,
 }
 
 impl Drop for Channel {
@@ -274,14 +288,20 @@ impl Channel {
         max_buf_size: usize,
     ) -> Self {
         let (channel_duplex, central_duplex) = duplex(max_buf_size);
-        let channel_core = ChannelCore { central_duplex };
+        let (outbound_reader, inbound_writer) = split(central_duplex);
+        let channel_core = ChannelCore { inbound_writer };
         let core = Arc::new(Mutex::new(channel_core));
+        let outbound_processor = tokio::spawn(Self::outbound_data_processor(
+            outbound_reader,
+            message_sink,
+            id,
+        ));
         Channel {
             core,
-            message_sink,
             id,
             channel_duplex,
             stream_core,
+            outbound_processor,
         }
     }
 
@@ -291,6 +311,23 @@ impl Channel {
 
     pub fn duplex(&mut self) -> &mut DuplexStream {
         &mut self.channel_duplex
+    }
+
+    async fn outbound_data_processor(
+        mut outbound_reader: ReadHalf<DuplexStream>,
+        outbound_writer: mpsc::UnboundedSender<Message>,
+        id: QualifiedChannelId,
+    ) -> Result<(), MultiplexingStreamError> {
+        let mut buffer = [0u8; FRAME_PAYLOAD_MAX_LENGTH];
+        loop {
+            let count = outbound_reader.read(&mut buffer).await?;
+            if count == 0 {
+                let _ = outbound_writer.send(Message::ContentWritingCompleted(id));
+                return Ok(());
+            }
+
+            outbound_writer.send(Message::Content(id, buffer[..count].to_vec()))?;
+        }
     }
 }
 
@@ -524,13 +561,13 @@ impl MultiplexingStream {
                             .await?
                     }
                     frame::Message::Content(channel_id, payload) => {
-                        me.on_content(channel_id, payload)?
+                        me.on_content(channel_id, payload).await?
                     }
                     frame::Message::ContentProcessed(channel_id, content_processed) => {
                         me.on_content_processed(channel_id, content_processed)?
                     }
                     frame::Message::ContentWritingCompleted(channel_id) => {
-                        me.on_content_writing_completed(channel_id)?
+                        me.on_content_writing_completed(channel_id).await?
                     }
                     frame::Message::ChannelTerminated(channel_id) => {
                         me.on_channel_terminated(channel_id, Vec::new()).await?
@@ -554,7 +591,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn offer_accept_by_name_then_drop() {
+    async fn named_channel_lifecycle() {
         env_logger::init();
 
         let (alice, bob) = duplex(4096);
@@ -564,13 +601,32 @@ mod tests {
         let bob_channel = bob.accept_channel_by_name(NAME.to_string(), None);
 
         let (alice_channel, bob_channel) = tokio::join!(alice_channel, bob_channel);
-        let alice_channel = alice_channel.unwrap();
+        let mut alice_channel = alice_channel.unwrap();
         let mut bob_channel = bob_channel.unwrap();
 
-        // Verify that dropping one end of the channel is communicated with the other side.
-        drop(alice_channel);
-        let mut buf = [0u8; 1];
+        // Send content
+        alice_channel
+            .channel_duplex
+            .write_all(&[1, 2, 3])
+            .await
+            .unwrap();
+
+        // Receive content.
+        let mut buf = [0u8; 5];
         let count = bob_channel.channel_duplex.read(&mut buf).await.unwrap();
+        assert_eq!(&[1, 2, 3], &buf[..count]);
+
+        // Indicate that Alice won't be talking any more.
+        alice_channel.channel_duplex.shutdown().await.unwrap();
+
+        // Verify that bob won't wait for more.
+        let count = bob_channel.channel_duplex.read(&mut buf).await.unwrap();
+        assert_eq!(0, count);
+
+        // Verify that bob dropping his end of the channel is communicated with Alice so she doesn't wait for data.
+        drop(bob_channel);
+        let mut buf = [0u8; 1];
+        let count = alice_channel.channel_duplex.read(&mut buf).await.unwrap();
         assert_eq!(count, 0);
     }
 }
