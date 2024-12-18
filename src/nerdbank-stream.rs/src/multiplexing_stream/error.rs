@@ -92,3 +92,9 @@ impl<T> From<tokio::sync::mpsc::error::SendError<T>> for MultiplexingStreamError
         MultiplexingStreamError::WriteFailure(format!("Error posting message to outbound queue: {}", e))
     }
 }
+
+impl From<tokio::sync::oneshot::error::RecvError> for MultiplexingStreamError {
+    fn from(e: tokio::sync::oneshot::error::RecvError) -> Self {
+        MultiplexingStreamError::ChannelConnectionFailure(e.to_string())
+    }
+}

@@ -139,18 +139,22 @@ impl MultiplexingStreamCore {
         }
 
         // No one is waiting on this offer, so queue it for future interested folks.
-        let pending_offer_queue = self
-            .offered_channels_by_them_by_name
-            .entry(offer.name.clone())
-            .or_insert_with(|| VecDeque::new());
-
         let pending_offer = PendingInboundChannel {
             offer_parameters: offer,
             id: channel_id,
         };
 
-        pending_offer_queue.push_back(pending_offer);
+        if pending_offer.offer_parameters.name.is_empty() {
+            self.offered_channels_by_them_by_id
+                .insert(channel_id, pending_offer);
+        } else {
+            let pending_offer_queue = self
+                .offered_channels_by_them_by_name
+                .entry(pending_offer.offer_parameters.name.clone())
+                .or_insert_with(|| VecDeque::new());
 
+            pending_offer_queue.push_back(pending_offer);
+        }
         // Raise on_channel_offered event.
 
         Ok(())
@@ -261,6 +265,33 @@ impl MultiplexingStreamCore {
             Ok(false)
         }
     }
+
+    fn accept_pending_channel(
+        &mut self,
+        options: ChannelOptions,
+        acceptance_parameters: AcceptanceParameters,
+        pending_channel: PendingInboundChannel,
+        core_mutex: Arc<Mutex<MultiplexingStreamCore>>,
+    ) -> Result<Channel, MultiplexingStreamError> {
+        let id = pending_channel.id;
+        self.message_sink
+            .send(Message::Acceptance(id, acceptance_parameters))?;
+        let max_buf_size = pending_channel
+            .offer_parameters
+            .remote_window_size
+            .map_or(options.channel_receiving_window_size, |r| {
+                max(options.channel_receiving_window_size, r as usize)
+            });
+        let channel = Channel::new(
+            core_mutex,
+            self.message_sink.clone(),
+            id,
+            max_buf_size as usize,
+        );
+        self.open_channels.insert(id, channel.core.clone());
+
+        Ok(channel)
+    }
 }
 
 // TODO: dropping this should send a channel closed notice to the remote party
@@ -346,6 +377,7 @@ impl Channel {
 
 pub struct PendingChannel {
     id: QualifiedChannelId,
+    receiver: oneshot::Receiver<Channel>,
 }
 
 impl PendingChannel {
@@ -354,7 +386,7 @@ impl PendingChannel {
     }
 
     pub async fn acceptance(self) -> Result<Channel, MultiplexingStreamError> {
-        todo!()
+        Ok(self.receiver.await?)
     }
 }
 
@@ -416,22 +448,11 @@ pub fn create_with_options(
 }
 
 impl MultiplexingStream {
-    pub fn create_channel(
-        &mut self,
-        options: Option<ChannelOptions>,
-    ) -> Result<PendingChannel, MultiplexingStreamError> {
-        todo!()
-    }
-
-    pub fn reject_channel(id: u64) -> Result<(), MultiplexingStreamError> {
-        todo!()
-    }
-
-    pub async fn offer_channel(
+    async fn prepare_new_channel(
         &mut self,
         name: String,
         options: Option<ChannelOptions>,
-    ) -> Result<Channel, MultiplexingStreamError> {
+    ) -> Result<(QualifiedChannelId, oneshot::Receiver<Channel>), MultiplexingStreamError> {
         let qualified_id = QualifiedChannelId {
             source: ChannelSource::Local,
             id: self.reserved_unused_channel_id(),
@@ -443,7 +464,7 @@ impl MultiplexingStream {
                 o.channel_receiving_window_size
             });
         let offer_parameters = OfferParameters {
-            name: name.clone(),
+            name,
             remote_window_size: Some(local_window_size as u64),
         };
         let message = Message::Offer(qualified_id, offer_parameters.clone());
@@ -457,19 +478,72 @@ impl MultiplexingStream {
         core.offered_channels_by_us
             .insert(qualified_id, pending_channel);
         core.message_sink.send(message)?;
-        drop(core);
 
-        Ok(receiver
-            .await
-            .map_err(|e| MultiplexingStreamError::ChannelConnectionFailure(e.to_string()))?)
+        Ok((qualified_id, receiver))
     }
 
-    pub fn accept_channel_by_id(
+    pub async fn create_channel(
+        &mut self,
+        options: Option<ChannelOptions>,
+    ) -> Result<PendingChannel, MultiplexingStreamError> {
+        let (id, receiver) = self.prepare_new_channel("".to_string(), options).await?;
+
+        Ok(PendingChannel { id, receiver })
+    }
+
+    pub fn reject_channel(id: u64) -> Result<(), MultiplexingStreamError> {
+        todo!()
+    }
+
+    pub async fn offer_channel(
+        &mut self,
+        name: String,
+        options: Option<ChannelOptions>,
+    ) -> Result<Channel, MultiplexingStreamError> {
+        let (qualified_id, receiver) = self.prepare_new_channel(name, options).await?;
+
+        Ok(receiver.await?)
+    }
+
+    pub async fn accept_channel_by_id(
         &self,
         id: u64,
         options: Option<ChannelOptions>,
     ) -> Result<Channel, MultiplexingStreamError> {
-        todo!()
+        let mut core = self.core.lock().await;
+        if let Some(pending_channel) =
+            core.offered_channels_by_them_by_id
+                .remove(&QualifiedChannelId {
+                    id,
+                    source: ChannelSource::Remote,
+                })
+        {
+            let (options, acceptance_parameters) = self.get_acceptance_parameters(options);
+            return Ok(core.accept_pending_channel(
+                options,
+                acceptance_parameters,
+                pending_channel,
+                self.core.clone(),
+            )?);
+        }
+
+        Err(MultiplexingStreamError::ChannelConnectionFailure(
+            "No pending channel with that ID found.".to_string(),
+        ))
+    }
+
+    fn get_acceptance_parameters(
+        &self,
+        options: Option<ChannelOptions>,
+    ) -> (ChannelOptions, AcceptanceParameters) {
+        let options = options.unwrap_or_else(|| self.default_channel_options());
+        let local_window_size = options.channel_receiving_window_size as u64;
+        (
+            options,
+            AcceptanceParameters {
+                remote_window_size: Some(local_window_size),
+            },
+        )
     }
 
     pub async fn accept_channel_by_name(
@@ -479,30 +553,17 @@ impl MultiplexingStream {
     ) -> Result<Channel, MultiplexingStreamError> {
         let mut core = self.core.lock().await;
 
-        let options = options.unwrap_or_else(|| self.default_channel_options());
-        let local_window_size = options.channel_receiving_window_size as u64;
-        let acceptance_parameters = AcceptanceParameters {
-            remote_window_size: Some(local_window_size),
-        };
+        let (options, acceptance_parameters) = self.get_acceptance_parameters(options);
 
         // First see if there's an existing offer to accept.
         if let Some(vec) = core.offered_channels_by_them_by_name.get_mut(name) {
             if let Some(pending_channel) = vec.pop_front() {
-                let id = pending_channel.id;
-                core.message_sink
-                    .send(Message::Acceptance(id, acceptance_parameters))?;
-                let max_buf_size = pending_channel
-                    .offer_parameters
-                    .remote_window_size
-                    .map_or(local_window_size, |r| max(local_window_size, r));
-                let channel = Channel::new(
+                return Ok(core.accept_pending_channel(
+                    options,
+                    acceptance_parameters,
+                    pending_channel,
                     self.core.clone(),
-                    core.message_sink.clone(),
-                    id,
-                    max_buf_size as usize,
-                );
-                core.open_channels.insert(id, channel.core.clone());
-                return Ok(channel);
+                )?);
             }
         }
 
@@ -632,7 +693,7 @@ mod tests {
             create_named_channel(&mut alice, &bob, "test_channel").await;
 
         // Alice creates an anonymous channel and communicates it with Bob
-        let pending_channel = alice.create_channel(None).unwrap();
+        let pending_channel = alice.create_channel(None).await.unwrap();
         let alice_id = pending_channel.id();
         alice_named_channel
             .duplex()
@@ -642,7 +703,7 @@ mod tests {
         let bob_id = bob_named_channel.duplex().read_u64().await.unwrap();
 
         // Bob accepts the channel, and Alice realizes it.
-        let mut bob_anon_channel = bob.accept_channel_by_id(bob_id, None).unwrap();
+        let mut bob_anon_channel = bob.accept_channel_by_id(bob_id, None).await.unwrap();
         let mut alice_anon_channel = pending_channel.acceptance().await.unwrap();
 
         // Now they exchange messages on the anonymous channel.
