@@ -1,16 +1,20 @@
 use msgpack_simple;
 
+use super::QualifiedChannelId;
+
 #[derive(Debug)]
 pub enum MultiplexingStreamError {
     Io(std::io::Error),
     PayloadTooLarge(usize),
     ChannelConnectionFailure(String),
+    ChannelRejected,
     ChannelFailure,
     WriteFailure(String),
     ReadFailure(String),
     ProtocolViolation(String),
     ListeningAlreadyStarted,
     NotListening,
+    ChannelIdNotFound(QualifiedChannelId),
 }
 
 impl std::error::Error for MultiplexingStreamError {}
@@ -44,6 +48,12 @@ impl std::fmt::Display for MultiplexingStreamError {
             }
             MultiplexingStreamError::ChannelConnectionFailure(msg) => {
                 write!(f, "Channel failed to connect: {}", msg)
+            }
+            MultiplexingStreamError::ChannelRejected => {
+                write!(f, "Channel rejected")
+            }
+            MultiplexingStreamError::ChannelIdNotFound(id) => {
+                write!(f, "No channel found with ID {} in the expected state.", id)
             }
         }
     }
@@ -90,11 +100,5 @@ impl From<rmp::decode::NumValueReadError> for MultiplexingStreamError {
 impl<T> From<tokio::sync::mpsc::error::SendError<T>> for MultiplexingStreamError {
     fn from(e: tokio::sync::mpsc::error::SendError<T>) -> Self {
         MultiplexingStreamError::WriteFailure(format!("Error posting message to outbound queue: {}", e))
-    }
-}
-
-impl From<tokio::sync::oneshot::error::RecvError> for MultiplexingStreamError {
-    fn from(e: tokio::sync::oneshot::error::RecvError) -> Self {
-        MultiplexingStreamError::ChannelConnectionFailure(e.to_string())
     }
 }

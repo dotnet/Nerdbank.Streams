@@ -227,6 +227,7 @@ impl MultiplexingStreamCore {
             let _ = self
                 .message_sink
                 .send(Message::ChannelTerminated(channel_id));
+        } else if let Some(_) = self.offered_channels_by_us.remove(&channel_id) {
         }
 
         Ok(())
@@ -234,8 +235,8 @@ impl MultiplexingStreamCore {
 
     fn on_content_processed(
         &self,
-        channel_id: QualifiedChannelId,
-        payload: ContentProcessed,
+        _channel_id: QualifiedChannelId,
+        _payload: ContentProcessed,
     ) -> Result<(), MultiplexingStreamError> {
         todo!()
     }
@@ -381,12 +382,15 @@ pub struct PendingChannel {
 }
 
 impl PendingChannel {
-    pub fn id(&self) -> QualifiedChannelId {
-        self.id
+    pub fn id(&self) -> u64 {
+        self.id.id
     }
 
     pub async fn acceptance(self) -> Result<Channel, MultiplexingStreamError> {
-        Ok(self.receiver.await?)
+        Ok(self
+            .receiver
+            .await
+            .map_err(|_| MultiplexingStreamError::ChannelRejected)?)
     }
 }
 
@@ -491,8 +495,37 @@ impl MultiplexingStream {
         Ok(PendingChannel { id, receiver })
     }
 
-    pub fn reject_channel(id: u64) -> Result<(), MultiplexingStreamError> {
-        todo!()
+    pub async fn reject_channel(&mut self, id: u64) -> Result<(), MultiplexingStreamError> {
+        let qualified_id = QualifiedChannelId {
+            id,
+            source: ChannelSource::Remote,
+        };
+        let mut core = self.core.lock().await;
+
+        if let Some(channel) = core.offered_channels_by_them_by_id.remove(&qualified_id) {
+            if !channel.offer_parameters.name.is_empty() {
+                // Search for the channel by name and remove it if we find it.
+                if let Some(named_queue) = core
+                    .offered_channels_by_them_by_name
+                    .get_mut(&channel.offer_parameters.name)
+                {
+                    for (index, pending_channel) in named_queue.iter().enumerate() {
+                        if pending_channel.id.id == id {
+                            named_queue.remove(index);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Issue a rejection of the offer.
+            core.message_sink
+                .send(Message::ChannelTerminated(qualified_id))?;
+
+            return Ok(());
+        }
+
+        Err(MultiplexingStreamError::ChannelIdNotFound(qualified_id))
     }
 
     pub async fn offer_channel(
@@ -500,9 +533,10 @@ impl MultiplexingStream {
         name: String,
         options: Option<ChannelOptions>,
     ) -> Result<Channel, MultiplexingStreamError> {
-        let (qualified_id, receiver) = self.prepare_new_channel(name, options).await?;
-
-        Ok(receiver.await?)
+        let (_, receiver) = self.prepare_new_channel(name, options).await?;
+        Ok(receiver
+            .await
+            .map_err(|_| MultiplexingStreamError::ChannelRejected)?)
     }
 
     pub async fn accept_channel_by_id(
@@ -697,7 +731,7 @@ mod tests {
         let alice_id = pending_channel.id();
         alice_named_channel
             .duplex()
-            .write_u64(alice_id.id)
+            .write_u64(alice_id)
             .await
             .unwrap();
         let bob_id = bob_named_channel.duplex().read_u64().await.unwrap();
@@ -756,4 +790,36 @@ mod tests {
         let count = alice_channel.channel_duplex.read(&mut buf).await.unwrap();
         assert_eq!(count, 0);
     }
+
+    #[tokio::test]
+    async fn reject_anonymous_channel() {
+        init();
+
+        let (mut alice, mut bob) = create_mxstream();
+        let (mut alice_channel, mut bob_channel) =
+            create_named_channel(&mut alice, &bob, "test_channel").await;
+
+        // Alice creates an anonymous channel and invites Bob to connect.
+        let alice_anon_channel = alice.create_channel(None).await.unwrap();
+        alice_channel
+            .duplex()
+            .write_u64(alice_anon_channel.id())
+            .await
+            .unwrap();
+        let bob_anon_channel_id = bob_channel.duplex().read_u64().await.unwrap();
+
+        // Bob rejects the offer.
+        bob.reject_channel(bob_anon_channel_id).await.unwrap();
+
+        // Alice should see the rejection.
+        let result = alice_anon_channel.acceptance().await;
+        assert!(matches!(
+            result,
+            Err(MultiplexingStreamError::ChannelRejected)
+        ));
+    }
+
+    // More tests:
+    // large content (exceeding max frame size).
+    // receiving window backpressure.
 }

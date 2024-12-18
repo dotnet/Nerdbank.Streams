@@ -94,8 +94,8 @@ pub enum Message {
 impl std::fmt::Display for Message {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Message::Offer(qualified_channel_id, _offer_parameters) => {
-                write!(f, "Offer channel {}", qualified_channel_id)
+            Message::Offer(qualified_channel_id, offer_parameters) => {
+                write!(f, "Offer channel {} \"{}\"", qualified_channel_id, offer_parameters.name)
             }
             Message::Acceptance(qualified_channel_id, _acceptance_parameters) => {
                 write!(f, "Accept channel {}", qualified_channel_id)
