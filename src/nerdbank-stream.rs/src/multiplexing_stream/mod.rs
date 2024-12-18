@@ -344,10 +344,18 @@ impl Channel {
 // Acceptance pending by us: (map-by-name->queue)
 //    OneTimeChannel<Channel>
 
-enum PendingChannel {
-    OfferedByThem(PendingInboundChannel),
-    OfferedByUs(PendingOutboundChannel),
-    AcceptingByUs(AwaitingChannel),
+pub struct PendingChannel {
+    id: QualifiedChannelId,
+}
+
+impl PendingChannel {
+    pub fn id(&self) -> QualifiedChannelId {
+        self.id
+    }
+
+    pub async fn acceptance(self) -> Result<Channel, MultiplexingStreamError> {
+        todo!()
+    }
 }
 
 /// A channel offered by the remote party that we have not yet accepted.
@@ -409,6 +417,7 @@ pub fn create_with_options(
 
 impl MultiplexingStream {
     pub fn create_channel(
+        &mut self,
         options: Option<ChannelOptions>,
     ) -> Result<PendingChannel, MultiplexingStreamError> {
         todo!()
@@ -465,7 +474,7 @@ impl MultiplexingStream {
 
     pub async fn accept_channel_by_name(
         &self,
-        name: String,
+        name: &String,
         options: Option<ChannelOptions>,
     ) -> Result<Channel, MultiplexingStreamError> {
         let mut core = self.core.lock().await;
@@ -477,7 +486,7 @@ impl MultiplexingStream {
         };
 
         // First see if there's an existing offer to accept.
-        if let Some(vec) = core.offered_channels_by_them_by_name.get_mut(&name) {
+        if let Some(vec) = core.offered_channels_by_them_by_name.get_mut(name) {
             if let Some(pending_channel) = vec.pop_front() {
                 let id = pending_channel.id;
                 core.message_sink
@@ -501,7 +510,7 @@ impl MultiplexingStream {
         let (sender, receiver) = oneshot::channel();
         let by_name_deque = core
             .accepting_channels
-            .entry(name)
+            .entry(name.clone())
             .or_insert_with(|| VecDeque::new());
         let pending_channel = AwaitingChannel {
             matured_signal: sender,
@@ -584,25 +593,82 @@ mod tests {
 
     use super::*;
 
+    fn init() {
+        env_logger::init();
+    }
+
+    fn create_mxstream() -> (MultiplexingStream, MultiplexingStream) {
+        let duplexes = duplex(4096);
+        (create(duplexes.0).unwrap(), create(duplexes.1).unwrap())
+    }
+
+    async fn create_named_channel(
+        left: &mut MultiplexingStream,
+        right: &MultiplexingStream,
+        channel_name: &str,
+    ) -> (Channel, Channel) {
+        let channel_name = channel_name.to_string();
+        let left_offer = left.offer_channel(channel_name.clone(), None);
+        let right_accept = right.accept_channel_by_name(&channel_name, None);
+        let (left_channel, right_channel) = tokio::join!(left_offer, right_accept);
+        (left_channel.unwrap(), right_channel.unwrap())
+    }
+
     #[tokio::test]
     async fn create_v3() {
-        let duplexes = duplex(4096);
-        let (mx1, mx2) = (create(duplexes.0).unwrap(), create(duplexes.1).unwrap());
+        init();
+
+        create_mxstream();
+    }
+
+    #[tokio::test]
+    async fn anonymous_channel() {
+        init();
+
+        let (mut alice, bob) = create_mxstream();
+
+        // Alice and Bob start with a named channel.
+        let (mut alice_named_channel, mut bob_named_channel) =
+            create_named_channel(&mut alice, &bob, "test_channel").await;
+
+        // Alice creates an anonymous channel and communicates it with Bob
+        let pending_channel = alice.create_channel(None).unwrap();
+        let alice_id = pending_channel.id();
+        alice_named_channel
+            .duplex()
+            .write_u64(alice_id.id)
+            .await
+            .unwrap();
+        let bob_id = bob_named_channel.duplex().read_u64().await.unwrap();
+
+        // Bob accepts the channel, and Alice realizes it.
+        let mut bob_anon_channel = bob.accept_channel_by_id(bob_id, None).unwrap();
+        let mut alice_anon_channel = pending_channel.acceptance().await.unwrap();
+
+        // Now they exchange messages on the anonymous channel.
+        bob_anon_channel
+            .duplex()
+            .write_all(&[1, 2, 3])
+            .await
+            .unwrap();
+        let mut buf = [0u8; 5];
+        let count = alice_anon_channel.duplex().read(&mut buf).await.unwrap();
+        assert_eq!(&buf[..count], &[1, 2, 3]);
+
+        // Alice is done with her anonymous channel.
+        drop(alice_anon_channel);
+
+        // And Bob can tell.
+        assert_eq!(0, bob_anon_channel.duplex().read(&mut buf).await.unwrap());
     }
 
     #[tokio::test]
     async fn named_channel_lifecycle() {
-        env_logger::init();
+        init();
 
-        let (alice, bob) = duplex(4096);
-        let (mut alice, bob) = (create(alice).unwrap(), create(bob).unwrap());
-        const NAME: &str = "test_channel";
-        let alice_channel = alice.offer_channel(NAME.to_string(), None);
-        let bob_channel = bob.accept_channel_by_name(NAME.to_string(), None);
-
-        let (alice_channel, bob_channel) = tokio::join!(alice_channel, bob_channel);
-        let mut alice_channel = alice_channel.unwrap();
-        let mut bob_channel = bob_channel.unwrap();
+        let (mut alice, bob) = create_mxstream();
+        let (mut alice_channel, mut bob_channel) =
+            create_named_channel(&mut alice, &bob, "test_channel").await;
 
         // Send content
         alice_channel
