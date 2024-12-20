@@ -183,7 +183,7 @@ impl Decoder for MultiplexingFrameV3Codec {
     type Error = MultiplexingStreamError;
 
     fn decode(&mut self, src: &mut bytes::BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        let mut reader = src.reader();
+        let mut reader = src.as_ref().reader();
 
         let array_len = match rmp::decode::read_array_len(&mut reader) {
             Ok(v) => v,
@@ -235,6 +235,10 @@ impl Decoder for MultiplexingFrameV3Codec {
         } else {
             Vec::new()
         };
+
+        // Advance the buffer only if we have successfully read a complete frame
+        let bytes_read = src.len() - reader.get_ref().remaining();
+        src.advance(bytes_read);
 
         return Ok(Some(Frame {
             header: FrameHeader { code, channel_id },

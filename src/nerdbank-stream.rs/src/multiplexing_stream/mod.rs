@@ -684,7 +684,10 @@ impl MultiplexingStream {
 
 #[cfg(test)]
 mod tests {
-    use tokio::io::{duplex, AsyncReadExt};
+    use tokio::{
+        io::{duplex, AsyncReadExt},
+        join,
+    };
 
     use super::*;
 
@@ -819,7 +822,45 @@ mod tests {
         ));
     }
 
+    #[tokio::test]
+    async fn large_content() {
+        init();
+
+        let (mut alice, mut bob) = create_mxstream();
+        let (mut alice_channel, mut bob_channel) =
+            create_named_channel(&mut alice, &bob, "test_channel").await;
+
+        // Send data sufficient to fill several mxstream frames to verify that the data is correctly split across them.
+        let mut data = Vec::new();
+        data.extend_from_slice(&[1u8; FRAME_PAYLOAD_MAX_LENGTH]);
+        data.extend_from_slice(&[2u8; FRAME_PAYLOAD_MAX_LENGTH]);
+        data.extend_from_slice(&[3u8; FRAME_PAYLOAD_MAX_LENGTH]);
+        data.extend_from_slice(&[4u8; FRAME_PAYLOAD_MAX_LENGTH]);
+
+        let mut received_data = [0u8; FRAME_PAYLOAD_MAX_LENGTH * 4];
+
+        // We have to arrange to await sending and receiving in parallel
+        // to avoid a deadlock from awaiting the write when the receiving window is full.
+        let (write_task, read_task) = join!(
+            alice_channel.duplex().write_all(&data),
+            bob_channel.duplex().read_exact(&mut received_data)
+        );
+
+        write_task.unwrap();
+        assert_eq!(data.len(), read_task.unwrap());
+
+        // Verify that the data matches expectations.
+        assert!(data.eq(&received_data));
+
+        // Verify that no additional data is received.
+        alice_channel.duplex().shutdown().await.unwrap();
+        assert_eq!(
+            0,
+            bob_channel.duplex().read(&mut received_data).await.unwrap()
+        );
+    }
+
     // More tests:
-    // large content (exceeding max frame size).
     // receiving window backpressure.
+    // one channel can't starve another.
 }
