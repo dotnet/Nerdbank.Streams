@@ -6,7 +6,6 @@
 using Nerdbank.Streams;
 using NSubstitute;
 using Xunit;
-using Xunit.Abstractions;
 
 public class MonitoringStreamTests : TestBase
 {

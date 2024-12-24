@@ -8,7 +8,6 @@ using Nerdbank.Streams;
 using NSubstitute;
 using NSubstitute.ReceivedExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 public class FullDuplexStreamCombineTests : TestBase
 {
