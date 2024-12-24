@@ -466,13 +466,13 @@ public abstract class TestBase : IDisposable
         private readonly StreamWriter file;
         private readonly ITestOutputHelper forwardTo;
 
-        public string Output => throw new NotImplementedException();
-
         internal FileLogger(string fileName, ITestOutputHelper forwardTo)
         {
             this.file = new StreamWriter(File.OpenWrite(fileName));
             this.forwardTo = forwardTo;
         }
+
+        public string Output => throw new NotImplementedException();
 
         public void WriteLine(string message)
         {

@@ -772,7 +772,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
                 await Task.Delay(250);
             }
 
-            MultiplexingStream.Channel? acceptedChannel = await this.mx2.AcceptChannelAsync(string.Empty, ExpectedTimeoutToken).ConfigureAwait(false);
+            MultiplexingStream.Channel? acceptedChannel = await this.mx2.AcceptChannelAsync(string.Empty, ExpectedTimeoutToken);
             acceptedStream = acceptedChannel.AsStream();
 
             // In this case, we accepted the channel before receiving the cancellation notice. The channel should be terminated by the remote side very soon.
