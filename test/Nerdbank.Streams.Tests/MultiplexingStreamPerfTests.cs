@@ -42,6 +42,7 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
     {
         this.serverPipe.Dispose();
         this.clientPipe.Dispose();
+        this.Dispose();
         return default;
     }
 

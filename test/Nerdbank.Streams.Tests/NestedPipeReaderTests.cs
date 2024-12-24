@@ -19,7 +19,11 @@ public class NestedPipeReaderTests : TestBase, IAsyncLifetime
     {
     }
 
-    public ValueTask DisposeAsync() => default;
+    public ValueTask DisposeAsync()
+    {
+        this.Dispose();
+        return default;
+    }
 
     public async ValueTask InitializeAsync()
     {

@@ -49,6 +49,8 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
         this.mx1?.TraceSource.Listeners.OfType<XunitTraceListener>().SingleOrDefault()?.Dispose();
         this.mx2?.TraceSource.Listeners.OfType<XunitTraceListener>().SingleOrDefault()?.Dispose();
+
+        this.Dispose();
     }
 
     [Fact, Obsolete]

@@ -66,6 +66,7 @@ public abstract class TestBase : IDisposable
 
     public void Dispose()
     {
+        this.timeoutLoggerRegistration.Dispose();
         this.Dispose(true);
         GC.SuppressFinalize(this);
     }
