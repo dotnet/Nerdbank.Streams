@@ -1,22 +1,17 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
 using System.Buffers;
 using System.Diagnostics;
-using System.IO;
 using System.IO.Pipelines;
-using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft;
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
-using Xunit.Abstractions;
+using Xunit.Sdk;
 
 public abstract class TestBase : IDisposable
 {
@@ -207,7 +202,7 @@ public abstract class TestBase : IDisposable
 #if NETFRAMEWORK
         if (IsMono)
         {
-            return Task.FromException<bool>(new SkipException("Test isolation is not yet supported on this mono."));
+            return Task.FromException<bool>(SkipException.ForSkip("Test isolation is not yet supported on this mono."));
         }
 
         const string testHostProcessName = "IsolatedTestHost.exe";
@@ -264,7 +259,7 @@ public abstract class TestBase : IDisposable
                 switch (t.Result)
                 {
                     case IsolatedTestHost.ExitCodes.TestSkipped:
-                        throw new SkipException("Test skipped. See output of isolated task for details.");
+                        throw SkipException.ForSkip("Test skipped. See output of isolated task for details.");
                     case IsolatedTestHost.ExitCodes.TestPassed:
                     default:
                         Assert.Equal(IsolatedTestHost.ExitCodes.TestPassed, t.Result);
@@ -275,7 +270,7 @@ public abstract class TestBase : IDisposable
             },
             TaskScheduler.Default);
 #else
-        return Task.FromException<bool>(new SkipException("Test isolation is not yet supported on this platform."));
+        return Task.FromException<bool>(SkipException.ForSkip("Test isolation is not yet supported on this platform."));
 #endif
     }
 
@@ -470,6 +465,8 @@ public abstract class TestBase : IDisposable
         private readonly StreamWriter file;
         private readonly ITestOutputHelper forwardTo;
 
+        public string Output => throw new NotImplementedException();
+
         internal FileLogger(string fileName, ITestOutputHelper forwardTo)
         {
             this.file = new StreamWriter(File.OpenWrite(fileName));
@@ -491,5 +488,19 @@ public abstract class TestBase : IDisposable
         }
 
         public void Dispose() => this.file.Dispose();
+
+        public void Write(string message)
+        {
+            this.file.Write(message);
+            this.forwardTo.Write(message);
+            Debug.Write(message);
+        }
+
+        public void Write(string format, params object[] args)
+        {
+            this.file.Write(format, args);
+            this.forwardTo.Write(format, args);
+            Debug.Write(string.Format(format, args));
+        }
     }
 }

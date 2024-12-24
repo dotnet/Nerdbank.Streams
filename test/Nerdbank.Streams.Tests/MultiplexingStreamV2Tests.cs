@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
-using Xunit.Abstractions;
 
 public class MultiplexingStreamV2Tests : MultiplexingStreamTests
 {

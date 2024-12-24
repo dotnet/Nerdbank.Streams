@@ -14,7 +14,6 @@ using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using StreamJsonRpc;
 using Xunit;
-using Xunit.Abstractions;
 
 public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
 {
@@ -32,27 +31,27 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
         this.clientPipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         Task connectTask = this.serverPipe.WaitForConnectionAsync(this.TimeoutToken);
         await this.clientPipe.ConnectAsync(this.TimeoutToken);
         await connectTask;
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         this.serverPipe.Dispose();
         this.clientPipe.Dispose();
-        return Task.CompletedTask;
+        return default;
     }
 
-    [SkippableFact]
+    [Fact]
     public Task JsonRpcPerf_Pipe() => this.JsonRpcPerf(useChannel: false);
 
-    [SkippableFact]
+    [Fact]
     public Task JsonRpcPerf_Channel() => this.JsonRpcPerf(useChannel: true);
 
-    [SkippableFact]
+    [Fact]
     public async Task SendLargePayloadOnOneStream()
     {
         if (await this.ExecuteInIsolationAsync())
@@ -103,7 +102,7 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
         }
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task SendLargePayloadOnManyChannels()
     {
         if (await this.ExecuteInIsolationAsync())

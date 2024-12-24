@@ -30,8 +30,9 @@
   </ItemGroup>
   <ItemGroup Label="Library.Template">
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
-    <PackageVersion Include="xunit" Version="2.9.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.0.0" />
+    <PackageVersion Include="xunit.v3" Version="1.0.0" />
+    <PackageVersion Include="xunit.v3.core" Version="1.0.0" />
   </ItemGroup>
   <ItemGroup>
     <!-- Put repo-specific GlobalPackageReference items in this group. -->

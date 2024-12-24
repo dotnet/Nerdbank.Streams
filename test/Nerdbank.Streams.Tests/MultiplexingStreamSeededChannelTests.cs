@@ -15,7 +15,6 @@ using Microsoft;
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
-using Xunit.Abstractions;
 
 public class MultiplexingStreamSeededChannelTests : TestBase, IAsyncLifetime
 {
@@ -61,12 +60,12 @@ public class MultiplexingStreamSeededChannelTests : TestBase, IAsyncLifetime
         this.mx2 = MultiplexingStream.Create(this.transport2, new MultiplexingStream.Options(this.options) { TraceSource = mx2TraceSource, DefaultChannelTraceSourceFactoryWithQualifier = mx2TraceSourceFactory });
     }
 
-    public Task InitializeAsync()
+    public ValueTask InitializeAsync()
     {
-        return Task.CompletedTask;
+        return default;
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         await (this.mx1?.DisposeAsync() ?? default);
         await (this.mx2?.DisposeAsync() ?? default);
