@@ -48,3 +48,7 @@
 ## .NET Foundation
 
 This project is supported by the [.NET Foundation](https://dotnetfoundation.org).
+
+## Sponsorships
+
+[<img src="https://api.gitsponsors.com/api/badge/img?id=43795655" height="20">](https://api.gitsponsors.com/api/badge/link?p=ImOZElhl40yN+Id6Hg2/oLexrVG9UIpQtoRMDGA8gPCD+IsEisGQs2ZyAndA4TGLn0cX4aHiSw7nSROPscc5ltqnMt3FomBxZzv6fiBY3nVKdILRf8/dM2mrH07jnWbCO6t8tlwcz53xzfFj/E+89A==)
