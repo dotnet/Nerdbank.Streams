@@ -5,7 +5,7 @@ runs:
   using: composite
   steps:
   - name: 📥 Collect artifacts
-    run: azure-pipelines/artifacts/_stage_all.ps1
+    run: tools/artifacts/_stage_all.ps1
     shell: pwsh
     if: always()
 
@@ -31,13 +31,6 @@ runs:
     with:
       name: build_logs-${{ runner.os }}
       path: ${{ runner.temp }}/_artifacts/build_logs
-    continue-on-error: true
-  - name: 📢 Upload test_logs
-    if: always()
-    uses: actions/upload-artifact@v4
-    with:
-      name: test_logs-${{ runner.os }}
-      path: ${{ runner.temp }}/_artifacts/test_logs
     continue-on-error: true
   - name: 📢 Upload testResults
     if: always()

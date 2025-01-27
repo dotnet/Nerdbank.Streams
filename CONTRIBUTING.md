@@ -13,7 +13,7 @@ You should install the version specified in `global.json` or a later version wit
 the same major.minor.Bxx "hundreds" band.
 For example if 2.2.300 is specified, you may install 2.2.300, 2.2.301, or 2.2.310
 while the 2.2.400 version would not be considered compatible by .NET SDK.
-See [.NET Core Versioning](https://docs.microsoft.com/dotnet/core/versions/) for more information.
+See [.NET Core Versioning](https://learn.microsoft.com/dotnet/core/versions/) for more information.
 
 All dependencies can be installed by running the `init.ps1` script at the root of the repository
 using Windows PowerShell or [PowerShell Core][pwsh] (on any OS).
@@ -40,7 +40,7 @@ Please review the [CONTRIBUTING.md](src/nerdbank-streams/CONTRIBUTING.md) docume
 ## Releases
 
 Use `nbgv tag` to create a tag for a particular commit that you mean to release.
-[Learn more about `nbgv` and its `tag` and `prepare-release` commands](https://github.com/dotnet/Nerdbank.GitVersioning/blob/main/doc/nbgv-cli.md).
+[Learn more about `nbgv` and its `tag` and `prepare-release` commands](https://dotnet.github.io/Nerdbank.GitVersioning/docs/nbgv-cli.html).
 
 Push the tag.
 
@@ -68,3 +68,13 @@ You can make changes and host the site locally to preview them by switching to t
 After making a change, you can rebuild the docs site while the localhost server is running by running `dotnet docfx` again from a separate terminal.
 
 The `.github/workflows/docs.yml` GitHub Actions workflow publishes the content of these docs to github.io if the workflow itself and [GitHub Pages is enabled for your repository](https://docs.github.com/en/pages/quickstart).
+
+## Updating dependencies
+
+This repo uses Renovate to keep dependencies current.
+Configuration is in the `.github/renovate.json` file.
+[Learn more about configuring Renovate](https://docs.renovatebot.com/configuration-options/).
+
+When changing the renovate.json file, follow [these validation steps](https://docs.renovatebot.com/config-validation/).
+
+If Renovate is not creating pull requests when you expect it to, check that the [Renovate GitHub App](https://github.com/apps/renovate) is configured for your account or repo.
