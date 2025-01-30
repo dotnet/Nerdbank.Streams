@@ -14,7 +14,6 @@ namespace Nerdbank.Streams
     using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
-    using MessagePack;
     using Microsoft;
     using Microsoft.VisualStudio.Threading;
 
@@ -1145,6 +1144,11 @@ namespace Nerdbank.Streams
                 if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
                 {
                     this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelDisposed, "Local channel {0} \"{1}\" stream disposed.", channel.QualifiedId, channel.Name);
+                }
+
+                if (exception is not null && this.TraceSource.Switch.ShouldTrace(TraceEventType.Error))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Error, (int)TraceEventId.ChannelDisposed, "Local channel {0} \"{1}\" stream disposed with {2}: {3}", channel.QualifiedId, channel.Name, exception.GetType().Name, exception.Message);
                 }
 
                 this.SendFrame(header, payload, this.DisposalToken);
