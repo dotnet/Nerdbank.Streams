@@ -56,6 +56,7 @@ jobs:
       shell: pwsh
     - name: 🧪 NativeAOT test
       run: dotnet publish -c Release -r ${{ matrix.rid }}-x64 -warnaserror
+      working-directory: test/NativeAOTCompatibility
 
     - name: ⚙️ Use Node.js 16.x
       uses: actions/setup-node@v3
