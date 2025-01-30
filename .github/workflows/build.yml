@@ -49,9 +49,9 @@ jobs:
     - name: ⚙️ Set pipeline variables based on source
       run: tools/variables/_define.ps1
       shell: pwsh
-    - name: 🛠 build
+    - name: 🛠 dotnet build
       run: dotnet build -t:build,pack --no-restore -c ${{ env.BUILDCONFIGURATION }} -warnAsError -warnNotAsError:NU1901,NU1902,NU1903,NU1904 /bl:"${{ runner.temp }}/_artifacts/build_logs/build.binlog"
-    - name: 🧪 test
+    - name: 🧪 dotnet test
       run: tools/dotnet-test-cloud.ps1 -Configuration ${{ env.BUILDCONFIGURATION }} -Agent ${{ runner.os }}
       shell: pwsh
     - name: 🧪 NativeAOT test
@@ -62,10 +62,10 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: 16.x
-    - name: ⚙️ Use Yarn 1.x
-      run: npm install -g yarn@1.x
-    - name: 🛠️ yarn install
-      run: yarn install
+    - name: ⚙️ yarn
+      run: |
+        npm install -g yarn@1.x
+        yarn install
       working-directory: src/nerdbank-streams
     - name: 🛠️ yarn build
       run: yarn build
