@@ -9,9 +9,9 @@ namespace Nerdbank.Streams
     using System.IO.Pipelines;
     using System.Threading;
     using System.Threading.Tasks;
-    using MessagePack;
     using Microsoft;
     using Microsoft.VisualStudio.Threading;
+    using Nerdbank.MessagePack;
 
     /// <content>
     /// Contains the <see cref="Formatter" /> nested type.
@@ -585,7 +585,7 @@ namespace Nerdbank.Streams
             {
                 for (int i = 0; i < elementsToDiscard; i++)
                 {
-                    reader.Skip();
+                    reader.Skip(new SerializationContext());
                 }
             }
 

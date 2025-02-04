@@ -1,0 +1,3 @@
+[submodule "ext/Nerdbank.MessagePack"]
+	path = ext/Nerdbank.MessagePack
+	url = https://github.com/aarnott/Nerdbank.MessagePack.git
