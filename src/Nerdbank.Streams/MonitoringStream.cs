@@ -1,7 +1,7 @@
-﻿// Copyright (c) Andrew Arnott. All rights reserved.
+// Copyright (c) Andrew Arnott. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-namespace Nerdbank.Streams
+namespace MyMonitoringStream
 {
     using System;
     using System.IO;
@@ -59,12 +59,28 @@ namespace Nerdbank.Streams
         public event EventHandler<long>? DidSeek;
 
         /// <summary>
+        /// Occurs before <see cref="Read(byte[], int, int)"/> or 
+        ///               <see cref="ReadAsync(byte[], int, int, CancellationToken)"/> or
+        ///               <see cref="ReadAsync(Memory{byte}, CancellationToken)"/> or
+        ///               <see cref="Read(Span{byte})"/> is invoked.
+        /// </summary>
+        public event EventHandler<ArraySegment<byte>>? WillRead;
+
+        /// <summary>
         /// Occurs before <see cref="Read(byte[], int, int)"/> or <see cref="ReadAsync(byte[], int, int, CancellationToken)"/> is invoked.
         /// </summary>
         /// <remarks>
         /// The <see cref="ArraySegment{T}.Count"/> value is the maximum bytes that may be read.
         /// </remarks>
-        public event EventHandler<ArraySegment<byte>>? WillRead;
+        public event EventHandler<ArraySegment<byte>>? WillReadArraySegment;
+
+        /// <summary>
+        /// Occurs after <see cref="Read(byte[], int, int)"/> or 
+        ///              <see cref="ReadAsync(byte[], int, int, CancellationToken)"/> or
+        ///              <see cref="ReadAsync(Memory{byte}, CancellationToken)"/> or
+        ///              <see cref="Read(Span{byte})"/> is invoked.
+        /// </summary>
+        public event EventHandler<ArraySegment<byte>>? DidRead;
 
         /// <summary>
         /// Occurs after <see cref="Read(byte[], int, int)"/> or <see cref="ReadAsync(byte[], int, int, CancellationToken)"/> is invoked.
@@ -72,7 +88,7 @@ namespace Nerdbank.Streams
         /// <remarks>
         /// The <see cref="ArraySegment{T}.Count"/> value is the actual bytes that were read.
         /// </remarks>
-        public event EventHandler<ArraySegment<byte>>? DidRead;
+        public event EventHandler<ArraySegment<byte>>? DidReadArraySegment;
 
 #pragma warning disable CS1574
 #pragma warning disable CS0067 // Only .NET Core 2.1 raises these
@@ -124,14 +140,30 @@ namespace Nerdbank.Streams
 #pragma warning restore CS1574
 
         /// <summary>
-        /// Occurs before <see cref="Write(byte[], int, int)"/> or <see cref="WriteAsync(byte[], int, int, CancellationToken)"/> is invoked.
+        /// Occurs before <see cref="Write(byte[], int, int)"/> or
+        ///               <see cref="WriteAsync(byte[], int, int, CancellationToken)"/> is invoked.
+        ///               <see cref="WriteAsync(Memory{byte}, CancellationToken)"/> or
+        ///               <see cref="Write(Span{byte})"/> is invoked.
         /// </summary>
         public event EventHandler<ArraySegment<byte>>? WillWrite;
 
         /// <summary>
-        /// Occurs after <see cref="Write(byte[], int, int)"/> or <see cref="WriteAsync(byte[], int, int, CancellationToken)"/> is invoked.
+        /// Occurs before <see cref="Write(byte[], int, int)"/> or <see cref="WriteAsync(byte[], int, int, CancellationToken)"/> is invoked.
+        /// </summary>
+        public event EventHandler<ArraySegment<byte>>? WillWriteArraySegment;
+
+        /// <summary>
+        /// Occurs after <see cref="Write(byte[], int, int)"/> or 
+        ///              <see cref="WriteAsync(byte[], int, int, CancellationToken)"/> or
+        ///              <see cref="WriteAsync(Memory{byte}, CancellationToken)"/> or
+        ///              <see cref="Write(Span{byte})"/> is invoked.
         /// </summary>
         public event EventHandler<ArraySegment<byte>>? DidWrite;
+
+        /// <summary>
+        /// Occurs after <see cref="Write(byte[], int, int)"/> or <see cref="WriteAsync(byte[], int, int, CancellationToken)"/> is invoked.
+        /// </summary>
+        public event EventHandler<ArraySegment<byte>>? DidWriteArraySegment;
 
         /// <summary>
         /// Occurs before <see cref="SetLength(long)"/> is invoked.
@@ -229,8 +261,10 @@ namespace Nerdbank.Streams
         /// <inheritdoc/>
         public override int Read(byte[] buffer, int offset, int count)
         {
+            this.WillReadArraySegment?.Invoke(this, new ArraySegment<byte>(buffer, offset, count));
             this.WillRead?.Invoke(this, new ArraySegment<byte>(buffer, offset, count));
             int bytesRead = this.inner.Read(buffer, offset, count);
+            this.DidReadArraySegment?.Invoke(this, new ArraySegment<byte>(buffer, offset, bytesRead));
             this.DidRead?.Invoke(this, new ArraySegment<byte>(buffer, offset, bytesRead));
             this.RaiseEndOfStreamIfNecessary(bytesRead);
             return bytesRead;
@@ -239,8 +273,10 @@ namespace Nerdbank.Streams
         /// <inheritdoc/>
         public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
+            this.WillReadArraySegment?.Invoke(this, new ArraySegment<byte>(buffer, offset, count));
             this.WillRead?.Invoke(this, new ArraySegment<byte>(buffer, offset, count));
             int bytesRead = await this.inner.ReadAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
+            this.DidReadArraySegment?.Invoke(this, new ArraySegment<byte>(buffer, offset, bytesRead));
             this.DidRead?.Invoke(this, new ArraySegment<byte>(buffer, offset, bytesRead));
             this.RaiseEndOfStreamIfNecessary(bytesRead);
             return bytesRead;
@@ -252,8 +288,11 @@ namespace Nerdbank.Streams
         public override int Read(Span<byte> buffer)
         {
             this.WillReadSpan?.Invoke(this, buffer);
+            this.WillRead?.Invoke(this, buffer.ToArray());
             int bytesRead = this.inner.Read(buffer);
-            this.DidReadSpan?.Invoke(this, buffer);
+            //this.DidReadSpan?.Invoke(this, buffer);
+            this.DidReadSpan?.Invoke(this, buffer[..bytesRead]);
+            this.DidRead?.Invoke(this, buffer[..bytesRead].ToArray());
             this.RaiseEndOfStreamIfNecessary(bytesRead);
             return bytesRead;
         }
@@ -262,8 +301,11 @@ namespace Nerdbank.Streams
         public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
         {
             this.WillReadMemory?.Invoke(this, buffer);
+            this.WillRead?.Invoke(this, buffer.ToArray());
             int bytesRead = await this.inner.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
-            this.DidReadMemory?.Invoke(this, buffer);
+            //this.DidReadMemory?.Invoke(this, buffer);
+            this.DidReadMemory?.Invoke(this, buffer[..bytesRead]);
+            this.DidRead?.Invoke(this, buffer[..bytesRead].ToArray());
             this.RaiseEndOfStreamIfNecessary(bytesRead);
             return bytesRead;
         }
@@ -272,16 +314,20 @@ namespace Nerdbank.Streams
         public override void Write(ReadOnlySpan<byte> buffer)
         {
             this.WillWriteSpan?.Invoke(this, buffer);
+            this.WillWrite?.Invoke(this, buffer.ToArray());
             this.inner.Write(buffer);
             this.DidWriteSpan?.Invoke(this, buffer);
+            this.DidWrite?.Invoke(this, buffer.ToArray());
         }
 
         /// <inheritdoc/>
         public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
         {
             this.WillWriteMemory?.Invoke(this, buffer);
+            this.WillWrite?.Invoke(this, buffer.ToArray());
             await this.inner.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
             this.DidWriteMemory?.Invoke(this, buffer);
+            this.DidWrite?.Invoke(this, buffer.ToArray());
         }
 
 #endif
@@ -305,16 +351,20 @@ namespace Nerdbank.Streams
         /// <inheritdoc/>
         public override void Write(byte[] buffer, int offset, int count)
         {
+            this.WillWriteArraySegment?.Invoke(this, new ArraySegment<byte>(buffer, offset, count));
             this.WillWrite?.Invoke(this, new ArraySegment<byte>(buffer, offset, count));
             this.inner.Write(buffer, offset, count);
+            this.DidWriteArraySegment?.Invoke(this, new ArraySegment<byte>(buffer, offset, count));
             this.DidWrite?.Invoke(this, new ArraySegment<byte>(buffer, offset, count));
         }
 
         /// <inheritdoc/>
         public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
+            this.WillWriteArraySegment?.Invoke(this, new ArraySegment<byte>(buffer, offset, count));
             this.WillWrite?.Invoke(this, new ArraySegment<byte>(buffer, offset, count));
             await this.inner.WriteAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
+            this.DidWriteArraySegment?.Invoke(this, new ArraySegment<byte>(buffer, offset, count));
             this.DidWrite?.Invoke(this, new ArraySegment<byte>(buffer, offset, count));
         }
 
@@ -339,7 +389,7 @@ namespace Nerdbank.Streams
         /// <inheritdoc/>
         protected override void Dispose(bool disposing)
         {
-            if (disposing)
+            if(disposing)
             {
                 this.IsDisposed = true;
                 this.inner.Dispose();
@@ -349,7 +399,7 @@ namespace Nerdbank.Streams
 
         private void RaiseEndOfStreamIfNecessary(int bytesRead)
         {
-            if (bytesRead == 0 && !this.endOfStreamRaised)
+            if(bytesRead == 0 && !this.endOfStreamRaised)
             {
                 this.EndOfStream?.Invoke(this, EventArgs.Empty);
                 this.endOfStreamRaised = true;
