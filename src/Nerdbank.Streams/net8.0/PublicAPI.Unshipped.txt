@@ -2,6 +2,4 @@ Nerdbank.Streams.MonitoringStream.DidReadAny -> Nerdbank.Streams.MonitoringStrea
 Nerdbank.Streams.MonitoringStream.DidWriteAny -> Nerdbank.Streams.MonitoringStream.ReadOnlySpanEventHandler?
 Nerdbank.Streams.MonitoringStream.WillReadAny -> Nerdbank.Streams.MonitoringStream.ReadOnlySpanEventHandler?
 Nerdbank.Streams.MonitoringStream.WillWriteAny -> Nerdbank.Streams.MonitoringStream.ReadOnlySpanEventHandler?
-static Nerdbank.Streams.PipeExtensions.UseUtf8TextPipe(this System.Net.WebSockets.WebSocket! webSocket, int sizeHint = 0, System.IO.Pipelines.PipeOptions? pipeOptions = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.IO.Pipelines.IDuplexPipe!
-static Nerdbank.Streams.PipeExtensions.UseUtf8TextPipeWriter(this System.Net.WebSockets.WebSocket! webSocket, System.IO.Pipelines.PipeOptions? pipeOptions = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.IO.Pipelines.PipeWriter!
 static Nerdbank.Streams.ReadOnlySequenceExtensions.SequenceEqual<T>(this in System.Buffers.ReadOnlySequence<T> left, in System.Buffers.ReadOnlySequence<T> right) -> bool
