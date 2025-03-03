@@ -1,10 +1,11 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+#pragma warning disable CA2022 // Observe return values from Stream.Read calls
+
 using Nerdbank.Streams;
 using NSubstitute;
 using Xunit;
-using Xunit.Abstractions;
 
 public class MonitoringStreamTests : TestBase
 {

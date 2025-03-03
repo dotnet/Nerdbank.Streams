@@ -11,7 +11,6 @@ using System.Threading.Tasks;
 using Microsoft;
 using Nerdbank.Streams;
 using Xunit;
-using Xunit.Abstractions;
 
 public class ReadOnlySequenceStreamTests : TestBase
 {

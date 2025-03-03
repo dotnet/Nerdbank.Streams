@@ -4,7 +4,6 @@
 using System;
 using Nerdbank.Streams;
 using Xunit;
-using Xunit.Abstractions;
 
 public class MultiplexingProtocolExceptionTests : TestBase
 {

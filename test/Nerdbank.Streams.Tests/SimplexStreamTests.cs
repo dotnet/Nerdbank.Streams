@@ -11,7 +11,6 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
-using Xunit.Abstractions;
 
 public class SimplexStreamTests : TestBase
 {
