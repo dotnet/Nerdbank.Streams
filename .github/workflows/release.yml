@@ -99,11 +99,11 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        Get-ChildItem '${{ runner.temp }}/deployables' |% {
+        Get-ChildItem '${{ runner.temp }}/deployables' -File -Recurse |% {
           Write-Host "Uploading $($_.Name) to release..."
           gh release -R ${{ github.repository }} upload "${{ github.ref_name }}" $_.FullName
         }
 
     - name: 🚀 Push NuGet packages
-      run: dotnet nuget push ${{ runner.temp }}/deployables/*.nupkg --source https://api.nuget.org/v3/index.json -k '${{ secrets.NUGET_API_KEY }}'
+      run: dotnet nuget push ${{ runner.temp }}/deployables/NuGet/*.nupkg --source https://api.nuget.org/v3/index.json -k '${{ secrets.NUGET_API_KEY }}'
       if: ${{ env.NUGET_API_KEY_DEFINED == 'true' }}
