@@ -5,7 +5,6 @@ namespace Nerdbank.Streams
 {
     using System;
     using System.IO;
-    using System.Runtime.InteropServices;
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft;
@@ -253,7 +252,7 @@ namespace Nerdbank.Streams
         {
             this.WillReadSpan?.Invoke(this, buffer);
             int bytesRead = this.inner.Read(buffer);
-            this.DidReadSpan?.Invoke(this, buffer);
+            this.DidReadSpan?.Invoke(this, buffer[..bytesRead]);
             this.RaiseEndOfStreamIfNecessary(bytesRead);
             return bytesRead;
         }
@@ -263,7 +262,7 @@ namespace Nerdbank.Streams
         {
             this.WillReadMemory?.Invoke(this, buffer);
             int bytesRead = await this.inner.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
-            this.DidReadMemory?.Invoke(this, buffer);
+            this.DidReadMemory?.Invoke(this, buffer[..bytesRead]);
             this.RaiseEndOfStreamIfNecessary(bytesRead);
             return bytesRead;
         }
