@@ -1,0 +1,5 @@
+Nerdbank.Streams.MonitoringStream.DidReadAny -> Nerdbank.Streams.MonitoringStream.ReadOnlySpanEventHandler?
+Nerdbank.Streams.MonitoringStream.DidWriteAny -> Nerdbank.Streams.MonitoringStream.ReadOnlySpanEventHandler?
+Nerdbank.Streams.MonitoringStream.WillReadAny -> Nerdbank.Streams.MonitoringStream.ReadOnlySpanEventHandler?
+Nerdbank.Streams.MonitoringStream.WillWriteAny -> Nerdbank.Streams.MonitoringStream.ReadOnlySpanEventHandler?
+static Nerdbank.Streams.ReadOnlySequenceExtensions.SequenceEqual<T>(this in System.Buffers.ReadOnlySequence<T> left, in System.Buffers.ReadOnlySequence<T> right) -> bool

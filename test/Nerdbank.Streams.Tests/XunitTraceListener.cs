@@ -5,7 +5,7 @@ using System;
 using System.Buffers;
 using System.Diagnostics;
 using System.Text;
-using Xunit.Abstractions;
+using Xunit;
 
 internal class XunitTraceListener : TraceListener
 {

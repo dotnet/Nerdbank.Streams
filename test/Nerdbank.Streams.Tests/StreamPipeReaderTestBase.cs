@@ -6,7 +6,6 @@ using System.IO.Pipelines;
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
-using Xunit.Abstractions;
 
 public abstract class StreamPipeReaderTestBase : TestBase
 {
@@ -23,10 +22,10 @@ public abstract class StreamPipeReaderTestBase : TestBase
         Assert.Throws<ArgumentNullException>(() => this.CreatePipeReader((Stream)null!));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Stream()
     {
-        Skip.If(this is IOPipelinesStreamPipeReaderTests, "OnWriterCompleted isn't supported.");
+        Assert.SkipWhen(this is IOPipelinesStreamPipeReaderTests, "OnWriterCompleted isn't supported.");
 
         byte[] expectedBuffer = this.GetRandomBuffer(2048);
         var stream = new MemoryStream(expectedBuffer);
@@ -241,10 +240,10 @@ public abstract class StreamPipeReaderTestBase : TestBase
         Assert.True(ex is InvalidCastException || ex is InvalidOperationException);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task OnWriterCompleted()
     {
-        Skip.If(this is IOPipelinesStreamPipeReaderTests, "OnWriterCompleted isn't supported.");
+        Assert.SkipWhen(this is IOPipelinesStreamPipeReaderTests, "OnWriterCompleted isn't supported.");
         byte[] expectedBuffer = this.GetRandomBuffer(50);
         var stream = new MemoryStream(expectedBuffer);
         PipeReader? reader = this.CreatePipeReader(stream, sizeHint: 50);

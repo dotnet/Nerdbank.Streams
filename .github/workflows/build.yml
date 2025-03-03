@@ -1,0 +1,108 @@
+name: 🏭 Build
+
+on:
+  push:
+    branches:
+    - main
+    - 'v*.*'
+    - validate/*
+  pull_request:
+  workflow_dispatch:
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  BUILDCONFIGURATION: Release
+  # codecov_token: 4dc9e7e2-6b01-4932-a180-847b52b43d35 # Get a new one from https://codecov.io/
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages/
+
+jobs:
+  build:
+    name: 🏭 Build
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - os: ubuntu-22.04
+          rid: linux
+        - os: macos-14
+          rid: osx
+        - os: windows-2022
+          rid: win
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 # avoid shallow clone so nbgv can do its work.
+        submodules: true
+    - name: ⚙ Install prerequisites
+      run: |
+        ./init.ps1 -UpgradePrerequisites
+        dotnet --info
+
+        # Print mono version if it is present.
+        if (Get-Command mono -ErrorAction SilentlyContinue) {
+          mono --version
+        }
+      shell: pwsh
+    - name: ⚙️ Set pipeline variables based on source
+      run: tools/variables/_define.ps1
+      shell: pwsh
+    - name: 🛠 dotnet build
+      run: dotnet build -t:build,pack --no-restore -c ${{ env.BUILDCONFIGURATION }} -warnAsError -warnNotAsError:NU1901,NU1902,NU1903,NU1904 /bl:"${{ runner.temp }}/_artifacts/build_logs/build.binlog"
+    - name: 🧪 dotnet test
+      run: tools/dotnet-test-cloud.ps1 -Configuration ${{ env.BUILDCONFIGURATION }} -Agent ${{ runner.os }}
+      shell: pwsh
+    - name: 🧪 NativeAOT test
+      run: dotnet publish -c Release -r ${{ matrix.rid }}-x64 -warnaserror
+      working-directory: test/NativeAOTCompatibility
+
+    - name: ⚙️ Use Node.js 16.x
+      uses: actions/setup-node@v3
+      with:
+        node-version: 16.x
+    - name: ⚙️ yarn
+      run: |
+        npm install -g yarn@1.x
+        yarn install
+      working-directory: src/nerdbank-streams
+    - name: 🛠️ yarn build
+      run: yarn build
+      working-directory: src/nerdbank-streams
+    - name: 🧪 yarn test
+      run: yarn test
+      working-directory: src/nerdbank-streams
+    - name: 🧪 yarn lint
+      run: yarn lint
+      working-directory: src/nerdbank-streams
+
+    - name: 💅🏻 Verify formatted code
+      run: dotnet format --verify-no-changes --no-restore
+      shell: pwsh
+      if: runner.os == 'Linux'
+    - name: 📚 Verify docfx build
+      run: dotnet docfx docfx/docfx.json --warningsAsErrors --disableGitFeatures
+      if: runner.os == 'Linux'
+    - name: ⚙ Update pipeline variables based on build outputs
+      run: tools/variables/_define.ps1
+      shell: pwsh
+    - name: 📢 Publish artifacts
+      uses: ./.github/actions/publish-artifacts
+      if: cancelled() == false
+    - name: 📢 Publish code coverage results to codecov.io
+      run: ./tools/publish-CodeCov.ps1 -CodeCovToken "${{ env.codecov_token }}" -PathToCodeCoverage "${{ runner.temp }}/_artifacts/coverageResults" -Name "${{ runner.os }} Coverage Results" -Flags "${{ runner.os }}"
+      shell: pwsh
+      timeout-minutes: 3
+      continue-on-error: true
+      if: env.codecov_token != ''
+
+  docs:
+    name: 📃 Docs
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: 🔗 Markup Link Checker (mlc)
+      uses: becheran/mlc@v0.19.0
+      with:
+        args: --do-not-warn-for-redirect-to https://learn.microsoft.com*,https://dev.azure.com/*,https://app.codecov.io/* -p docfx

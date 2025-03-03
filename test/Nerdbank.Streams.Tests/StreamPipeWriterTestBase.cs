@@ -7,7 +7,6 @@ using Nerdbank.Streams;
 using NSubstitute;
 using NSubstitute.ReceivedExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 public abstract class StreamPipeWriterTestBase : TestBase
 {

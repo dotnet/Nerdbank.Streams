@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net6.0</TargetFrameworks>
+    <TargetFrameworks>net8.0</TargetFrameworks>
     <TargetFrameworks Condition="$([MSBuild]::IsOsPlatform('Windows'))">$(TargetFrameworks);net472</TargetFrameworks>
+    <OutputType>Exe</OutputType>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <RootNamespace />
 
@@ -11,6 +12,9 @@
     <CoverletOutputFormat>opencover</CoverletOutputFormat>
     <!--<CoverletOutput>$(OutDir)code_coverage.xml</CoverletOutput>-->
     <Exclude>[xunit.*]*,[IsolatedTestHost]*</Exclude>
+
+    <!-- Security vulnerabilities in the test project aren't that interesting, at least until we can remove/upgrade the ASP.NET Core tests. -->
+    <NoWarn>$(NoWarn);NU1902;NU1904</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\src\Nerdbank.Streams\Utilities.cs" Link="Utilities.cs" />
@@ -19,8 +23,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" />
-    <!-- Temporarily upgrade Microsoft.Bcl.AsyncInterfaces while we reference StreamJsonRpc that wants 7.0.0 -->
-    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" VersionOverride="7.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.VisualStudio.Threading" />
     <PackageReference Include="NSubstitute" />
@@ -31,11 +33,9 @@
     <PackageReference Include="PInvoke.Kernel32" />
     <PackageReference Include="StreamJsonRpc" />
     <PackageReference Include="System.IO.Pipes" />
-    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.v3" />
     <PackageReference Include="xunit.combinatorial" />
-    <PackageReference Include="xunit.runner.console" />
     <PackageReference Include="xunit.runner.visualstudio" />
-    <PackageReference Include="xunit.skippablefact" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\IsolatedTestHost\IsolatedTestHost.csproj">
