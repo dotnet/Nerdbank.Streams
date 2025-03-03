@@ -71,6 +71,7 @@ namespace Nerdbank.Streams
         /// <remarks>
         /// The <see cref="ArraySegment{T}.Count"/> value is the actual bytes that were read.
         /// </remarks>
+        [Obsolete("This event is raised for Span and Memory reads as well, and may result in buffer copies. Use DidReadAny from 2.12+ instead.")]
         public event EventHandler<ArraySegment<byte>>? DidRead;
 
 #pragma warning disable CS1574
@@ -130,6 +131,7 @@ namespace Nerdbank.Streams
         /// <summary>
         /// Occurs after <see cref="Write(byte[], int, int)"/> or <see cref="WriteAsync(byte[], int, int, CancellationToken)"/> is invoked.
         /// </summary>
+        [Obsolete("This event is raised for Span and Memory writes as well, and may result in buffer copies. Use DidWriteAny from 2.12+ instead.")]
         public event EventHandler<ArraySegment<byte>>? DidWrite;
 
         /// <summary>
@@ -251,7 +253,7 @@ namespace Nerdbank.Streams
         public override int Read(Span<byte> buffer)
         {
             this.WillReadSpan?.Invoke(this, buffer);
-            int bytesRead = this.inner.Read(buffer);
+            int bytesRead = base.Read(buffer);
             this.DidReadSpan?.Invoke(this, buffer[..bytesRead]);
             this.RaiseEndOfStreamIfNecessary(bytesRead);
             return bytesRead;
@@ -261,7 +263,7 @@ namespace Nerdbank.Streams
         public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
         {
             this.WillReadMemory?.Invoke(this, buffer);
-            int bytesRead = await this.inner.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            int bytesRead = await base.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
             this.DidReadMemory?.Invoke(this, buffer[..bytesRead]);
             this.RaiseEndOfStreamIfNecessary(bytesRead);
             return bytesRead;
@@ -271,7 +273,7 @@ namespace Nerdbank.Streams
         public override void Write(ReadOnlySpan<byte> buffer)
         {
             this.WillWriteSpan?.Invoke(this, buffer);
-            this.inner.Write(buffer);
+            base.Write(buffer);
             this.DidWriteSpan?.Invoke(this, buffer);
         }
 
@@ -279,7 +281,7 @@ namespace Nerdbank.Streams
         public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
         {
             this.WillWriteMemory?.Invoke(this, buffer);
-            await this.inner.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
+            await base.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
             this.DidWriteMemory?.Invoke(this, buffer);
         }
 
