@@ -31,6 +31,11 @@ jobs:
           echo "NUGET_API_KEY_DEFINED=true" >> $env:GITHUB_ENV
         }
 
+        if ('${{ secrets.NPM_API_KEY }}') {
+          Write-Host "NPM_API_KEY secret detected. NPM packages will be pushed."
+          echo "NPM_API_KEY_DEFINED=true" >> $env:GITHUB_ENV
+        }
+
     - name: 🔎 Search for build of ${{ github.ref }}
       shell: pwsh
       id: findrunid
@@ -103,6 +108,18 @@ jobs:
           Write-Host "Uploading $($_.Name) to release..."
           gh release -R ${{ github.repository }} upload "${{ github.ref_name }}" $_.FullName
         }
+
+    - name: 🚀 Push NPM packages
+      shell: pwsh
+      run: |
+        $tgz = (Get-ChildItem ./deployables/npm/*.tgz)[0].FullName
+        npm init -y
+        npm install $tgz
+        Push-Location node_modules/nerdbank-streams
+        npm set //registry.npmjs.org/:_authToken=${{ secrets.NPM_API_KEY }}
+        npm publish
+      working-directory: ${{ runner.temp }}
+      if: ${{ env.NPM_API_KEY_DEFINED == 'true' }}
 
     - name: 🚀 Push NuGet packages
       run: dotnet nuget push ${{ runner.temp }}/deployables/NuGet/*.nupkg --source https://api.nuget.org/v3/index.json -k '${{ secrets.NUGET_API_KEY }}'
