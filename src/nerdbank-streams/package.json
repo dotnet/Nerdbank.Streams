@@ -13,7 +13,7 @@
   "homepage": "https://github.com/AArnott/Nerdbank.Streams",
   "repository": {
     "type": "git",
-    "url": "https://github.com/AArnott/Nerdbank.Streams.git"
+    "url": "git+https://github.com/AArnott/Nerdbank.Streams.git"
   },
   "bugs": {
     "url": "https://github.com/AArnott/Nerdbank.Streams/issues"
