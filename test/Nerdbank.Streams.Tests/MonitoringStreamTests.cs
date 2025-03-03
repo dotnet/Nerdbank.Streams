@@ -60,7 +60,9 @@ public class MonitoringStreamTests : TestBase
             Assert.Equal(2, e.Offset);
             Assert.Equal(6, e.Count);
         };
+#pragma warning disable CS0618 // Testing an obsolete API
         this.monitoringStream.DidRead += (s, e) =>
+#pragma warning restore CS0618 // Testing an obsolete API
         {
             didReadInvoked = true;
             Assert.True(willReadInvoked);
@@ -106,7 +108,9 @@ public class MonitoringStreamTests : TestBase
             Assert.Equal(2, e.Offset);
             Assert.Equal(6, e.Count);
         };
+#pragma warning disable CS0618 // Testing an obsolete API
         this.monitoringStream.DidRead += (s, e) =>
+#pragma warning restore CS0618 // Testing an obsolete API
         {
             didReadInvoked = true;
             Assert.True(willReadInvoked);
@@ -196,7 +200,9 @@ public class MonitoringStreamTests : TestBase
             Assert.Equal(2, e.Offset);
             Assert.Equal(3, e.Count);
         };
+#pragma warning disable CS0618 // Testing an obsolete API
         this.monitoringStream.DidWrite += (s, e) =>
+#pragma warning restore CS0618 // Testing an obsolete API
         {
             didWriteInvoked = true;
             Assert.True(willWriteInvoked);
@@ -225,7 +231,9 @@ public class MonitoringStreamTests : TestBase
             Assert.Equal(2, e.Offset);
             Assert.Equal(3, e.Count);
         };
+#pragma warning disable CS0618 // Testing an obsolete API
         this.monitoringStream.DidWrite += (s, e) =>
+#pragma warning restore CS0618 // Testing an obsolete API
         {
             didWriteInvoked = true;
             Assert.True(willWriteInvoked);
@@ -430,28 +438,38 @@ public class MonitoringStreamTests : TestBase
     public void Read_Span_RaisesEvents()
     {
         bool willReadInvoked = false;
+        bool didReadSpanInvoked = false;
         bool didReadInvoked = false;
         this.monitoringStream.WillReadSpan += (s, e) =>
         {
             willReadInvoked = true;
-            Assert.False(didReadInvoked);
+            Assert.False(didReadSpanInvoked);
             Assert.Same(this.monitoringStream, s);
             Assert.Equal(6, e.Length);
         };
         this.monitoringStream.DidReadSpan += (s, e) =>
         {
-            didReadInvoked = true;
+            didReadSpanInvoked = true;
             Assert.True(willReadInvoked);
             Assert.Same(this.monitoringStream, s);
             Assert.Equal(5, e.Length);
         };
-        this.monitoringStream.DidRead += (s, e) => Assert.Fail("Unexpected event.");
+#pragma warning disable CS0618 // Testing an obsolete API
+        this.monitoringStream.DidRead += (s, e) =>
+#pragma warning restore CS0618 // Testing an obsolete API
+        {
+            didReadInvoked = true;
+            Assert.True(willReadInvoked);
+            Assert.Same(this.monitoringStream, s);
+            Assert.Equal(5, e.Count);
+        };
         this.monitoringStream.DidReadMemory += (s, e) => Assert.Fail("Unexpected event.");
         this.monitoringStream.DidReadByte += (s, e) => Assert.Fail("Unexpected event.");
         int bytesRead = this.monitoringStream.Read(this.buffer.AsSpan(2, 6));
         Assert.Equal(5, bytesRead);
         Assert.Equal(bytesRead, this.underlyingStream.Position);
         Assert.True(willReadInvoked);
+        Assert.True(didReadSpanInvoked);
         Assert.True(didReadInvoked);
     }
 
@@ -475,28 +493,38 @@ public class MonitoringStreamTests : TestBase
     public async Task ReadAsync_Memory_RaisesEvents()
     {
         bool willReadInvoked = false;
+        bool didReadMemoryInvoked = false;
         bool didReadInvoked = false;
         this.monitoringStream.WillReadMemory += (s, e) =>
         {
             willReadInvoked = true;
-            Assert.False(didReadInvoked);
+            Assert.False(didReadMemoryInvoked);
             Assert.Same(this.monitoringStream, s);
             Assert.Equal(6, e.Length);
         };
         this.monitoringStream.DidReadMemory += (s, e) =>
         {
-            didReadInvoked = true;
+            didReadMemoryInvoked = true;
             Assert.True(willReadInvoked);
             Assert.Same(this.monitoringStream, s);
             Assert.Equal(5, e.Length);
         };
-        this.monitoringStream.DidRead += (s, e) => Assert.Fail("Unexpected event.");
+#pragma warning disable CS0618 // Testing an obsolete API
+        this.monitoringStream.DidRead += (s, e) =>
+#pragma warning restore CS0618 // Testing an obsolete API
+        {
+            didReadInvoked = true;
+            Assert.True(willReadInvoked);
+            Assert.Same(this.monitoringStream, s);
+            Assert.Equal(5, e.Count);
+        };
         this.monitoringStream.DidReadSpan += (s, e) => Assert.Fail("Unexpected event.");
         this.monitoringStream.DidReadByte += (s, e) => Assert.Fail("Unexpected event.");
         int bytesRead = await this.monitoringStream.ReadAsync(this.buffer.AsMemory(2, 6));
         Assert.Equal(5, bytesRead);
         Assert.Equal(bytesRead, this.underlyingStream.Position);
         Assert.True(willReadInvoked);
+        Assert.True(didReadMemoryInvoked);
         Assert.True(didReadInvoked);
     }
 
@@ -520,6 +548,7 @@ public class MonitoringStreamTests : TestBase
     public void Write_Span_RaisesEvents()
     {
         bool willWriteInvoked = false;
+        bool didWriteSpanInvoked = false;
         bool didWriteInvoked = false;
         this.monitoringStream.WillWriteSpan += (s, e) =>
         {
@@ -530,17 +559,26 @@ public class MonitoringStreamTests : TestBase
         };
         this.monitoringStream.DidWriteSpan += (s, e) =>
         {
-            didWriteInvoked = true;
+            didWriteSpanInvoked = true;
             Assert.True(willWriteInvoked);
             Assert.Same(this.monitoringStream, s);
             Assert.Equal(3, e.Length);
         };
-        this.monitoringStream.DidWrite += (s, e) => Assert.Fail("Unexpected event.");
+#pragma warning disable CS0618 // Testing an obsolete API
+        this.monitoringStream.DidWrite += (s, e) =>
+#pragma warning restore CS0618 // Testing an obsolete API
+        {
+            didWriteInvoked = true;
+            Assert.True(willWriteInvoked);
+            Assert.Same(this.monitoringStream, s);
+            Assert.Equal(3, e.Count);
+        };
         this.monitoringStream.DidWriteMemory += (s, e) => Assert.Fail("Unexpected event.");
         this.monitoringStream.DidWriteByte += (s, e) => Assert.Fail("Unexpected event.");
         this.monitoringStream.Write(this.buffer.AsSpan(2, 3));
         Assert.True(willWriteInvoked);
         Assert.True(didWriteInvoked);
+        Assert.True(didWriteSpanInvoked);
         Assert.Equal(new byte[] { 8, 9, 10, 4, 5 }, this.underlyingStream.ToArray());
     }
 
@@ -548,28 +586,39 @@ public class MonitoringStreamTests : TestBase
     public async Task WriteAsync_Memory_RaisesEvents()
     {
         int willWriteInvoked = 0;
+        int didWriteMemoryInvoked = 0;
         int didWriteInvoked = 0;
         this.monitoringStream.WillWriteMemory += (s, e) =>
         {
             Assert.Equal(0, willWriteInvoked);
             willWriteInvoked++;
-            Assert.Equal(0, didWriteInvoked);
+            Assert.Equal(0, didWriteMemoryInvoked);
             Assert.Same(this.monitoringStream, s);
             Assert.Equal(3, e.Length);
         };
         this.monitoringStream.DidWriteMemory += (s, e) =>
         {
+            Assert.Equal(0, didWriteMemoryInvoked);
+            Assert.Equal(1, willWriteInvoked);
+            didWriteMemoryInvoked++;
+            Assert.Same(this.monitoringStream, s);
+            Assert.Equal(3, e.Length);
+        };
+#pragma warning disable CS0618 // Testing an obsolete API
+        this.monitoringStream.DidWrite += (s, e) =>
+#pragma warning restore CS0618 // Testing an obsolete API
+        {
             Assert.Equal(0, didWriteInvoked);
             Assert.Equal(1, willWriteInvoked);
             didWriteInvoked++;
             Assert.Same(this.monitoringStream, s);
-            Assert.Equal(3, e.Length);
+            Assert.Equal(3, e.Count);
         };
-        this.monitoringStream.DidWrite += (s, e) => Assert.Fail("Unexpected event.");
         this.monitoringStream.DidWriteSpan += (s, e) => Assert.Fail("Unexpected event.");
         this.monitoringStream.DidWriteByte += (s, e) => Assert.Fail("Unexpected event.");
         await this.monitoringStream.WriteAsync(this.buffer.AsMemory(2, 3));
         Assert.Equal(1, willWriteInvoked);
+        Assert.Equal(1, didWriteMemoryInvoked);
         Assert.Equal(1, didWriteInvoked);
         Assert.Equal(new byte[] { 8, 9, 10, 4, 5 }, this.underlyingStream.ToArray());
     }

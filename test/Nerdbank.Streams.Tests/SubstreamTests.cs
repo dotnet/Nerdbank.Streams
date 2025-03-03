@@ -287,7 +287,9 @@ public class SubstreamTests : TestBase
     {
         var monitoredStream = new MonitoringStream(this.underlyingStream);
         int lastOperation = 0;
+#pragma warning disable CS0618 // Testing an obsolete API
         monitoredStream.DidWrite += (s, e) => lastOperation = 1;
+#pragma warning restore CS0618 // Testing an obsolete API
         monitoredStream.DidWriteMemory += (s, e) => lastOperation = 1;
         monitoredStream.DidWriteSpan += (s, e) => lastOperation = 1;
         monitoredStream.DidWriteByte += (s, e) => lastOperation = 1;
