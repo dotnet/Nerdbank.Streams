@@ -100,7 +100,7 @@ jobs:
 
     - name: 💽 Upload artifacts to release
       shell: pwsh
-      if: ${{ github.event.release.assets_url }} != ''
+      if: ${{ github.event_name == 'release' && github.event.release.assets_url != '' }}
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
