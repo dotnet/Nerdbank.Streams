@@ -443,7 +443,7 @@ public class MonitoringStreamTests : TestBase
             didReadInvoked = true;
             Assert.True(willReadInvoked);
             Assert.Same(this.monitoringStream, s);
-            Assert.Equal(6, e.Length);
+            Assert.Equal(5, e.Length);
         };
         this.monitoringStream.DidRead += (s, e) => Assert.Fail("Unexpected event.");
         this.monitoringStream.DidReadMemory += (s, e) => Assert.Fail("Unexpected event.");
@@ -488,7 +488,7 @@ public class MonitoringStreamTests : TestBase
             didReadInvoked = true;
             Assert.True(willReadInvoked);
             Assert.Same(this.monitoringStream, s);
-            Assert.Equal(6, e.Length);
+            Assert.Equal(5, e.Length);
         };
         this.monitoringStream.DidRead += (s, e) => Assert.Fail("Unexpected event.");
         this.monitoringStream.DidReadSpan += (s, e) => Assert.Fail("Unexpected event.");
