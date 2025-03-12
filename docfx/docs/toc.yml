@@ -1,0 +1,32 @@
+items:
+- name: Features
+  href: features.md
+- name: Getting Started
+  href: getting-started.md
+- name: Exposing I/O as a Stream
+  href: AsStream.md
+- name: TextWriter for IBufferWriter<byte>
+  href: BufferTextWriter.md
+- name: DuplexPipe
+  href: DuplexPipe.md
+- name: Full-duplex streams
+  href: FullDuplexStream.md
+- name: Monitoring Stream
+  href: MonitoringStream.md
+- name: Multiplexing Stream
+  href: MultiplexingStream.md
+- name: Prefixing buffer writer
+  href: PrefixingBufferWriter.md
+- name: Stream.ReadBlockAsync(Memory<byte>, CancellationToken)
+  href: ReadBlockAsync.md
+- name: Read sliced Stream or PipeReader
+  href: ReadSlice.md
+- name: Sequence<T>
+  href: Sequence.md
+- name: TextReader for ReadOnlySequence<byte>
+  href: SequenceTextReader.md
+- name: Simplex Stream
+  href: SimplexStream.md
+- name: Access existing I/O APIS using Pipelines
+  href: UsePipe.md
+- href: Substream.md

@@ -8,7 +8,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Nerdbank.Streams;
 using Xunit;
-using Xunit.Abstractions;
 
 public class StreamExtensionsTests : TestBase
 {

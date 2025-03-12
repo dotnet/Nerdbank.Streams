@@ -8,7 +8,6 @@ using Microsoft;
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
-using Xunit.Abstractions;
 
 #pragma warning disable SA1401 // Fields should be private
 #pragma warning disable SA1414 // Tuple types in signatures should have element names
@@ -29,12 +28,12 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
     protected virtual int ProtocolMajorVersion { get; } = 1;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await this.ReinitializeMxStreamsAsync(new MultiplexingStream.Options());
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         await (this.mx1?.DisposeAsync() ?? default);
         await (this.mx2?.DisposeAsync() ?? default);
@@ -43,6 +42,8 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
         this.mx1?.TraceSource.Listeners.OfType<XunitTraceListener>().SingleOrDefault()?.Dispose();
         this.mx2?.TraceSource.Listeners.OfType<XunitTraceListener>().SingleOrDefault()?.Dispose();
+
+        this.Dispose();
     }
 
     [Fact, Obsolete]
@@ -748,7 +749,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         await ReadAtLeastAsync(s2, new ArraySegment<byte>(recvBuffer), recvBuffer.Length, this.TimeoutToken);
     }
 
-    [SkippableTheory]
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public async Task CancelChannelOfferBeforeAcceptance(bool cancelFirst)
@@ -768,20 +769,20 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
                 await Task.Delay(250);
             }
 
-            MultiplexingStream.Channel? acceptedChannel = await this.mx2.AcceptChannelAsync(string.Empty, ExpectedTimeoutToken).ConfigureAwait(false);
+            MultiplexingStream.Channel? acceptedChannel = await this.mx2.AcceptChannelAsync(string.Empty, ExpectedTimeoutToken);
             acceptedStream = acceptedChannel.AsStream();
 
             // In this case, we accepted the channel before receiving the cancellation notice. The channel should be terminated by the remote side very soon.
             int bytesRead = await acceptedStream.ReadAsync(new byte[1], 0, 1, this.TimeoutToken).WithCancellation(this.TimeoutToken);
             Assert.Equal(0, bytesRead); // confirm that the stream was closed.
             this.Logger.WriteLine("Verified the channel terminated condition.");
-            Skip.If(cancelFirst);
+            Assert.SkipWhen(cancelFirst, "Skipped");
         }
         catch (OperationCanceledException) when (acceptedStream == null)
         {
             // In this case, the channel offer was canceled before we accepted it.
             this.Logger.WriteLine("Verified the channel offer was canceled before acceptance condition.");
-            Skip.IfNot(cancelFirst);
+            Assert.SkipUnless(cancelFirst, "Skipped");
         }
     }
 

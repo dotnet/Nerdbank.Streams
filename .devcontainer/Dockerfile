@@ -1,5 +1,5 @@
 # Refer to https://hub.docker.com/_/microsoft-dotnet-sdk for available versions
-FROM mcr.microsoft.com/dotnet/sdk:8.0.201-jammy
+FROM mcr.microsoft.com/dotnet/sdk:9.0.200-noble
 
 # Installing mono makes `dotnet test` work without errors even for net472.
 # But installing it takes a long time, so it's excluded by default.
@@ -12,3 +12,8 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0.201-jammy
 # See https://github.com/dotnet/dotnet-docker/issues/2790 for a discussion on this, where the prioritized use case
 # was *not* devcontainers, sadly.
 ENV NUGET_XMLDOC_MODE=
+
+# Install Node.js 16
+RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash - \
+    && apt-get install -y nodejs
+RUN npm i -g yarn

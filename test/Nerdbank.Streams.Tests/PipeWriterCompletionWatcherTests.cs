@@ -6,7 +6,6 @@ using System.IO.Pipelines;
 using System.Threading.Tasks;
 using Nerdbank.Streams;
 using Xunit;
-using Xunit.Abstractions;
 
 public class PipeWriterCompletionWatcherTests : TestBase
 {

@@ -1,0 +1,34 @@
+{
+	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
+	"extends": ["config:recommended"],
+	"semanticCommits": "disabled",
+	"labels": ["dependencies"],
+	"packageRules": [
+		{
+			"matchPackageNames": ["nbgv", "nerdbank.gitversioning"],
+			"groupName": "nbgv and nerdbank.gitversioning updates"
+		},
+		{
+			"matchPackageNames": ["xunit*"],
+			"groupName": "xunit"
+		},
+		{
+			"matchDatasources": ["dotnet-version", "docker"],
+			"matchDepNames": ["dotnet-sdk", "mcr.microsoft.com/dotnet/sdk"],
+			"groupName": "Dockerfile and global.json updates"
+		},
+		{
+			"matchPackageNames": ["*"],
+			"allowedVersions": "!/-g[a-f0-9]+$/"
+		},
+		{
+			"matchPackageNames": [
+				"Microsoft.Bcl.AsyncInterfaces",
+				"System.Collections.Immutable",
+				"System.Text.Json"
+			],
+			"allowedVersions": "<9.0",
+			"groupName": "Included in .NET runtime"
+		}
+	]
+}

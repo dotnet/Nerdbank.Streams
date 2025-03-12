@@ -8,7 +8,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Nerdbank.Streams;
 using Xunit;
-using Xunit.Abstractions;
 
 public class NestedPipeReaderTests : TestBase, IAsyncLifetime
 {
@@ -20,9 +19,13 @@ public class NestedPipeReaderTests : TestBase, IAsyncLifetime
     {
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync()
+    {
+        this.Dispose();
+        return default;
+    }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await this.pipe.Writer.WriteAsync(OriginalBuffer, this.TimeoutToken);
     }

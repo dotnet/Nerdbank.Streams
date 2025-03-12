@@ -5,7 +5,7 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
     <BenchmarkDotNetVersion>0.13.12</BenchmarkDotNetVersion>
-    <AspNetCoreVersion>2.2.0</AspNetCoreVersion>
+    <AspNetCoreVersion>2.3.0</AspNetCoreVersion>
     <VSThreadingVersion>17.14.2-alpha</VSThreadingVersion>
   </PropertyGroup>
   <ItemGroup>
@@ -13,36 +13,37 @@
     <PackageVersion Include="BenchmarkDotNet" Version="$(BenchmarkDotNetVersion)" />
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="$(AspNetCoreVersion)" />
     <PackageVersion Include="Microsoft.AspNetCore" Version="$(AspNetCoreVersion)" />
-    <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="6.0.0" />
+    <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="8.0.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.3.4" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
     <PackageVersion Include="Microsoft.VisualStudio.Threading.Analyzers" Version="$(VSThreadingVersion)" />
     <PackageVersion Include="Microsoft.VisualStudio.Threading.Only" Version="$(VSThreadingVersion)" />
     <PackageVersion Include="Microsoft.VisualStudio.Threading" Version="$(VSThreadingVersion)" />
     <PackageVersion Include="Microsoft.VisualStudio.Validation" Version="17.8.8" />
-    <PackageVersion Include="NSubstitute" Version="5.1.0" />
-    <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.16" />
+    <PackageVersion Include="NSubstitute" Version="5.3.0" />
+    <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.17" />
     <PackageVersion Include="PInvoke.Kernel32" Version="0.7.124" />
-    <PackageVersion Include="StreamJsonRpc" Version="2.16.36" />
+    <PackageVersion Include="StreamJsonRpc" Version="2.21.10" />
     <PackageVersion Include="System.IO.Pipelines" Version="8.0.0" />
     <PackageVersion Include="System.IO.Pipes" Version="4.3.0" />
-    <PackageVersion Include="System.Runtime.CompilerServices.Unsafe" Version="6.0.0" />
-    <PackageVersion Include="xunit.abstractions" Version="2.0.3" />
-    <PackageVersion Include="xunit.combinatorial" Version="1.6.24" />
-    <PackageVersion Include="xunit.extensibility.core" Version="2.7.1" />
-    <PackageVersion Include="xunit.runner.console" Version="2.6.4" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="2.5.7" />
-    <PackageVersion Include="xunit.skippablefact" Version="1.4.13" />
-    <PackageVersion Include="xunit" Version="2.7.1" />
+    <PackageVersion Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.0" />
+    <PackageVersion Include="System.Text.Json" Version="8.0.5" />
+    <PackageVersion Include="xunit.v3.extensibility.core" Version="1.1.0" />
+    <PackageVersion Include="xunit.combinatorial" Version="2.0.24" />
+  </ItemGroup>
+  <ItemGroup Label="Library.Template">
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.0.2" />
+    <PackageVersion Include="xunit.v3" Version="1.1.0" />
   </ItemGroup>
   <ItemGroup>
-    <GlobalPackageReference Include="CSharpIsNullAnalyzer" Version="0.1.495" />
+    <!-- Put repo-specific GlobalPackageReference items in this group. -->
+  </ItemGroup>
+  <ItemGroup Label="Library.Template">
+    <GlobalPackageReference Include="CSharpIsNullAnalyzer" Version="0.1.593" />
     <GlobalPackageReference Include="DotNetAnalyzers.DocumentationAnalyzers" Version="1.0.0-beta.59" />
-    <GlobalPackageReference Include="Nerdbank.GitVersioning" Version="3.6.133" />
-    <GlobalPackageReference Include="Nullable" Version="1.3.1" />
+    <!-- The condition works around https://github.com/dotnet/sdk/issues/44951 -->
+    <GlobalPackageReference Include="Nerdbank.GitVersioning" Version="3.7.115" Condition="!('$(TF_BUILD)'=='true' and '$(dotnetformat)'=='true')" />
+    <GlobalPackageReference Include="PolySharp" Version="1.15.0" />
     <GlobalPackageReference Include="StyleCop.Analyzers.Unstable" Version="1.2.0.556" />
-  </ItemGroup>
-  <ItemGroup>
-    <GlobalPackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
   </ItemGroup>
 </Project>

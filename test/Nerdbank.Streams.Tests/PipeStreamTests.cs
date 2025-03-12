@@ -1,6 +1,8 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+#pragma warning disable CA2022 // Observe return values from Stream.Read calls
+
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -14,7 +16,6 @@ using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
-using Xunit.Abstractions;
 
 public class PipeStreamTests : TestBase
 {

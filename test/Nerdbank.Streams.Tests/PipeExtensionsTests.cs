@@ -9,7 +9,6 @@ using Microsoft;
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
-using Xunit.Abstractions;
 using IPC = System.IO.Pipes;
 
 public partial class PipeExtensionsTests : TestBase
