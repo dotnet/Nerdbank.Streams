@@ -1,6 +1,6 @@
 # Specialized .NET Stream classes
 
-[![NuGet package](https://img.shields.io/nuget/v/Nerdbank.Streams.svg)](https://nuget.org/packages/Nerdbank.Streams)
+[![NuGet package](https://img.shields.io/nuget/v/Nerdbank.Streams.svg)](https://www.nuget.org/packages/Nerdbank.Streams)
 [![Build Status](https://dev.azure.com/andrewarnott/OSS/_apis/build/status/Nerdbank.Streams)](https://dev.azure.com/andrewarnott/OSS/_build/latest?definitionId=14)
 [![codecov](https://codecov.io/gh/AArnott/Nerdbank.Streams/branch/main/graph/badge.svg)](https://codecov.io/gh/AArnott/Nerdbank.Streams)
 
