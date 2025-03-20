@@ -1,6 +1,9 @@
 {
 	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
-	"extends": ["config:recommended"],
+	"extends": [
+		"config:best-practices",
+		"github>microsoft/vs-renovate-presets:dotnet_packages_below(9)"
+	],
 	"semanticCommits": "disabled",
 	"labels": ["dependencies"],
 	"packageRules": [
@@ -20,15 +23,6 @@
 		{
 			"matchPackageNames": ["*"],
 			"allowedVersions": "!/-g[a-f0-9]+$/"
-		},
-		{
-			"matchPackageNames": [
-				"Microsoft.Bcl.AsyncInterfaces",
-				"System.Collections.Immutable",
-				"System.Text.Json"
-			],
-			"allowedVersions": "<9.0",
-			"groupName": "Included in .NET runtime"
 		}
 	]
 }
