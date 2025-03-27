@@ -914,10 +914,12 @@
   dependencies:
     undici-types "~6.20.0"
 
-"@types/node@16.18.125":
-  version "16.18.125"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-16.18.125.tgz#c2bfb73222c573e5906843a13db24714c21ba556"
-  integrity sha512-w7U5ojboSPfZP4zD98d+/cjcN2BDW6lKH2M0ubipt8L8vUC7qUAC6ENKGSJL4tEktH2Saw2K4y1uwSjyRGKMhw==
+"@types/node@22.13.14":
+  version "22.13.14"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-22.13.14.tgz#70d84ec91013dcd2ba2de35532a5a14c2b4cc912"
+  integrity sha512-Zs/Ollc1SJ8nKUAgc7ivOEdIBM8JAKgrqqUYi2J997JuKO7/tpQC+WCetQ1sypiKCQWHdvdg9wBNpUPEWZae7w==
+  dependencies:
+    undici-types "~6.20.0"
 
 "@types/promise@7.1.30":
   version "7.1.30"
