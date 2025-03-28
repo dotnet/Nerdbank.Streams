@@ -37,11 +37,12 @@ namespace Nerdbank.Streams.UnitTests
                 this.delayMilliseconds = delayMilliseconds;
             }
 
-//             public override async Task<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) [Error] (40-45)CS0508 'StreamPipeReaderTests.DelayingStream.ReadAsync(Memory<byte>, CancellationToken)': return type must be 'ValueTask<int>' to match overridden member 'MemoryStream.ReadAsync(Memory<byte>, CancellationToken)'
-//             {
-//                 await Task.Delay(delayMilliseconds, cancellationToken);
-//                 return await base.ReadAsync(buffer, cancellationToken);
-//             }
+            //             public override async Task<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) [Error] (40-45)CS0508 'StreamPipeReaderTests.DelayingStream.ReadAsync(Memory<byte>, CancellationToken)': return type must be 'ValueTask<int>' to match overridden member 'MemoryStream.ReadAsync(Memory<byte>, CancellationToken)'
+            //             {
+            //                 await Task.Delay(delayMilliseconds, cancellationToken);
+            //                 return await base.ReadAsync(buffer, cancellationToken);
+            //             }
+
 
             public override int Read(Span<byte> buffer)
             {

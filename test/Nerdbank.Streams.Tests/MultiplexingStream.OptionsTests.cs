@@ -270,7 +270,7 @@ namespace Nerdbank.Streams.UnitTests
             Assert.Equal(options.StartSuspended, frozenCopy.StartSuspended);
             Assert.Equal(options.FaultOpenChannelsOnStreamDisposal, frozenCopy.FaultOpenChannelsOnStreamDisposal);
             // SeededChannels should be a ReadOnlyCollection in the frozen copy.
-            Assert.IsType<ReadOnlyCollection<ChannelOptions>>(frozenCopy.SeededChannels);
+            Assert.IsType<ReadOnlyCollection<MultiplexingStream.ChannelOptions>>(frozenCopy.SeededChannels);
         }
 
         /// <summary>
