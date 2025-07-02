@@ -8,6 +8,7 @@ namespace Nerdbank.Streams
     using System.Collections.Generic;
     using System.IO;
     using System.IO.Pipelines;
+    using System.Runtime.ExceptionServices;
     using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
@@ -24,6 +25,11 @@ namespace Nerdbank.Streams
         /// The pipe that does all the hard work.
         /// </summary>
         private readonly Pipe pipe;
+
+        /// <summary>
+        /// Potential exception passed from writer to reader.
+        /// </summary>
+        private Exception? error;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SimplexStream"/> class.
@@ -74,6 +80,16 @@ namespace Nerdbank.Streams
         /// </summary>
         public void CompleteWriting() => this.pipe.Writer.Complete();
 
+        /// <summary>
+        /// Signals that no more writing will take place, causing readers to receive 0 bytes when asking for any more data.
+        /// </summary>
+        /// <param name="exception">Exception which will be thrown by the reader when end of this stream is reached.</param>
+        public void CompleteWriting(Exception exception)
+        {
+            this.error = exception;
+            this.pipe.Writer.Complete();
+        }
+
         /// <inheritdoc />
         public override async Task FlushAsync(CancellationToken cancellationToken) => await this.pipe.Writer.FlushAsync(cancellationToken).ConfigureAwait(false);
 
@@ -104,6 +120,14 @@ namespace Nerdbank.Streams
             }
 
             this.pipe.Reader.AdvanceTo(slice.End);
+
+            // exception is throw when reader reaches same position as writer was at when error was set.
+            if (bytesRead == 0 && readResult.IsCompleted && this.error is { } ex)
+            {
+                // rethrow the exception preserving the original stack trace.
+                ExceptionDispatchInfo.Capture(ex).Throw();
+            }
+
             return bytesRead;
         }
 

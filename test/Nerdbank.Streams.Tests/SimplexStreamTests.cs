@@ -6,6 +6,7 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.Threading;
@@ -267,6 +268,59 @@ public class SimplexStreamTests : TestBase
         int bytesRead = await this.stream.ReadAsync(readBuffer, 0, 10, this.TimeoutToken);
         Assert.Equal(9, bytesRead);
         Assert.Equal(Enumerable.Range(1, 9).Select(i => (byte)i), readBuffer.Take(bytesRead));
+    }
+
+    [Fact]
+    public void CompleteWriting_ErrorCanBeSetAndIsRethrown()
+    {
+        this.stream.CompleteWriting(new InvalidOperationException("Test error"));
+        Assert.Throws<InvalidOperationException>(() => this.stream.Read(new byte[1], 0, 1));
+    }
+
+    [Fact]
+    public void CompleteWriting_ErrorIsRethrownAfterAllDataRead()
+    {
+        byte[] expected = [1, 2, 3];
+        this.stream.Write(expected);
+        this.stream.CompleteWriting(new InvalidOperationException("Test error"));
+        byte[] buffer = new byte[10];
+        int read = this.stream.Read(buffer, 0, 4);
+        byte[] actual = [..buffer.Take(read)];
+        Assert.Equal(expected, actual);
+        Assert.Throws<InvalidOperationException>(() => this.stream.Read(buffer, 0, buffer.Length));
+    }
+
+    [Fact]
+    public void CompleteWriting_ErrorPreservesStackTrace()
+    {
+        InternalMethodSettingErrorWithCallStack();
+
+        try
+        {
+            _ = this.stream.Read(new byte[1], 0, 1);
+            Assert.Fail("Expected an exception to be thrown.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            Assert.Equal("Test error", ex.Message);
+            Assert.NotNull(ex.StackTrace);
+            Assert.Contains(nameof(InternalMethodSettingErrorWithCallStack), ex.StackTrace, StringComparison.Ordinal);
+        }
+
+        return;
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        void InternalMethodSettingErrorWithCallStack()
+        {
+            try
+            {
+                throw new InvalidOperationException("Test error");
+            }
+            catch (Exception ex)
+            {
+                this.stream.CompleteWriting(ex);
+            }
+        }
     }
 
     protected override void Dispose(bool disposing)
