@@ -5,11 +5,9 @@ namespace Nerdbank.Streams
 {
     using System;
     using System.Buffers;
-    using System.Collections.Generic;
     using System.IO;
     using System.IO.Pipelines;
     using System.Runtime.ExceptionServices;
-    using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft;
@@ -30,6 +28,11 @@ namespace Nerdbank.Streams
         /// Potential exception passed from writer to reader.
         /// </summary>
         private Exception? error;
+
+        /// <summary>
+        /// Whether <see cref="CompleteWriting(Exception?)"/> has been called.
+        /// </summary>
+        private bool completed;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SimplexStream"/> class.
@@ -78,16 +81,22 @@ namespace Nerdbank.Streams
         /// <summary>
         /// Signals that no more writing will take place, causing readers to receive 0 bytes when asking for any more data.
         /// </summary>
-        public void CompleteWriting() => this.pipe.Writer.Complete();
+        public void CompleteWriting() => this.CompleteWriting(null);
 
         /// <summary>
         /// Signals that no more writing will take place, causing readers to receive 0 bytes when asking for any more data.
         /// </summary>
         /// <param name="exception">Exception which will be thrown by the reader when end of this stream is reached.</param>
-        public void CompleteWriting(Exception exception)
+        public void CompleteWriting(Exception? exception)
         {
+            if (this.completed)
+            {
+                return;
+            }
+
             this.error = exception;
             this.pipe.Writer.Complete();
+            this.completed = true;
         }
 
         /// <inheritdoc />
