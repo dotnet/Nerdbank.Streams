@@ -226,6 +226,11 @@ namespace Nerdbank.Streams
             /// A fatal exception occurred that took down one channel.
             /// </summary>
             ChannelFatalError,
+
+            /// <summary>
+            /// Raised when we receive a <see cref="ControlCode.Content"/> message for an unknown or closed channel.
+            /// </summary>
+            UnexpectedContent,
         }
 
         /// <summary>
@@ -966,11 +971,21 @@ namespace Nerdbank.Streams
 
         private async ValueTask OnContentAsync(FrameHeader header, ReadOnlySequence<byte> payload, CancellationToken cancellationToken)
         {
-            Channel channel;
+            Channel? channel;
             QualifiedChannelId channelId = header.RequiredChannelId;
             lock (this.syncObject)
             {
-                channel = this.openChannels[channelId];
+                this.openChannels.TryGetValue(channelId, out channel);
+            }
+
+            if (channel is null)
+            {
+                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Warning))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Warning, (int)TraceEventId.UnexpectedContent, "Ignoring " + nameof(ControlCode.Content) + " message for channel {0} that does not exist.", header.ChannelId);
+                }
+
+                return;
             }
 
             if (channelId.Source == ChannelSource.Local && !channel.IsAccepted)
