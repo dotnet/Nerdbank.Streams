@@ -14,7 +14,6 @@
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="$(AspNetCoreVersion)" />
     <PackageVersion Include="Microsoft.AspNetCore" Version="$(AspNetCoreVersion)" />
     <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="8.0.0" />
-    <PackageVersion Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.3.4" />
     <PackageVersion Include="Microsoft.VisualStudio.Threading.Analyzers" Version="$(VSThreadingVersion)" />
     <PackageVersion Include="Microsoft.VisualStudio.Threading.Only" Version="$(VSThreadingVersion)" />
     <PackageVersion Include="Microsoft.VisualStudio.Threading" Version="$(VSThreadingVersion)" />
