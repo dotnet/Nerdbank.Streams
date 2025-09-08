@@ -1,0 +1,32 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- https://learn.microsoft.com/dotnet/fundamentals/package-validation/diagnostic-ids -->
+<Suppressions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Suppression>
+    <!-- False positive: https://github.com/dotnet/sdk/issues/50672 -->
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>T:System.Buffers.SequenceReader`1</Target>
+    <Left>lib/netstandard2.0/Nerdbank.Streams.dll</Left>
+    <Right>lib/netstandard2.1/Nerdbank.Streams.dll</Right>
+  </Suppression>
+  <Suppression>
+    <!-- False positive: https://github.com/dotnet/sdk/issues/50672 -->
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>T:System.Buffers.SequenceReaderExtensions</Target>
+    <Left>lib/netstandard2.0/Nerdbank.Streams.dll</Left>
+    <Right>lib/netstandard2.1/Nerdbank.Streams.dll</Right>
+  </Suppression>
+  <Suppression>
+    <!-- False positive: https://github.com/dotnet/sdk/issues/50671 -->
+    <DiagnosticId>CP0012</DiagnosticId>
+    <Target>M:Nerdbank.Streams.BufferTextWriter.Write(System.ReadOnlySpan{System.Char})</Target>
+    <Left>lib/netstandard2.0/Nerdbank.Streams.dll</Left>
+    <Right>lib/netstandard2.1/Nerdbank.Streams.dll</Right>
+  </Suppression>
+  <Suppression>
+    <!-- False positive: https://github.com/dotnet/sdk/issues/50671 -->
+    <DiagnosticId>CP0012</DiagnosticId>
+    <Target>M:Nerdbank.Streams.BufferTextWriter.WriteLine(System.ReadOnlySpan{System.Char})</Target>
+    <Left>lib/netstandard2.0/Nerdbank.Streams.dll</Left>
+    <Right>lib/netstandard2.1/Nerdbank.Streams.dll</Right>
+  </Suppression>
+</Suppressions>

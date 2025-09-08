@@ -58,6 +58,13 @@ jobs:
     - name: 🧪 NativeAOT test
       run: dotnet publish -c Release -r ${{ matrix.rid }}-x64 -warnaserror
       working-directory: test/NativeAOTCompatibility
+    - name: 📋 API compat test
+      run: |
+        Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/nerdbank.streams -OutFile obj/nerdbank.streams.baseline.nupkg
+        $pkgPath = (gci ./bin/Packages/Release/NuGet/Nerdbank.Streams.*.nupkg).FullName
+        dotnet apicompat package $pkgPath --baseline-package obj/nerdbank.streams.baseline.nupkg --suppression-file ./src/Nerdbank.Streams/ApiCompatSuppressions.xml
+      shell: pwsh
+      if: runner.os == 'Linux'
 
     - name: ⚙️ Use Node.js 16.x
       uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
