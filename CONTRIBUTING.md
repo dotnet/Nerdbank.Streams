@@ -2,7 +2,7 @@
 
 ## Best practices
 
-* Use Windows PowerShell or [PowerShell Core][pwsh] (including on Linux/OSX) to run .ps1 scripts.
+- Use Windows PowerShell or [PowerShell Core][pwsh] (including on Linux/OSX) to run .ps1 scripts.
   Some scripts set environment variables to help you, but they are only retained if you use PowerShell as your shell.
 
 ## Prerequisites
@@ -35,7 +35,7 @@ Building, testing, and packing this repository can be done by using the standard
 The `nerdbank-streams` NPM package builds out of the `src/nerdbank-streams` directory.
 Please review the [CONTRIBUTING.md](src/nerdbank-streams/CONTRIBUTING.md) document in that directory for instructions.
 
-[pwsh]: https://docs.microsoft.com/powershell/scripting/install/installing-powershell?view=powershell-6
+[pwsh]: https://learn.microsoft.com/powershell/scripting/install/installing-powershell
 
 ## Releases
 
@@ -84,7 +84,7 @@ If Renovate is not creating pull requests when you expect it to, check that the 
 ### Maintaining your repo based on this template
 
 The best way to keep your repo in sync with Library.Template's evolving features and best practices is to periodically merge the template into your repo:
-`
+
 ```ps1
 git fetch
 git checkout origin/main
