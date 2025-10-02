@@ -16,8 +16,7 @@ jobs:
     runs-on: windows-latest
     environment: Signing
     permissions:
-      id-token: write # Required for Azure CLI Login
-    permissions:
+      id-token: write # Required for Azure / NuGet CLI Login
       actions: read
       contents: write
     steps:
@@ -83,7 +82,7 @@ jobs:
         run-id: ${{ steps.findrunid.outputs.runid }}
         github-token: ${{ github.token }}
 
-# Login to Azure using a ServicePrincipal configured to authenticate agaist a GitHub Action
+    # Login to Azure using a ServicePrincipal configured to authenticate agaist a GitHub Action
     - name: 🪪 Authorize signing
       uses: azure/login@v2.3.0
       with:
@@ -129,6 +128,13 @@ jobs:
       working-directory: ${{ runner.temp }}
       if: ${{ env.NPM_API_KEY_DEFINED == 'true' }}
 
+    - name: 🚀 NuGet login for push
+      uses: NuGet/login@v1
+      id: nuget-login
+      with:
+        user: ${{ secrets.NUGET_USER }}
+      if: ${{ env.NUGET_API_KEY_DEFINED == 'true' }}
+
     - name: 🚀 Push NuGet packages
-      run: dotnet nuget push ${{ runner.temp }}\deployables\NuGet\*.nupkg --source https://api.nuget.org/v3/index.json -k '${{ secrets.NUGET_API_KEY }}'
+      run: dotnet nuget push ${{ runner.temp }}\deployables\NuGet\*.nupkg --source https://api.nuget.org/v3/index.json -k '${{ steps.nuget-login.outputs.NUGET_API_KEY }}'
       if: ${{ env.NUGET_API_KEY_DEFINED == 'true' }}
