@@ -16,10 +16,9 @@ jobs:
     runs-on: windows-latest
     environment: Signing
     permissions:
-      id-token: write # Required for Azure CLI Login
-    permissions:
       actions: read
       contents: write
+      id-token: write # Required for Azure CLI Login
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       with:
