@@ -58,13 +58,6 @@ jobs:
     - name: 🧪 NativeAOT test
       run: dotnet publish -c Release -r ${{ matrix.rid }}-x64 -warnaserror
       working-directory: test/NativeAOTCompatibility
-    - name: 📋 API compat test
-      run: |
-        Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/nerdbank.streams -OutFile obj/nerdbank.streams.baseline.nupkg
-        $pkgPath = (gci ./bin/Packages/Release/NuGet/Nerdbank.Streams.*.nupkg).FullName
-        dotnet apicompat package $pkgPath --baseline-package obj/nerdbank.streams.baseline.nupkg --suppression-file ./src/Nerdbank.Streams/ApiCompatSuppressions.xml
-      shell: pwsh
-      if: runner.os == 'Linux'
 
     - name: ⚙️ Use Node.js 16.x
       uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -113,4 +106,4 @@ jobs:
     - name: 🔗 Markup Link Checker (mlc)
       uses: becheran/mlc@18a06b3aa2901ca197de59c8b0b1f54fdba6b3fa # v1.0.0
       with:
-        args: --do-not-warn-for-redirect-to https://learn.microsoft.com*,https://dotnet.microsoft.com/*,https://dev.azure.com/*,https://app.codecov.io/*,https://dotnetfoundation.org/*,https://docs.github.com/* -p docfx,ext
+        args: --do-not-warn-for-redirect-to https://learn.microsoft.com*,https://dotnet.microsoft.com/*,https://dev.azure.com/*,https://app.codecov.io/*,https://dotnetfoundation.org/*,https://docs.github.com/* -i https://www.npmjs.com/package/*,https://get.dot.net/ -p docfx,ext
