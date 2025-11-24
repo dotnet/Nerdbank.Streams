@@ -3,15 +3,8 @@
 <Suppressions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <Suppression>
     <!-- False positive: https://github.com/dotnet/sdk/issues/50672 -->
-    <DiagnosticId>CP0001</DiagnosticId>
-    <Target>T:System.Buffers.SequenceReader`1</Target>
-    <Left>lib/netstandard2.0/Nerdbank.Streams.dll</Left>
-    <Right>lib/netstandard2.1/Nerdbank.Streams.dll</Right>
-  </Suppression>
-  <Suppression>
-    <!-- False positive: https://github.com/dotnet/sdk/issues/50672 -->
-    <DiagnosticId>CP0001</DiagnosticId>
-    <Target>T:System.Buffers.SequenceReaderExtensions</Target>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:System.Buffers.SequenceReader`1.TryReadExact(System.Int32,System.Buffers.ReadOnlySequence{`0}@)</Target>
     <Left>lib/netstandard2.0/Nerdbank.Streams.dll</Left>
     <Right>lib/netstandard2.1/Nerdbank.Streams.dll</Right>
   </Suppression>
