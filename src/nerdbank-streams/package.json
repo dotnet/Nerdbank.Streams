@@ -52,7 +52,7 @@
     "path": "0.12.7",
     "prettier": "3.0.3",
     "promise": "8.3.0",
-    "ts-jest": "29.2.6",
+    "ts-jest": "29.4.6",
     "ts-node": "10.9.2",
     "typescript": "5.8.2",
     "vscode-jsonrpc": "8.2.1"
