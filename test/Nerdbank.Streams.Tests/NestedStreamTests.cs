@@ -229,7 +229,9 @@ public class NestedStreamTests : TestBase
     [Fact]
     public void Flush()
     {
-        Assert.Throws<NotSupportedException>(() => this.stream.Flush());
+        // Flush should be allowed on read-only streams
+        this.stream.Flush();
+
         this.stream.Dispose();
         Assert.Throws<ObjectDisposedException>(() => this.stream.Flush());
     }
@@ -237,7 +239,8 @@ public class NestedStreamTests : TestBase
     [Fact]
     public async Task FlushAsync()
     {
-        await Assert.ThrowsAsync<NotSupportedException>(() => this.stream.FlushAsync());
+        await this.stream.FlushAsync();
+
         this.stream.Dispose();
         await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream.FlushAsync());
     }

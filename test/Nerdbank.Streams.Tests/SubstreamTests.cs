@@ -159,7 +159,9 @@ public class SubstreamTests : TestBase
     public async Task ReadSubstream_Flush(bool async)
     {
         Stream? substream = this.underlyingStream.ReadSubstream();
-        await Assert.ThrowsAsync<NotSupportedException>(() => this.FlushSyncOrAsync(substream, async));
+
+        // Flush should succeed on read-only streams
+        await this.FlushSyncOrAsync(substream, async);
         substream.Dispose();
         await Assert.ThrowsAsync<ObjectDisposedException>(() => this.FlushSyncOrAsync(substream, async));
     }

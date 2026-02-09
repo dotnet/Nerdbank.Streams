@@ -88,10 +88,21 @@ namespace Nerdbank.Streams
         }
 
         /// <inheritdoc />
-        public override void Flush() => this.ThrowDisposedOr(new NotSupportedException());
+        public override void Flush()
+        {
+            Verify.NotDisposed(this);
+        }
 
         /// <inheritdoc />
-        public override Task FlushAsync(CancellationToken cancellationToken) => throw this.ThrowDisposedOr(new NotSupportedException());
+        public override Task FlushAsync(CancellationToken cancellationToken)
+        {
+            if (this.IsDisposed)
+            {
+                Verify.NotDisposed(this);
+            }
+
+            return Task.CompletedTask;
+        }
 
         /// <inheritdoc />
         public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
