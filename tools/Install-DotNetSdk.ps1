@@ -125,14 +125,14 @@ Function Get-InstallerExe(
     }
 
     if ($TypedVersion.Build -eq -1) {
-        $versionInfo = -Split (Invoke-WebRequest -Uri "https://dotnetcli.blob.core.windows.net/dotnet/$sku/$Version/latest.version" -UseBasicParsing)
+        $versionInfo = -Split (Invoke-WebRequest -Uri "https://builds.dotnet.microsoft.com/dotnet/$sku/$Version/latest.version" -UseBasicParsing)
         $Version = $versionInfo[-1]
     }
 
     $majorMinor = "$($TypedVersion.Major).$($TypedVersion.Minor)"
     $ReleasesFile = Join-Path $DotNetInstallScriptRoot "$majorMinor\releases.json"
     if (!(Test-Path $ReleasesFile)) {
-        Get-FileFromWeb -Uri "https://dotnetcli.blob.core.windows.net/dotnet/release-metadata/$majorMinor/releases.json" -OutDir (Split-Path $ReleasesFile) | Out-Null
+        Get-FileFromWeb -Uri "https://builds.dotnet.microsoft.com/dotnet/release-metadata/$majorMinor/releases.json" -OutDir (Split-Path $ReleasesFile) | Out-Null
     }
 
     $releases = Get-Content $ReleasesFile | ConvertFrom-Json
@@ -281,10 +281,10 @@ if ($IncludeX86) {
 }
 
 if ($IsMacOS -or $IsLinux) {
-    $DownloadUri = "https://raw.githubusercontent.com/dotnet/install-scripts/0b09de9bc136cacb5f849a6957ebd4062173c148/src/dotnet-install.sh"
+    $DownloadUri = "https://raw.githubusercontent.com/dotnet/install-scripts/a3fbd0fd625032bac207f1f590e5353fe26faa59/src/dotnet-install.sh"
     $DotNetInstallScriptPath = "$DotNetInstallScriptRoot/dotnet-install.sh"
 } else {
-    $DownloadUri = "https://raw.githubusercontent.com/dotnet/install-scripts/0b09de9bc136cacb5f849a6957ebd4062173c148/src/dotnet-install.ps1"
+    $DownloadUri = "https://raw.githubusercontent.com/dotnet/install-scripts/a3fbd0fd625032bac207f1f590e5353fe26faa59/src/dotnet-install.ps1"
     $DotNetInstallScriptPath = "$DotNetInstallScriptRoot/dotnet-install.ps1"
 }
 
