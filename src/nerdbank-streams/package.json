@@ -54,7 +54,7 @@
     "promise": "8.3.0",
     "ts-jest": "29.2.6",
     "ts-node": "10.9.2",
-    "typescript": "5.8.2",
+    "typescript": "5.9.3",
     "vscode-jsonrpc": "8.2.1"
   },
   "dependencies": {
