@@ -7,14 +7,14 @@
     <MicrosoftTestingPlatformVersion>2.1.0</MicrosoftTestingPlatformVersion>
     <BenchmarkDotNetVersion>0.15.8</BenchmarkDotNetVersion>
     <AspNetCoreVersion>2.3.9</AspNetCoreVersion>
-    <VSThreadingVersion>17.13.61</VSThreadingVersion>
+    <VSThreadingVersion>17.14.15</VSThreadingVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="BenchmarkDotNet.Diagnostics.Windows" Version="$(BenchmarkDotNetVersion)" />
     <PackageVersion Include="BenchmarkDotNet" Version="$(BenchmarkDotNetVersion)" />
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="$(AspNetCoreVersion)" />
     <PackageVersion Include="Microsoft.AspNetCore" Version="$(AspNetCoreVersion)" />
-    <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.0" />
     <PackageVersion Include="Microsoft.VisualStudio.Threading.Analyzers" Version="$(VSThreadingVersion)" />
     <PackageVersion Include="Microsoft.VisualStudio.Threading.Only" Version="$(VSThreadingVersion)" />
     <PackageVersion Include="Microsoft.VisualStudio.Threading" Version="$(VSThreadingVersion)" />
@@ -22,7 +22,7 @@
     <PackageVersion Include="NSubstitute" Version="5.3.0" />
     <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.17" />
     <PackageVersion Include="PInvoke.Kernel32" Version="0.7.124" />
-    <PackageVersion Include="StreamJsonRpc" Version="2.22.11" />
+    <PackageVersion Include="StreamJsonRpc" Version="2.24.84" />
     <PackageVersion Include="System.IO.Pipelines" Version="8.0.0" />
     <PackageVersion Include="System.IO.Pipes" Version="4.3.0" />
     <PackageVersion Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.2" />
