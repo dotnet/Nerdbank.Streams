@@ -35,10 +35,10 @@ export namespace QualifiedChannelId {
 			id.source === ChannelSource.Local
 				? 'local'
 				: id.source === ChannelSource.Remote
-				? 'remote'
-				: id.source === ChannelSource.Seeded
-				? 'seeded'
-				: 'unknown'
+					? 'remote'
+					: id.source === ChannelSource.Seeded
+						? 'seeded'
+						: 'unknown'
 		return `${id.id} (${sourceName})`
 	}
 }
