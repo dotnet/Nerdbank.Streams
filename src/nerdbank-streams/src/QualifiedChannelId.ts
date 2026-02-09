@@ -13,18 +13,18 @@ export interface QualifiedChannelId {
  */
 export enum ChannelSource {
 	/** The channel was offered by this MultiplexingStream instance to the other party. */
-	// eslint-disable-next-line @typescript-eslint/naming-convention
+
 	Local = 1,
 
 	/** The channel was offered to this MultiplexingStream instance by the other party. */
-	// eslint-disable-next-line @typescript-eslint/naming-convention
+
 	Remote = -1,
 
 	/**
 	 * The channel was seeded during construction via the Options.SeededChannels collection.
 	 * This channel is to be accepted by both parties.
 	 */
-	// eslint-disable-next-line @typescript-eslint/naming-convention
+
 	Seeded = 0,
 }
 
