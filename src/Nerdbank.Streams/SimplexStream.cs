@@ -53,11 +53,6 @@ namespace Nerdbank.Streams
         private bool completed;
 
         /// <summary>
-        /// The number of bytes written since the last flush.
-        /// </summary>
-        private int bytesSinceLastFlush;
-
-        /// <summary>
         /// Initializes a new instance of the <see cref="SimplexStream"/> class.
         /// </summary>
         /// <remarks>
@@ -80,6 +75,10 @@ namespace Nerdbank.Streams
                 resumeWriterThreshold: resumeWriterThreshold,
                 useSynchronizationContext: false);
             this.pipe = new Pipe(options);
+            if (!this.pipe.Writer.CanGetUnflushedBytes)
+            {
+                throw new NotSupportedException("Pipe writer does not support getting unflushed bytes.");
+            }
         }
 
         /// <inheritdoc />
@@ -103,8 +102,6 @@ namespace Nerdbank.Streams
             get => throw this.ThrowDisposedOr(new NotSupportedException());
             set => throw this.ThrowDisposedOr(new NotSupportedException());
         }
-
-        private long UnflushedBytes => this.pipe.Writer.CanGetUnflushedBytes ? this.pipe.Writer.UnflushedBytes : this.bytesSinceLastFlush;
 
         /// <summary>
         /// Signals that no more writing will take place, causing readers to receive 0 bytes when asking for any more data.
@@ -181,21 +178,16 @@ namespace Nerdbank.Streams
             Memory<byte> memory = this.pipe.Writer.GetMemory(count);
             buffer.AsMemory(offset, count).CopyTo(memory);
             this.pipe.Writer.Advance(count);
-            this.RecordBytesWritten(count);
 
             // Auto-flush if we've written enough data
-            if (this.UnflushedBytes >= AutoFlushThreshold)
+            if (this.pipe.Writer.UnflushedBytes >= AutoFlushThreshold)
             {
                 await this.FlushAsync(cancellationToken).ConfigureAwait(false);
             }
         }
 
         /// <inheritdoc />
-        void IBufferWriter<byte>.Advance(int count)
-        {
-            this.pipe.Writer.Advance(count);
-            this.RecordBytesWritten(count);
-        }
+        void IBufferWriter<byte>.Advance(int count) => this.pipe.Writer.Advance(count);
 
         /// <inheritdoc />
         Memory<byte> IBufferWriter<byte>.GetMemory(int sizeHint) => this.pipe.Writer.GetMemory(sizeHint);
@@ -220,10 +212,9 @@ namespace Nerdbank.Streams
             Memory<byte> memory = this.pipe.Writer.GetMemory(count);
             buffer.AsMemory(offset, count).CopyTo(memory);
             this.pipe.Writer.Advance(count);
-            this.RecordBytesWritten(count);
 
             // Auto-flush if we've written enough data
-            if (this.UnflushedBytes >= AutoFlushThreshold)
+            if (this.pipe.Writer.UnflushedBytes >= AutoFlushThreshold)
             {
                 this.Flush();
             }
@@ -248,18 +239,5 @@ namespace Nerdbank.Streams
             Verify.NotDisposed(this);
             throw ex;
         }
-
-        private void RecordBytesWritten(int count)
-        {
-            if (this.pipe.Writer.CanGetUnflushedBytes)
-            {
-                // The PipeWriter is tracking unflushed bytes for us, so we don't need to.
-                return;
-            }
-
-            this.bytesSinceLastFlush += count;
-        }
-
-        private void ResetBytesSinceLastFlush() => this.bytesSinceLastFlush = 0;
     }
 }
