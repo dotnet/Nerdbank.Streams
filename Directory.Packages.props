@@ -14,7 +14,7 @@
     <PackageVersion Include="BenchmarkDotNet" Version="$(BenchmarkDotNetVersion)" />
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="$(AspNetCoreVersion)" />
     <PackageVersion Include="Microsoft.AspNetCore" Version="$(AspNetCoreVersion)" />
-    <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.0" />
+    <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.12" />
     <PackageVersion Include="Microsoft.VisualStudio.Threading.Analyzers" Version="$(VSThreadingVersion)" />
     <PackageVersion Include="Microsoft.VisualStudio.Threading.Only" Version="$(VSThreadingVersion)" />
     <PackageVersion Include="Microsoft.VisualStudio.Threading" Version="$(VSThreadingVersion)" />
