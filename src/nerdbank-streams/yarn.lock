@@ -4648,10 +4648,10 @@ natural-compare@^1.4.0:
   resolved "https://registry.yarnpkg.com/natural-compare/-/natural-compare-1.4.0.tgz#4abebfeed7541f2c27acfb29bdbbd15c8d5ba4f7"
   integrity sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==
 
-nerdbank-gitversioning@3.7.115:
-  version "3.7.115"
-  resolved "https://registry.yarnpkg.com/nerdbank-gitversioning/-/nerdbank-gitversioning-3.7.115.tgz#37e7458626ab3f55ae91a1684224bb007f4d29bb"
-  integrity sha512-5qDOHT38a+9ZV3IDX1A5i50BIJ3xlz6iAZx4IKjP9t6yMko9cxY6geIuotvFEpJzODex7fRpvYRGUcYQd1jdwQ==
+nerdbank-gitversioning@3.9.50:
+  version "3.9.50"
+  resolved "https://registry.yarnpkg.com/nerdbank-gitversioning/-/nerdbank-gitversioning-3.9.50.tgz#770a7730df1257a443d79aa6df1dbaf415ad837a"
+  integrity sha512-n7H6cQ9AqXOYYPx9poQ/trPC3Mm+LFM2OnJvogcSM3HZ4irTITJSQl15Jm7rUocGTLU25avSlqKuknSvnIEETA==
 
 node-int64@^0.4.0:
   version "0.4.0"
