@@ -1,7 +1,6 @@
 import { Duplex, PassThrough } from 'stream'
 
 export class FullDuplexStream {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
 	public static CreatePair(): { first: Duplex; second: Duplex } {
 		const pass1 = new PassThrough()
 		const pass2 = new PassThrough()
@@ -11,7 +10,6 @@ export class FullDuplexStream {
 		}
 	}
 
-	// eslint-disable-next-line @typescript-eslint/naming-convention
 	public static Splice(readable: NodeJS.ReadableStream, writable: NodeJS.WritableStream): Duplex {
 		const duplex = new Duplex({
 			write(chunk, encoding, callback) {

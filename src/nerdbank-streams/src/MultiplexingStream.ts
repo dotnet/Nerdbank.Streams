@@ -63,7 +63,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 	 * @param cancellationToken A token whose cancellation aborts the handshake with the remote end.
 	 * @returns The multiplexing stream, once the handshake is complete.
 	 */
-	// eslint-disable-next-line @typescript-eslint/naming-convention
+
 	public static async CreateAsync(
 		stream: NodeJS.ReadWriteStream,
 		options?: MultiplexingStreamOptions,
@@ -108,7 +108,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 	 * @param options Options to customize the behavior of the stream.
 	 * @returns The multiplexing stream.
 	 */
-	// eslint-disable-next-line @typescript-eslint/naming-convention
+
 	public static Create(stream: NodeJS.ReadWriteStream, options?: MultiplexingStreamOptions): MultiplexingStream {
 		options ??= { protocolMajorVersion: 3 }
 		options.protocolMajorVersion ??= 3
@@ -130,7 +130,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 	/**
 	 * The encoding used for characters in control frames.
 	 */
-	// eslint-disable-next-line @typescript-eslint/naming-convention
+
 	static readonly ControlFrameEncoding = 'utf-8'
 
 	protected readonly _completionSource = new Deferred<void>()

@@ -12,7 +12,6 @@ import { MultiplexingStream } from '../MultiplexingStream'
 		let procExited: Deferred<any>
 		const spawnOptions: SpawnOptions = {
 			env: {
-				// eslint-disable-next-line @typescript-eslint/naming-convention
 				DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1', // prevent warnings in stdout that corrupt our interop stream.
 			},
 		}
