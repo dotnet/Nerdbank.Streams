@@ -13,6 +13,9 @@ public class SimplexStreamTests : TestBase
 
     private const int PauseThreshold = 40;
 
+    // Test-local constant for auto-flush threshold. Keep in sync with production value in SimplexStream.
+    private const int AutoFlushThreshold = 4096;
+
     private readonly Random random = new Random();
 
     private SimplexStream stream = new SimplexStream(ResumeThreshold, PauseThreshold);
@@ -342,6 +345,203 @@ public class SimplexStreamTests : TestBase
         this.stream.CompleteWriting(new InvalidOperationException("Test error"));
         byte[] buffer = new byte[10];
         Assert.Equal(0, this.stream.Read(buffer, 0, buffer.Length));
+    }
+
+    [Theory]
+    [CombinatorialData]
+    public async Task AutoFlush_OccursAfter4KB(bool useAsync)
+    {
+        // Use a stream with larger thresholds to avoid blocking
+        using var largeStream = new SimplexStream(8192, 16384);
+
+        // Write exactly 4KB (4096 bytes) which should trigger auto-flush
+        byte[] sendBuffer = this.GetRandomBuffer(AutoFlushThreshold);
+        if (useAsync)
+        {
+            await largeStream.WriteAsync(sendBuffer, 0, sendBuffer.Length, this.TimeoutToken);
+        }
+        else
+        {
+            largeStream.Write(sendBuffer, 0, sendBuffer.Length);
+        }
+
+        // Data should be available for reading without explicit flush
+        byte[] recvBuffer = new byte[sendBuffer.Length];
+        await this.ReadAsync(largeStream, recvBuffer, isAsync: useAsync);
+        Assert.Equal(sendBuffer, recvBuffer);
+    }
+
+    [Theory]
+    [CombinatorialData]
+    public async Task AutoFlush_DoesNotOccurBelow4KB(bool useAsync)
+    {
+        // Use a stream with larger thresholds
+        using var largeStream = new SimplexStream(8192, 16384);
+
+        // Write less than 4KB
+        byte[] sendBuffer = this.GetRandomBuffer(4095);
+        if (useAsync)
+        {
+            await largeStream.WriteAsync(sendBuffer, 0, sendBuffer.Length, this.TimeoutToken);
+        }
+        else
+        {
+            largeStream.Write(sendBuffer, 0, sendBuffer.Length);
+        }
+
+        // Data should NOT be available without explicit flush - read should timeout
+        byte[] recvBuffer = new byte[1];
+        Task<int> readTask = largeStream.ReadAsync(recvBuffer, 0, 1, ExpectedTimeoutToken);
+
+        // This should timeout because data hasn't been flushed yet
+        await Assert.ThrowsAsync<OperationCanceledException>(async () => await readTask);
+
+        // After explicit flush, data should be available
+        await largeStream.FlushAsync();
+        recvBuffer = new byte[sendBuffer.Length];
+        await this.ReadAsync(largeStream, recvBuffer, isAsync: useAsync);
+        Assert.Equal(sendBuffer, recvBuffer);
+    }
+
+    [Theory]
+    [CombinatorialData]
+    public async Task AutoFlush_AccumulatesAcrossMultipleWrites(bool useAsync)
+    {
+        // Use a stream with larger thresholds to avoid blocking
+        using var largeStream = new SimplexStream(8192, 16384);
+
+        // Write 2KB three times (total 6KB) - should auto-flush after second write
+        byte[] sendBuffer = this.GetRandomBuffer(6144);
+
+        // First write (2KB) - no flush yet
+        if (useAsync)
+        {
+            await largeStream.WriteAsync(sendBuffer, 0, 2048, this.TimeoutToken);
+        }
+        else
+        {
+            largeStream.Write(sendBuffer, 0, 2048);
+        }
+
+        // Second write (2KB, total 4KB) - should auto-flush
+        if (useAsync)
+        {
+            await largeStream.WriteAsync(sendBuffer, 2048, 2048, this.TimeoutToken);
+        }
+        else
+        {
+            largeStream.Write(sendBuffer, 2048, 2048);
+        }
+
+        // Data should be available for reading (4KB)
+        byte[] recvBuffer = new byte[AutoFlushThreshold];
+        await this.ReadAsync(largeStream, recvBuffer, isAsync: useAsync);
+        Assert.Equal(sendBuffer.Take(AutoFlushThreshold), recvBuffer);
+
+        // Third write (2KB) - not flushed yet
+        if (useAsync)
+        {
+            await largeStream.WriteAsync(sendBuffer, AutoFlushThreshold, 2048, this.TimeoutToken);
+        }
+        else
+        {
+            largeStream.Write(sendBuffer, AutoFlushThreshold, 2048);
+        }
+
+        // Explicitly flush to make remaining data available
+        await largeStream.FlushAsync();
+        recvBuffer = new byte[2048];
+        await this.ReadAsync(largeStream, recvBuffer, isAsync: useAsync);
+        Assert.Equal(sendBuffer.Skip(AutoFlushThreshold).Take(2048), recvBuffer);
+    }
+
+    [Fact]
+    public async Task BackpressureWorks_WithAutoFlush()
+    {
+        // This test verifies that the pauseWriterThreshold works correctly with auto-flush
+        // by having concurrent reading and writing
+        var simplex = new SimplexStream(2048, AutoFlushThreshold);
+
+        try
+        {
+            byte[] sendBuffer = this.GetRandomBuffer(8192);
+            byte[] recvBuffer = new byte[8192];
+            int bytesRead = 0;
+
+            // Start concurrent reader
+            var readTask = Task.Run(async () =>
+            {
+                while (bytesRead < 8192)
+                {
+                    int count = await simplex.ReadAsync(recvBuffer, bytesRead, 1024, this.TimeoutToken);
+                    if (count == 0)
+                    {
+                        break;
+                    }
+
+                    bytesRead += count;
+                    await Task.Delay(10); // Simulate slow reader
+                }
+            });
+
+            // Write 8KB in 1KB chunks (should auto-flush twice at 4KB and 8KB)
+            for (int i = 0; i < 8; i++)
+            {
+                await simplex.WriteAsync(sendBuffer, i * 1024, 1024, this.TimeoutToken);
+            }
+
+            simplex.CompleteWriting();
+            await readTask.WithCancellation(this.TimeoutToken);
+
+            Assert.Equal(8192, bytesRead);
+            Assert.Equal(sendBuffer, recvBuffer);
+        }
+        finally
+        {
+            simplex.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task Issue918_LargeWriteSmallReadWithDispose()
+    {
+        // This is the scenario from issue #918
+        var simplex = new SimplexStream(0, 4096);
+
+        try
+        {
+            int written = 0;
+            var writeTask = Task.Run(async () =>
+            {
+                byte[] buffer = new byte[1024];
+                int totalToWrite = 10 * 1024 * 1024; // 10 MB
+
+                while (written < totalToWrite)
+                {
+                    await simplex.WriteAsync(buffer, 0, buffer.Length, this.TimeoutToken);
+                    written += buffer.Length;
+                }
+
+                simplex.CompleteWriting();
+            });
+
+            // Read only 1KB
+            byte[] readBuffer = new byte[1024];
+            int bytesRead = await simplex.ReadAsync(readBuffer, 0, readBuffer.Length, this.TimeoutToken);
+            Assert.Equal(1024, bytesRead);
+
+            // Dispose the stream - this should cause the writer to fail
+            simplex.Dispose();
+
+            // Wait for writer to complete (it should fail with ObjectDisposedException or similar)
+            Exception ex = await Assert.ThrowsAnyAsync<Exception>(() => writeTask.WithCancellation(this.TimeoutToken));
+            this.Logger.WriteLine($"Writer stopped after {written} bytes with: {ex.GetType().Name}: {ex.Message}");
+            simplex.CompleteWriting(ex);
+        }
+        finally
+        {
+            simplex.Dispose();
+        }
     }
 
     protected override void Dispose(bool disposing)
