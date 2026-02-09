@@ -50,7 +50,7 @@
     "mkdirp": "3.0.1",
     "nerdbank-gitversioning": "3.9.50",
     "path": "0.12.7",
-    "prettier": "3.0.3",
+    "prettier": "3.8.1",
     "promise": "8.3.0",
     "ts-jest": "29.2.6",
     "ts-node": "10.9.2",

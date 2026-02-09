@@ -85,10 +85,10 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 			options.protocolMajorVersion === 1
 				? new MultiplexingStreamV1Formatter(stream)
 				: options.protocolMajorVersion === 2
-				? new MultiplexingStreamV2Formatter(stream)
-				: options.protocolMajorVersion === 3
-				? new MultiplexingStreamV3Formatter(stream)
-				: undefined
+					? new MultiplexingStreamV2Formatter(stream)
+					: options.protocolMajorVersion === 3
+						? new MultiplexingStreamV3Formatter(stream)
+						: undefined
 		if (!formatter) {
 			throw new Error(`Protocol major version ${options.protocolMajorVersion} is not supported.`)
 		}
