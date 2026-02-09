@@ -238,10 +238,40 @@ public abstract class TestBase : IDisposable
         {
             processExitCode.SetResult((IsolatedTestHost.ExitCodes)isolatedTestProcess.ExitCode);
         };
+
+        // Track when stdout/stderr have been fully read.
+        // The Process.Exited event can fire before all redirected output is flushed.
+        // If we return from the test before output is fully consumed, xunit v3's
+        // TestOutputHelper throws InvalidOperationException ("no currently active test")
+        // when late-arriving output is written, crashing the test host.
+        TaskCompletionSource<bool>? stdoutDone = null;
+        TaskCompletionSource<bool>? stderrDone = null;
         if (logger != null)
         {
-            isolatedTestProcess.OutputDataReceived += (s, e) => logger.WriteLine(e.Data ?? string.Empty);
-            isolatedTestProcess.ErrorDataReceived += (s, e) => logger.WriteLine(e.Data ?? string.Empty);
+            stdoutDone = new TaskCompletionSource<bool>();
+            stderrDone = new TaskCompletionSource<bool>();
+            isolatedTestProcess.OutputDataReceived += (s, e) =>
+            {
+                if (e.Data is null)
+                {
+                    stdoutDone.TrySetResult(true);
+                }
+                else
+                {
+                    logger.WriteLine(e.Data);
+                }
+            };
+            isolatedTestProcess.ErrorDataReceived += (s, e) =>
+            {
+                if (e.Data is null)
+                {
+                    stderrDone.TrySetResult(true);
+                }
+                else
+                {
+                    logger.WriteLine(e.Data);
+                }
+            };
         }
 
         logger?.WriteLine("Test host launched with: \"{0}\" {1}", Path.GetFullPath(startInfo.FileName), startInfo.Arguments);
@@ -254,16 +284,23 @@ public abstract class TestBase : IDisposable
             isolatedTestProcess.BeginErrorReadLine();
         }
 
-        return processExitCode.Task.ContinueWith(
-            t =>
+        // Wait for the process to exit AND for all redirected output to be consumed,
+        // so no async output callbacks fire after the test is no longer active.
+        Task allDone = stdoutDone != null
+            ? Task.WhenAll(processExitCode.Task, stdoutDone.Task, stderrDone!.Task)
+            : (Task)processExitCode.Task;
+
+        return allDone.ContinueWith(
+            _ =>
             {
-                switch (t.Result)
+                IsolatedTestHost.ExitCodes result = processExitCode.Task.Result;
+                switch (result)
                 {
                     case IsolatedTestHost.ExitCodes.TestSkipped:
                         throw SkipException.ForSkip("Test skipped. See output of isolated task for details.");
                     case IsolatedTestHost.ExitCodes.TestPassed:
                     default:
-                        Assert.Equal(IsolatedTestHost.ExitCodes.TestPassed, t.Result);
+                        Assert.Equal(IsolatedTestHost.ExitCodes.TestPassed, result);
                         break;
                 }
 
