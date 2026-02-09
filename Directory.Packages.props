@@ -5,7 +5,7 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
     <MicrosoftTestingPlatformVersion>2.1.0</MicrosoftTestingPlatformVersion>
-    <BenchmarkDotNetVersion>0.15.6</BenchmarkDotNetVersion>
+    <BenchmarkDotNetVersion>0.15.8</BenchmarkDotNetVersion>
     <AspNetCoreVersion>2.3.9</AspNetCoreVersion>
     <VSThreadingVersion>17.13.61</VSThreadingVersion>
   </PropertyGroup>
