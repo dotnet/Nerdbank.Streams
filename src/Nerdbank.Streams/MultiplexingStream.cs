@@ -963,6 +963,13 @@ namespace Nerdbank.Streams
 
             if (channelId.Source == ChannelSource.Local && !channel.IsAccepted)
             {
+                if (channel.IsRejectedOrCanceled)
+                {
+                    // The channel offer was rescinded locally, but the remote party may have already
+                    // accepted and started writing before receiving our cancellation. This is a harmless race.
+                    return;
+                }
+
                 throw new MultiplexingProtocolException($"Remote party indicated they're done writing to channel {channelId} before accepting it.");
             }
 
@@ -990,6 +997,13 @@ namespace Nerdbank.Streams
 
             if (channelId.Source == ChannelSource.Local && !channel.IsAccepted)
             {
+                if (channel.IsRejectedOrCanceled)
+                {
+                    // The channel offer was rescinded locally, but the remote party may have already
+                    // accepted and started writing before receiving our cancellation. This is a harmless race.
+                    return;
+                }
+
                 throw new MultiplexingProtocolException($"Remote party sent content for channel {channelId} before accepting it.");
             }
 
