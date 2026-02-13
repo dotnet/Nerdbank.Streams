@@ -34,7 +34,7 @@
   "devDependencies": {
     "@types/jest": "29.5.14",
     "@types/msgpack-lite": "0.1.12",
-    "@types/node": "16.18.126",
+    "@types/node": "24.10.13",
     "@types/promise": "7.1.30",
     "@typescript-eslint/eslint-plugin": "5.62.0",
     "@typescript-eslint/parser": "5.62.0",
