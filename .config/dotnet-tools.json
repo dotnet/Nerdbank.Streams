@@ -3,14 +3,14 @@
   "isRoot": true,
   "tools": {
     "powershell": {
-      "version": "7.5.4",
+      "version": "7.6.1",
       "commands": [
         "pwsh"
       ],
       "rollForward": false
     },
     "dotnet-coverage": {
-      "version": "18.4.1",
+      "version": "18.6.2",
       "commands": [
         "dotnet-coverage"
       ],
@@ -24,16 +24,23 @@
       "rollForward": false
     },
     "docfx": {
-      "version": "2.78.4",
+      "version": "2.78.5",
       "commands": [
         "docfx"
       ],
       "rollForward": false
     },
     "nerdbank.dotnetrepotools": {
-      "version": "1.0.92",
+      "version": "1.3.22",
       "commands": [
         "repo"
+      ],
+      "rollForward": false
+    },
+    "dotnet-symbol": {
+      "version": "9.0.661903",
+      "commands": [
+        "dotnet-symbol"
       ],
       "rollForward": false
     }
