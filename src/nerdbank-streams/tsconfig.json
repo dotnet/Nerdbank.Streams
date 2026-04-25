@@ -14,7 +14,8 @@
 		"strict": true,
 		"strictFunctionTypes": true,
 		"strictNullChecks": true,
-		"strictPropertyInitialization": true
+		"strictPropertyInitialization": true,
+		"skipLibCheck": true
   },
   "include": [
     "src/index.ts",
