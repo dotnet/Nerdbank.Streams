@@ -32,7 +32,7 @@
     "watch": "node ./node_modules/typescript/bin/tsc -p tsconfig.json -w"
   },
   "devDependencies": {
-    "@types/gulp": "4.0.17",
+    "@types/gulp": "4.0.18",
     "@types/jest": "30.0.0",
     "@types/msgpack-lite": "0.1.12",
     "@types/node": "16.18.126",
