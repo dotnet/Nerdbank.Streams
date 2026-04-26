@@ -32,10 +32,10 @@
     "watch": "node ./node_modules/typescript/bin/tsc -p tsconfig.json -w"
   },
   "devDependencies": {
+    "@types/gulp": "4.0.17",
     "@types/jest": "30.0.0",
     "@types/msgpack-lite": "0.1.12",
     "@types/node": "16.18.126",
-    "@types/promise": "7.1.30",
     "@typescript-eslint/eslint-plugin": "8.59.0",
     "@typescript-eslint/parser": "8.59.0",
     "eslint": "10.2.1",
@@ -51,7 +51,6 @@
     "nerdbank-gitversioning": "3.9.50",
     "path": "0.12.7",
     "prettier": "3.8.3",
-    "promise": "8.3.0",
     "ts-jest": "29.4.9",
     "ts-node": "10.9.2",
     "typescript": "6.0.3",
