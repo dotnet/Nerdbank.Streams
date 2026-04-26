@@ -1,5 +1,4 @@
 import * as cp from "child_process";
-import * as Promise from "promise";
 
 export interface IExecAsyncResult {
     stdout: string;
@@ -7,12 +6,16 @@ export interface IExecAsyncResult {
 }
 
 export function execAsync(command: string, options?: cp.ExecOptions): Promise<IExecAsyncResult> {
-    return new Promise<IExecAsyncResult>(
-        (resolve, reject) => cp.exec(command, options, (error, stdout, stderr) => {
+    return new Promise<IExecAsyncResult>((resolve, reject) => {
+        cp.exec(command, options, (error, stdout, stderr) => {
             if (error) {
                 reject(error);
             } else {
-                resolve({ stdout, stderr });
+                resolve({
+                    stdout: stdout.toString(),
+                    stderr: stderr.toString(),
+                });
             }
-        }));
+        });
+    });
 }
