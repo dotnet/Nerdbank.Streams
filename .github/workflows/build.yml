@@ -15,6 +15,9 @@ env:
   BUILDCONFIGURATION: Release
   NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages/
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: 🏭 Build
