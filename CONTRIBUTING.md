@@ -30,12 +30,16 @@ to the feeds that packages for this repo come from, if any.
 
 Building, testing, and packing this repository can be done by using the standard dotnet CLI commands (e.g. `dotnet build`, `dotnet test`, `dotnet pack`, etc.).
 
+## Testing
+
+You can use `dotnet test` to build and/or test the repo.
+
+There may be tests that are known to be unstable or have special requirements. These can be avoided by running tests using the [dotnet-test-cloud.ps1](tools/dotnet-test-cloud.ps1) script *after* running `dotnet build`.
+
 ## The `nerdbank-streams` NPM package
 
 The `nerdbank-streams` NPM package builds out of the `src/nerdbank-streams` directory.
 Please review the [CONTRIBUTING.md](src/nerdbank-streams/CONTRIBUTING.md) document in that directory for instructions.
-
-[pwsh]: https://learn.microsoft.com/powershell/scripting/install/installing-powershell
 
 ## Releases
 
@@ -92,3 +96,5 @@ git checkout origin/main
 # resolve any conflicts, then commit the merge commit.
 git push origin -u HEAD
 ```
+
+[pwsh]: https://learn.microsoft.com/powershell/scripting/install/installing-powershell
