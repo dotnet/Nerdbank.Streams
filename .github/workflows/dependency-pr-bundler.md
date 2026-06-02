@@ -2,11 +2,11 @@
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 7 * * *'
+    - cron: daily
 permissions:
-      contents: read
-      issues: read
-      pull-requests: read
+  contents: read
+  issues: read
+  pull-requests: read
 engine: copilot
 network:
   allowed:
@@ -20,6 +20,7 @@ tools:
 safe-outputs:
   add-comment:
   create-pull-request:
+    draft: false
   create-pull-request-review-comment:
   submit-pull-request-review:
   reply-to-pull-request-review-comment:
@@ -47,13 +48,15 @@ You can identify dependency update PRs by those authored by `dependabot` or `ren
 You'll find instructions for building and validating the repo in the [CONTRIBUTING.md](../../CONTRIBUTING.md) doc.
 Always validate your changes locally before pushing them to the remote repository.
 
+When writing PR bodies or comments, avoid unmatched markdown code fences. Keep markdown well-formed.
+
 ## Fix up dependency PRs with failing checks
 
 Before aggregating PRs, first try to fix any individual dependency update PRs with failing build/test checks.
 
 1. For the dependency PRs with failing build or test PR checks, check out their source branch and fix any issues.
 2. Push your fixes as fresh commits to the individual dependency PRs.
-3. If you can't fix a particular PR, add a comment to the PR describing your attempt and outcome.
+3. If you can't fix a particular PR, add a comment to the PR describing your attempt and outcome using the `safe-outputs.add-comment` tool.
 
 ## Group dependency PRs that are ready to go
 
@@ -68,4 +71,4 @@ Your next goal is to collect all the dependency updates that are ready to go int
    Resolve any conflicts.
    Build and run tests to validate your branch.
 3. Push the branch.
-4. Create a PR, if one does not already exist.
+4. Create a PR, if one does not already exist, using the `safe-outputs.create-pull-request` tool.
