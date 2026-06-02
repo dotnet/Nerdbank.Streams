@@ -30,7 +30,7 @@ jobs:
       with:
         fetch-depth: 0 # avoid shallow clone so nbgv can do its work.
     - name: Install gh-aw extension
-      uses: github/gh-aw-actions/setup-cli@3ea13c02d765410340d533515cb31a7eef2baaf0 # v0.77.5
+      uses: github/gh-aw-actions/setup-cli@3928d9c902852a519b0a03ea19f4fe43c085c753 # v0.77.6
       with:
         version: v0.77.5
     - name: ⚙ Install prerequisites
