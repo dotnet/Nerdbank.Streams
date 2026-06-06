@@ -54,7 +54,7 @@
     "ts-jest": "29.4.11",
     "ts-node": "10.9.2",
     "typescript": "6.0.3",
-    "vscode-jsonrpc": "8.2.1"
+    "vscode-jsonrpc": "9.0.0"
   },
   "dependencies": {
     "await-semaphore": "^0.1.3",
