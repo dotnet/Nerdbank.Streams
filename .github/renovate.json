@@ -12,6 +12,13 @@
 			"groupName": "nbgv and nerdbank.gitversioning updates"
 		},
 		{
+			"description": "Do not update the central AspNetCoreVersion property.",
+			"matchManagers": ["nuget"],
+			"matchFileNames": ["Directory.Packages.props"],
+			"matchDepNames": ["AspNetCoreVersion"],
+			"enabled": false
+		},
+		{
 			"matchPackageNames": ["xunit*"],
 			"groupName": "xunit"
 		},
