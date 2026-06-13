@@ -3994,10 +3994,10 @@ neo-async@^2.6.2:
   resolved "https://registry.yarnpkg.com/neo-async/-/neo-async-2.6.2.tgz#b4aafb93e3aeb2d8174ca53cf163ab7d7308305f"
   integrity sha512-Yd3UES5mWCSqR+qNT93S3UoYUkqAZ9lLg8a7g9rimsWmYGK8cVToA4/sF3RrshdyV3sAGMXVUmpMYOw+dLpOuw==
 
-nerdbank-gitversioning@3.9.50:
-  version "3.9.50"
-  resolved "https://registry.yarnpkg.com/nerdbank-gitversioning/-/nerdbank-gitversioning-3.9.50.tgz#770a7730df1257a443d79aa6df1dbaf415ad837a"
-  integrity sha512-n7H6cQ9AqXOYYPx9poQ/trPC3Mm+LFM2OnJvogcSM3HZ4irTITJSQl15Jm7rUocGTLU25avSlqKuknSvnIEETA==
+nerdbank-gitversioning@3.10.70:
+  version "3.10.70"
+  resolved "https://registry.yarnpkg.com/nerdbank-gitversioning/-/nerdbank-gitversioning-3.10.70.tgz#7b222d5911d61da289696b3e31c999165f403fde"
+  integrity sha512-Pw5TzbHIZlFc2inZEXu1B47gdpmNvIsPOomwA0qOJukhg4Dvrame8NEWm5khMP/z4A7J/Kems0c+qG9F+KYX9g==
 
 node-exports-info@^1.6.0:
   version "1.6.0"
