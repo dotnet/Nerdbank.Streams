@@ -8,6 +8,11 @@
 	"labels": ["dependencies"],
 	"packageRules": [
 		{
+			"description": "Generated agentic workflow lock files are managed by 'gh aw compile' and must not be directly updated by Renovate.",
+			"matchFileNames": [".github/workflows/*.lock.yml"],
+			"enabled": false
+		},
+		{
 			"matchPackageNames": ["nbgv", "nerdbank.gitversioning"],
 			"groupName": "nbgv and nerdbank.gitversioning updates"
 		},
