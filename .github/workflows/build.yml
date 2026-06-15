@@ -61,23 +61,28 @@ jobs:
       run: dotnet publish -c Release -r ${{ matrix.rid }}-x64 -warnaserror
       working-directory: test/NativeAOTCompatibility
 
-    - name: ⚙️ Use Node.js 20.x
+    - name: ⚙️ Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 11.6.0
+        run_install: false
+    - name: ⚙️ Use Node.js 24.x
       uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
       with:
         node-version: 24.x
-    - name: ⚙️ yarn
-      run: |
-        npm install -g yarn@1.x
-        yarn install
+        cache: pnpm
+        cache-dependency-path: src/nerdbank-streams/pnpm-lock.yaml
+    - name: ⚙️ pnpm install
+      run: pnpm install --frozen-lockfile
       working-directory: src/nerdbank-streams
-    - name: 🛠️ yarn build
-      run: yarn build
+    - name: 🛠️ pnpm build
+      run: pnpm build
       working-directory: src/nerdbank-streams
-    - name: 🧪 yarn test
-      run: yarn test
+    - name: 🧪 pnpm test
+      run: pnpm test
       working-directory: src/nerdbank-streams
-    - name: 🧪 yarn lint
-      run: yarn lint
+    - name: 🧪 pnpm lint
+      run: pnpm lint
       working-directory: src/nerdbank-streams
 
     - name: 💅🏻 Verify formatted code

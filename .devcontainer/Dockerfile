@@ -13,7 +13,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0.301@sha256:548d93f8a18a1acbe6cc127bc4f472
 # was *not* devcontainers, sadly.
 ENV NUGET_XMLDOC_MODE=
 
-# Install Node.js 16
-RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash - \
+# Install Node.js 24
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
     && apt-get install -y nodejs
-RUN npm i -g yarn
+RUN corepack enable pnpm

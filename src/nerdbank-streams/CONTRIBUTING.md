@@ -2,9 +2,9 @@
 
 ## NPM packages
 
-We use `yarn` to install NPM packages.
-If you do not have yarn, you can obtain it with `npm i -g yarn`.
-Simply run `yarn` in this directory to install dependencies.
+We use `pnpm` to install NPM packages.
+If you do not already have the `pnpm` shim available, run `corepack enable`.
+Then run `pnpm install` in this directory to install dependencies.
 
 ## Editing
 
@@ -13,12 +13,12 @@ The folder recommends several VS Code extensions to install.
 
 ## Building
 
-Run `yarn build` in this directory to transpile the Typescript files to Javascript.
+Run `pnpm build` in this directory to transpile the Typescript files to Javascript.
 
 ## Testing
 
-Run `yarn test` in this directory to run tests.
-You must have transpiled first (using `yarn build` or `yarn tsc`).
-Using `yarn watch` is a good way to ensure tsc has run with your changes automatically so you can run tests whenever you want.
+Run `pnpm test` in this directory to run tests.
+You must have transpiled first (using `pnpm build`).
+Using `pnpm watch` is a good way to ensure tsc has run with your changes automatically so you can run tests whenever you want.
 
 You can also run tests from the (jest) Test Explorer in VS Code.
