@@ -68,5 +68,4 @@ Your next goal is to collect all the dependency updates that are ready to go int
    Resolve any conflicts.
    Build and run tests to validate your branch.
 3. Push the branch.
-4. Create a PR, if one does not already exist: `gh pr create -f -t "Bundle dependency updates"`
-   Set the PR to auto-complete with a merge completion option: `gh pr merge --auto --merge <pr-id>`.
+4. Create a PR, if one does not already exist.
