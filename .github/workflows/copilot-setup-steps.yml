@@ -29,10 +29,6 @@ jobs:
     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       with:
         fetch-depth: 0 # avoid shallow clone so nbgv can do its work.
-    - name: Install gh-aw extension
-      uses: github/gh-aw-actions/setup-cli@c20f9e750acfb2da7ce8698626ebeb65efb33300 # v0.80.6
-      with:
-        version: v0.77.5
     - name: ⚙ Install prerequisites
       run: |
         ./init.ps1 -UpgradePrerequisites -NoNuGetCredProvider
