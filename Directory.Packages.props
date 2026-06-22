@@ -7,7 +7,7 @@
     <MicrosoftTestingPlatformVersion>2.2.3</MicrosoftTestingPlatformVersion>
     <BenchmarkDotNetVersion>0.15.8</BenchmarkDotNetVersion>
     <AspNetCoreVersion>2.3.11</AspNetCoreVersion>
-    <VSThreadingVersion>17.14.15</VSThreadingVersion>
+    <VSThreadingVersion>18.7.23</VSThreadingVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="BenchmarkDotNet.Diagnostics.Windows" Version="$(BenchmarkDotNetVersion)" />
