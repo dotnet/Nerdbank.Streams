@@ -25,7 +25,7 @@
   },
   "license": "MIT",
   "private": false,
-  "packageManager": "pnpm@11.8.0",
+  "packageManager": "pnpm@11.9.0",
   "scripts": {
     "build": "tsc -p gulpfile.tsconfig.json && gulp",
     "lint": "eslint src --ext ts",
