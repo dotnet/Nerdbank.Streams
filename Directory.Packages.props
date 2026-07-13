@@ -4,7 +4,7 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
-    <MicrosoftTestingPlatformVersion>2.3.0</MicrosoftTestingPlatformVersion>
+    <MicrosoftTestingPlatformVersion>2.3.2</MicrosoftTestingPlatformVersion>
     <BenchmarkDotNetVersion>0.15.8</BenchmarkDotNetVersion>
     <AspNetCoreVersion>2.3.11</AspNetCoreVersion>
     <VSThreadingVersion>18.7.23</VSThreadingVersion>
