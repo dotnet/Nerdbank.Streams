@@ -9,7 +9,10 @@ import * as ap from "./asyncprocess";
 const outDir = "dist";
 
 async function tsc() {
-	await ap.execAsync(`node ./node_modules/typescript/bin/tsc -p tsconfig.json`, { cwd: __dirname });
+	// `tsc` comes from @typescript/native (TypeScript 7). The `typescript` package is
+	// aliased to @typescript/typescript6 so tools like ts-jest and typescript-eslint
+	// still get the JavaScript compiler API (TS 7 does not expose one yet).
+	await ap.execAsync(`tsc -p tsconfig.json`, { cwd: __dirname });
 }
 
 async function copyPackageContents() {
