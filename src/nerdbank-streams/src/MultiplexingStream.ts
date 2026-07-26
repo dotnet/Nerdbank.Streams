@@ -18,7 +18,6 @@ import {
 	MultiplexingStreamV1Formatter,
 	MultiplexingStreamV2Formatter,
 	MultiplexingStreamV3Formatter,
-	MultiplexingStreamV4Formatter,
 } from './MultiplexingStreamFormatters'
 import './MultiplexingStreamOptions'
 import { MultiplexingStreamOptions } from './MultiplexingStreamOptions'
@@ -89,8 +88,6 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 					? new MultiplexingStreamV2Formatter(stream)
 					: options.protocolMajorVersion === 3
 						? new MultiplexingStreamV3Formatter(stream)
-						: options.protocolMajorVersion === 4
-							? new MultiplexingStreamV4Formatter(stream)
 						: undefined
 		if (!formatter) {
 			throw new Error(`Protocol major version ${options.protocolMajorVersion} is not supported.`)
@@ -604,12 +601,11 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 	}
 
 	public onChannelReadingCompleted(channel: ChannelClass): Promise<void> {
-		if (this.protocolMajorVersion >= 4) {
+		if (this.protocolMajorVersion >= 3) {
 			return this.sendFrame(ControlCode.contentReadingCompleted, channel.qualifiedId)
-		} else {
-			channel.dispose()
-			return Promise.resolve()
 		}
+
+		return Promise.resolve()
 	}
 
 	public async onChannelDisposed(channel: ChannelClass, error: Error | null) {

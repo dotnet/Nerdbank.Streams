@@ -161,7 +161,6 @@ export class ChannelClass extends Channel {
 			read() {
 				// Nothing to do here since data is pushed to us.
 			},
-
 		})
 		this._duplex.on('close', () => {
 			if (!self.isDisposed) {

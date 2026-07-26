@@ -775,7 +775,7 @@ namespace Nerdbank.Streams
                             : new Pipe();
                         this.mxStreamIOReader = writerRelay.Reader;
                         this.mxStreamIOWriter = readerRelay.Writer;
-                        this.channelIO = new DuplexPipe(new WindowPipeReader(this, readerRelay.Reader), writerRelay.Writer);
+                        this.channelIO = new DuplexPipe(this.BackpressureSupportEnabled ? new WindowPipeReader(this, readerRelay.Reader) : readerRelay.Reader, writerRelay.Writer);
                     }
                 }
             }
@@ -947,36 +947,32 @@ namespace Nerdbank.Streams
                 }
             }
 
+            private void LocalContentReadingCompleted()
+            {
+                if (this.IsDisposed)
+                {
+                    return;
+                }
+
+                if (this.MultiplexingStream.protocolMajorVersion >= 3)
+                {
+                    this.MultiplexingStream.SendFrame(
+                        new FrameHeader
+                        {
+                            Code = ControlCode.ContentReadingCompleted,
+                            ChannelId = this.QualifiedId,
+                        },
+                        default,
+                        CancellationToken.None);
+                }
+            }
+
             private void LocalContentExamined(long bytesExamined)
             {
                 Requires.Range(bytesExamined >= 0, nameof(bytesExamined));
                 if (!this.BackpressureSupportEnabled || bytesExamined == 0 || this.IsDisposed)
                 {
                     return;
-                }
-
-                private void LocalContentReadingCompleted()
-                {
-                    if (this.IsDisposed)
-                    {
-                        return;
-                    }
-
-                    if (this.MultiplexingStream.protocolMajorVersion >= 4)
-                    {
-                        this.MultiplexingStream.SendFrame(
-                            new FrameHeader
-                            {
-                                Code = ControlCode.ContentReadingCompleted,
-                                ChannelId = this.QualifiedId,
-                            },
-                            default,
-                            CancellationToken.None);
-                    }
-                    else
-                    {
-                        this.Dispose();
-                    }
                 }
 
                 if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))

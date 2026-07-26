@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
+using System.IO.Pipelines;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
@@ -15,6 +16,19 @@ public class MultiplexingStreamV3Tests : MultiplexingStreamV2Tests
     }
 
     protected override int ProtocolMajorVersion => 3;
+
+    [Fact]
+    public async Task ReaderCompletionUnblocksRemoteWriter()
+    {
+        MultiplexingStream.Channel a = await this.mx1.OfferChannelAsync("test", this.TimeoutToken);
+        MultiplexingStream.Channel b = await this.mx2.AcceptChannelAsync("test", this.TimeoutToken);
+
+        a.Output.Write(new byte[this.mx1.DefaultChannelReceivingWindowSize].AsSpan());
+        ValueTask<FlushResult> flush = a.Output.FlushAsync(this.TimeoutToken);
+        await b.Input.CompleteAsync();
+
+        Assert.True((await flush.WithCancellation(this.TimeoutToken)).IsCompleted);
+    }
 
     /// <summary>
     /// Verify the <see cref="MultiplexingStream.Create(System.IO.Stream, MultiplexingStream.Options?)"/> method,

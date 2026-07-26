@@ -392,7 +392,4 @@ export class MultiplexingStreamV3Formatter extends MultiplexingStreamV2Formatter
 			payload: msgpackObject[3] || Buffer.from([]),
 		}
 	}
-
 }
-
-export class MultiplexingStreamV4Formatter extends MultiplexingStreamV3Formatter {}
