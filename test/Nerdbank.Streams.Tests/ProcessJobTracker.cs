@@ -85,24 +85,35 @@ internal class ProcessJobTracker : IDisposable
     /// Ensures a given process is killed when the current process exits.
     /// </summary>
     /// <param name="process">The process whose lifetime should never exceed the lifetime of the current process.</param>
-    public void AddProcess(Process process)
+    /// <returns>The error that prevented the process from being added to the job; or <see langword="null"/> if the process was successfully added (or the OS has no job objects).</returns>
+    /// <remarks>
+    /// Job assignment is a best effort convenience for cleaning up child processes, and can fail for environmental
+    /// reasons that are outside the caller's control (e.g. the process already exited, or the process already belongs
+    /// to a job hierarchy that this job is not a part of). Callers should therefore treat a returned error
+    /// as a diagnostic warning rather than a failure.
+    /// </remarks>
+    public Exception? TryAddProcess(Process process)
     {
         Requires.NotNull(process, nameof(process));
 
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            return;
+            return null;
         }
 
-        bool success = AssignProcessToJobObject(this.jobHandle, new SafeObjectHandle(process.Handle, ownsHandle: false));
-        if (!success && !process.HasExited)
+        if (!AssignProcessToJobObject(this.jobHandle, new SafeObjectHandle(process.Handle, ownsHandle: false)))
         {
-            throw new Win32Exception();
+            // Capture the error code *immediately*, since any subsequent interop call
+            // (e.g. Process.HasExited) would overwrite it and lead to misleading diagnostics.
+            int errorCode = Marshal.GetLastWin32Error();
+            return new System.ComponentModel.Win32Exception(errorCode);
         }
+
+        return null;
     }
 
     /// <summary>
-    /// Kills all processes previously tracked with <see cref="AddProcess(Process)"/> by closing the Windows Job.
+    /// Kills all processes previously tracked with <see cref="TryAddProcess(Process)"/> by closing the Windows Job.
     /// </summary>
     public void Dispose()
     {
