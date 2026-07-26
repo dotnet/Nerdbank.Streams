@@ -1,6 +1,5 @@
 import CancellationToken from 'cancellationtoken'
 import { Readable, Writable } from 'stream'
-import { Deferred } from './Deferred'
 import { IDisposableObservable } from './IDisposableObservable'
 
 export async function writeAsync(stream: NodeJS.WritableStream, chunk: any) {
@@ -35,20 +34,207 @@ export function writeSubstream(stream: NodeJS.WritableStream): NodeJS.WritableSt
 	})
 }
 
-export function readSubstream(stream: NodeJS.ReadableStream): NodeJS.ReadableStream {
+/**
+ * Reads the next chunk from a stream, asynchronously waiting for more to be read if necessary.
+ * @param stream The stream to read from.
+ * @param cancellationToken A token whose cancellation will result in immediate rejection of the returned promise.
+ * @returns The result of reading from the stream. This will be null if the end of the stream is reached before any more can be read.
+ */
+export function readAsync(stream: NodeJS.ReadableStream, cancellationToken?: CancellationToken): Promise<string | Buffer | null> {
+	return readAtMostAsync(stream, undefined, cancellationToken)
+}
+
+/**
+ * Reads the next chunk from a stream, asynchronously waiting for more to be read if necessary,
+ * without ever consuming more than a given number of bytes from the stream.
+ * @param stream The stream to read from.
+ * @param maxBytes The maximum number of bytes to consume from the stream, or `undefined` to consume whatever is immediately available.
+ * @param cancellationToken A token whose cancellation will result in immediate rejection of the returned promise.
+ * @returns The result of reading from the stream. This will be null if the end of the stream is reached before any more can be read.
+ */
+function readAtMostAsync(stream: NodeJS.ReadableStream, maxBytes?: number, cancellationToken?: CancellationToken): Promise<string | Buffer | null> {
+	if (cancellationToken?.isCancelled) {
+		return Promise.reject(new CancellationToken.CancellationError(cancellationToken.reason))
+	}
+
+	// Always try a synchronous read first. Besides being faster, this avoids resuming on a later
+	// microtask, by which time the stream may have already emitted its 'end' event.
+	const initialChunk = readSyncAtMost(stream, maxBytes)
+	if (initialChunk !== null) {
+		return Promise.resolve(initialChunk)
+	}
+
+	const readable = stream as Readable
+	if (readable.errored) {
+		// The stream has already failed. Report it immediately rather than waiting for an
+		// 'error' event that may have already been emitted.
+		return Promise.reject(readable.errored)
+	}
+
+	if (readable.readableEnded || readable.destroyed) {
+		return Promise.resolve(null)
+	}
+
+	return new Promise<string | Buffer | null>((resolve, reject) => {
+		// Note that adding a 'readable' event handler switches the stream to paused mode, which is exactly what we want
+		// since we read explicitly. Node.js restores the stream's prior flowing state when the last such handler is removed,
+		// so this has no lasting impact on the stream for other consumers.
+		const ctReg = cancellationToken?.onCancelled(reason => {
+			cleanup()
+			reject(new CancellationToken.CancellationError(reason))
+		})
+		stream.on('readable', onReadable)
+		stream.once('error', onError)
+		stream.once('end', onEnd)
+		stream.once('close', onClose)
+
+		function onReadable() {
+			const chunk = readSyncAtMost(stream, maxBytes)
+			if (chunk !== null) {
+				cleanup()
+				resolve(chunk)
+			}
+		}
+
+		function onError(err: Error) {
+			cleanup()
+			reject(err)
+		}
+
+		function onEnd() {
+			cleanup()
+			resolve(null)
+		}
+
+		function onClose() {
+			cleanup()
+			resolve(null)
+		}
+
+		function cleanup() {
+			stream.off('readable', onReadable)
+			stream.off('error', onError)
+			stream.off('end', onEnd)
+			stream.off('close', onClose)
+			if (ctReg) {
+				ctReg()
+			}
+		}
+	})
+}
+
+/**
+ * Synchronously reads whatever is immediately available from a stream, without consuming more than `maxBytes` bytes.
+ * @param stream The stream to read from.
+ * @param maxBytes The maximum number of bytes to consume, or `undefined` for no limit.
+ * @returns The chunk that was read, or null if nothing was immediately available.
+ */
+function readSyncAtMost(stream: NodeJS.ReadableStream, maxBytes?: number): string | Buffer | null {
+	if (maxBytes === undefined) {
+		return stream.read() as string | Buffer | null
+	}
+
+	if (maxBytes === 0) {
+		return null
+	}
+
+	// Only ask for as much as is already buffered so that `read` doesn't return null merely
+	// because fewer than `maxBytes` bytes have arrived so far.
+	const buffered = (stream as Readable).readableLength
+	return stream.read(buffered > 0 ? Math.min(buffered, maxBytes) : maxBytes) as string | Buffer | null
+}
+
+/**
+ * Returns a readable stream that will read just a slice of some existing stream.
+ * @param stream The stream to read from.
+ * @param length The maximum number of bytes to read from the stream.
+ * @returns A stream that will read up to the given number of bytes, leaving the rest in the underlying stream.
+ */
+export function sliceStream(stream: NodeJS.ReadableStream, length: number): Readable {
+	// Reads that are in flight when this stream is destroyed must be cancelled so that
+	// they do not go on to consume data from the underlying stream that no one will receive.
+	const cts = CancellationToken.create()
 	return new Readable({
 		async read(_: number) {
-			const lenBuffer = await getBufferFrom(stream, 4)
-			const dv = new DataView(lenBuffer.buffer, lenBuffer.byteOffset, lenBuffer.length)
-			const chunkSize = dv.getUint32(0, false)
-			if (chunkSize === 0) {
-				this.push(null)
-				return
-			}
+			try {
+				if (length === 0) {
+					this.push(null)
+					return
+				}
 
-			// TODO: make this *stream* instead of read as an atomic chunk.
-			const payload = await getBufferFrom(stream, chunkSize)
-			this.push(payload)
+				const chunk = (await readAtMostAsync(stream, length, cts.token)) as Buffer | null
+				if (chunk === null) {
+					// We've reached the end of the source stream.
+					this.push(null)
+					return
+				}
+
+				length -= chunk.length
+				this.push(chunk)
+				if (length === 0) {
+					// Save another call later by informing immediately that we're at the end of the stream.
+					this.push(null)
+				}
+			} catch (err) {
+				this.destroy(err as Error)
+			}
+		},
+
+		destroy(error, callback) {
+			cts.cancel()
+			callback(error)
+		},
+	})
+}
+
+/**
+ * Returns a readable stream that reads a substream that was written with {@link writeSubstream}.
+ * @param stream The stream to read the substream from.
+ * @returns A stream that ends when the substream ends, leaving the rest of `stream` available to other readers.
+ */
+export function readSubstream(stream: NodeJS.ReadableStream): Readable {
+	let bytesRemainingInChunk = 0
+	let reachedEnd = false
+
+	// Reads that are in flight when this stream is destroyed must be cancelled so that
+	// they do not go on to consume data from the underlying stream that no one will receive.
+	const cts = CancellationToken.create()
+	return new Readable({
+		async read(_: number) {
+			try {
+				if (reachedEnd) {
+					this.push(null)
+					return
+				}
+
+				if (bytesRemainingInChunk === 0) {
+					const lenBuffer = await getBufferFrom(stream, 4, false, cts.token)
+					const dv = new DataView(lenBuffer.buffer, lenBuffer.byteOffset, lenBuffer.length)
+					bytesRemainingInChunk = dv.getUint32(0, false)
+					if (bytesRemainingInChunk === 0) {
+						// We've reached the end of the substream.
+						reachedEnd = true
+						this.push(null)
+						return
+					}
+				}
+
+				// Push whatever is available rather than waiting for the entire chunk to arrive.
+				const payload = (await readAtMostAsync(stream, bytesRemainingInChunk, cts.token)) as Buffer | null
+				if (payload === null) {
+					throw new Error('Stream terminated before the substream was completed.')
+				}
+
+				bytesRemainingInChunk -= payload.length
+				this.push(payload)
+			} catch (err) {
+				this.destroy(err as Error)
+			}
+		},
+
+		destroy(error, callback) {
+			cts.cancel()
+			callback(error)
 		},
 	})
 }
@@ -73,81 +259,38 @@ export async function getBufferFrom(
 	allowEndOfStream: boolean = false,
 	cancellationToken?: CancellationToken
 ): Promise<Buffer | null> {
-	const streamEnded = new Deferred<void>()
-
 	if (size === 0) {
-		return Buffer.from([])
+		return Buffer.alloc(0)
 	}
 
-	let readBuffer: Buffer | null = null
-	let index: number = 0
-	while (size > 0) {
+	let result: Buffer | null = null
+	let bytesRead = 0
+	while (bytesRead < size) {
 		cancellationToken?.throwIfCancelled()
-		let availableSize = (readable as Readable).readableLength
-		if (!availableSize) {
-			// Check the end of stream
-			if ((readable as Readable).readableEnded || streamEnded.isCompleted) {
-				// stream is closed
-				if (!allowEndOfStream) {
-					throw new Error('Stream terminated before required bytes were read.')
-				}
-
-				// Returns what has been read so far.
-				if (readBuffer === null) {
-					return null
-				}
-
-				// We need to trim the trailing space.
-				return readBuffer.subarray(0, index)
-			}
-
-			// we retain this behavior when availableSize === false
-			// to make existing unit tests happy (which assumes we will try to read stream when no data is ready.)
-			availableSize = size
-		} else if (availableSize > size) {
-			availableSize = size
-		}
-
-		const newBuffer = readable.read(availableSize) as Buffer
-		if (newBuffer) {
-			if (newBuffer.length < availableSize && !allowEndOfStream) {
+		const chunk = (await readAtMostAsync(readable, size - bytesRead, cancellationToken)) as Buffer | null
+		if (chunk === null) {
+			// The stream ended before we could read everything that was requested.
+			if (!allowEndOfStream) {
 				throw new Error('Stream terminated before required bytes were read.')
 			}
 
-			if (readBuffer === null) {
-				if (availableSize === size || newBuffer.length < availableSize) {
-					// In the fast pass, we read the entire data once, and do not allocate an extra array.
-					return newBuffer
-				}
-
-				// If we read partial data, we need to allocate a buffer to join all data together.
-				readBuffer = Buffer.alloc(size)
-			}
-
-			// now append new data to the buffer
-			newBuffer.copy(readBuffer, index)
-
-			size -= newBuffer.length
-			index += newBuffer.length
+			return bytesRead === 0 ? null : result!.subarray(0, bytesRead)
 		}
 
-		if (size > 0) {
-			const bytesAvailable = new Deferred<void>()
-			const bytesAvailableCallback = bytesAvailable.resolve.bind(bytesAvailable)
-			const streamEndedCallback = streamEnded.resolve.bind(streamEnded)
-			readable.once('readable', bytesAvailableCallback)
-			readable.once('end', streamEndedCallback)
-			try {
-				const endPromise = Promise.race([bytesAvailable.promise, streamEnded.promise])
-				await (cancellationToken ? cancellationToken.racePromise(endPromise) : endPromise)
-			} finally {
-				readable.removeListener('readable', bytesAvailableCallback)
-				readable.removeListener('end', streamEndedCallback)
-			}
+		if (result === null && chunk.length === size) {
+			// Fast path: the entire request was satisfied by a single read, so avoid an extra allocation and copy.
+			return chunk
 		}
+
+		if (result === null) {
+			result = Buffer.alloc(size)
+		}
+
+		chunk.copy(result, bytesRead)
+		bytesRead += chunk.length
 	}
 
-	return readBuffer
+	return result
 }
 
 export function throwIfDisposed(value: IDisposableObservable) {

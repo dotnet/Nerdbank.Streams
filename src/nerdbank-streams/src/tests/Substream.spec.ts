@@ -170,6 +170,165 @@ describe('Substream', () => {
 		})
 	})
 
+	describe('streaming behavior', () => {
+		it('yields partial chunks as they arrive', async () => {
+			const thru = new PassThrough()
+			await writeLengthHeader(thru, 6)
+
+			const substream = readSubstream(thru)
+
+			// Write only part of the announced chunk and expect to be able to read it
+			// without waiting for the rest of the chunk to arrive.
+			await writeAsync(thru, Buffer.from([1, 2, 3]))
+			expect(await getBufferFrom(substream, 3)).toEqual(Buffer.from([1, 2, 3]))
+
+			await writeAsync(thru, Buffer.from([4, 5, 6]))
+			expect(await getBufferFrom(substream, 3)).toEqual(Buffer.from([4, 5, 6]))
+
+			await writeLengthHeader(thru, 0)
+			await endAsync(thru)
+			await expectEndOfStream(substream)
+		})
+
+		it('reads across chunk boundaries', async () => {
+			const thru = new PassThrough()
+			await writeLengthHeader(thru, 3)
+			await writeAsync(thru, Buffer.from([1, 2, 3]))
+			await writeLengthHeader(thru, 3)
+			await writeAsync(thru, Buffer.from([4, 5, 6]))
+			await writeLengthHeader(thru, 0)
+			await endAsync(thru)
+
+			const substream = readSubstream(thru)
+			expect(await getBufferFrom(substream, 6)).toEqual(Buffer.from([1, 2, 3, 4, 5, 6]))
+			await expectEndOfStream(substream)
+			await expectEndOfStream(thru)
+		})
+
+		it('can be consumed with getBufferFrom allowing end of stream', async () => {
+			const thru = new PassThrough()
+			await writeLengthHeader(thru, 3)
+			await writeAsync(thru, Buffer.from([1, 2, 3]))
+			await writeLengthHeader(thru, 3)
+			await writeAsync(thru, Buffer.from([4, 5, 6]))
+			await writeLengthHeader(thru, 0)
+			await endAsync(thru)
+
+			const substream = readSubstream(thru)
+			expect(await getBufferFrom(substream, 10, true)).toEqual(Buffer.from([1, 2, 3, 4, 5, 6]))
+			await expectEndOfStream(thru)
+		})
+
+		it('can be consumed by async iteration', async () => {
+			const thru = new PassThrough()
+			await writeLengthHeader(thru, 3)
+			await writeAsync(thru, Buffer.from([1, 2, 3]))
+			await writeLengthHeader(thru, 3)
+			await writeAsync(thru, Buffer.from([4, 5, 6]))
+			await writeLengthHeader(thru, 0)
+			await writeAsync(thru, Buffer.from([9, 9]))
+			await endAsync(thru)
+
+			const substream = readSubstream(thru)
+			const chunks: Buffer[] = []
+			for await (const chunk of substream) {
+				chunks.push(chunk as Buffer)
+			}
+
+			expect(Buffer.concat(chunks)).toEqual(Buffer.from([1, 2, 3, 4, 5, 6]))
+
+			// Anything that followed the substream must remain available on the underlying stream.
+			expect(await getBufferFrom(thru, 2)).toEqual(Buffer.from([9, 9]))
+		})
+
+		it('can be consumed by pipe', async () => {
+			const thru = new PassThrough()
+			await writeLengthHeader(thru, 3)
+			await writeAsync(thru, Buffer.from([1, 2, 3]))
+			await writeLengthHeader(thru, 0)
+			await writeAsync(thru, Buffer.from([9, 9]))
+			await endAsync(thru)
+
+			const substream = readSubstream(thru)
+			const destination = new PassThrough()
+			substream.pipe(destination)
+			expect(await getBufferFrom(destination, 3)).toEqual(Buffer.from([1, 2, 3]))
+			expect(await getBufferFrom(thru, 2)).toEqual(Buffer.from([9, 9]))
+		})
+
+		it('round-trips a large payload written by writeSubstream', async () => {
+			const thru = new PassThrough()
+			const payload = Buffer.alloc(1024 * 128)
+			for (let i = 0; i < payload.length; i++) {
+				payload[i] = i % 256
+			}
+
+			const writer = writeSubstream(thru)
+			const writeTask = (async () => {
+				await writeAsync(writer, payload)
+				await endAsync(writer)
+				await endAsync(thru)
+			})()
+
+			const substream = readSubstream(thru)
+			const readPayload = await getBufferFrom(substream, payload.length)
+			expect(readPayload).toEqual(payload)
+			await writeTask
+			await expectEndOfStream(substream)
+		})
+
+		it('faults when the underlying stream ends mid-substream', async () => {
+			const thru = new PassThrough()
+			await writeLengthHeader(thru, 6)
+			await writeAsync(thru, Buffer.from([1, 2, 3]))
+			await endAsync(thru)
+
+			const substream = readSubstream(thru)
+			const errorRaised = new Deferred<Error>()
+			substream.on('error', err => errorRaised.resolve(err))
+			expect(await getBufferFrom(substream, 3)).toEqual(Buffer.from([1, 2, 3]))
+			await expect(getBufferFrom(substream, 3)).rejects.toThrow()
+			expect(await errorRaised.promise).toBeInstanceOf(Error)
+		})
+
+		it('faults when the underlying stream ends before a full header', async () => {
+			const thru = new PassThrough()
+			await writeAsync(thru, Buffer.from([0, 0]))
+			await endAsync(thru)
+
+			const substream = readSubstream(thru)
+			substream.on('error', () => {})
+			await expect(getBufferFrom(substream, 1)).rejects.toThrow()
+		})
+
+		it('stops consuming the underlying stream when destroyed', async () => {
+			const thru = new PassThrough()
+			const substream = readSubstream(thru)
+			substream.on('error', () => {})
+
+			// Start a read that cannot complete yet, then destroy the substream.
+			const readTask = getBufferFrom(substream, 1)
+			substream.destroy()
+			await expect(readTask).rejects.toThrow()
+
+			// Data written after the substream was destroyed must remain in the underlying stream.
+			await writeLengthHeader(thru, 3)
+			await writeAsync(thru, Buffer.from([1, 2, 3]))
+			expect(await getBufferFrom(thru, 7)).toEqual(Buffer.from([0, 0, 0, 3, 1, 2, 3]))
+			expect(thru.listenerCount('readable')).toEqual(0)
+		})
+
+		it('propagates errors from the underlying stream', async () => {
+			const thru = new PassThrough()
+			const error = new Error('Mock error')
+			const substream = readSubstream(thru)
+			substream.on('error', () => {})
+			const readTask = getBufferFrom(substream, 1)
+			thru.destroy(error)
+			await expect(readTask).rejects.toThrow(error)
+		})
+	})
+
 	async function readLengthHeader(stream: NodeJS.ReadableStream) {
 		const readBuffer = await getBufferFrom(stream, 4)
 		const dv = new DataView(readBuffer.buffer, readBuffer.byteOffset, readBuffer.length)
