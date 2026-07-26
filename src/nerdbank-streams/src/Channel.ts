@@ -81,6 +81,7 @@ export class ChannelClass extends Channel {
 
 	/** A signal which indicates when the <see cref="RemoteWindowRemaining"/> is non-zero. */
 	private remoteWindowHasCapacity: Deferred<void>
+	private remoteContentReadingCompleted: boolean = false
 
 	constructor(multiplexingStream: MultiplexingStreamClass, id: QualifiedChannelId, offerParameters: OfferParameters) {
 		super(id)
@@ -120,6 +121,9 @@ export class ChannelClass extends Channel {
 						// Don't send more than will fit in the remote's receiving window size.
 						if (self._multiplexingStream.backpressureSupportEnabled) {
 							await self.remoteWindowHasCapacity.promise
+							if (self.remoteContentReadingCompleted) {
+								break
+							}
 							if (!self.remoteWindowSize) {
 								throw new Error('Remote window size unknown.')
 							}
@@ -157,6 +161,12 @@ export class ChannelClass extends Channel {
 			read() {
 				// Nothing to do here since data is pushed to us.
 			},
+
+		})
+		this._duplex.on('close', () => {
+			if (!self.isDisposed) {
+				self._multiplexingStream.onChannelReadingCompleted(self)
+			}
 		})
 	}
 
@@ -252,6 +262,11 @@ export class ChannelClass extends Channel {
 		if (this.remoteWindowFilled < this.remoteWindowSize) {
 			this.remoteWindowHasCapacity.resolve()
 		}
+	}
+
+	public onContentReadingCompleted() {
+		this.remoteContentReadingCompleted = true
+		this.remoteWindowHasCapacity.resolve()
 	}
 
 	public dispose(error?: Error | null): void {

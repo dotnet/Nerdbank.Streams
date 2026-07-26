@@ -121,6 +121,7 @@ namespace Nerdbank.Streams
             /// signifying the point where we will stop relaying data from the channel to the <see cref="MultiplexingStream"/> for transmission to the remote party.
             /// </summary>
             private Task? mxStreamIOReaderCompleted;
+            private bool remoteContentReadingCompleted;
 
             /// <summary>
             /// The <see cref="PipeWriter"/> the underlying <see cref="Streams.MultiplexingStream"/> should use.
@@ -547,6 +548,15 @@ namespace Nerdbank.Streams
                             using PipeWriterRental writerRental = await this.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
                             await writerRental.Writer.CompleteAsync().ConfigureAwait(false);
                         }
+
+                        internal void OnContentReadingCompleted()
+                        {
+                            lock (this.SyncObject)
+                            {
+                                this.remoteContentReadingCompleted = true;
+                                this.remoteWindowHasCapacity.Set();
+                            }
+                        }
                         catch (ObjectDisposedException)
                         {
                             if (this.mxStreamIOWriter != null)
@@ -765,7 +775,7 @@ namespace Nerdbank.Streams
                             : new Pipe();
                         this.mxStreamIOReader = writerRelay.Reader;
                         this.mxStreamIOWriter = readerRelay.Writer;
-                        this.channelIO = new DuplexPipe(this.BackpressureSupportEnabled ? new WindowPipeReader(this, readerRelay.Reader) : readerRelay.Reader, writerRelay.Writer);
+                        this.channelIO = new DuplexPipe(new WindowPipeReader(this, readerRelay.Reader), writerRelay.Writer);
                     }
                 }
             }
@@ -805,7 +815,7 @@ namespace Nerdbank.Streams
                         }
 
                         await this.remoteWindowHasCapacity.WaitAsync().ConfigureAwait(false);
-                        if (this.IsRemotelyTerminated)
+                        if (this.IsRemotelyTerminated || this.remoteContentReadingCompleted)
                         {
                             if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
                             {
@@ -940,9 +950,33 @@ namespace Nerdbank.Streams
             private void LocalContentExamined(long bytesExamined)
             {
                 Requires.Range(bytesExamined >= 0, nameof(bytesExamined));
-                if (bytesExamined == 0 || this.IsDisposed)
+                if (!this.BackpressureSupportEnabled || bytesExamined == 0 || this.IsDisposed)
                 {
                     return;
+                }
+
+                private void LocalContentReadingCompleted()
+                {
+                    if (this.IsDisposed)
+                    {
+                        return;
+                    }
+
+                    if (this.MultiplexingStream.protocolMajorVersion >= 4)
+                    {
+                        this.MultiplexingStream.SendFrame(
+                            new FrameHeader
+                            {
+                                Code = ControlCode.ContentReadingCompleted,
+                                ChannelId = this.QualifiedId,
+                            },
+                            default,
+                            CancellationToken.None);
+                    }
+                    else
+                    {
+                        this.Dispose();
+                    }
                 }
 
                 if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
@@ -1123,7 +1157,11 @@ namespace Nerdbank.Streams
 
                 public override void CancelPendingRead() => this.inner.CancelPendingRead();
 
-                public override void Complete(Exception? exception = null) => this.inner.Complete(exception);
+                public override void Complete(Exception? exception = null)
+                {
+                    this.inner.Complete(exception);
+                    this.owner.LocalContentReadingCompleted();
+                }
 
                 public override async ValueTask<ReadResult> ReadAsync(CancellationToken cancellationToken = default)
                 {
@@ -1137,7 +1175,11 @@ namespace Nerdbank.Streams
                     return result;
                 }
 
-                public override ValueTask CompleteAsync(Exception? exception = null) => this.inner.CompleteAsync(exception);
+                public override async ValueTask CompleteAsync(Exception? exception = null)
+                {
+                    await this.inner.CompleteAsync(exception).ConfigureAwait(false);
+                    this.owner.LocalContentReadingCompleted();
+                }
 
                 [Obsolete]
                 public override void OnWriterCompleted(Action<Exception?, object?> callback, object? state) => this.inner.OnWriterCompleted(callback, state);

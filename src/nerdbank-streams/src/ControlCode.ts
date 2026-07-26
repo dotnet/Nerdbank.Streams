@@ -32,4 +32,9 @@ export enum ControlCode {
 	 * Sent when a channel has finished processing data received from the remote party, allowing them to send more data.
 	 */
 	contentProcessed,
+
+	/**
+	 * Sent when a channel reader has completed and can no longer receive content.
+	 */
+	contentReadingCompleted,
 }

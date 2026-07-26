@@ -44,6 +44,11 @@ namespace Nerdbank.Streams
             /// allowing them to send more data.
             /// </summary>
             ContentProcessed,
+
+            /// <summary>
+            /// Sent when a channel reader has completed and can no longer receive content.
+            /// </summary>
+            ContentReadingCompleted,
         }
     }
 }

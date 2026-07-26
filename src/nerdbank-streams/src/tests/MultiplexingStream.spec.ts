@@ -61,7 +61,7 @@ it('highWatermark threshold does not clog', async () => {
 		await receivedAllBytes.promise
 	}
 })
-;[1, 2, 3].forEach(protocolMajorVersion => {
+;[1, 2, 3, 4].forEach(protocolMajorVersion => {
 	describe(`MultiplexingStream v${protocolMajorVersion}`, () => {
 		let mx1: MultiplexingStream
 		let mx2: MultiplexingStream
@@ -295,6 +295,20 @@ it('highWatermark threshold does not clog', async () => {
 			expect(await getBufferFrom(channels[1].stream, 8)).toEqual(Buffer.from('finished'))
 			expect(await getBufferFrom(channels[1].stream, 1, true)).toBeNull()
 		})
+
+		if (protocolMajorVersion === 4) {
+			it('reader completion unblocks the remote writer', async () => {
+				const [writer] = await Promise.all([mx1.offerChannelAsync('test'), mx2.acceptChannelAsync('test')])
+				;(writer as any).onContentReadingCompleted()
+
+				await timeout(
+					new Promise<void>((resolve, reject) => {
+						writer.stream.write(Buffer.alloc(2 * 1024 * 1024), error => (error ? reject(error) : resolve()))
+					}),
+					1000,
+				)
+			})
+		}
 
 		it('channel terminated', async () => {
 			const channels = await Promise.all([mx1.offerChannelAsync('test'), mx2.acceptChannelAsync('test')])

@@ -287,6 +287,7 @@ namespace Nerdbank.Streams
             {
                 // We do NOT support 1-2 here because they require an asynchronous handshake.
                 3 => new V3Formatter(streamWriter, stream),
+                4 => new V4Formatter(streamWriter, stream),
                 _ => throw new NotSupportedException($"Protocol major version {options.ProtocolMajorVersion} is not supported."),
             };
 
@@ -331,6 +332,7 @@ namespace Nerdbank.Streams
                 1 => (Formatter)new V1Formatter(streamWriter, stream),
                 2 => new V2Formatter(streamWriter, stream),
                 3 => new V3Formatter(streamWriter, stream),
+                4 => new V4Formatter(streamWriter, stream),
                 _ => throw new NotSupportedException($"Protocol major version {options.ProtocolMajorVersion} is not supported."),
             };
 
@@ -855,6 +857,9 @@ namespace Nerdbank.Streams
                         case ControlCode.ContentWritingCompleted:
                             this.OnContentWritingCompleted(header.RequiredChannelId);
                             break;
+                        case ControlCode.ContentReadingCompleted:
+                            this.OnContentReadingCompleted(header.RequiredChannelId);
+                            break;
                         case ControlCode.ChannelTerminated:
                             await this.OnChannelTerminatedAsync(header.RequiredChannelId, frame.Value.Payload).ConfigureAwait(false);
                             break;
@@ -974,6 +979,14 @@ namespace Nerdbank.Streams
             }
 
             channel.OnContentWritingCompleted();
+        }
+
+        private void OnContentReadingCompleted(QualifiedChannelId channelId)
+        {
+            if (this.openChannels.TryGetValue(channelId, out Channel? channel))
+            {
+                channel.OnContentReadingCompleted();
+            }
         }
 
         private async ValueTask OnContentAsync(FrameHeader header, ReadOnlySequence<byte> payload, CancellationToken cancellationToken)

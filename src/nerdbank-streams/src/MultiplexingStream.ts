@@ -18,6 +18,7 @@ import {
 	MultiplexingStreamV1Formatter,
 	MultiplexingStreamV2Formatter,
 	MultiplexingStreamV3Formatter,
+	MultiplexingStreamV4Formatter,
 } from './MultiplexingStreamFormatters'
 import './MultiplexingStreamOptions'
 import { MultiplexingStreamOptions } from './MultiplexingStreamOptions'
@@ -88,6 +89,8 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 					? new MultiplexingStreamV2Formatter(stream)
 					: options.protocolMajorVersion === 3
 						? new MultiplexingStreamV3Formatter(stream)
+						: options.protocolMajorVersion === 4
+							? new MultiplexingStreamV4Formatter(stream)
 						: undefined
 		if (!formatter) {
 			throw new Error(`Protocol major version ${options.protocolMajorVersion} is not supported.`)
@@ -600,6 +603,15 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 		}
 	}
 
+	public onChannelReadingCompleted(channel: ChannelClass): Promise<void> {
+		if (this.protocolMajorVersion >= 4) {
+			return this.sendFrame(ControlCode.contentReadingCompleted, channel.qualifiedId)
+		} else {
+			channel.dispose()
+			return Promise.resolve()
+		}
+	}
+
 	public async onChannelDisposed(channel: ChannelClass, error: Error | null) {
 		if (!this._completionSource.isCompleted) {
 			try {
@@ -647,6 +659,9 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 					break
 				case ControlCode.contentWritingCompleted:
 					this.onContentWritingCompleted(frame.header.requiredChannel)
+					break
+				case ControlCode.contentReadingCompleted:
+					this.onContentReadingCompleted(frame.header.requiredChannel)
 					break
 				case ControlCode.channelTerminated:
 					this.onChannelTerminated(frame.header.requiredChannel, frame.payload)
@@ -740,6 +755,15 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 		}
 
 		channel.onContent(null) // signify that the remote is done writing.
+	}
+
+	private onContentReadingCompleted(channelId: QualifiedChannelId) {
+		const channel = this.getOpenChannel(channelId)
+		if (!channel) {
+			throw new Error(`No channel with id ${channelId} found.`)
+		}
+
+		channel.onContentReadingCompleted()
 	}
 
 	/**

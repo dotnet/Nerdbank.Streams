@@ -638,6 +638,14 @@ namespace Nerdbank.Streams
             {
             }
 
+            internal class V4Formatter : V3Formatter
+            {
+                internal V4Formatter(PipeWriter writer, Stream readingStream)
+                    : base(writer, readingStream)
+                {
+                }
+            }
+
             internal override object? WriteHandshake() => null;
 
             internal override Task<(bool? IsOdd, Version ProtocolVersion)> ReadHandshakeAsync(object? writeHandshakeResult, Options options, CancellationToken cancellationToken)
