@@ -601,7 +601,9 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 	}
 
 	public onChannelReadingCompleted(channel: ChannelClass): Promise<void> {
-		if (this.protocolMajorVersion >= 3) {
+		// Only inform the remote side if backpressure is in play (so the frame is meaningful)
+		// and this channel has not already been terminated.
+		if (this.backpressureSupportEnabled && !channel.isDisposed && this.getOpenChannel(channel.qualifiedId)) {
 			return this.sendFrame(ControlCode.contentReadingCompleted, channel.qualifiedId)
 		}
 
@@ -754,12 +756,9 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 	}
 
 	private onContentReadingCompleted(channelId: QualifiedChannelId) {
+		// The channel may have been terminated concurrently, in which case there's nothing to do.
 		const channel = this.getOpenChannel(channelId)
-		if (!channel) {
-			throw new Error(`No channel with id ${channelId} found.`)
-		}
-
-		channel.onContentReadingCompleted()
+		channel?.onContentReadingCompleted()
 	}
 
 	/**

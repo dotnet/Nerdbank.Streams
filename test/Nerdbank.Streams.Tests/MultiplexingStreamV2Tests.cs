@@ -62,6 +62,25 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
     }
 
     [Fact]
+    public async Task ReaderCompletionUnblocksRemoteWriter()
+    {
+        long backpressureThreshold = this.mx1.DefaultChannelReceivingWindowSize;
+        (MultiplexingStream.Channel a, MultiplexingStream.Channel b) = await this.EstablishChannelsAsync("a");
+
+        // Write more than the remote window can accept so the flush cannot complete.
+        a.Output.Write(new byte[backpressureThreshold * 2]);
+        Task<FlushResult> flushTask = a.Output.FlushAsync(this.TimeoutToken).AsTask();
+        await Task.Delay(ExpectedTimeout);
+        Assert.False(flushTask.IsCompleted);
+
+        // The remote party gives up on reading. This should release our blocked writer
+        // rather than leave it waiting forever for window capacity that will never come.
+        await b.Input.CompleteAsync();
+
+        await flushTask.WithCancellation(this.TimeoutToken);
+    }
+
+    [Fact]
     public async Task Backpressure_FullButNeedMoreBytesToProcess()
     {
         (MultiplexingStream.Channel a, MultiplexingStream.Channel b) = await this.EstablishChannelsAsync("a");

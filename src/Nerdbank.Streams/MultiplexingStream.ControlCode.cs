@@ -46,8 +46,13 @@ namespace Nerdbank.Streams
             ContentProcessed,
 
             /// <summary>
-            /// Sent when a channel reader has completed and can no longer receive content.
+            /// Sent when a channel reader has completed and can no longer receive content,
+            /// so the remote party can stop transmitting and release any writer blocked on flow control.
             /// </summary>
+            /// <remarks>
+            /// Only sent when the protocol version supports backpressure (v2 and later).
+            /// Recipients that do not recognize this code ignore it.
+            /// </remarks>
             ContentReadingCompleted,
         }
     }

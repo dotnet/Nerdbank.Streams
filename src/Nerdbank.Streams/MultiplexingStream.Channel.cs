@@ -121,7 +121,20 @@ namespace Nerdbank.Streams
             /// signifying the point where we will stop relaying data from the channel to the <see cref="MultiplexingStream"/> for transmission to the remote party.
             /// </summary>
             private Task? mxStreamIOReaderCompleted;
+
+            /// <summary>
+            /// Indicates whether the remote party has completed reading from this channel,
+            /// such that no more content should be transmitted to them.
+            /// </summary>
+            /// <remarks>
+            /// This should only be set within a <see cref="SyncObject"/> lock.
+            /// </remarks>
             private bool remoteContentReadingCompleted;
+
+            /// <summary>
+            /// Indicates whether we have already notified the remote party that our reader has completed.
+            /// </summary>
+            private bool localContentReadingCompletedSent;
 
             /// <summary>
             /// The <see cref="PipeWriter"/> the underlying <see cref="Streams.MultiplexingStream"/> should use.
@@ -548,15 +561,6 @@ namespace Nerdbank.Streams
                             using PipeWriterRental writerRental = await this.GetReceivedMessagePipeWriterAsync().ConfigureAwait(false);
                             await writerRental.Writer.CompleteAsync().ConfigureAwait(false);
                         }
-
-                        internal void OnContentReadingCompleted()
-                        {
-                            lock (this.SyncObject)
-                            {
-                                this.remoteContentReadingCompleted = true;
-                                this.remoteWindowHasCapacity.Set();
-                            }
-                        }
                         catch (ObjectDisposedException)
                         {
                             if (this.mxStreamIOWriter != null)
@@ -577,6 +581,24 @@ namespace Nerdbank.Streams
 
                     this.mxStreamIOWriterCompleted.Set();
                 });
+            }
+
+            /// <summary>
+            /// Called by the <see cref="MultiplexingStream"/> when the remote party will not be reading any more data from the channel,
+            /// so that we can stop transmitting and release any writer that is blocked waiting for window capacity.
+            /// </summary>
+            internal void OnContentReadingCompleted()
+            {
+                lock (this.SyncObject)
+                {
+                    this.remoteContentReadingCompleted = true;
+
+                    // Release any writer that is waiting for the remote window to open up, so it can observe the flag above and quit.
+                    this.remoteWindowHasCapacity.Set();
+                }
+
+                // The reader may be blocked on a read rather than on window capacity, so cancel that too.
+                this.mxStreamIOReader?.CancelPendingRead();
             }
 
             /// <summary>
@@ -947,30 +969,41 @@ namespace Nerdbank.Streams
                 }
             }
 
+            /// <summary>
+            /// Notifies the remote party that our reader has completed, so they can stop transmitting content
+            /// and release any writer of theirs that is blocked waiting for window capacity.
+            /// </summary>
             private void LocalContentReadingCompleted()
             {
-                if (this.IsDisposed)
+                if (this.IsDisposed || !this.BackpressureSupportEnabled)
                 {
                     return;
                 }
 
-                if (this.MultiplexingStream.protocolMajorVersion >= 3)
+                lock (this.SyncObject)
                 {
-                    this.MultiplexingStream.SendFrame(
-                        new FrameHeader
-                        {
-                            Code = ControlCode.ContentReadingCompleted,
-                            ChannelId = this.QualifiedId,
-                        },
-                        default,
-                        CancellationToken.None);
+                    if (this.localContentReadingCompletedSent)
+                    {
+                        return;
+                    }
+
+                    this.localContentReadingCompletedSent = true;
                 }
+
+                this.MultiplexingStream.SendFrame(
+                    new FrameHeader
+                    {
+                        Code = ControlCode.ContentReadingCompleted,
+                        ChannelId = this.QualifiedId,
+                    },
+                    default,
+                    CancellationToken.None);
             }
 
             private void LocalContentExamined(long bytesExamined)
             {
                 Requires.Range(bytesExamined >= 0, nameof(bytesExamined));
-                if (!this.BackpressureSupportEnabled || bytesExamined == 0 || this.IsDisposed)
+                if (bytesExamined == 0 || this.IsDisposed)
                 {
                     return;
                 }

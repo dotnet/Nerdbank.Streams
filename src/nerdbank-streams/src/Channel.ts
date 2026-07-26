@@ -164,7 +164,7 @@ export class ChannelClass extends Channel {
 		})
 		this._duplex.on('close', () => {
 			if (!self.isDisposed) {
-				self._multiplexingStream.onChannelReadingCompleted(self)
+				caught(self._multiplexingStream.onChannelReadingCompleted(self))
 			}
 		})
 	}
