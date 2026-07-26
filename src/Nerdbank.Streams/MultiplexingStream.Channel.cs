@@ -123,6 +123,20 @@ namespace Nerdbank.Streams
             private Task? mxStreamIOReaderCompleted;
 
             /// <summary>
+            /// Indicates whether the remote party has completed reading from this channel,
+            /// such that no more content should be transmitted to them.
+            /// </summary>
+            /// <remarks>
+            /// This should only be set within a <see cref="SyncObject"/> lock.
+            /// </remarks>
+            private bool remoteContentReadingCompleted;
+
+            /// <summary>
+            /// Indicates whether we have already notified the remote party that our reader has completed.
+            /// </summary>
+            private bool localContentReadingCompletedSent;
+
+            /// <summary>
             /// The <see cref="PipeWriter"/> the underlying <see cref="Streams.MultiplexingStream"/> should use.
             /// </summary>
             private PipeWriter? mxStreamIOWriter;
@@ -570,6 +584,24 @@ namespace Nerdbank.Streams
             }
 
             /// <summary>
+            /// Called by the <see cref="MultiplexingStream"/> when the remote party will not be reading any more data from the channel,
+            /// so that we can stop transmitting and release any writer that is blocked waiting for window capacity.
+            /// </summary>
+            internal void OnContentReadingCompleted()
+            {
+                lock (this.SyncObject)
+                {
+                    this.remoteContentReadingCompleted = true;
+
+                    // Release any writer that is waiting for the remote window to open up, so it can observe the flag above and quit.
+                    this.remoteWindowHasCapacity.Set();
+                }
+
+                // The reader may be blocked on a read rather than on window capacity, so cancel that too.
+                this.mxStreamIOReader?.CancelPendingRead();
+            }
+
+            /// <summary>
             /// Accepts an offer made by the remote party.
             /// </summary>
             /// <param name="channelOptions">The options to apply to the channel.</param>
@@ -805,7 +837,7 @@ namespace Nerdbank.Streams
                         }
 
                         await this.remoteWindowHasCapacity.WaitAsync().ConfigureAwait(false);
-                        if (this.IsRemotelyTerminated)
+                        if (this.IsRemotelyTerminated || this.remoteContentReadingCompleted)
                         {
                             if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
                             {
@@ -935,6 +967,37 @@ namespace Nerdbank.Streams
                         }
                     }
                 }
+            }
+
+            /// <summary>
+            /// Notifies the remote party that our reader has completed, so they can stop transmitting content
+            /// and release any writer of theirs that is blocked waiting for window capacity.
+            /// </summary>
+            private void LocalContentReadingCompleted()
+            {
+                if (this.IsDisposed || !this.BackpressureSupportEnabled)
+                {
+                    return;
+                }
+
+                lock (this.SyncObject)
+                {
+                    if (this.localContentReadingCompletedSent)
+                    {
+                        return;
+                    }
+
+                    this.localContentReadingCompletedSent = true;
+                }
+
+                this.MultiplexingStream.SendFrame(
+                    new FrameHeader
+                    {
+                        Code = ControlCode.ContentReadingCompleted,
+                        ChannelId = this.QualifiedId,
+                    },
+                    default,
+                    CancellationToken.None);
             }
 
             private void LocalContentExamined(long bytesExamined)
@@ -1123,7 +1186,11 @@ namespace Nerdbank.Streams
 
                 public override void CancelPendingRead() => this.inner.CancelPendingRead();
 
-                public override void Complete(Exception? exception = null) => this.inner.Complete(exception);
+                public override void Complete(Exception? exception = null)
+                {
+                    this.inner.Complete(exception);
+                    this.owner.LocalContentReadingCompleted();
+                }
 
                 public override async ValueTask<ReadResult> ReadAsync(CancellationToken cancellationToken = default)
                 {
@@ -1137,7 +1204,11 @@ namespace Nerdbank.Streams
                     return result;
                 }
 
-                public override ValueTask CompleteAsync(Exception? exception = null) => this.inner.CompleteAsync(exception);
+                public override async ValueTask CompleteAsync(Exception? exception = null)
+                {
+                    await this.inner.CompleteAsync(exception).ConfigureAwait(false);
+                    this.owner.LocalContentReadingCompleted();
+                }
 
                 [Obsolete]
                 public override void OnWriterCompleted(Action<Exception?, object?> callback, object? state) => this.inner.OnWriterCompleted(callback, state);

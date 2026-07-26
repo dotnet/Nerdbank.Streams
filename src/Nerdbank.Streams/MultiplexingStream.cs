@@ -855,6 +855,9 @@ namespace Nerdbank.Streams
                         case ControlCode.ContentWritingCompleted:
                             this.OnContentWritingCompleted(header.RequiredChannelId);
                             break;
+                        case ControlCode.ContentReadingCompleted:
+                            this.OnContentReadingCompleted(header.RequiredChannelId);
+                            break;
                         case ControlCode.ChannelTerminated:
                             await this.OnChannelTerminatedAsync(header.RequiredChannelId, frame.Value.Payload).ConfigureAwait(false);
                             break;
@@ -974,6 +977,14 @@ namespace Nerdbank.Streams
             }
 
             channel.OnContentWritingCompleted();
+        }
+
+        private void OnContentReadingCompleted(QualifiedChannelId channelId)
+        {
+            if (this.openChannels.TryGetValue(channelId, out Channel? channel))
+            {
+                channel.OnContentReadingCompleted();
+            }
         }
 
         private async ValueTask OnContentAsync(FrameHeader header, ReadOnlySequence<byte> payload, CancellationToken cancellationToken)

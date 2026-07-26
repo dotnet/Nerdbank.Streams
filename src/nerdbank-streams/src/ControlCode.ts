@@ -32,4 +32,11 @@ export enum ControlCode {
 	 * Sent when a channel has finished processing data received from the remote party, allowing them to send more data.
 	 */
 	contentProcessed,
+
+	/**
+	 * Sent when a channel reader has completed and can no longer receive content,
+	 * so the remote party can stop transmitting and release any writer blocked on flow control.
+	 * Only sent when the protocol version supports backpressure (v2 and later).
+	 */
+	contentReadingCompleted,
 }

@@ -296,6 +296,34 @@ it('highWatermark threshold does not clog', async () => {
 			expect(await getBufferFrom(channels[1].stream, 1, true)).toBeNull()
 		})
 
+		if (protocolMajorVersion >= 2) {
+			it('reader completion stops the remote writer', async () => {
+				const [writer, reader] = await Promise.all([mx1.offerChannelAsync('test'), mx2.acceptChannelAsync('test')])
+
+				// Observe when the writer's channel is told that the remote reader is done.
+				const readingCompleted = new Deferred<void>()
+				const writerChannel = writer as any
+				const originalHandler = writerChannel.onContentReadingCompleted.bind(writerChannel)
+				writerChannel.onContentReadingCompleted = () => {
+					originalHandler()
+					readingCompleted.resolve()
+				}
+
+				// The remote party gives up on reading, which must be signaled to us.
+				;(reader.stream as Duplex).destroy()
+				await timeout(readingCompleted.promise, 5000)
+
+				// Writing far more than the remote receiving window can hold must no longer block,
+				// since we know the remote party will never open the window up again.
+				await timeout(
+					new Promise<void>((resolve, reject) => {
+						writer.stream.write(Buffer.alloc(2 * 1024 * 1024), error => (error ? reject(error) : resolve()))
+					}),
+					5000
+				)
+			})
+		}
+
 		it('channel terminated', async () => {
 			const channels = await Promise.all([mx1.offerChannelAsync('test'), mx2.acceptChannelAsync('test')])
 			channels[0].dispose()

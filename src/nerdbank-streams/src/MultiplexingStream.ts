@@ -600,6 +600,16 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 		}
 	}
 
+	public onChannelReadingCompleted(channel: ChannelClass): Promise<void> {
+		// Only inform the remote side if backpressure is in play (so the frame is meaningful)
+		// and this channel has not already been terminated.
+		if (this.backpressureSupportEnabled && !channel.isDisposed && this.getOpenChannel(channel.qualifiedId)) {
+			return this.sendFrame(ControlCode.contentReadingCompleted, channel.qualifiedId)
+		}
+
+		return Promise.resolve()
+	}
+
 	public async onChannelDisposed(channel: ChannelClass, error: Error | null) {
 		if (!this._completionSource.isCompleted) {
 			try {
@@ -647,6 +657,9 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 					break
 				case ControlCode.contentWritingCompleted:
 					this.onContentWritingCompleted(frame.header.requiredChannel)
+					break
+				case ControlCode.contentReadingCompleted:
+					this.onContentReadingCompleted(frame.header.requiredChannel)
 					break
 				case ControlCode.channelTerminated:
 					this.onChannelTerminated(frame.header.requiredChannel, frame.payload)
@@ -740,6 +753,12 @@ export class MultiplexingStreamClass extends MultiplexingStream {
 		}
 
 		channel.onContent(null) // signify that the remote is done writing.
+	}
+
+	private onContentReadingCompleted(channelId: QualifiedChannelId) {
+		// The channel may have been terminated concurrently, in which case there's nothing to do.
+		const channel = this.getOpenChannel(channelId)
+		channel?.onContentReadingCompleted()
 	}
 
 	/**
