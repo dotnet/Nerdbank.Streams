@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System;
 using System.Buffers;
 using System.IO.Pipelines;
 using System.Linq;
@@ -228,5 +229,100 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
 
         await b.Input.CompleteAsync();
         await a.Input.CompleteAsync();
+    }
+
+    /// <summary>
+    /// Verifies that a sender which fills the receiving window always earns credit back once the
+    /// receiver drains it, across window sizes both far above and far below the maximum frame length.
+    /// </summary>
+    /// <param name="windowSize">The receiving window size to configure for the connection.</param>
+    /// <returns>A task that tracks the test.</returns>
+    /// <remarks>
+    /// The receiver acknowledges data only after a threshold of it has been examined. If that threshold
+    /// could ever exceed the window itself, a sender that filled the window would wait forever for credit
+    /// the receiver would never send. The window sizes below deliberately straddle the maximum frame
+    /// length, since the threshold is clamped at that length and therefore relates to the window
+    /// differently on either side of it.
+    /// </remarks>
+    [Theory]
+    [InlineData(1024)]
+    [InlineData(20 * 1024)]
+    [InlineData(100 * 1024)]
+    [InlineData(1024 * 1024)]
+    public async Task Backpressure_CreditIsReturnedForAnyWindowSize(int windowSize)
+    {
+        // The window must be set on the stream. A channel may only raise its window above the
+        // stream default, never lower it, so ChannelOptions alone cannot produce a small window.
+        await this.ReinitializeMxStreamsAsync(new MultiplexingStream.Options { DefaultChannelReceivingWindowSize = windowSize });
+        (MultiplexingStream.Channel a, MultiplexingStream.Channel b) = await this.EstablishChannelsAsync("a");
+
+        // Send several windows' worth so that the sender must block for credit repeatedly.
+        int bytesToSend = windowSize * 4;
+        Task writeTask = Task.Run(async delegate
+        {
+            await a.Output.WriteAsync(new byte[bytesToSend], this.TimeoutToken);
+            await a.Output.CompleteAsync();
+        });
+
+        long bytesRead = 0;
+        while (bytesRead < bytesToSend)
+        {
+            ReadResult readResult = await b.Input.ReadAsync(this.TimeoutToken);
+            if (readResult.Buffer.IsEmpty && readResult.IsCompleted)
+            {
+                break;
+            }
+
+            bytesRead += readResult.Buffer.Length;
+            b.Input.AdvanceTo(readResult.Buffer.End);
+        }
+
+        await writeTask.WithCancellation(this.TimeoutToken);
+        Assert.Equal(bytesToSend, bytesRead);
+    }
+
+    /// <summary>
+    /// Verifies that a receiver which examines data in increments far smaller than the window
+    /// still allows the transfer to complete.
+    /// </summary>
+    /// <returns>A task that tracks the test.</returns>
+    /// <remarks>
+    /// This is the shape most likely to stall if the receiver waits for too much data to accumulate
+    /// before acknowledging it: the sender fills the window and stops, while the reader consumes in
+    /// pieces far too small to individually cross the acknowledgement threshold.
+    /// </remarks>
+    [Fact]
+    public async Task Backpressure_SmallReadsStillMakeProgress()
+    {
+        const int windowSize = 1024 * 1024;
+        const int readIncrement = 4 * 1024;
+        await this.ReinitializeMxStreamsAsync(new MultiplexingStream.Options { DefaultChannelReceivingWindowSize = windowSize });
+        (MultiplexingStream.Channel a, MultiplexingStream.Channel b) = await this.EstablishChannelsAsync("a");
+
+        const int bytesToSend = windowSize * 3;
+        Task writeTask = Task.Run(async delegate
+        {
+            await a.Output.WriteAsync(new byte[bytesToSend], this.TimeoutToken);
+            await a.Output.CompleteAsync();
+        });
+
+        long bytesRead = 0;
+        while (bytesRead < bytesToSend)
+        {
+            ReadResult readResult = await b.Input.ReadAsync(this.TimeoutToken);
+            if (readResult.Buffer.IsEmpty && readResult.IsCompleted)
+            {
+                break;
+            }
+
+            // Consume only a small slice at a time, examining no more than we consume.
+            long bytesThisRound = Math.Min(readIncrement, readResult.Buffer.Length);
+            SequencePosition position = readResult.Buffer.GetPosition(bytesThisRound);
+            b.Input.AdvanceTo(position, position);
+            bytesRead += bytesThisRound;
+        }
+
+        await writeTask.WithCancellation(this.TimeoutToken);
+        Assert.Equal(bytesToSend, bytesRead);
     }
 }

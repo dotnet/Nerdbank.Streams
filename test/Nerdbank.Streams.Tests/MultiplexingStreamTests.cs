@@ -1317,7 +1317,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         return (channel1.AsStream(), channel2.AsStream());
     }
 
-    private async Task ReinitializeMxStreamsAsync(MultiplexingStream.Options optionsTemplate)
+    protected async Task ReinitializeMxStreamsAsync(MultiplexingStream.Options optionsTemplate)
     {
         await (this.mx1?.DisposeAsync() ?? default);
         await (this.mx2?.DisposeAsync() ?? default);

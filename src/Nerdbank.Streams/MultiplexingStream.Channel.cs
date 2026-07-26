@@ -1160,6 +1160,7 @@ namespace Nerdbank.Streams
             {
                 private readonly Channel owner;
                 private readonly PipeReader inner;
+                private readonly long ackThreshold;
                 private ReadResult lastReadResult;
                 private long bytesProcessed;
                 private SequencePosition lastExaminedPosition;
@@ -1168,6 +1169,15 @@ namespace Nerdbank.Streams
                 {
                     this.owner = owner;
                     this.inner = inner;
+
+                    // Acknowledge in fractions of the window rather than in fixed-size frames.
+                    // Every acknowledgement costs a frame on the wire and a wake-up on both sides, so tying the
+                    // rate to the window keeps that cost proportional to the window instead of growing with it.
+                    // The frame length floor preserves the original behavior for small windows, and dividing
+                    // (rather than subtracting) guarantees the threshold never exceeds the window itself, so a
+                    // sender that has filled the window always earns credit once the reader drains it.
+                    Assumes.True(owner.localWindowSize.HasValue);
+                    this.ackThreshold = Math.Max(FramePayloadMaxLength, owner.localWindowSize.Value / 8);
                 }
 
                 public override void AdvanceTo(SequencePosition consumed)
@@ -1229,11 +1239,11 @@ namespace Nerdbank.Streams
 
                     this.bytesProcessed += bytesJustProcessed;
 
-                    // Only send the 'more bytes please' message if we've consumed at least a max frame's worth of data
-                    // or if our reader indicates that more data is required before it will examine any more.
+                    // Only send the 'more bytes please' message if we've examined a large enough fraction of the window
+                    // to be worth a frame, or if our reader indicates that more data is required before it will examine any more.
                     // Or in some cases of very small receiving windows, when the entire window is empty.
                     long result = 0;
-                    if (this.bytesProcessed >= FramePayloadMaxLength || this.bytesProcessed == this.owner.localWindowSize)
+                    if (this.bytesProcessed >= this.ackThreshold || this.bytesProcessed == this.owner.localWindowSize)
                     {
                         result = this.bytesProcessed;
                         this.bytesProcessed = 0;
