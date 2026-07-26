@@ -25,10 +25,18 @@ namespace Nerdbank.Streams
             /// which also serves as the minimum window size for any channel.
             /// </summary>
             /// <remarks>
+            /// <para>
             /// Using an integer multiple of <see cref="FramePayloadMaxLength"/> ensures that the client can send full frames
             /// instead of ending with a partial frame when the remote window limit is reached.
+            /// </para>
+            /// <para>
+            /// This window is the number of bytes a channel's sender may transmit before it must stop and wait for the
+            /// receiver to acknowledge that it has processed some of them. Each such wait costs a round-trip through both
+            /// processes' thread pools, so a small window severely limits throughput on fast transports. This value is only
+            /// a <em>limit</em>; memory is allocated on demand, so channels that carry little data cost little memory.
+            /// </para>
             /// </remarks>
-            private static readonly long RecommendedDefaultChannelReceivingWindowSize = 5 * FramePayloadMaxLength;
+            private static readonly long RecommendedDefaultChannelReceivingWindowSize = 50 * FramePayloadMaxLength;
 
             /// <summary>
             /// Backing field for the <see cref="TraceSource"/> property.

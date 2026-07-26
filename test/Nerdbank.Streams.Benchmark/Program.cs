@@ -13,6 +13,7 @@ namespace Nerdbank.Streams.Benchmark
             var switcher = new BenchmarkSwitcher(new[]
             {
                 typeof(SequenceBenchmark),
+                typeof(MultiplexingStreamBenchmark),
             });
             switcher.Run(args);
         }
