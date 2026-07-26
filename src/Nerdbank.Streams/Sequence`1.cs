@@ -276,7 +276,10 @@ namespace Nerdbank.Streams
                 Sequence<T>.SequenceSegment? segment = this.segmentPool.Count > 0 ? this.segmentPool.Pop() : new SequenceSegment();
                 if (this.arrayPool != null)
                 {
-                    segment.Assign(this.arrayPool.Rent(minBufferSize.Value == -1 ? DefaultLengthFromArrayPool : minBufferSize.Value));
+                    // When the caller gave no size hint, we still honor MinimumSpanLength when it exceeds the pool's
+                    // own default, since callers that fill buffers from a stream benefit from larger buffers
+                    // just as much as those that ask for a specific size. Never shrink below the pool's default.
+                    segment.Assign(this.arrayPool.Rent(minBufferSize.Value == -1 ? Math.Max(DefaultLengthFromArrayPool, this.MinimumSpanLength) : minBufferSize.Value));
                 }
                 else
                 {

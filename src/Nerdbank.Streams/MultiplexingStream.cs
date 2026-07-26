@@ -33,6 +33,20 @@ namespace Nerdbank.Streams
         private const int FramePayloadMaxLength = 20 * 1024;
 
         /// <summary>
+        /// Options for the <see cref="Pipe"/> that buffers frames on their way to the underlying transport.
+        /// </summary>
+        /// <remarks>
+        /// The default <see cref="PipeOptions"/> allow only 64KB of buffering, which is barely three frames.
+        /// A multiplexing transport benefits from buffering many more frames so that several may be written
+        /// to the transport at once and so that frame producers rarely have to wait on the transport.
+        /// </remarks>
+        private static readonly PipeOptions TransportPipeOptions = new PipeOptions(
+            pauseWriterThreshold: 16 * FramePayloadMaxLength,
+            resumeWriterThreshold: 8 * FramePayloadMaxLength,
+            minimumSegmentSize: FramePayloadMaxLength,
+            useSynchronizationContext: false);
+
+        /// <summary>
         /// The encoding used for characters in control frames.
         /// </summary>
         private static readonly Encoding ControlFrameEncoding = Encoding.UTF8;
@@ -324,7 +338,7 @@ namespace Nerdbank.Streams
 
             // Do NOT specify our own cancellationToken parameter in UsePipeWriter, since this PipeWriter
             // must outlive this method and therefore should not be canceled later if that token is eventually canceled.
-            PipeWriter? streamWriter = stream.UsePipeWriter(cancellationToken: CancellationToken.None);
+            PipeWriter? streamWriter = stream.UsePipeWriter(TransportPipeOptions, cancellationToken: CancellationToken.None);
 
             Formatter? formatter = options.ProtocolMajorVersion switch
             {

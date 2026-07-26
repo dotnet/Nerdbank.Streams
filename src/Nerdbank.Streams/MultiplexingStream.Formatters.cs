@@ -20,6 +20,18 @@ namespace Nerdbank.Streams
     {
         internal abstract class Formatter : System.IAsyncDisposable
         {
+            /// <summary>
+            /// The maximum number of bytes required to encode a <see cref="ControlCode.ContentProcessed"/> payload:
+            /// a 1-element msgpack array header, plus a 9-byte (worst case) integer.
+            /// </summary>
+            protected const int MaxContentProcessedPayloadLength = 10;
+
+            /// <summary>
+            /// The maximum number of bytes required to encode everything in a frame that precedes its payload
+            /// (the msgpack array header, control code, channel ID, channel source, and binary payload header).
+            /// </summary>
+            protected const int MaxFramePrologueLength = 25;
+
             protected Formatter(PipeWriter writer)
             {
                 this.PipeWriter = writer;
@@ -133,6 +145,77 @@ namespace Nerdbank.Streams
                     Code = code,
                     ChannelId = qualifiedId,
                 };
+            }
+
+            /// <summary>
+            /// An <see cref="IBufferWriter{T}"/> over a single, fixed-size array.
+            /// </summary>
+            /// <remarks>
+            /// This is a lighter-weight alternative to <see cref="Sequence{T}"/> for very small payloads
+            /// whose maximum size is known in advance. <see cref="Sequence{T}"/>'s default constructor
+            /// creates a dedicated <see cref="ArrayPool{T}"/>, which is far too expensive for hot paths.
+            /// </remarks>
+            protected class FixedSizeBufferWriter : IBufferWriter<byte>
+            {
+                private readonly byte[] buffer;
+                private int written;
+
+                /// <summary>
+                /// Initializes a new instance of the <see cref="FixedSizeBufferWriter"/> class.
+                /// </summary>
+                /// <param name="capacity">The maximum number of bytes that may be written.</param>
+                internal FixedSizeBufferWriter(int capacity)
+                {
+                    this.buffer = new byte[capacity];
+                }
+
+                /// <summary>
+                /// Gets a sequence over the bytes written so far.
+                /// </summary>
+                internal ReadOnlySequence<byte> WrittenSequence => new ReadOnlySequence<byte>(this.buffer, 0, this.written);
+
+                /// <inheritdoc/>
+                /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="count"/> is negative or exceeds the space previously returned by <see cref="GetSpan(int)"/> or <see cref="GetMemory(int)"/>.</exception>
+                public void Advance(int count)
+                {
+                    Requires.Range(count >= 0 && count <= this.buffer.Length - this.written, nameof(count));
+                    this.written += count;
+                }
+
+                /// <inheritdoc/>
+                /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="sizeHint"/> is negative or exceeds the remaining capacity.</exception>
+                public Memory<byte> GetMemory(int sizeHint = 0)
+                {
+                    this.CheckSizeHint(sizeHint);
+                    return new Memory<byte>(this.buffer, this.written, this.buffer.Length - this.written);
+                }
+
+                /// <inheritdoc/>
+                /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="sizeHint"/> is negative or exceeds the remaining capacity.</exception>
+                public Span<byte> GetSpan(int sizeHint = 0)
+                {
+                    this.CheckSizeHint(sizeHint);
+                    return new Span<byte>(this.buffer, this.written, this.buffer.Length - this.written);
+                }
+
+                /// <summary>
+                /// Verifies that this writer can satisfy a request for a given amount of space.
+                /// </summary>
+                /// <param name="sizeHint">The amount of space requested by the caller.</param>
+                /// <remarks>
+                /// This writer cannot grow, so a request it cannot satisfy indicates that the capacity
+                /// this instance was created with is too small for what is being serialized.
+                /// Failing loudly here is far preferable to silently returning a short buffer,
+                /// which would violate the <see cref="IBufferWriter{T}"/> contract.
+                /// </remarks>
+                private void CheckSizeHint(int sizeHint)
+                {
+                    Requires.Range(sizeHint >= 0, nameof(sizeHint));
+                    if (sizeHint > this.buffer.Length - this.written)
+                    {
+                        throw new ArgumentOutOfRangeException(nameof(sizeHint), $"Requested {sizeHint} bytes but only {this.buffer.Length - this.written} remain of this writer's {this.buffer.Length} byte capacity.");
+                    }
+                }
             }
         }
 
@@ -369,6 +452,11 @@ namespace Nerdbank.Streams
             {
                 Verify.NotDisposed(!this.IsDisposed, this);
 
+                // Reserve enough contiguous space for the entire frame up-front.
+                // Without this, the payload lands in a buffer of its own, separate from the frame's msgpack header,
+                // which fragments the frame across multiple buffers and thus multiple writes to the transport.
+                this.PipeWriter.GetSpan(checked(MaxFramePrologueLength + (int)payload.Length));
+
                 var writer = new MessagePackWriter(this.PipeWriter);
 
                 int elementCount = !payload.IsEmpty ? 3 : header.ChannelId.HasValue ? 2 : 1;
@@ -463,12 +551,14 @@ namespace Nerdbank.Streams
 
             internal override ReadOnlySequence<byte> SerializeContentProcessed(long bytesProcessed)
             {
-                var sequence = new Sequence<byte>();
-                var writer = new MessagePackWriter(sequence);
+                // This method is on a very hot path (one call per frame of content received),
+                // so avoid Sequence<byte>, whose default constructor creates a dedicated ArrayPool<byte> each time.
+                var bufferWriter = new FixedSizeBufferWriter(MaxContentProcessedPayloadLength);
+                var writer = new MessagePackWriter(bufferWriter);
                 writer.WriteArrayHeader(1);
                 writer.Write(bytesProcessed);
                 writer.Flush();
-                return sequence;
+                return bufferWriter.WrittenSequence;
             }
 
             internal override long DeserializeContentProcessed(ReadOnlySequence<byte> payload)
@@ -648,6 +738,11 @@ namespace Nerdbank.Streams
             internal override void WriteFrame(FrameHeader header, ReadOnlySequence<byte> payload)
             {
                 Verify.NotDisposed(!this.IsDisposed, this);
+
+                // Reserve enough contiguous space for the entire frame up-front.
+                // Without this, the payload lands in a buffer of its own, separate from the frame's msgpack header,
+                // which fragments the frame across multiple buffers and thus multiple writes to the transport.
+                this.PipeWriter.GetSpan(checked(MaxFramePrologueLength + (int)payload.Length));
 
                 var writer = new MessagePackWriter(this.PipeWriter);
 
