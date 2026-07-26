@@ -7,6 +7,9 @@
 *.sh eol=lf
 *.ps1 eol=lf
 
+# The macOS codesign tool is extremely picky, and requires LF line endings.
+*.plist eol=lf
+
 ###############################################################################
 # Set default behavior for command prompt diff.
 #
@@ -65,3 +68,5 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+.github/workflows/*.lock.yml linguist-generated=true merge=ours

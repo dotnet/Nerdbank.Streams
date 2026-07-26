@@ -37,7 +37,7 @@ namespace Nerdbank.Streams
         /// <param name="pipe">The pipe to wrap as a stream.</param>
         /// <param name="ownsPipe"><see langword="true"/> to complete the underlying reader and writer when the <see cref="Stream"/> is disposed; <see langword="false"/> to keep them open.</param>
         /// <returns>The wrapping stream.</returns>
-        public static Stream AsStream(this IDuplexPipe pipe, bool ownsPipe) => FullDuplexStream.Splice(pipe.Input.AsStream(leaveOpen: !ownsPipe), pipe.Output.AsStream(leaveOpen: !ownsPipe));
+        public static Stream AsStream(this IDuplexPipe pipe, bool ownsPipe) => FullDuplexStream.Splice(Requires.NotNull(pipe).Input.AsStream(leaveOpen: !ownsPipe), pipe.Output.AsStream(leaveOpen: !ownsPipe));
 
         /// <summary>
         /// Exposes a pipe reader as a <see cref="Stream"/>.
@@ -48,7 +48,7 @@ namespace Nerdbank.Streams
         /// The reader will be completed when the <see cref="Stream"/> is disposed.
         /// </remarks>
         [Obsolete("Use " + nameof(PipeReader) + "." + nameof(PipeReader.AsStream) + " instead.")]
-        public static Stream AsStream(this PipeReader pipeReader) => pipeReader.AsStream(leaveOpen: false);
+        public static Stream AsStream(this PipeReader pipeReader) => Requires.NotNull(pipeReader).AsStream(leaveOpen: false);
 
         /// <summary>
         /// Exposes a pipe reader as a <see cref="Stream"/> after asynchronously reading all content
@@ -91,7 +91,7 @@ namespace Nerdbank.Streams
         /// The writer will be completed when the <see cref="Stream"/> is disposed.
         /// </remarks>
         [Obsolete("Use " + nameof(PipeWriter) + "." + nameof(PipeWriter.AsStream) + " instead.")]
-        public static Stream AsStream(this PipeWriter pipeWriter) => pipeWriter.AsStream(leaveOpen: false);
+        public static Stream AsStream(this PipeWriter pipeWriter) => Requires.NotNull(pipeWriter).AsStream(leaveOpen: false);
 
         /// <summary>
         /// Enables efficiently reading a stream using <see cref="PipeReader"/>.
@@ -143,42 +143,44 @@ namespace Nerdbank.Streams
             Requires.Argument(stream.CanWrite, nameof(stream), "Stream must be writable.");
 
             var pipe = new Pipe(pipeOptions ?? PipeOptions.Default);
-            Task.Run(async delegate
-            {
-                try
+            Task.Run(
+                async delegate
                 {
-                    while (true)
+                    try
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        ReadResult readResult = await pipe.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
-                        if (readResult.Buffer.Length > 0)
+                        while (true)
                         {
-                            foreach (ReadOnlyMemory<byte> segment in readResult.Buffer)
+                            cancellationToken.ThrowIfCancellationRequested();
+                            ReadResult readResult = await pipe.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                            if (readResult.Buffer.Length > 0)
                             {
-                                await stream.WriteAsync(segment, cancellationToken).ConfigureAwait(false);
+                                foreach (ReadOnlyMemory<byte> segment in readResult.Buffer)
+                                {
+                                    await stream.WriteAsync(segment, cancellationToken).ConfigureAwait(false);
+                                }
+
+                                await stream.FlushIfNecessaryAsync(cancellationToken).ConfigureAwait(false);
                             }
 
-                            await stream.FlushIfNecessaryAsync(cancellationToken).ConfigureAwait(false);
+                            pipe.Reader.AdvanceTo(readResult.Buffer.End);
+                            readResult.ScrubAfterAdvanceTo();
+
+                            if (readResult.IsCompleted)
+                            {
+                                break;
+                            }
                         }
 
-                        pipe.Reader.AdvanceTo(readResult.Buffer.End);
-                        readResult.ScrubAfterAdvanceTo();
-
-                        if (readResult.IsCompleted)
-                        {
-                            break;
-                        }
+                        await pipe.Reader.CompleteAsync().ConfigureAwait(false);
                     }
-
-                    await pipe.Reader.CompleteAsync().ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    // Propagate the exception to the writer.
-                    await pipe.Reader.CompleteAsync(ex).ConfigureAwait(false);
-                    return;
-                }
-            }).Forget();
+                    catch (Exception ex)
+                    {
+                        // Propagate the exception to the writer.
+                        await pipe.Reader.CompleteAsync(ex).ConfigureAwait(false);
+                        return;
+                    }
+                },
+                CancellationToken.None).Forget();
             return pipe.Writer;
         }
 
@@ -268,46 +270,51 @@ namespace Nerdbank.Streams
         /// <param name="pipeOptions">Optional pipe options to use.</param>
         /// <param name="cancellationToken">A cancellation token that aborts reading from the <paramref name="webSocket"/>.</param>
         /// <returns>A <see cref="PipeReader"/>.</returns>
+        /// <remarks>
+        /// Because a <see cref="PipeReader"/> has no concept of message boundaries, this API should only be used when they are of no consequence, and a steady stream of bytes is all that the reader requires.
+        /// </remarks>
         public static PipeReader UsePipeReader(this WebSocket webSocket, int sizeHint = 0, PipeOptions? pipeOptions = null, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(webSocket, nameof(webSocket));
 
             var pipe = new Pipe(pipeOptions ?? PipeOptions.Default);
-            Task.Run(async delegate
-            {
-                while (true)
+            Task.Run(
+                async delegate
                 {
-                    Memory<byte> memory = pipe.Writer.GetMemory(sizeHint);
-                    try
+                    while (true)
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
+                        Memory<byte> memory = pipe.Writer.GetMemory(sizeHint);
+                        try
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
 #pragma warning disable IDE0008 // Use explicit type - it varies across TFMs so we rely on duck-typing.
-                        var readResult = await webSocket.ReceiveAsync(memory, cancellationToken).ConfigureAwait(false);
+                            var readResult = await webSocket.ReceiveAsync(memory, cancellationToken).ConfigureAwait(false);
 #pragma warning restore IDE0008 // Use explicit type
-                        if (readResult.Count == 0)
+                            if (readResult.Count == 0)
+                            {
+                                break;
+                            }
+
+                            pipe.Writer.Advance(readResult.Count);
+                        }
+                        catch (Exception ex)
+                        {
+                            // Propagate the exception to the reader.
+                            await pipe.Writer.CompleteAsync(ex).ConfigureAwait(false);
+                            return;
+                        }
+
+                        FlushResult result = await pipe.Writer.FlushAsync().ConfigureAwait(false);
+                        if (result.IsCompleted)
                         {
                             break;
                         }
-
-                        pipe.Writer.Advance(readResult.Count);
-                    }
-                    catch (Exception ex)
-                    {
-                        // Propagate the exception to the reader.
-                        await pipe.Writer.CompleteAsync(ex).ConfigureAwait(false);
-                        return;
                     }
 
-                    FlushResult result = await pipe.Writer.FlushAsync().ConfigureAwait(false);
-                    if (result.IsCompleted)
-                    {
-                        break;
-                    }
-                }
-
-                // Tell the PipeReader that there's no more data coming
-                await pipe.Writer.CompleteAsync().ConfigureAwait(false);
-            }).Forget();
+                    // Tell the PipeReader that there's no more data coming
+                    await pipe.Writer.CompleteAsync().ConfigureAwait(false);
+                },
+                CancellationToken.None).Forget();
 
             return pipe.Reader;
         }
@@ -319,46 +326,44 @@ namespace Nerdbank.Streams
         /// <param name="pipeOptions">Optional pipe options to use.</param>
         /// <param name="cancellationToken">A cancellation token that aborts writing to the <paramref name="webSocket"/>.</param>
         /// <returns>A <see cref="PipeWriter"/>.</returns>
+        /// <remarks>
+        /// Because a <see cref="PipeWriter"/> has no concept of message boundaries, this API should only be used when the remote party
+        /// can process a stream of bytes, ignoring where the message boundaries may happen to land.
+        /// As implemented by this API, message boundaries may only appear at positions where <see cref="PipeWriter.FlushAsync(CancellationToken)"/>
+        /// or <see cref="PipeWriter.WriteAsync(ReadOnlyMemory{byte}, CancellationToken)"/> are called, but they are not guaranteed to be inserted
+        /// for each of these calls.
+        /// </remarks>
         public static PipeWriter UsePipeWriter(this WebSocket webSocket, PipeOptions? pipeOptions = null, CancellationToken cancellationToken = default)
         {
-            Requires.NotNull(webSocket, nameof(webSocket));
+            return UsePipeWriter(webSocket, pipeOptions, WebSocketMessageType.Binary, cancellationToken);
+        }
 
-            var pipe = new Pipe(pipeOptions ?? PipeOptions.Default);
-            Task.Run(async delegate
-            {
-                try
-                {
-                    while (true)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        ReadResult readResult = await pipe.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
-                        if (readResult.Buffer.Length > 0)
-                        {
-                            foreach (ReadOnlyMemory<byte> segment in readResult.Buffer)
-                            {
-                                await webSocket.SendAsync(segment, WebSocketMessageType.Binary, endOfMessage: true, cancellationToken).ConfigureAwait(false);
-                            }
-                        }
-
-                        pipe.Reader.AdvanceTo(readResult.Buffer.End);
-                        readResult.ScrubAfterAdvanceTo();
-
-                        if (readResult.IsCompleted)
-                        {
-                            break;
-                        }
-                    }
-
-                    await pipe.Reader.CompleteAsync().ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    // Propagate the exception to the writer.
-                    await pipe.Reader.CompleteAsync(ex).ConfigureAwait(false);
-                    return;
-                }
-            }).Forget();
-            return pipe.Writer;
+        /// <summary>
+        /// Enables efficiently writing UTF-8 encoded text to a <see cref="WebSocket"/> using a <see cref="PipeWriter"/>.
+        /// </summary>
+        /// <param name="webSocket">The web socket to write to using a pipe.</param>
+        /// <param name="pipeOptions">Optional pipe options to use.</param>
+        /// <param name="cancellationToken">A cancellation token that aborts writing to the <paramref name="webSocket"/>.</param>
+        /// <returns>A <see cref="PipeWriter"/>.</returns>
+        /// <remarks>
+        /// <para>
+        /// Although <see cref="PipeWriter" /> itself takes bytes, it is the caller's responsibility to only write bytes that represent UTF-8 encoded characters.
+        /// </para>
+        /// <para>
+        /// Because a <see cref="PipeWriter"/> has no concept of message boundaries, this API should only be used when the remote party
+        /// can process a stream of bytes, ignoring where the message boundaries may happen to land.
+        /// As implemented by this API, message boundaries may only appear at positions where <see cref="PipeWriter.FlushAsync(CancellationToken)"/>
+        /// or <see cref="PipeWriter.WriteAsync(ReadOnlyMemory{byte}, CancellationToken)"/> are called, but they are not guaranteed to be inserted
+        /// for each of these calls.
+        /// </para>
+        /// <para>
+        /// Users should be sure to write whole UTF-8 characters to the <see cref="PipeWriter"/>.
+        /// In particular, never call <see cref="PipeWriter.FlushAsync(CancellationToken)"/> after writing only a subset of the bytes for any UTF-8 character.
+        /// </para>
+        /// </remarks>
+        public static PipeWriter UseUtf8TextPipeWriter(this WebSocket webSocket, PipeOptions? pipeOptions = null, CancellationToken cancellationToken = default)
+        {
+            return UsePipeWriter(webSocket, pipeOptions, WebSocketMessageType.Text, cancellationToken);
         }
 
         /// <summary>
@@ -372,6 +377,20 @@ namespace Nerdbank.Streams
         public static IDuplexPipe UsePipe(this WebSocket webSocket, int sizeHint = 0, PipeOptions? pipeOptions = null, CancellationToken cancellationToken = default)
         {
             return new DuplexPipe(webSocket.UsePipeReader(sizeHint, pipeOptions, cancellationToken), webSocket.UsePipeWriter(pipeOptions, cancellationToken));
+        }
+
+        /// <summary>
+        /// <para>Enables reading and writing to a <see cref="WebSocket"/> using <see cref="PipeWriter"/> and <see cref="PipeReader"/>.</para>
+        /// <para>IMPORTANT: it is YOUR responsibility to make sure that the messages you write conform to UTF-8.</para>
+        /// </summary>
+        /// <param name="webSocket">The <see cref="WebSocket"/> to access using a pipe.</param>
+        /// <param name="sizeHint">A hint at the size of messages that may be transferred. Use 0 for a commonly reasonable default.</param>
+        /// <param name="pipeOptions">Optional pipe options to use.</param>
+        /// <param name="cancellationToken">A token that may cancel async processes to read from and write to the <paramref name="webSocket"/>.</param>
+        /// <returns>An <see cref="IDuplexPipe"/> instance.</returns>
+        public static IDuplexPipe UseUtf8TextPipe(this WebSocket webSocket, int sizeHint = 0, PipeOptions? pipeOptions = null, CancellationToken cancellationToken = default)
+        {
+            return new DuplexPipe(webSocket.UsePipeReader(sizeHint, pipeOptions, cancellationToken), webSocket.UseUtf8TextPipeWriter(pipeOptions, cancellationToken));
         }
 
         /// <summary>
@@ -435,58 +454,60 @@ namespace Nerdbank.Streams
                 return Task.FromCanceled(cancellationToken);
             }
 
-            return Task.Run(async delegate
-            {
-                try
+            return Task.Run(
+                async delegate
                 {
-                    if (DuplexPipe.IsDefinitelyCompleted(reader))
+                    try
                     {
-                        await writer.CompleteAsync().ConfigureAwait(false);
-                        return;
-                    }
-
-                    while (true)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        ReadResult result = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
-                        if (result.IsCanceled)
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            throw new OperationCanceledException(Strings.PipeReaderCanceled);
-                        }
-
-                        writer.Write(result.Buffer);
-                        reader.AdvanceTo(result.Buffer.End);
-                        result.ScrubAfterAdvanceTo();
-                        FlushResult flushResult = await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
-
-                        if (flushResult.IsCanceled)
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            throw new OperationCanceledException(Strings.PipeWriterFlushCanceled);
-                        }
-
-                        if (flushResult.IsCompleted)
-                        {
-                            // Break out of copy loop. The receiver doesn't care any more.
-                            break;
-                        }
-
-                        if (result.IsCompleted)
+                        if (DuplexPipe.IsDefinitelyCompleted(reader))
                         {
                             await writer.CompleteAsync().ConfigureAwait(false);
-                            break;
+                            return;
                         }
-                    }
 
-                    await reader.CompleteAsync().ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    await writer.CompleteAsync(ex).ConfigureAwait(false);
-                    await reader.CompleteAsync(ex).ConfigureAwait(false);
-                }
-            });
+                        while (true)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            ReadResult result = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                            if (result.IsCanceled)
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                throw new OperationCanceledException(Strings.PipeReaderCanceled);
+                            }
+
+                            writer.Write(result.Buffer);
+                            reader.AdvanceTo(result.Buffer.End);
+                            result.ScrubAfterAdvanceTo();
+                            FlushResult flushResult = await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+
+                            if (flushResult.IsCanceled)
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                throw new OperationCanceledException(Strings.PipeWriterFlushCanceled);
+                            }
+
+                            if (flushResult.IsCompleted)
+                            {
+                                // Break out of copy loop. The receiver doesn't care any more.
+                                break;
+                            }
+
+                            if (result.IsCompleted)
+                            {
+                                await writer.CompleteAsync().ConfigureAwait(false);
+                                break;
+                            }
+                        }
+
+                        await reader.CompleteAsync().ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        await writer.CompleteAsync(ex).ConfigureAwait(false);
+                        await reader.CompleteAsync(ex).ConfigureAwait(false);
+                    }
+                },
+                CancellationToken.None);
         }
 
         /// <summary>
@@ -570,47 +591,104 @@ namespace Nerdbank.Streams
             }
 #pragma warning restore CS0618 // Type or member is obsolete
 
-            Task.Run(async delegate
-            {
-                while (!combinedTokenSource.Token.IsCancellationRequested)
+            Task.Run(
+                async delegate
                 {
-                    Memory<byte> memory = pipe.Writer.GetMemory(sizeHint);
-                    try
+                    while (!combinedTokenSource.Token.IsCancellationRequested)
                     {
-                        int bytesRead = await stream.ReadAsync(memory, combinedTokenSource.Token).ConfigureAwait(false);
-                        if (bytesRead == 0)
+                        Memory<byte> memory = pipe.Writer.GetMemory(sizeHint);
+                        try
+                        {
+                            int bytesRead = await stream.ReadAsync(memory, combinedTokenSource.Token).ConfigureAwait(false);
+                            if (bytesRead == 0)
+                            {
+                                break;
+                            }
+
+                            pipe.Writer.Advance(bytesRead);
+                        }
+                        catch (OperationCanceledException)
                         {
                             break;
                         }
+                        catch (ObjectDisposedException)
+                        {
+                            break;
+                        }
+                        catch (Exception ex)
+                        {
+                            // Propagate the exception to the reader.
+                            await pipe.Writer.CompleteAsync(ex).ConfigureAwait(false);
+                            return;
+                        }
 
-                        pipe.Writer.Advance(bytesRead);
+                        FlushResult result = await pipe.Writer.FlushAsync().ConfigureAwait(false);
+                        if (result.IsCompleted)
+                        {
+                            break;
+                        }
                     }
-                    catch (OperationCanceledException)
+
+                    // Tell the PipeReader that there's no more data coming
+                    await pipe.Writer.CompleteAsync().ConfigureAwait(false);
+                },
+                CancellationToken.None).Forget();
+            return pipe.Reader;
+        }
+
+        /// <summary>
+        /// Enables efficiently writing to a <see cref="WebSocket"/> using a <see cref="PipeWriter"/>.
+        /// </summary>
+        /// <param name="webSocket">The web socket to write to using a pipe.</param>
+        /// <param name="pipeOptions">Optional pipe options to use.</param>
+        /// <param name="messageType">
+        /// Either <see cref="WebSocketMessageType.Binary"/> or <see cref="WebSocketMessageType.Text"/>.
+        /// Private method assumes it's one of those, and does not validate UTF-8 for text-based.
+        /// </param>
+        /// <param name="cancellationToken">A cancellation token that aborts writing to the <paramref name="webSocket"/>.</param>
+        /// <returns>A <see cref="PipeWriter"/>.</returns>
+        private static PipeWriter UsePipeWriter(WebSocket webSocket, PipeOptions? pipeOptions, WebSocketMessageType messageType, CancellationToken cancellationToken)
+        {
+            Requires.NotNull(webSocket, nameof(webSocket));
+
+            var pipe = new Pipe(pipeOptions ?? PipeOptions.Default);
+            Task.Run(
+                async delegate
+                {
+                    try
                     {
-                        break;
-                    }
-                    catch (ObjectDisposedException)
-                    {
-                        break;
+                        while (true)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            ReadResult readResult = await pipe.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                            if (readResult.Buffer.Length > 0)
+                            {
+                                foreach (ReadOnlyMemory<byte> segment in readResult.Buffer)
+                                {
+                                    await webSocket.SendAsync(segment, messageType, endOfMessage: true, cancellationToken).ConfigureAwait(false);
+                                }
+                            }
+
+                            pipe.Reader.AdvanceTo(readResult.Buffer.End);
+                            readResult.ScrubAfterAdvanceTo();
+
+                            if (readResult.IsCompleted)
+                            {
+                                break;
+                            }
+                        }
+
+                        await pipe.Reader.CompleteAsync().ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
-                        // Propagate the exception to the reader.
-                        await pipe.Writer.CompleteAsync(ex).ConfigureAwait(false);
+                        // Propagate the exception to the writer.
+                        await pipe.Reader.CompleteAsync(ex).ConfigureAwait(false);
                         return;
                     }
-
-                    FlushResult result = await pipe.Writer.FlushAsync().ConfigureAwait(false);
-                    if (result.IsCompleted)
-                    {
-                        break;
-                    }
-                }
-
-                // Tell the PipeReader that there's no more data coming
-                await pipe.Writer.CompleteAsync().ConfigureAwait(false);
-            }).Forget();
-            return pipe.Reader;
+                },
+                CancellationToken.None).Forget();
+            return pipe.Writer;
         }
 
         /// <summary>

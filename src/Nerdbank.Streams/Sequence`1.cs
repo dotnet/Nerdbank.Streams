@@ -122,9 +122,9 @@ namespace Nerdbank.Streams
         /// Expresses this sequence as a <see cref="ReadOnlySequence{T}"/>.
         /// </summary>
         /// <param name="sequence">The sequence to convert.</param>
-        public static implicit operator ReadOnlySequence<T>(Sequence<T> sequence)
+        public static implicit operator ReadOnlySequence<T>(Sequence<T>? sequence)
         {
-            return sequence.first is { } first && sequence.last is { } last
+            return sequence?.first is { } first && sequence.last is { } last
                 ? new ReadOnlySequence<T>(first, first.Start, last, last!.End)
                 : Empty;
         }

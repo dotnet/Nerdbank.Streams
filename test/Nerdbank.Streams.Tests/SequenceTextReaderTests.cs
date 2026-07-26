@@ -10,7 +10,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Nerdbank.Streams;
 using Xunit;
-using Xunit.Abstractions;
 
 public class SequenceTextReaderTests : TestBase
 {

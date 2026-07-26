@@ -59,3 +59,6 @@ dotnet_diagnostic.VSTHRD003.severity = silent
 
 # SA1611: Element parameters should be documented
 dotnet_diagnostic.SA1611.severity = silent
+
+# xUnit1051: Calls to methods which accept CancellationToken should use TestContext.Current.CancellationToken
+dotnet_diagnostic.xUnit1051.severity = suggestion

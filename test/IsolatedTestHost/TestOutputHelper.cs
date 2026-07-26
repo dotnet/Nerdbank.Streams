@@ -4,10 +4,22 @@
 namespace IsolatedTestHost
 {
     using System;
-    using Xunit.Abstractions;
+    using Xunit;
 
     internal class TestOutputHelper : ITestOutputHelper
     {
+        public string Output => throw new NotImplementedException();
+
+        public void Write(string message)
+        {
+            Console.Write(message);
+        }
+
+        public void Write(string format, params object[] args)
+        {
+            Console.Write(format, args);
+        }
+
         public void WriteLine(string message)
         {
             Console.WriteLine(message);

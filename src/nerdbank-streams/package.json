@@ -13,7 +13,7 @@
   "homepage": "https://github.com/AArnott/Nerdbank.Streams",
   "repository": {
     "type": "git",
-    "url": "https://github.com/AArnott/Nerdbank.Streams.git"
+    "url": "git+https://github.com/AArnott/Nerdbank.Streams.git"
   },
   "bugs": {
     "url": "https://github.com/AArnott/Nerdbank.Streams/issues"
@@ -25,35 +25,43 @@
   },
   "license": "MIT",
   "private": false,
+  "packageManager": "pnpm@11.15.1",
   "scripts": {
     "build": "tsc -p gulpfile.tsconfig.json && gulp",
-    "watch": "node ./node_modules/typescript/bin/tsc -p tsconfig.json -w",
-    "test": "jasmine",
-    "lint": "tslint --project ."
+    "lint": "eslint src --ext ts",
+    "test": "jest",
+    "watch": "tsc -p tsconfig.json -w"
   },
   "devDependencies": {
-    "@types/jasmine": "^4.0.3",
-    "@types/mkdirp": "^1.0.2",
-    "@types/msgpack-lite": "^0.1.8",
-    "@types/node": "^15.14.5",
-    "@types/promise": "^7.1.30",
-    "gulp": "^4.0.2",
-    "gulp-typescript": "^6.0.0-alpha.1",
-    "jasmine": "^4.0.2",
-    "jshint": "^2.13.0",
-    "mkdirp": "^1.0.4",
-    "nerdbank-gitversioning": "^3.4.231",
-    "path": "^0.12.7",
-    "promise": "^8.1.0",
-    "tslint": "^6.1.3",
-    "typescript": "^4.3.5",
-    "vscode-jsonrpc": "^8.0.1"
+    "@types/gulp": "4.0.18",
+    "@types/jest": "30.0.0",
+    "@types/msgpack-lite": "0.1.12",
+    "@types/node": "24.13.3",
+    "@typescript/native": "npm:typescript@7.0.2",
+    "@typescript-eslint/eslint-plugin": "8.65.0",
+    "@typescript-eslint/parser": "8.65.0",
+    "eslint": "10.7.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-import": "2.32.0",
+    "eslint-plugin-jsx-a11y": "6.10.2",
+    "eslint-plugin-prettier": "5.5.6",
+    "gulp": "5.0.1",
+    "gulp-typescript": "6.0.0-alpha.1",
+    "jest": "30.4.2",
+    "jshint": "2.13.6",
+    "mkdirp": "3.0.1",
+    "nerdbank-gitversioning": "3.10.91",
+    "path": "0.12.7",
+    "prettier": "3.9.6",
+    "ts-jest": "29.4.12",
+    "ts-node": "10.9.2",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
+    "vscode-jsonrpc": "9.0.1"
   },
   "dependencies": {
     "await-semaphore": "^0.1.3",
-    "cancellationtoken": "^2.0.1",
+    "cancellationtoken": "^2.2.0",
     "caught": "^0.1.3",
-    "msgpack-lite": "^0.1.26",
-    "plexer": "^2.0.0"
+    "msgpack-lite": "^0.1.26"
   }
 }

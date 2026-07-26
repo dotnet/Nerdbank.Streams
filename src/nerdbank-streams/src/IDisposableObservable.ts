@@ -1,4 +1,4 @@
 export interface IDisposableObservable {
-    readonly isDisposed: boolean;
-    dispose();
+	readonly isDisposed: boolean
+	dispose()
 }

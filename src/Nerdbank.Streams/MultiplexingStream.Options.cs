@@ -61,6 +61,11 @@ namespace Nerdbank.Streams
             private bool startSuspended;
 
             /// <summary>
+            /// Backing field for the <see cref="FaultOpenChannelsOnStreamDisposal"/> property.
+            /// </summary>
+            private bool faultOpenChannelsOnStreamDisposal;
+
+            /// <summary>
             /// Initializes a new instance of the <see cref="Options"/> class.
             /// </summary>
             public Options()
@@ -83,6 +88,7 @@ namespace Nerdbank.Streams
                 this.defaultChannelTraceSourceFactory = copyFrom.defaultChannelTraceSourceFactory;
                 this.defaultChannelTraceSourceFactoryWithQualifier = copyFrom.defaultChannelTraceSourceFactoryWithQualifier;
                 this.startSuspended = copyFrom.startSuspended;
+                this.faultOpenChannelsOnStreamDisposal = copyFrom.faultOpenChannelsOnStreamDisposal;
                 this.SeededChannels = copyFrom.SeededChannels.ToList();
             }
 
@@ -227,6 +233,20 @@ namespace Nerdbank.Streams
             public IList<ChannelOptions> SeededChannels { get; private set; }
 
             /// <summary>
+            /// Gets or sets a value indicating whether any open channels should be faulted (i.e. their <see cref="Channel.Completion"/> task will be faulted)
+            /// when the <see cref="MultiplexingStream"/> is disposed.
+            /// </summary>
+            public bool FaultOpenChannelsOnStreamDisposal
+            {
+                get => this.faultOpenChannelsOnStreamDisposal;
+                set
+                {
+                    this.ThrowIfFrozen();
+                    this.faultOpenChannelsOnStreamDisposal = value;
+                }
+            }
+
+            /// <summary>
             /// Gets a value indicating whether this instance is frozen.
             /// </summary>
             public bool IsFrozen { get; private set; }
@@ -237,7 +257,14 @@ namespace Nerdbank.Streams
             /// <returns>This instance if already frozen, otherwise a frozen copy.</returns>
             public Options GetFrozenCopy() => this.IsFrozen ? this : new Options(this, frozen: true);
 
-            private void ThrowIfFrozen() => Verify.Operation(!this.IsFrozen, Strings.Frozen);
+            private void ThrowIfFrozen()
+            {
+                // Avoid loading string unless needed
+                if (this.IsFrozen)
+                {
+                    Verify.FailOperation(Strings.Frozen);
+                }
+            }
         }
     }
 }

@@ -19,7 +19,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
-using Xunit.Abstractions;
 
 #pragma warning disable SA1414 // Tuple types in signatures should have element names
 

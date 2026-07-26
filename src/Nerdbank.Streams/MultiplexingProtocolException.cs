@@ -8,7 +8,7 @@ namespace Nerdbank.Streams
     /// <summary>
     /// An exception that is thrown when an error occurs on the remote side of a multiplexed connection.
     /// </summary>
-    [System.Serializable]
+    [Serializable]
     public class MultiplexingProtocolException : Exception
     {
         /// <summary>
@@ -44,7 +44,9 @@ namespace Nerdbank.Streams
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The serialization context.</param>
         protected MultiplexingProtocolException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context)
+#pragma warning disable SYSLIB0051 // Type or member is obsolete
             : base(info, context)
+#pragma warning restore SYSLIB0051 // Type or member is obsolete
         {
         }
     }

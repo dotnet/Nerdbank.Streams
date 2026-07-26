@@ -4,8 +4,10 @@
     "target": "ES2018",
     "sourceMap": true,
     "outDir": "out",
+    "rootDir": "src",
     "declaration": true,
     "module": "commonjs",
+    "types": ["node", "jest"],
 		"noImplicitAny": false,
 		"noImplicitReturns": true,
 		"noImplicitThis": true,
@@ -14,7 +16,8 @@
 		"strict": true,
 		"strictFunctionTypes": true,
 		"strictNullChecks": true,
-		"strictPropertyInitialization": true
+		"strictPropertyInitialization": true,
+		"skipLibCheck": true
   },
   "include": [
     "src/index.ts",

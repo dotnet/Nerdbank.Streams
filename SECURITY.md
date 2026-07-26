@@ -29,4 +29,4 @@ We prefer all communications to be in English.
 
 ## Policy
 
-This project follows the [GitHub CVD process](https://github.blog/2022-02-09-coordinated-vulnerability-disclosure-cvd-open-source-projects/) and will use [GHSA](https://docs.github.com/code-security/security-advisories/about-github-security-advisories) to manage discussion of the vulnerability and fixes, and create a public CVE advisory through github if applicable.
+This project follows the [GitHub CVD process](https://github.blog/security/vulnerability-research/coordinated-vulnerability-disclosure-cvd-open-source-projects/) and will use [GHSA](https://docs.github.com/code-security/security-advisories/working-with-repository-security-advisories/about-repository-security-advisories) to manage discussion of the vulnerability and fixes, and create a public CVE advisory through github if applicable.

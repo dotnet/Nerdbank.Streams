@@ -6,7 +6,6 @@ using System.Diagnostics;
 using System.IO.Pipelines;
 using Nerdbank.Streams;
 using Xunit;
-using Xunit.Abstractions;
 
 public class MultiplexingStreamChannelOptionsTests : TestBase
 {

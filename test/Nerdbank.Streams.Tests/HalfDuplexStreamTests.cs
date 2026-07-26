@@ -11,7 +11,6 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
-using Xunit.Abstractions;
 
 #pragma warning disable CS0618 // Type or member is obsolete
 
@@ -229,6 +228,21 @@ public class HalfDuplexStreamTests : TestBase
         await this.stream.WriteAsync(sendBuffer, 0, sendBuffer.Length).WithCancellation(this.TimeoutToken);
         await this.stream.FlushAsync(this.TimeoutToken);
         await readTask.WithCancellation(this.TimeoutToken);
+        Assert.Equal(sendBuffer, recvBuffer);
+    }
+
+    [Fact]
+    public async Task ReadAsync0LengthBufferThenWriteAsync()
+    {
+        byte[] sendBuffer = this.GetRandomBuffer(20);
+        byte[] recvBuffer = Array.Empty<byte>();
+        Task readTask = this.ReadAsync(this.stream, recvBuffer);
+        await this.stream.WriteAsync(sendBuffer, 0, sendBuffer.Length).WithCancellation(this.TimeoutToken);
+        await this.stream.FlushAsync(this.TimeoutToken);
+        await readTask.WithCancellation(this.TimeoutToken);
+
+        recvBuffer = new byte[sendBuffer.Length];
+        await this.ReadAsync(this.stream, recvBuffer);
         Assert.Equal(sendBuffer, recvBuffer);
     }
 

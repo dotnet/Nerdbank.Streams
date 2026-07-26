@@ -58,10 +58,17 @@ namespace Nerdbank.Streams
         public bool IsDisposed { get; private set; }
 
         /// <inheritdoc/>
-        public override void Flush() => throw this.ThrowDisposedOr(new NotSupportedException());
+        public override void Flush()
+        {
+            Verify.NotDisposed(this);
+        }
 
         /// <inheritdoc/>
-        public override Task FlushAsync(CancellationToken cancellationToken) => throw this.ThrowDisposedOr(new NotSupportedException());
+        public override Task FlushAsync(CancellationToken cancellationToken)
+        {
+            Verify.NotDisposed(this);
+            return Task.CompletedTask;
+        }
 
         /// <inheritdoc/>
         public override int Read(byte[] buffer, int offset, int count)
@@ -103,7 +110,7 @@ namespace Nerdbank.Streams
             {
                 while (bytesRead < 4)
                 {
-                    int bytesJustRead = await this.underlyingStream.ReadAsync(this.intBuffer, bytesRead, 4 - bytesRead).ConfigureAwait(false);
+                    int bytesJustRead = await this.underlyingStream.ReadAsync(this.intBuffer, bytesRead, 4 - bytesRead, cancellationToken).ConfigureAwait(false);
                     if (bytesJustRead == 0)
                     {
                         throw new EndOfStreamException();
@@ -122,7 +129,7 @@ namespace Nerdbank.Streams
                 return 0;
             }
 
-            bytesRead = await this.underlyingStream.ReadAsync(buffer, offset, Math.Min(count, this.count)).ConfigureAwait(false);
+            bytesRead = await this.underlyingStream.ReadAsync(buffer, offset, Math.Min(count, this.count), cancellationToken).ConfigureAwait(false);
             this.count -= bytesRead;
             return bytesRead;
         }

@@ -1,21 +1,13 @@
 // Copyright (c) Andrew Arnott. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
 using System.Buffers;
 using System.Diagnostics;
-using System.IO;
 using System.IO.Pipelines;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Runtime.ExceptionServices;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft;
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
-using Xunit.Abstractions;
 
 #pragma warning disable SA1401 // Fields should be private
 #pragma warning disable SA1414 // Tuple types in signatures should have element names
@@ -36,33 +28,12 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
     protected virtual int ProtocolMajorVersion { get; } = 1;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
-        var mx1TraceSource = new TraceSource(nameof(this.mx1), SourceLevels.All);
-        var mx2TraceSource = new TraceSource(nameof(this.mx2), SourceLevels.All);
-
-        mx1TraceSource.Listeners.Add(new XunitTraceListener(this.Logger, this.TestId, this.TestTimer));
-        mx2TraceSource.Listeners.Add(new XunitTraceListener(this.Logger, this.TestId, this.TestTimer));
-
-        Func<string, MultiplexingStream.QualifiedChannelId, string, TraceSource> traceSourceFactory = (string mxInstanceName, MultiplexingStream.QualifiedChannelId id, string name) =>
-        {
-            var traceSource = new TraceSource(mxInstanceName + " channel " + id, SourceLevels.All);
-            traceSource.Listeners.Clear(); // remove DefaultTraceListener
-            traceSource.Listeners.Add(new XunitTraceListener(this.Logger, this.TestId, this.TestTimer));
-            return traceSource;
-        };
-
-        Func<MultiplexingStream.QualifiedChannelId, string, TraceSource> mx1TraceSourceFactory = (MultiplexingStream.QualifiedChannelId id, string name) => traceSourceFactory(nameof(this.mx1), id, name);
-        Func<MultiplexingStream.QualifiedChannelId, string, TraceSource> mx2TraceSourceFactory = (MultiplexingStream.QualifiedChannelId id, string name) => traceSourceFactory(nameof(this.mx2), id, name);
-
-        (this.transport1, this.transport2) = FullDuplexStream.CreatePair(new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024));
-        Task<MultiplexingStream>? mx1 = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, TraceSource = mx1TraceSource, DefaultChannelTraceSourceFactoryWithQualifier = mx1TraceSourceFactory }, this.TimeoutToken);
-        Task<MultiplexingStream>? mx2 = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, TraceSource = mx2TraceSource, DefaultChannelTraceSourceFactoryWithQualifier = mx2TraceSourceFactory }, this.TimeoutToken);
-        this.mx1 = await mx1;
-        this.mx2 = await mx2;
+        await this.ReinitializeMxStreamsAsync(new MultiplexingStream.Options());
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         await (this.mx1?.DisposeAsync() ?? default);
         await (this.mx2?.DisposeAsync() ?? default);
@@ -71,6 +42,8 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
 
         this.mx1?.TraceSource.Listeners.OfType<XunitTraceListener>().SingleOrDefault()?.Dispose();
         this.mx2?.TraceSource.Listeners.OfType<XunitTraceListener>().SingleOrDefault()?.Dispose();
+
+        this.Dispose();
     }
 
     [Fact, Obsolete]
@@ -197,6 +170,74 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
+    public async Task OfferErrorCompletedPipe()
+    {
+        // Prepare a readonly pipe that is completed with an error
+        string localErrMsg = "Hello World";
+        string remoteErrMsg = $"Received error from remote side: {nameof(ApplicationException)}: {localErrMsg}";
+        var pipe = new Pipe();
+        await pipe.Writer.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
+        pipe.Writer.Complete(new ApplicationException(localErrMsg));
+
+        // Offer the error pipe to the remote side and get the remote side to try to accept the channel
+        MultiplexingStream.Channel localChannel = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(pipe.Reader) });
+        await this.WaitForEphemeralChannelOfferToPropagateAsync();
+        MultiplexingStream.Channel remoteChannel = this.mx2.AcceptChannel(localChannel.QualifiedId.Id);
+
+        // The local channel should always complete with the error
+        await VerifyChannelCompleted(localChannel, localErrMsg);
+
+        // The remote side should only receive the remote exception for protocol versions > 1
+        await VerifyChannelCompleted(remoteChannel, this.ProtocolMajorVersion > 1 ? remoteErrMsg : null);
+    }
+
+    [Fact]
+    public async Task OfferEmptyErrorCompletedPipe()
+    {
+        string localErrMsg = string.Empty;
+        string remoteErrMsg = $"Received error from remote side: {nameof(IndexOutOfRangeException)}: {localErrMsg}";
+
+        // Prepare a readonly pipe that is completed with an error
+        var pipe = new Pipe();
+        await pipe.Writer.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
+        pipe.Writer.Complete(new IndexOutOfRangeException(string.Empty));
+
+        // Offer the error pipe to the remote side and get the remote side to try to accept the channel
+        MultiplexingStream.Channel localChannel = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(pipe.Reader) });
+        await this.WaitForEphemeralChannelOfferToPropagateAsync();
+        MultiplexingStream.Channel remoteChannel = this.mx2.AcceptChannel(localChannel.QualifiedId.Id);
+
+        // The local channel should always complete with the error
+        await VerifyChannelCompleted(localChannel, localErrMsg);
+
+        // The remote side should only receive the remote exception for protocol versions > 1
+        await VerifyChannelCompleted(remoteChannel, this.ProtocolMajorVersion > 1 ? remoteErrMsg : null);
+    }
+
+    [Fact]
+    public async Task OfferNullErrorCompletedPipe()
+    {
+        string localErrMsg = "Exception of type 'System.NullReferenceException' was thrown.";
+        string remoteErrMsg = $"Received error from remote side: {nameof(NullReferenceException)}: {localErrMsg}";
+
+        // Prepare a readonly pipe that is completed with an error
+        var pipe = new Pipe();
+        await pipe.Writer.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
+        pipe.Writer.Complete(new NullReferenceException(null));
+
+        // Offer the error pipe to the remote side and get the remote side to try to accept the channel
+        MultiplexingStream.Channel localChannel = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(pipe.Reader) });
+        await this.WaitForEphemeralChannelOfferToPropagateAsync();
+        MultiplexingStream.Channel remoteChannel = this.mx2.AcceptChannel(localChannel.QualifiedId.Id);
+
+        // The local channel should always complete with the error
+        await VerifyChannelCompleted(localChannel, localErrMsg);
+
+        // The remote side should only receive the remote exception for protocol versions > 1
+        await VerifyChannelCompleted(remoteChannel, this.ProtocolMajorVersion > 1 ? remoteErrMsg : null);
+    }
+
+    [Fact]
     public async Task Dispose_CancelsOutstandingOperations()
     {
         Task offer = this.mx1.OfferChannelAsync("offer");
@@ -208,19 +249,41 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     }
 
     [Fact]
+    public async Task Dispose_CompleteWithErrorAfterwards()
+    {
+        // Create the local and remote channels using channel names
+        Task<MultiplexingStream.Channel>? localChannelTask = this.mx1.OfferChannelAsync("completeAfterwards", this.TimeoutToken);
+        Task<MultiplexingStream.Channel>? remoteChannelTask = this.mx2.AcceptChannelAsync("completeAfterwards", this.TimeoutToken);
+        MultiplexingStream.Channel remoteChannel = await remoteChannelTask;
+        MultiplexingStream.Channel localChannel = await localChannelTask;
+
+        // Dispose the local channel and then complete the writer that *we* own later with an error.
+        localChannel.Dispose();
+        await localChannel.Output.CompleteAsync(new InvalidOperationException("Complete after dispose"));
+
+        // Ensure that the local channel completed without error (because we disposed before faulting the PipeWriter).
+        await VerifyChannelCompleted(localChannel, null);
+
+        // Ensure that the remote channel similarly did not receive notice of any fault.
+        await VerifyChannelCompleted(remoteChannel, null);
+    }
+
+    [Fact]
     public async Task Disposal_DisposesTransportStream()
     {
         await this.mx1.DisposeAsync();
         Assert.Throws<ObjectDisposedException>(() => this.transport1.Position);
     }
 
-    [Fact]
-    public async Task Dispose_DisposesChannels()
+    [Theory, PairwiseData]
+    public async Task Dispose_DisposesChannels(bool channelFaulted)
     {
+        await this.ReinitializeMxStreamsAsync(new MultiplexingStream.Options() { FaultOpenChannelsOnStreamDisposal = channelFaulted });
         (MultiplexingStream.Channel channel1, MultiplexingStream.Channel channel2) = await this.EstablishChannelsAsync("A");
         await this.mx1.DisposeAsync();
         Assert.True(channel1.IsDisposed);
-        await channel1.Completion.WithCancellation(this.TimeoutToken);
+        await VerifyChannelCompleted(channel1, channelFaulted ? new ObjectDisposedException(nameof(MultiplexingStream)).Message : null);
+
 #pragma warning disable CS0618 // Type or member is obsolete
         await channel1.Input.WaitForWriterCompletionAsync().WithCancellation(this.TimeoutToken);
         await channel1.Output.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken);
@@ -390,6 +453,23 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => acceptTask).WithCancellation(this.TimeoutToken);
     }
 
+    /// <summary>
+    /// Documents behavior when an anonymous channel is created and an accept of an empty named channel is attempted.
+    /// </summary>
+    [Theory, PairwiseData]
+    public async Task CreateChannel_AcceptChannelAsync(bool waitForPropagation)
+    {
+        MultiplexingStream.Channel ch1 = this.mx1.CreateChannel();
+        if (waitForPropagation)
+        {
+            await this.WaitForEphemeralChannelOfferToPropagateAsync();
+        }
+
+        MultiplexingStream.Channel ch2 = await this.mx2.AcceptChannelAsync(string.Empty, this.TimeoutToken);
+        ch1.Dispose();
+        ch2.Dispose();
+    }
+
     [Fact]
     public void ChannelExposesMultiplexingStream()
     {
@@ -480,6 +560,10 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         byte[]? buffer = new byte[] { 5 };
         await a.WriteAsync(buffer, 0, buffer.Length, this.TimeoutToken).WithCancellation(this.TimeoutToken);
         await a.FlushAsync(this.TimeoutToken).WithCancellation(this.TimeoutToken);
+
+        // Avoid a random hang by yielding before engaging in sync I/O because we may be on an inline task completion stack
+        await Task.Yield();
+
         Assert.Equal(5, b.ReadByte());
     }
 
@@ -665,7 +749,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         await ReadAtLeastAsync(s2, new ArraySegment<byte>(recvBuffer), recvBuffer.Length, this.TimeoutToken);
     }
 
-    [SkippableTheory]
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public async Task CancelChannelOfferBeforeAcceptance(bool cancelFirst)
@@ -685,20 +769,20 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
                 await Task.Delay(250);
             }
 
-            MultiplexingStream.Channel? acceptedChannel = await this.mx2.AcceptChannelAsync(string.Empty, ExpectedTimeoutToken).ConfigureAwait(false);
+            MultiplexingStream.Channel? acceptedChannel = await this.mx2.AcceptChannelAsync(string.Empty, ExpectedTimeoutToken);
             acceptedStream = acceptedChannel.AsStream();
 
             // In this case, we accepted the channel before receiving the cancellation notice. The channel should be terminated by the remote side very soon.
             int bytesRead = await acceptedStream.ReadAsync(new byte[1], 0, 1, this.TimeoutToken).WithCancellation(this.TimeoutToken);
             Assert.Equal(0, bytesRead); // confirm that the stream was closed.
             this.Logger.WriteLine("Verified the channel terminated condition.");
-            Skip.If(cancelFirst);
+            Assert.SkipWhen(cancelFirst, "Skipped");
         }
         catch (OperationCanceledException) when (acceptedStream == null)
         {
             // In this case, the channel offer was canceled before we accepted it.
             this.Logger.WriteLine("Verified the channel offer was canceled before acceptance condition.");
-            Skip.IfNot(cancelFirst);
+            Assert.SkipUnless(cancelFirst, "Skipped");
         }
     }
 
@@ -1179,6 +1263,19 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         await this.ReadAtLeastAsync(mx2Baseline.Input, 3);
     }
 
+    protected static async Task VerifyChannelCompleted(MultiplexingStream.Channel channel, string? expectedErrMsg)
+    {
+        if (expectedErrMsg != null)
+        {
+            Exception completionException = await Assert.ThrowsAnyAsync<Exception>(() => channel.Completion);
+            Assert.Equal(expectedErrMsg, completionException.Message);
+        }
+        else
+        {
+            await channel.Completion;
+        }
+    }
+
     protected static Task CompleteChannelsAsync(params MultiplexingStream.Channel[] channels)
     {
         foreach (MultiplexingStream.Channel? channel in channels)
@@ -1218,6 +1315,40 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
     {
         (MultiplexingStream.Channel channel1, MultiplexingStream.Channel channel2) = await this.EstablishChannelsAsync(identifier, receivingWindowSize);
         return (channel1.AsStream(), channel2.AsStream());
+    }
+
+    private async Task ReinitializeMxStreamsAsync(MultiplexingStream.Options optionsTemplate)
+    {
+        await (this.mx1?.DisposeAsync() ?? default);
+        await (this.mx2?.DisposeAsync() ?? default);
+
+        var mx1TraceSource = new TraceSource(nameof(this.mx1), SourceLevels.All);
+        var mx2TraceSource = new TraceSource(nameof(this.mx2), SourceLevels.All);
+
+        mx1TraceSource.Listeners.Add(new XunitTraceListener(this.Logger, this.TestId, this.TestTimer));
+        mx2TraceSource.Listeners.Add(new XunitTraceListener(this.Logger, this.TestId, this.TestTimer));
+
+        Func<string, MultiplexingStream.QualifiedChannelId, string, TraceSource> traceSourceFactory = (string mxInstanceName, MultiplexingStream.QualifiedChannelId id, string name) =>
+        {
+            var traceSource = new TraceSource(mxInstanceName + " channel " + id, SourceLevels.All);
+            traceSource.Listeners.Clear(); // remove DefaultTraceListener
+            traceSource.Listeners.Add(new XunitTraceListener(this.Logger, this.TestId, this.TestTimer));
+            return traceSource;
+        };
+
+        Func<MultiplexingStream.QualifiedChannelId, string, TraceSource> mx1TraceSourceFactory = (MultiplexingStream.QualifiedChannelId id, string name) => traceSourceFactory(nameof(this.mx1), id, name);
+        Func<MultiplexingStream.QualifiedChannelId, string, TraceSource> mx2TraceSourceFactory = (MultiplexingStream.QualifiedChannelId id, string name) => traceSourceFactory(nameof(this.mx2), id, name);
+
+        optionsTemplate = new(optionsTemplate) { ProtocolMajorVersion = this.ProtocolMajorVersion };
+
+        var mx1Options = new MultiplexingStream.Options(optionsTemplate) { TraceSource = mx1TraceSource, DefaultChannelTraceSourceFactoryWithQualifier = mx1TraceSourceFactory };
+        var mx2Options = new MultiplexingStream.Options(optionsTemplate) { TraceSource = mx2TraceSource, DefaultChannelTraceSourceFactoryWithQualifier = mx2TraceSourceFactory };
+
+        (this.transport1, this.transport2) = FullDuplexStream.CreatePair(new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024));
+        Task<MultiplexingStream>? mx1 = MultiplexingStream.CreateAsync(this.transport1, mx1Options, this.TimeoutToken);
+        Task<MultiplexingStream>? mx2 = MultiplexingStream.CreateAsync(this.transport2, mx2Options, this.TimeoutToken);
+        this.mx1 = await mx1;
+        this.mx2 = await mx2;
     }
 
     protected class SlowPipeWriter : PipeWriter

@@ -9,6 +9,7 @@ namespace Nerdbank.Streams
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft;
+    using Microsoft.VisualStudio.Threading;
 
     /// <summary>
     /// Exposes a <see cref="WebSocket"/> as a <see cref="Stream"/>.
@@ -98,7 +99,21 @@ namespace Nerdbank.Streams
             return this.webSocket.SendAsync(new ArraySegment<byte>(buffer, offset, count), WebSocketMessageType.Binary, true, cancellationToken);
         }
 
-#pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
+        /// <inheritdoc />
+        public override IAsyncResult BeginRead(byte[] buffer, int offset, int count, AsyncCallback? callback, object? state)
+            => this.ReadAsync(buffer, offset, count, CancellationToken.None).ToApm(callback, state);
+
+        /// <inheritdoc />
+        public override IAsyncResult BeginWrite(byte[] buffer, int offset, int count, AsyncCallback? callback, object? state)
+            => this.WriteAsync(buffer, offset, count, CancellationToken.None).ToApm(callback, state);
+
+#pragma warning disable VSTHRD002 // Avoid problematic synchronous waits - This should not deadlock because the implementation always uses .ConfigureAwait(false).
+        /// <inheritdoc />
+        public override int EndRead(IAsyncResult asyncResult)
+            => ((Task<int>)asyncResult).GetAwaiter().GetResult();
+
+        public override void EndWrite(IAsyncResult asyncResult)
+            => ((Task)asyncResult).GetAwaiter().GetResult();
 
         /// <inheritdoc />
         public override int Read(byte[] buffer, int offset, int count) => this.ReadAsync(buffer, offset, count, CancellationToken.None).GetAwaiter().GetResult();

@@ -5,3 +5,4 @@ dotnet_analyzer_diagnostic.severity = none
 
 [*.cs]
 dotnet_diagnostic.DOC104.severity = silent
+dotnet_diagnostic.SYSLIB0051.severity = silent # Type or member is obsolete

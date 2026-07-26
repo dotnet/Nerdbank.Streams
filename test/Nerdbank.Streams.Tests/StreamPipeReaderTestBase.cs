@@ -1,20 +1,11 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
 using System.Buffers;
-using System.Collections.Generic;
-using System.IO;
 using System.IO.Pipelines;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.VisualStudio.Threading;
-using Moq;
 using Nerdbank.Streams;
 using Xunit;
-using Xunit.Abstractions;
 
 public abstract class StreamPipeReaderTestBase : TestBase
 {
@@ -31,10 +22,10 @@ public abstract class StreamPipeReaderTestBase : TestBase
         Assert.Throws<ArgumentNullException>(() => this.CreatePipeReader((Stream)null!));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Stream()
     {
-        Skip.If(this is IOPipelinesStreamPipeReaderTests, "OnWriterCompleted isn't supported.");
+        Assert.SkipWhen(this is IOPipelinesStreamPipeReaderTests, "OnWriterCompleted isn't supported.");
 
         byte[] expectedBuffer = this.GetRandomBuffer(2048);
         var stream = new MemoryStream(expectedBuffer);
@@ -103,10 +94,12 @@ public abstract class StreamPipeReaderTestBase : TestBase
         // and shouldn't give us any more buffer.
         ValueTask<ReadResult> resultTask = reader.ReadAsync(this.TimeoutToken);
         Assert.True(resultTask.IsCompleted);
+#pragma warning disable xUnit1031 // Do not use blocking task operations in test method
         Assert.Equal(result.Buffer.Length, resultTask.Result.Buffer.Length);
 
         // Now examine everything, but don't consume it. We should get more.
         reader.AdvanceTo(resultTask.Result.Buffer.Start, resultTask.Result.Buffer.End);
+#pragma warning restore xUnit1031 // Do not use blocking task operations in test method
         ValueTask<ReadResult> resultTask2 = reader.ReadAsync(this.TimeoutToken);
         Assert.False(resultTask2.IsCompleted);
         stream.Write(expectedBuffer, 50, 50);
@@ -247,10 +240,10 @@ public abstract class StreamPipeReaderTestBase : TestBase
         Assert.True(ex is InvalidCastException || ex is InvalidOperationException);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task OnWriterCompleted()
     {
-        Skip.If(this is IOPipelinesStreamPipeReaderTests, "OnWriterCompleted isn't supported.");
+        Assert.SkipWhen(this is IOPipelinesStreamPipeReaderTests, "OnWriterCompleted isn't supported.");
         byte[] expectedBuffer = this.GetRandomBuffer(50);
         var stream = new MemoryStream(expectedBuffer);
         PipeReader? reader = this.CreatePipeReader(stream, sizeHint: 50);

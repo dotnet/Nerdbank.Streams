@@ -1,6 +1,8 @@
 // Copyright (c) Andrew Arnott. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+#pragma warning disable VSTHRD003 // Avoid awaiting foreign Tasks -- We always use .ConfigureAwait(false).
+
 namespace Nerdbank.Streams
 {
     using System;
@@ -12,7 +14,6 @@ namespace Nerdbank.Streams
     using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
-    using MessagePack;
     using Microsoft;
     using Microsoft.VisualStudio.Threading;
 
@@ -105,6 +106,12 @@ namespace Nerdbank.Streams
         private readonly int protocolMajorVersion;
 
         /// <summary>
+        /// A value indicating whether any open channels should be faulted (i.e. their <see cref="Channel.Completion"/> task will be faulted)
+        /// when the <see cref="MultiplexingStream"/> is disposed.
+        /// </summary>
+        private readonly bool faultOpenChannelsOnStreamDisposal;
+
+        /// <summary>
         /// The last number assigned to a channel.
         /// Each use of this should increment by two, if <see cref="isOdd"/> has a value.
         /// </summary>
@@ -131,6 +138,7 @@ namespace Nerdbank.Streams
             }
 
             this.TraceSource = options.TraceSource;
+            this.faultOpenChannelsOnStreamDisposal = options.FaultOpenChannelsOnStreamDisposal;
 
             this.DefaultChannelTraceSourceFactory =
                 options.DefaultChannelTraceSourceFactoryWithQualifier
@@ -173,6 +181,10 @@ namespace Nerdbank.Streams
         {
             HandshakeSuccessful = 1,
             HandshakeFailed,
+
+            /// <summary>
+            /// A fatal error occurred at the overall multiplexing stream level, taking down the whole connection.
+            /// </summary>
             FatalError,
             UnexpectedChannelAccept,
             ChannelAutoClosing,
@@ -209,6 +221,16 @@ namespace Nerdbank.Streams
             /// Raised when the protocol handshake is starting, to annouce the major version being used.
             /// </summary>
             HandshakeStarted,
+
+            /// <summary>
+            /// A fatal exception occurred that took down one channel.
+            /// </summary>
+            ChannelFatalError,
+
+            /// <summary>
+            /// Raised when we receive a <see cref="ControlCode.Content"/> message for an unknown or closed channel.
+            /// </summary>
+            UnexpectedContent,
         }
 
         /// <summary>
@@ -543,22 +565,17 @@ namespace Nerdbank.Streams
             }
         }
 
-        /// <summary>
-        /// Accepts a channel that the remote end has attempted or may attempt to create.
-        /// </summary>
-        /// <param name="name">The name of the channel to accept.</param>
-        /// <param name="cancellationToken">A token to indicate lost interest in accepting the channel.</param>
-        /// <returns>The <see cref="Channel"/>, after its offer has been received from the remote party and accepted.</returns>
-        /// <remarks>
-        /// If multiple offers exist with the specified <paramref name="name"/>, the first one received will be accepted.
-        /// </remarks>
-        /// <exception cref="OperationCanceledException">Thrown if <paramref name="cancellationToken"/> is canceled before a request to create the channel has been received.</exception>
+        /// <inheritdoc cref="AcceptChannelAsync(string, ChannelOptions?, CancellationToken)"/>
         public Task<Channel> AcceptChannelAsync(string name, CancellationToken cancellationToken) => this.AcceptChannelAsync(name, options: null, cancellationToken);
 
         /// <summary>
         /// Accepts a channel that the remote end has attempted or may attempt to create.
         /// </summary>
-        /// <param name="name">The name of the channel to accept.</param>
+        /// <param name="name">
+        /// The name of the channel to accept.
+        /// An empty string will match an offer made via <see cref="OfferChannelAsync(string, ChannelOptions?, CancellationToken)"/> with an empty channel name.
+        /// It will also match an anonymous channel offer made with <see cref="CreateChannel(ChannelOptions?)"/>.
+        /// </param>
         /// <param name="options">A set of options that describe local treatment of this channel.</param>
         /// <param name="cancellationToken">A token to indicate lost interest in accepting the channel.</param>
         /// <returns>The <see cref="Channel"/>, after its offer has been received from the remote party and accepted.</returns>
@@ -658,7 +675,11 @@ namespace Nerdbank.Streams
                 return;
             }
 
+#if NET8_0_OR_GREATER
+            await this.disposalTokenSource.CancelAsync().ConfigureAwait(false);
+#else
             this.disposalTokenSource.Cancel();
+#endif
             try
             {
                 if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
@@ -680,7 +701,7 @@ namespace Nerdbank.Streams
                 {
                     foreach (KeyValuePair<QualifiedChannelId, Channel> entry in this.openChannels)
                     {
-                        entry.Value.Dispose();
+                        entry.Value.Dispose(this.faultOpenChannelsOnStreamDisposal ? new ObjectDisposedException(nameof(MultiplexingStream)) : null);
                     }
 
                     foreach (KeyValuePair<string, Queue<TaskCompletionSource<Channel>>> entry in this.acceptingChannels)
@@ -835,7 +856,7 @@ namespace Nerdbank.Streams
                             this.OnContentWritingCompleted(header.RequiredChannelId);
                             break;
                         case ControlCode.ChannelTerminated:
-                            await this.OnChannelTerminatedAsync(header.RequiredChannelId).ConfigureAwait(false);
+                            await this.OnChannelTerminatedAsync(header.RequiredChannelId, frame.Value.Payload).ConfigureAwait(false);
                             break;
                         default:
                             break;
@@ -892,7 +913,8 @@ namespace Nerdbank.Streams
         /// Occurs when the remote party has terminated a channel (including canceling an offer).
         /// </summary>
         /// <param name="channelId">The ID of the terminated channel.</param>
-        private async Task OnChannelTerminatedAsync(QualifiedChannelId channelId)
+        /// <param name="payload">The payload sent from the remote side alongside the channel terminated frame.</param>
+        private async Task OnChannelTerminatedAsync(QualifiedChannelId channelId, ReadOnlySequence<byte> payload)
         {
             Channel? channel;
             lock (this.syncObject)
@@ -913,9 +935,21 @@ namespace Nerdbank.Streams
 
             if (channel is Channel)
             {
-                await channel.OnChannelTerminatedAsync().ConfigureAwait(false);
-                channel.IsRemotelyTerminated = true;
-                channel.Dispose();
+                // Try to get the exception sent from the remote side if there was one sent.
+                Exception? remoteException = (this.formatter as V2Formatter)?.DeserializeException(payload);
+
+                if (remoteException != null && this.TraceSource.Switch.ShouldTrace(TraceEventType.Error))
+                {
+                    this.TraceSource.TraceEvent(
+                        TraceEventType.Error,
+                        (int)TraceEventId.ChannelFatalError,
+                        "Received {2} for channel {0} with exception: {1}",
+                        channelId,
+                        remoteException.Message,
+                        ControlCode.ChannelTerminated);
+                }
+
+                await channel.OnChannelTerminatedAsync(remoteException).ConfigureAwait(false);
             }
         }
 
@@ -929,6 +963,13 @@ namespace Nerdbank.Streams
 
             if (channelId.Source == ChannelSource.Local && !channel.IsAccepted)
             {
+                if (channel.IsRejectedOrCanceled)
+                {
+                    // The channel offer was rescinded locally, but the remote party may have already
+                    // accepted and started writing before receiving our cancellation. This is a harmless race.
+                    return;
+                }
+
                 throw new MultiplexingProtocolException($"Remote party indicated they're done writing to channel {channelId} before accepting it.");
             }
 
@@ -937,15 +978,32 @@ namespace Nerdbank.Streams
 
         private async ValueTask OnContentAsync(FrameHeader header, ReadOnlySequence<byte> payload, CancellationToken cancellationToken)
         {
-            Channel channel;
+            Channel? channel;
             QualifiedChannelId channelId = header.RequiredChannelId;
             lock (this.syncObject)
             {
-                channel = this.openChannels[channelId];
+                this.openChannels.TryGetValue(channelId, out channel);
+            }
+
+            if (channel is null)
+            {
+                if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Warning))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Warning, (int)TraceEventId.UnexpectedContent, "Ignoring " + nameof(ControlCode.Content) + " message for channel {0} that does not exist.", header.ChannelId);
+                }
+
+                return;
             }
 
             if (channelId.Source == ChannelSource.Local && !channel.IsAccepted)
             {
+                if (channel.IsRejectedOrCanceled)
+                {
+                    // The channel offer was rescinded locally, but the remote party may have already
+                    // accepted and started writing before receiving our cancellation. This is a harmless race.
+                    return;
+                }
+
                 throw new MultiplexingProtocolException($"Remote party sent content for channel {channelId} before accepting it.");
             }
 
@@ -1095,21 +1153,38 @@ namespace Nerdbank.Streams
         }
 
         /// <summary>
-        /// Raised when <see cref="Channel.Dispose"/> is called and any local transmission is completed.
+        /// Raised when <see cref="Channel.Dispose(Exception?)"/> is called and any local transmission is completed.
         /// </summary>
         /// <param name="channel">The channel that is closing down.</param>
-        private void OnChannelDisposed(Channel channel)
+        /// <param name="exception">The exception to send to the remote side alongside the disposal.</param>
+        private void OnChannelDisposed(Channel channel, Exception? exception = null)
         {
             Requires.NotNull(channel, nameof(channel));
 
             if (!this.Completion.IsCompleted && !this.DisposalToken.IsCancellationRequested)
             {
+                // Determine the header to send alongside the error payload
+                var header = new FrameHeader
+                {
+                    Code = ControlCode.ChannelTerminated,
+                    ChannelId = channel.QualifiedId,
+                };
+
+                // If there is an error and we support sending errors then
+                // serialize the exception and store it in the payload
+                ReadOnlySequence<byte> payload = (this.formatter as V2Formatter)?.SerializeException(exception) ?? default;
+
                 if (this.TraceSource.Switch.ShouldTrace(TraceEventType.Information))
                 {
                     this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.ChannelDisposed, "Local channel {0} \"{1}\" stream disposed.", channel.QualifiedId, channel.Name);
                 }
 
-                this.SendFrame(ControlCode.ChannelTerminated, channel.QualifiedId);
+                if (exception is not null && this.TraceSource.Switch.ShouldTrace(TraceEventType.Error))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Error, (int)TraceEventId.ChannelDisposed, "Local channel {0} \"{1}\" stream disposed with {2}: {3}", channel.QualifiedId, channel.Name, exception.GetType().Name, exception.Message);
+                }
+
+                this.SendFrame(header, payload, this.DisposalToken);
             }
         }
 

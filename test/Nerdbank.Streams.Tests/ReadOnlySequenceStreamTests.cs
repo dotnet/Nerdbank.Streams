@@ -11,7 +11,6 @@ using System.Threading.Tasks;
 using Microsoft;
 using Nerdbank.Streams;
 using Xunit;
-using Xunit.Abstractions;
 
 public class ReadOnlySequenceStreamTests : TestBase
 {
@@ -154,7 +153,9 @@ public class ReadOnlySequenceStreamTests : TestBase
     [Fact]
     public void Flush()
     {
-        Assert.Throws<NotSupportedException>(() => this.defaultStream.Flush());
+        // Flush should be allowed on read-only streams
+        this.defaultStream.Flush();
+
         this.defaultStream.Dispose();
         Assert.Throws<ObjectDisposedException>(() => this.defaultStream.Flush());
     }
@@ -162,7 +163,9 @@ public class ReadOnlySequenceStreamTests : TestBase
     [Fact]
     public async Task FlushAsync()
     {
-        await Assert.ThrowsAsync<NotSupportedException>(() => this.defaultStream.FlushAsync());
+        // FlushAsync should be allowed on read-only streams
+        await this.defaultStream.FlushAsync();
+
         this.defaultStream.Dispose();
         await Assert.ThrowsAsync<ObjectDisposedException>(() => this.defaultStream.FlushAsync());
     }

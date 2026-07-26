@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove($(MSBuildThisFile), $(MSBuildThisFileDirectory)..))" />
+
+  <ItemGroup>
+    <PackageVersion Update="System.IO.Pipelines" Version="10.0.8" />
+    <PackageVersion Update="System.Text.Json" Version="10.0.8" />
+  </ItemGroup>
+</Project>

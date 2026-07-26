@@ -1,4 +1,5 @@
-FROM mcr.microsoft.com/dotnet/sdk:6.0.300-focal
+# Refer to https://hub.docker.com/_/microsoft-dotnet-sdk for available versions
+FROM mcr.microsoft.com/dotnet/sdk:10.0.302@sha256:ed034a8bf0b24ded0cbbac07e17825d8e9ebfe21e308191d0f7421eaf5ad4664
 
 # Installing mono makes `dotnet test` work without errors even for net472.
 # But installing it takes a long time, so it's excluded by default.
@@ -11,3 +12,8 @@ FROM mcr.microsoft.com/dotnet/sdk:6.0.300-focal
 # See https://github.com/dotnet/dotnet-docker/issues/2790 for a discussion on this, where the prioritized use case
 # was *not* devcontainers, sadly.
 ENV NUGET_XMLDOC_MODE=
+
+# Install Node.js 24
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
+    && apt-get install -y nodejs
+RUN corepack enable pnpm

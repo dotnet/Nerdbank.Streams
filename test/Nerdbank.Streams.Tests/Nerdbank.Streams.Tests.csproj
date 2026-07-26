@@ -1,6 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net6.0;netcoreapp3.1;net472</TargetFrameworks>
+    <TargetFrameworks>net8.0</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::IsOsPlatform('Windows'))">$(TargetFrameworks);net472</TargetFrameworks>
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+    <OutputType>Exe</OutputType>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <RootNamespace />
 
@@ -10,28 +13,31 @@
     <CoverletOutputFormat>opencover</CoverletOutputFormat>
     <!--<CoverletOutput>$(OutDir)code_coverage.xml</CoverletOutput>-->
     <Exclude>[xunit.*]*,[IsolatedTestHost]*</Exclude>
+
+    <!-- Security vulnerabilities in the test project aren't that interesting, at least until we can remove/upgrade the ASP.NET Core tests. -->
+    <NoWarn>$(NoWarn);NU1902;NU1904</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\src\Nerdbank.Streams\Utilities.cs" Link="Utilities.cs" />
     <Compile Remove="SequenceReader\*.cs" Condition=" '$(TargetFramework)' != 'net472' " />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.VisualStudio.Threading" Version="$(VSThreadingVersion)" />
-    <PackageReference Include="PInvoke.Kernel32" Version="0.7.124" />
-    <PackageReference Include="StreamJsonRpc" Version="2.13.33" />
-    <PackageReference Include="xunit" Version="2.4.2" />
-    <PackageReference Include="xunit.combinatorial" Version="1.5.25" />
-    <PackageReference Include="xunit.skippablefact" Version="1.4.13" />
-    <PackageReference Include="xunit.runner.console" Version="2.4.2" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.3.2" />
-    <PackageReference Include="Moq" Version="4.18.2" />
-    <PackageReference Include="System.IO.Pipes" Version="4.3.0" />
-    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="2.2.0" />
-    <PackageReference Include="Microsoft.AspNetCore" Version="2.2.0" />
+    <PackageReference Include="Microsoft.AspNetCore" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="NSubstitute.Analyzers.CSharp">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="PInvoke.Kernel32" />
+    <PackageReference Include="StreamJsonRpc" />
+    <PackageReference Include="System.IO.Pipes" />
+    <PackageReference Include="xunit.combinatorial" />
+    <PackageReference Include="xunit.v3.mtp-v2" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\IsolatedTestHost\IsolatedTestHost.csproj" Condition=" '$(TargetFramework)' != 'netcoreapp1.0' ">
+    <ProjectReference Include="..\IsolatedTestHost\IsolatedTestHost.csproj">
       <Private>true</Private>
     </ProjectReference>
     <ProjectReference Include="..\..\src\Nerdbank.Streams\Nerdbank.Streams.csproj" />

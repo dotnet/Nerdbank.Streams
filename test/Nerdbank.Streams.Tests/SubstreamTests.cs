@@ -1,19 +1,10 @@
 ﻿// Copyright (c) Andrew Arnott. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
-using System.IO;
-using System.IO.Pipelines;
-using System.Linq;
-using System.Net.WebSockets;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft;
 using Microsoft.VisualStudio.Threading;
-using Moq;
 using Nerdbank.Streams;
+using NSubstitute;
 using Xunit;
-using Xunit.Abstractions;
 
 public class SubstreamTests : TestBase
 {
@@ -144,13 +135,13 @@ public class SubstreamTests : TestBase
         Assert.False(this.underlyingStream.ReadSubstream().CanTimeout);
         Assert.False(this.underlyingStream.WriteSubstream().CanTimeout);
 
-        var mockStream = new Mock<Stream>();
-        mockStream.SetupGet(s => s.CanRead).Returns(true);
-        mockStream.SetupGet(s => s.CanWrite).Returns(true);
-        mockStream.SetupGet(s => s.CanTimeout).Returns(true);
+        Stream mockStream = Substitute.For<Stream>();
+        mockStream.CanRead.Returns(true);
+        mockStream.CanWrite.Returns(true);
+        mockStream.CanTimeout.Returns(true);
 
-        Assert.True(mockStream.Object.ReadSubstream().CanTimeout);
-        Assert.True(mockStream.Object.WriteSubstream().CanTimeout);
+        Assert.True(mockStream.ReadSubstream().CanTimeout);
+        Assert.True(mockStream.WriteSubstream().CanTimeout);
     }
 
     [Theory]
@@ -168,7 +159,9 @@ public class SubstreamTests : TestBase
     public async Task ReadSubstream_Flush(bool async)
     {
         Stream? substream = this.underlyingStream.ReadSubstream();
-        await Assert.ThrowsAsync<NotSupportedException>(() => this.FlushSyncOrAsync(substream, async));
+
+        // Flush should succeed on read-only streams
+        await this.FlushSyncOrAsync(substream, async);
         substream.Dispose();
         await Assert.ThrowsAsync<ObjectDisposedException>(() => this.FlushSyncOrAsync(substream, async));
     }
@@ -295,7 +288,9 @@ public class SubstreamTests : TestBase
     {
         var monitoredStream = new MonitoringStream(this.underlyingStream);
         int lastOperation = 0;
+#pragma warning disable CS0618 // Testing an obsolete API
         monitoredStream.DidWrite += (s, e) => lastOperation = 1;
+#pragma warning restore CS0618 // Testing an obsolete API
         monitoredStream.DidWriteMemory += (s, e) => lastOperation = 1;
         monitoredStream.DidWriteSpan += (s, e) => lastOperation = 1;
         monitoredStream.DidWriteByte += (s, e) => lastOperation = 1;

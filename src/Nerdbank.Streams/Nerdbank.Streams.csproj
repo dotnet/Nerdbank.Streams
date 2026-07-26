@@ -1,21 +1,23 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;netstandard2.1</TargetFrameworks>
+    <TargetFrameworks>net8.0;netstandard2.0;netstandard2.1</TargetFrameworks>
+    <PackageValidationBaselineVersion>2.13.16</PackageValidationBaselineVersion>
     <DefineConstants>$(DefineConstants);MESSAGEPACK_INTERNAL;CSHARP8</DefineConstants>
 
     <Summary>Streams for full duplex in-proc communication, wrap a WebSocket, split a stream into multiple channels, etc.</Summary>
     <Description>$(Summary)</Description>
     <PackageTags>Stream full-duplex websocket multiplexing</PackageTags>
+    <!-- Enable warnings regarding AOT compatibility. Learn more about testing strategies at https://devblogs.microsoft.com/dotnet/creating-aot-compatible-libraries/ -->
+    <IsAotCompatible Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net8.0'))">true</IsAotCompatible>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="6.0.0" />
-    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.3.3" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.VisualStudio.Threading" Version="$(VSThreadingVersion)" PrivateAssets="build;analyzers;compile" />
-    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="$(VSThreadingVersion)" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.VisualStudio.Validation" Version="17.0.64" />
-    <PackageReference Include="System.IO.Pipelines" Version="6.0.3" />
-    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Condition="'$(TargetFramework)' == 'netstandard2.0'" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading.Only" PrivateAssets="build;analyzers;compile" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.VisualStudio.Validation" />
+    <PackageReference Include="System.IO.Pipelines" />
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Condition="'$(TargetFrameworkIdentifier)' != '.NETCoreApp'" />
   </ItemGroup>
   <ItemGroup>
     <Compile Update="Strings.Designer.cs">

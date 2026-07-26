@@ -61,10 +61,17 @@ namespace Nerdbank.Streams
         public bool IsDisposed { get; private set; }
 
         /// <inheritdoc/>
-        public override void Flush() => this.ThrowDisposedOr(new NotSupportedException());
+        public override void Flush()
+        {
+            Verify.NotDisposed(this);
+        }
 
         /// <inheritdoc/>
-        public override Task FlushAsync(CancellationToken cancellationToken) => throw this.ThrowDisposedOr(new NotSupportedException());
+        public override Task FlushAsync(CancellationToken cancellationToken)
+        {
+            Verify.NotDisposed(this);
+            return Task.CompletedTask;
+        }
 
         /// <inheritdoc/>
         public override int Read(byte[] buffer, int offset, int count)
@@ -86,6 +93,7 @@ namespace Nerdbank.Streams
                 return TaskOfZero;
             }
 
+#pragma warning disable VSTHRD103 // Call async methods when in an async method - This task is guaranteed to already be complete.
             if (this.lastReadTask?.Result == bytesRead)
             {
                 return this.lastReadTask;
@@ -94,6 +102,7 @@ namespace Nerdbank.Streams
             {
                 return this.lastReadTask = Task.FromResult(bytesRead);
             }
+#pragma warning restore VSTHRD103 // Call async methods when in an async method
         }
 
         /// <inheritdoc/>

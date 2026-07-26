@@ -1,8 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
 <Project>
-  <PropertyGroup>
-    <!-- Workaround https://github.com/dotnet/wpf/issues/1718 -->
-    <EmbedUntrackedSources Condition=" '$(UseWPF)' == 'true' ">false</EmbedUntrackedSources>
-  </PropertyGroup>
-
-  <Import Project="$(_WpfTempProjectNuGetFilePathNoExt).targets" Condition="'$(_WpfTempProjectNuGetFilePathNoExt)' != '' and Exists('$(_WpfTempProjectNuGetFilePathNoExt).targets')"/>
+  <ItemGroup>
+    <!-- Avoid compile error about missing namespace when combining ImplicitUsings with .NET Framework target frameworks. -->
+    <Using Remove="System.Net.Http" Condition="'$(TargetFrameworkIdentifier)'=='.NETFramework'" />
+  </ItemGroup>
 </Project>

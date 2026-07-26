@@ -10,7 +10,6 @@ using System.Runtime.InteropServices;
 using Microsoft;
 using Nerdbank.Streams;
 using Xunit;
-using Xunit.Abstractions;
 
 public class SequenceTests : TestBase
 {
