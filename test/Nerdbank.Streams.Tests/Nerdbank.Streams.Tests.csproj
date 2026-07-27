@@ -23,7 +23,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.VisualStudio.Threading" />
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="NSubstitute.Analyzers.CSharp">
@@ -33,9 +32,8 @@
     <PackageReference Include="PInvoke.Kernel32" />
     <PackageReference Include="StreamJsonRpc" />
     <PackageReference Include="System.IO.Pipes" />
-    <PackageReference Include="xunit.v3" />
     <PackageReference Include="xunit.combinatorial" />
-    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="xunit.v3.mtp-v2" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\IsolatedTestHost\IsolatedTestHost.csproj">
