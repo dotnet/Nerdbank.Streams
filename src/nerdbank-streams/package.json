@@ -10,13 +10,13 @@
   ],
   "main": "js/index.js",
   "typings": "js/index.d.ts",
-  "homepage": "https://github.com/AArnott/Nerdbank.Streams",
+  "homepage": "https://github.com/dotnet/Nerdbank.Streams",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/AArnott/Nerdbank.Streams.git"
+    "url": "https://github.com/dotnet/Nerdbank.Streams"
   },
   "bugs": {
-    "url": "https://github.com/AArnott/Nerdbank.Streams/issues"
+    "url": "https://github.com/dotnet/Nerdbank.Streams/issues"
   },
   "author": {
     "name": "Andrew Arnott",
