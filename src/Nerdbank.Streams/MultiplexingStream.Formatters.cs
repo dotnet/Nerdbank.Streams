@@ -562,7 +562,7 @@ namespace Nerdbank.Streams
                 }
 
                 // Get the exception message and return it as an exception.
-                string remoteErrorMsg = reader.ReadString();
+                string? remoteErrorMsg = reader.ReadString();
                 return new MultiplexingProtocolException($"Received error from remote side: {remoteErrorMsg}");
             }
 
@@ -610,14 +610,14 @@ namespace Nerdbank.Streams
                     throw new MultiplexingProtocolException("Insufficient elements in offer parameter payload.");
                 }
 
-                string name = reader.ReadString();
+                string? name = reader.ReadString();
                 long? remoteWindowSize = null;
                 if (elementsCount > 1)
                 {
                     remoteWindowSize = reader.ReadInt64();
                 }
 
-                return new Channel.OfferParameters(name, remoteWindowSize);
+                return new Channel.OfferParameters(name ?? string.Empty, remoteWindowSize);
             }
 
             internal override ReadOnlySequence<byte> Serialize(Channel.AcceptanceParameters acceptanceParameters)
