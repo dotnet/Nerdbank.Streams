@@ -276,7 +276,12 @@ public abstract class TestBase : IDisposable
 
         logger?.WriteLine("Test host launched with: \"{0}\" {1}", Path.GetFullPath(startInfo.FileName), startInfo.Arguments);
         Assert.True(isolatedTestProcess.Start());
-        this.processJobTracker.AddProcess(isolatedTestProcess);
+        if (this.processJobTracker.TryAddProcess(isolatedTestProcess) is Exception jobTrackingError)
+        {
+            // Job tracking is only a convenience for cleaning up the child process if this process dies unexpectedly.
+            // Its failure must not fail the test.
+            logger?.WriteLine("WARNING: Unable to add the isolated test host process to a job object: {0}", jobTrackingError);
+        }
 
         if (logger != null)
         {
