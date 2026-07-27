@@ -76,6 +76,17 @@ namespace Nerdbank.Streams.Benchmark
         protected virtual Task OnConnectedAsync() => Task.CompletedTask;
 
         /// <summary>
+        /// Wraps each end of the transport before the multiplexing streams are built on top of it.
+        /// </summary>
+        /// <param name="transport">One end of the loopback connection.</param>
+        /// <returns>The stream the multiplexing stream should use.</returns>
+        /// <remarks>
+        /// The default implementation returns <paramref name="transport"/> unchanged. Derived classes
+        /// override this to interpose behavior such as artificial latency.
+        /// </remarks>
+        protected virtual Stream WrapTransport(Stream transport) => transport;
+
+        /// <summary>
         /// Opens a channel with a unique name on both ends of the connection.
         /// </summary>
         /// <param name="name">A name that has not been used on this connection before.</param>
@@ -108,8 +119,8 @@ namespace Nerdbank.Streams.Benchmark
             this.client.NoDelay = true;
             this.server.NoDelay = true;
 
-            Stream clientStream = this.client.GetStream();
-            Stream serverStream = this.server.GetStream();
+            Stream clientStream = this.WrapTransport(this.client.GetStream());
+            Stream serverStream = this.WrapTransport(this.server.GetStream());
 
             Task<MultiplexingStream> mx1Task = MultiplexingStream.CreateAsync(clientStream, this.CreateOptions());
             Task<MultiplexingStream> mx2Task = MultiplexingStream.CreateAsync(serverStream, this.CreateOptions());
