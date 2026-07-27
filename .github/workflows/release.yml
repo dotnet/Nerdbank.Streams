@@ -135,8 +135,12 @@ jobs:
         npm init -y
         npm install $tgz
         Push-Location node_modules/nerdbank-streams
-        npm set //registry.npmjs.org/:_authToken=${{ secrets.NPM_API_KEY }}
-        npm publish
+        $packageVersion = (Get-Content package.json | ConvertFrom-Json).version
+        if ($packageVersion -match '-(?<tag>[0-9A-Za-z-]+)(?:\.[0-9A-Za-z-]+)*(?:\+[0-9A-Za-z.-]+)?$') {
+          npm publish --tag $Matches.tag
+        } else {
+          npm publish
+        }
       working-directory: ${{ runner.temp }}
 
     - name: 🚀 Push NuGet packages
