@@ -8,6 +8,14 @@ on:
       ship_run_id:
         description: ID of the GitHub workflow run to ship
         required: true
+      skip_npm:
+        description: Skip publishing NPM packages
+        type: boolean
+        default: false
+      skip_nuget:
+        description: Skip publishing NuGet packages
+        type: boolean
+        default: false
 
 run-name: ${{ github.ref_name }}
 
@@ -120,6 +128,7 @@ jobs:
         package-manager-cache: false  # never use caching in release builds
 
     - name: 🚀 Push NPM packages
+      if: ${{ !inputs.skip_npm }}
       shell: pwsh
       run: |
         $tgz = (Get-ChildItem ./deployables/npm/*.tgz)[0].FullName
@@ -131,6 +140,7 @@ jobs:
       working-directory: ${{ runner.temp }}
 
     - name: 🚀 Push NuGet packages
+      if: ${{ !inputs.skip_nuget }}
       run: dotnet nuget push ${{ runner.temp }}\deployables\NuGet\*.nupkg --source https://api.nuget.org/v3/index.json -k '${{ steps.nuget-login.outputs.NUGET_API_KEY }}'
 
     - name: 💽 Upload artifacts to release
