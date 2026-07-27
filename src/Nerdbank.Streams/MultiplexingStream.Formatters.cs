@@ -96,6 +96,23 @@ namespace Nerdbank.Streams
 
             internal abstract ReadOnlySequence<byte> SerializeContentProcessed(long bytesProcessed);
 
+            /// <summary>
+            /// Serializes the payload of a <see cref="ControlCode.ChannelWindowAdjust"/> frame.
+            /// </summary>
+            /// <param name="windowSize">The new (absolute) size of the receiving window.</param>
+            /// <returns>The serialized payload.</returns>
+            /// <remarks>
+            /// The payload is a single integer, so it shares an encoding with <see cref="SerializeContentProcessed(long)"/>.
+            /// </remarks>
+            internal virtual ReadOnlySequence<byte> SerializeWindowSize(long windowSize) => this.SerializeContentProcessed(windowSize);
+
+            /// <summary>
+            /// Deserializes the payload of a <see cref="ControlCode.ChannelWindowAdjust"/> frame.
+            /// </summary>
+            /// <param name="payload">The payload to deserialize.</param>
+            /// <returns>The new (absolute) size of the receiving window.</returns>
+            internal virtual long DeserializeWindowSize(ReadOnlySequence<byte> payload) => this.DeserializeContentProcessed(payload);
+
             protected static bool IsOdd(ReadOnlySpan<byte> localRandomBuffer, ReadOnlySpan<byte> remoteRandomBuffer)
             {
                 bool? isOdd = null;
