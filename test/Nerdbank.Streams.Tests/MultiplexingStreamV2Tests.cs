@@ -420,6 +420,12 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
             a.Output.Write(smallChunk);
             await a.Output.FlushAsync(this.TimeoutToken);
             await this.DrainAsync(b.Input, smallChunk.Length);
+
+            // Allow the acknowledgment to reach the sender before another half-window accumulates.
+            if ((i + 1) % 8 == 0)
+            {
+                await Task.Delay(ExpectedTimeout);
+            }
         }
 
         // The window should not have grown, so twice the original window must not fit.
