@@ -8,6 +8,14 @@ on:
       ship_run_id:
         description: ID of the GitHub workflow run to ship
         required: true
+      skip_npm:
+        description: Skip publishing NPM packages
+        type: boolean
+        default: false
+      skip_nuget:
+        description: Skip publishing NuGet packages
+        type: boolean
+        default: false
 
 run-name: ${{ github.ref_name }}
 
@@ -23,14 +31,6 @@ jobs:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       with:
         fetch-depth: 1
-
-    - name: ⚙️ Initialization
-      shell: pwsh
-      run: |
-        if ('${{ secrets.NPM_API_KEY }}') {
-          Write-Host "NPM_API_KEY secret detected. NPM packages will be pushed."
-          echo "NPM_API_KEY_DEFINED=true" >> $env:GITHUB_ENV
-        }
 
     - name: 🔎 Search for build of ${{ github.ref }}
       shell: pwsh
@@ -120,7 +120,15 @@ jobs:
       with:
         user: ${{ secrets.NUGET_USER }}
 
+    - name: 🟢 Setup Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version: 24
+        registry-url: https://registry.npmjs.org
+        package-manager-cache: false  # never use caching in release builds
+
     - name: 🚀 Push NPM packages
+      if: ${{ !inputs.skip_npm }}
       shell: pwsh
       run: |
         $tgz = (Get-ChildItem ./deployables/npm/*.tgz)[0].FullName
@@ -130,10 +138,10 @@ jobs:
         npm set //registry.npmjs.org/:_authToken=${{ secrets.NPM_API_KEY }}
         npm publish
       working-directory: ${{ runner.temp }}
-      if: ${{ env.NPM_API_KEY_DEFINED == 'true' }}
 
     - name: 🚀 Push NuGet packages
-      run: dotnet nuget push ${{ runner.temp }}/deployables/*.nupkg --source https://api.nuget.org/v3/index.json -k '${{ steps.nuget-login.outputs.NUGET_API_KEY }}'
+      if: ${{ !inputs.skip_nuget }}
+      run: dotnet nuget push ${{ runner.temp }}\deployables\NuGet\*.nupkg --source https://api.nuget.org/v3/index.json -k '${{ steps.nuget-login.outputs.NUGET_API_KEY }}'
 
     - name: 💽 Upload artifacts to release
       shell: pwsh
