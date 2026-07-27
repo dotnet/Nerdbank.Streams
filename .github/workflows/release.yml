@@ -24,14 +24,6 @@ jobs:
       with:
         fetch-depth: 1
 
-    - name: ⚙️ Initialization
-      shell: pwsh
-      run: |
-        if ('${{ secrets.NPM_API_KEY }}') {
-          Write-Host "NPM_API_KEY secret detected. NPM packages will be pushed."
-          echo "NPM_API_KEY_DEFINED=true" >> $env:GITHUB_ENV
-        }
-
     - name: 🔎 Search for build of ${{ github.ref }}
       shell: pwsh
       id: findrunid
@@ -120,6 +112,13 @@ jobs:
       with:
         user: ${{ secrets.NUGET_USER }}
 
+    - name: 🟢 Setup Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version: 24
+        registry-url: https://registry.npmjs.org
+        package-manager-cache: false  # never use caching in release builds
+
     - name: 🚀 Push NPM packages
       shell: pwsh
       run: |
@@ -130,7 +129,6 @@ jobs:
         npm set //registry.npmjs.org/:_authToken=${{ secrets.NPM_API_KEY }}
         npm publish
       working-directory: ${{ runner.temp }}
-      if: ${{ env.NPM_API_KEY_DEFINED == 'true' }}
 
     - name: 🚀 Push NuGet packages
       run: dotnet nuget push ${{ runner.temp }}/deployables/*.nupkg --source https://api.nuget.org/v3/index.json -k '${{ steps.nuget-login.outputs.NUGET_API_KEY }}'
