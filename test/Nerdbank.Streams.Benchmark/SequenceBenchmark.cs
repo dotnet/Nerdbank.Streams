@@ -10,7 +10,7 @@ namespace Nerdbank.Streams.Benchmark
     using BenchmarkDotNet.Attributes;
 
     [Config(typeof(BenchmarkConfig))]
-    public sealed class SequenceBenchmark : IDisposable
+    public class SequenceBenchmark : IDisposable
     {
         private readonly Sequence<byte> sequence = new Sequence<byte>();
 
