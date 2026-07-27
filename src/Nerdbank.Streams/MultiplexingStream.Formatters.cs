@@ -96,6 +96,23 @@ namespace Nerdbank.Streams
 
             internal abstract ReadOnlySequence<byte> SerializeContentProcessed(long bytesProcessed);
 
+            /// <summary>
+            /// Serializes the payload of a <see cref="ControlCode.ChannelWindowAdjust"/> frame.
+            /// </summary>
+            /// <param name="windowSize">The new (absolute) size of the receiving window.</param>
+            /// <returns>The serialized payload.</returns>
+            /// <remarks>
+            /// The payload is a single integer, so it shares an encoding with <see cref="SerializeContentProcessed(long)"/>.
+            /// </remarks>
+            internal virtual ReadOnlySequence<byte> SerializeWindowSize(long windowSize) => this.SerializeContentProcessed(windowSize);
+
+            /// <summary>
+            /// Deserializes the payload of a <see cref="ControlCode.ChannelWindowAdjust"/> frame.
+            /// </summary>
+            /// <param name="payload">The payload to deserialize.</param>
+            /// <returns>The new (absolute) size of the receiving window.</returns>
+            internal virtual long DeserializeWindowSize(ReadOnlySequence<byte> payload) => this.DeserializeContentProcessed(payload);
+
             protected static bool IsOdd(ReadOnlySpan<byte> localRandomBuffer, ReadOnlySpan<byte> remoteRandomBuffer)
             {
                 bool? isOdd = null;
@@ -804,6 +821,27 @@ namespace Nerdbank.Streams
                 }
 
                 return (header, default);
+            }
+        }
+
+        /// <summary>
+        /// A formatter for protocol version 4, which shares v3's framing and handshake-free startup
+        /// but adds the <see cref="ControlCode.ChannelWindowAdjust"/> frame so that a channel's
+        /// receiving window may grow after the channel has been established.
+        /// </summary>
+        internal class V4Formatter : V3Formatter
+        {
+            private static readonly Version ProtocolVersion = new Version(4, 0);
+            private static readonly Task<(bool?, Version)> ReadHandshakeResult = Task.FromResult<(bool?, Version)>((null, ProtocolVersion));
+
+            internal V4Formatter(PipeWriter writer, Stream readingStream)
+                : base(writer, readingStream)
+            {
+            }
+
+            internal override Task<(bool? IsOdd, Version ProtocolVersion)> ReadHandshakeAsync(object? writeHandshakeResult, Options options, CancellationToken cancellationToken)
+            {
+                return ReadHandshakeResult;
             }
         }
     }

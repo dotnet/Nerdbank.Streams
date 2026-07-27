@@ -54,6 +54,16 @@ namespace Nerdbank.Streams
             private long defaultChannelReceivingWindowSize = RecommendedDefaultChannelReceivingWindowSize;
 
             /// <summary>
+            /// Backing field for the <see cref="MaxChannelReceivingWindowSize"/> property.
+            /// </summary>
+            private long maxChannelReceivingWindowSize = 16 * RecommendedDefaultChannelReceivingWindowSize;
+
+            /// <summary>
+            /// Backing field for the <see cref="MaxTotalChannelReceivingWindowSize"/> property.
+            /// </summary>
+            private long maxTotalChannelReceivingWindowSize = 64 * RecommendedDefaultChannelReceivingWindowSize;
+
+            /// <summary>
             /// Backing field for the <see cref="DefaultChannelTraceSourceFactory"/> property.
             /// </summary>
             private Func<int, string, TraceSource?>? defaultChannelTraceSourceFactory;
@@ -91,6 +101,8 @@ namespace Nerdbank.Streams
                 Requires.NotNull(copyFrom, nameof(copyFrom));
 
                 this.defaultChannelReceivingWindowSize = copyFrom.defaultChannelReceivingWindowSize;
+                this.maxChannelReceivingWindowSize = copyFrom.maxChannelReceivingWindowSize;
+                this.maxTotalChannelReceivingWindowSize = copyFrom.maxTotalChannelReceivingWindowSize;
                 this.traceSource = copyFrom.traceSource;
                 this.protocolMajorVersion = copyFrom.protocolMajorVersion;
                 this.defaultChannelTraceSourceFactory = copyFrom.defaultChannelTraceSourceFactory;
@@ -153,6 +165,61 @@ namespace Nerdbank.Streams
             }
 
             /// <summary>
+            /// Gets or sets the largest value that <see cref="DefaultChannelReceivingWindowSize"/> may grow to
+            /// for an individual channel that demonstrates a need for it.
+            /// </summary>
+            /// <value>
+            /// Must be a positive value. The default is 16 times <see cref="DefaultChannelReceivingWindowSize"/>'s default value.
+            /// </value>
+            /// <exception cref="ArgumentOutOfRangeException">Thrown if set to a non-positive value.</exception>
+            /// <remarks>
+            /// <para>
+            /// This value is only used when <see cref="ProtocolMajorVersion"/> is at least 4, which adds the ability
+            /// for a receiver to enlarge a channel's receiving window after the channel has been established.
+            /// A channel's window only grows while its remote sender is actually blocked by it, so channels that never
+            /// saturate their window never consume more than <see cref="DefaultChannelReceivingWindowSize"/>.
+            /// </para>
+            /// <para>
+            /// Growth is additionally bounded across all channels by <see cref="MaxTotalChannelReceivingWindowSize"/>.
+            /// </para>
+            /// </remarks>
+            public long MaxChannelReceivingWindowSize
+            {
+                get => this.maxChannelReceivingWindowSize;
+                set
+                {
+                    Requires.Range(value > 0, nameof(value));
+                    this.ThrowIfFrozen();
+                    this.maxChannelReceivingWindowSize = value;
+                }
+            }
+
+            /// <summary>
+            /// Gets or sets the total number of bytes that all channels on this stream combined may commit to
+            /// receiving window growth beyond their initial <see cref="DefaultChannelReceivingWindowSize"/>.
+            /// </summary>
+            /// <value>
+            /// Must be a non-negative value. The default is 64 times <see cref="DefaultChannelReceivingWindowSize"/>'s default value.
+            /// </value>
+            /// <exception cref="ArgumentOutOfRangeException">Thrown if set to a negative value.</exception>
+            /// <remarks>
+            /// This value is only used when <see cref="ProtocolMajorVersion"/> is at least 4.
+            /// It bounds the worst case memory that automatic window growth may commit for the entire stream,
+            /// so that a stream with many busy channels cannot multiply <see cref="MaxChannelReceivingWindowSize"/>
+            /// by an unbounded number of channels.
+            /// </remarks>
+            public long MaxTotalChannelReceivingWindowSize
+            {
+                get => this.maxTotalChannelReceivingWindowSize;
+                set
+                {
+                    Requires.Range(value >= 0, nameof(value));
+                    this.ThrowIfFrozen();
+                    this.maxTotalChannelReceivingWindowSize = value;
+                }
+            }
+
+            /// <summary>
             /// Gets or sets the protocol version to be used.
             /// </summary>
             /// <value>The default is 1.</value>
@@ -160,6 +227,7 @@ namespace Nerdbank.Streams
             /// 1 is the original and default version.
             /// 2 is a protocol breaking change and adds backpressure support.
             /// 3 is a protocol breaking change that removes the initial handshake so no round-trip to establish the connection is necessary.
+            /// 4 is a protocol breaking change that allows a receiver to enlarge a channel's receiving window after the channel is established.
             /// </remarks>
             public int ProtocolMajorVersion
             {

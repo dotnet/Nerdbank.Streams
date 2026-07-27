@@ -54,6 +54,28 @@ namespace Nerdbank.Streams
             /// Recipients that do not recognize this code ignore it.
             /// </remarks>
             ContentReadingCompleted,
+
+            /// <summary>
+            /// Sent by a channel's receiver to enlarge the receiving window it previously advertised,
+            /// permitting the remote party to have more unacknowledged bytes in flight.
+            /// </summary>
+            /// <remarks>
+            /// Only sent when the protocol version supports dynamic windows (v4 and later).
+            /// The payload carries the new (absolute) window size, which is only ever larger than the prior value.
+            /// Recipients that do not recognize this code ignore it, which is safe because the window they
+            /// already agreed to remains valid.
+            /// </remarks>
+            ChannelWindowAdjust,
+
+            /// <summary>
+            /// Sent by a channel's sender when it has run out of credit and still has data to send,
+            /// asking the receiver to enlarge the window it advertises.
+            /// </summary>
+            /// <remarks>
+            /// Only sent when the protocol version supports dynamic windows (v4 and later).
+            /// The receiver is free to ignore this, which merely leaves throughput where it is.
+            /// </remarks>
+            ChannelWindowGrowthRequest,
         }
     }
 }

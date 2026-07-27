@@ -31,8 +31,9 @@ namespace Nerdbank.Streams.Benchmark
         /// <remarks>
         /// Version 1 has no backpressure at all, so it serves as the ceiling against which
         /// the cost of flow control in later versions can be measured.
+        /// Version 4 keeps v3's flow control but lets a throttled channel enlarge its window.
         /// </remarks>
-        [Params(1, 2, 3)]
+        [Params(1, 2, 3, 4)]
         public int ProtocolMajorVersion { get; set; }
 
         /// <summary>

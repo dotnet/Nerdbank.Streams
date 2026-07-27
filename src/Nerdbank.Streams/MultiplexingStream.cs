@@ -120,10 +120,24 @@ namespace Nerdbank.Streams
         private readonly int protocolMajorVersion;
 
         /// <summary>
+        /// The largest receiving window any single channel may grow to via <see cref="ControlCode.ChannelWindowAdjust"/>.
+        /// </summary>
+        private readonly long maxChannelReceivingWindowSize;
+
+        /// <summary>
         /// A value indicating whether any open channels should be faulted (i.e. their <see cref="Channel.Completion"/> task will be faulted)
         /// when the <see cref="MultiplexingStream"/> is disposed.
         /// </summary>
         private readonly bool faultOpenChannelsOnStreamDisposal;
+
+        /// <summary>
+        /// The number of bytes of receiving window growth (beyond each channel's initial window)
+        /// that remain available to be committed across all channels of this stream.
+        /// </summary>
+        /// <remarks>
+        /// Accessed only via <see cref="TryReserveWindowGrowth(long)"/> and <see cref="ReleaseWindowGrowth(long)"/>.
+        /// </remarks>
+        private long remainingWindowGrowthBudget;
 
         /// <summary>
         /// The last number assigned to a channel.
@@ -162,6 +176,8 @@ namespace Nerdbank.Streams
 
             this.DefaultChannelReceivingWindowSize = options.DefaultChannelReceivingWindowSize;
             this.protocolMajorVersion = options.ProtocolMajorVersion;
+            this.maxChannelReceivingWindowSize = Math.Max(options.MaxChannelReceivingWindowSize, options.DefaultChannelReceivingWindowSize);
+            this.remainingWindowGrowthBudget = options.MaxTotalChannelReceivingWindowSize;
 
             // Set up seed channels
             for (int i = 0; i < options.SeededChannels.Count; i++)
@@ -301,6 +317,7 @@ namespace Nerdbank.Streams
             {
                 // We do NOT support 1-2 here because they require an asynchronous handshake.
                 3 => new V3Formatter(streamWriter, stream),
+                4 => new V4Formatter(streamWriter, stream),
                 _ => throw new NotSupportedException($"Protocol major version {options.ProtocolMajorVersion} is not supported."),
             };
 
@@ -345,6 +362,7 @@ namespace Nerdbank.Streams
                 1 => (Formatter)new V1Formatter(streamWriter, stream),
                 2 => new V2Formatter(streamWriter, stream),
                 3 => new V3Formatter(streamWriter, stream),
+                4 => new V4Formatter(streamWriter, stream),
                 _ => throw new NotSupportedException($"Protocol major version {options.ProtocolMajorVersion} is not supported."),
             };
 
@@ -866,6 +884,12 @@ namespace Nerdbank.Streams
                         case ControlCode.ContentProcessed:
                             this.OnContentProcessed(header, frame.Value.Payload);
                             break;
+                        case ControlCode.ChannelWindowAdjust:
+                            this.OnChannelWindowAdjust(header, frame.Value.Payload);
+                            break;
+                        case ControlCode.ChannelWindowGrowthRequest:
+                            this.OnChannelWindowGrowthRequest(header);
+                            break;
                         case ControlCode.ContentWritingCompleted:
                             this.OnContentWritingCompleted(header.RequiredChannelId);
                             break;
@@ -1084,6 +1108,72 @@ namespace Nerdbank.Streams
 
             long bytesProcessed = this.formatter.DeserializeContentProcessed(payloadBuffer);
             channel.OnContentProcessed(bytesProcessed);
+        }
+
+        private void OnChannelWindowAdjust(FrameHeader header, ReadOnlySequence<byte> payloadBuffer)
+        {
+            Channel? channel;
+            lock (this.syncObject)
+            {
+                this.openChannels.TryGetValue(header.RequiredChannelId, out channel);
+            }
+
+            if (channel is null)
+            {
+                // The channel closed concurrently with the remote party's decision to enlarge its window.
+                // Dropping the adjustment is safe: there is nothing left to send.
+                return;
+            }
+
+            long newWindowSize = this.formatter.DeserializeWindowSize(payloadBuffer);
+            channel.OnWindowAdjust(newWindowSize);
+        }
+
+        private void OnChannelWindowGrowthRequest(FrameHeader header)
+        {
+            Channel? channel;
+            lock (this.syncObject)
+            {
+                this.openChannels.TryGetValue(header.RequiredChannelId, out channel);
+            }
+
+            // A request for a channel that has since closed needs no answer.
+            channel?.OnWindowGrowthRequested();
+        }
+
+        /// <summary>
+        /// Attempts to claim a portion of this stream's total budget for receiving window growth.
+        /// </summary>
+        /// <param name="bytes">The number of additional bytes of window the caller wants to commit to.</param>
+        /// <returns><see langword="true"/> if the budget had room and has been debited; otherwise <see langword="false"/>.</returns>
+        private bool TryReserveWindowGrowth(long bytes)
+        {
+            long remaining = Volatile.Read(ref this.remainingWindowGrowthBudget);
+            while (remaining >= bytes)
+            {
+                long candidate = Interlocked.CompareExchange(ref this.remainingWindowGrowthBudget, remaining - bytes, remaining);
+                if (candidate == remaining)
+                {
+                    return true;
+                }
+
+                remaining = candidate;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Returns window growth budget previously claimed by <see cref="TryReserveWindowGrowth(long)"/>,
+        /// so that other channels may use it after a channel closes.
+        /// </summary>
+        /// <param name="bytes">The number of bytes to return to the budget.</param>
+        private void ReleaseWindowGrowth(long bytes)
+        {
+            if (bytes > 0)
+            {
+                Interlocked.Add(ref this.remainingWindowGrowthBudget, bytes);
+            }
         }
 
         private void OnOffer(QualifiedChannelId channelId, ReadOnlySequence<byte> payloadBuffer)
