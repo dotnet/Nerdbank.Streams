@@ -29,7 +29,7 @@ jobs:
         fetch-depth: 0 # avoid shallow clone so nbgv can do its work.
         submodules: true
     - name: ⚙ Install prerequisites
-      run: ./init.ps1 -UpgradePrerequisites
+      run: ./init.ps1 -UpgradePrerequisites -NoNuGetCredProvider
 
     - run: dotnet docfx docfx/docfx.json
       name: 📚 Generate documentation
