@@ -1,7 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project>
+  <ItemGroup Condition="'$(IsTestProject)' != 'false'">
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
+    <PackageReference Include="Microsoft.Testing.Extensions.CrashDump" />
+    <PackageReference Include="Microsoft.Testing.Extensions.HangDump" />
+    <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" />
+  </ItemGroup>
   <ItemGroup>
     <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('xunit.runner.json')" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageVersion Remove="System.IO.Pipelines" />
+    <PackageVersion Remove="System.Runtime.CompilerServices.Unsafe" />
+    <PackageVersion Remove="System.Text.Json" />
+    <PackageVersion Remove="Microsoft.Bcl.AsyncInterfaces" />
   </ItemGroup>
 
   <Import Project="$([MSBuild]::GetPathOfFileAbove($(MSBuildThisFile), $(MSBuildThisFileDirectory)..))" />
