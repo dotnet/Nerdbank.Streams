@@ -409,11 +409,17 @@ namespace Nerdbank.Streams
             /// in response to evidence that the remote sender is being throttled by it.
             /// </summary>
             /// <remarks>
-            /// Window growth requires the <see cref="ControlCode.ChannelWindowAdjust"/> frame, which was added in protocol v4.
-            /// Earlier versions treat the window as fixed for the lifetime of the channel.
+            /// <para>
+            /// Growth is negotiated entirely by the <see cref="ControlCode.ChannelWindowGrowthRequest"/> and
+            /// <see cref="ControlCode.ChannelWindowAdjust"/> frames, which are additive to the protocol: a peer that
+            /// predates them ignores them, so it simply never asks and is never granted. No version bump is required.
+            /// </para>
+            /// <para>
+            /// Protocol v1 has no flow control at all, so there is no window to grow.
+            /// </para>
             /// </remarks>
             private bool WindowAutoTuningEnabled =>
-                this.MultiplexingStream.protocolMajorVersion >= 4 &&
+                this.BackpressureSupportEnabled &&
                 this.MultiplexingStream.maxChannelReceivingWindowSize > this.localWindowSize;
 
             /// <summary>
@@ -1250,7 +1256,7 @@ namespace Nerdbank.Streams
             /// </summary>
             private void RequestWindowGrowth()
             {
-                if (this.MultiplexingStream.protocolMajorVersion < 4 || this.IsDisposed)
+                if (!this.BackpressureSupportEnabled || this.IsDisposed)
                 {
                     return;
                 }

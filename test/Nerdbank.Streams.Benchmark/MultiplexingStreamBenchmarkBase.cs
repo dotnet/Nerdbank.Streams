@@ -33,7 +33,7 @@ namespace Nerdbank.Streams.Benchmark
         /// the cost of flow control in later versions can be measured.
         /// Version 4 keeps v3's flow control but lets a throttled channel enlarge its window.
         /// </remarks>
-        [Params(1, 2, 3, 4)]
+        [Params(1, 2, 3)]
         public int ProtocolMajorVersion { get; set; }
 
         /// <summary>

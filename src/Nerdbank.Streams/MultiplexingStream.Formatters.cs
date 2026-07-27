@@ -823,26 +823,5 @@ namespace Nerdbank.Streams
                 return (header, default);
             }
         }
-
-        /// <summary>
-        /// A formatter for protocol version 4, which shares v3's framing and handshake-free startup
-        /// but adds the <see cref="ControlCode.ChannelWindowAdjust"/> frame so that a channel's
-        /// receiving window may grow after the channel has been established.
-        /// </summary>
-        internal class V4Formatter : V3Formatter
-        {
-            private static readonly Version ProtocolVersion = new Version(4, 0);
-            private static readonly Task<(bool?, Version)> ReadHandshakeResult = Task.FromResult<(bool?, Version)>((null, ProtocolVersion));
-
-            internal V4Formatter(PipeWriter writer, Stream readingStream)
-                : base(writer, readingStream)
-            {
-            }
-
-            internal override Task<(bool? IsOdd, Version ProtocolVersion)> ReadHandshakeAsync(object? writeHandshakeResult, Options options, CancellationToken cancellationToken)
-            {
-                return ReadHandshakeResult;
-            }
-        }
     }
 }

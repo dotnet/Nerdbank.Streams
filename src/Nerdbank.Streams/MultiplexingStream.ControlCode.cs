@@ -60,10 +60,11 @@ namespace Nerdbank.Streams
             /// permitting the remote party to have more unacknowledged bytes in flight.
             /// </summary>
             /// <remarks>
-            /// Only sent when the protocol version supports dynamic windows (v4 and later).
             /// The payload carries the new (absolute) window size, which is only ever larger than the prior value.
-            /// Recipients that do not recognize this code ignore it, which is safe because the window they
-            /// already agreed to remains valid.
+            /// This code is additive to the protocol rather than a new version of it: recipients that predate it
+            /// ignore it, which is safe because the window they already agreed to remains valid.
+            /// It is only ever sent in reply to a <see cref="ChannelWindowGrowthRequest"/>, so it is never sent
+            /// to a party that would not understand it.
             /// </remarks>
             ChannelWindowAdjust,
 
@@ -72,8 +73,9 @@ namespace Nerdbank.Streams
             /// asking the receiver to enlarge the window it advertises.
             /// </summary>
             /// <remarks>
-            /// Only sent when the protocol version supports dynamic windows (v4 and later).
-            /// The receiver is free to ignore this, which merely leaves throughput where it is.
+            /// This code is additive to the protocol rather than a new version of it. A receiver that predates it
+            /// ignores it and never replies, which costs one small frame per channel and leaves throughput
+            /// exactly where a fixed window would have left it.
             /// </remarks>
             ChannelWindowGrowthRequest,
         }
