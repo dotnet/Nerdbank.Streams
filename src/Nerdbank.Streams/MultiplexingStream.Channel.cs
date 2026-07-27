@@ -32,6 +32,12 @@ namespace Nerdbank.Streams
         public class Channel : IDisposableObservable, IDuplexPipe
         {
             /// <summary>
+            /// The maximum number of consecutive refusals that lengthen the delay before we ask
+            /// for a larger receiving window again, which caps the backoff at 2^this many stalls.
+            /// </summary>
+            private const int MaxWindowGrowthBackoffShift = 10;
+
+            /// <summary>
             /// This task source completes when the channel has been accepted, rejected, or the offer is canceled.
             /// </summary>
             private readonly TaskCompletionSource<AcceptanceParameters> acceptanceSource = new TaskCompletionSource<AcceptanceParameters>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -97,6 +103,67 @@ namespace Nerdbank.Streams
             /// or the value of <see cref="AcceptanceParameters.RemoteWindowSize"/> if we accepted the channel.
             /// </remarks>
             private long? localWindowSize;
+
+            /// <summary>
+            /// The number of bytes of window growth this channel has claimed from the stream-wide growth budget.
+            /// </summary>
+            /// <remarks>
+            /// All access to this field should be made within a lock on the <see cref="SyncObject"/> object.
+            /// </remarks>
+            private long reservedWindowGrowth;
+
+            /// <summary>
+            /// Our own <see cref="PipeReader"/> wrapper, when flow control is in use, so that we can observe
+            /// whether our reader is currently starved for data.
+            /// </summary>
+            private WindowPipeReader? windowPipeReader;
+
+            /// <summary>
+            /// A value indicating whether the remote party has asked us to enlarge our receiving window
+            /// and we have deferred the answer until our reader runs out of work.
+            /// </summary>
+            /// <remarks>
+            /// All access to this field should be made within a lock on the <see cref="SyncObject"/> object.
+            /// </remarks>
+            private bool windowGrowthRequestOutstanding;
+
+            /// <summary>
+            /// A value indicating whether we have asked the remote party to enlarge its receiving window
+            /// and have not yet been answered.
+            /// </summary>
+            /// <remarks>
+            /// <para>
+            /// This throttles growth requests to at most one in flight, so a channel spends at most one extra
+            /// frame per stall. The receiver answers every request, whether or not it agrees to grow.
+            /// </para>
+            /// <para>
+            /// All access to this field should be made within a lock on the <see cref="SyncObject"/> object.
+            /// </para>
+            /// </remarks>
+            private bool windowGrowthRequestPending;
+
+            /// <summary>
+            /// The number of consecutive growth requests that the remote party has declined.
+            /// </summary>
+            /// <remarks>
+            /// <para>
+            /// Each refusal doubles the number of stalls we must observe before asking again, so a channel that is
+            /// limited by its remote consumer rather than by its window quickly stops spending frames on requests
+            /// that will not be granted. A successful grant resets this to zero.
+            /// </para>
+            /// <para>
+            /// All access to this field should be made within a lock on the <see cref="SyncObject"/> object.
+            /// </para>
+            /// </remarks>
+            private int windowGrowthRefusals;
+
+            /// <summary>
+            /// The number of times we have run out of credit since we last asked for a larger window.
+            /// </summary>
+            /// <remarks>
+            /// All access to this field should be made within a lock on the <see cref="SyncObject"/> object.
+            /// </remarks>
+            private int stallsSinceWindowGrowthRequest;
 
             /// <summary>
             /// Indicates whether the <see cref="Dispose(Exception)"/> method has been called.
@@ -338,6 +405,24 @@ namespace Nerdbank.Streams
             private bool BackpressureSupportEnabled => this.MultiplexingStream.protocolMajorVersion > 1;
 
             /// <summary>
+            /// Gets a value indicating whether this channel may enlarge its own receiving window
+            /// in response to evidence that the remote sender is being throttled by it.
+            /// </summary>
+            /// <remarks>
+            /// <para>
+            /// Growth is negotiated entirely by the <see cref="ControlCode.ChannelWindowGrowthRequest"/> and
+            /// <see cref="ControlCode.ChannelWindowAdjust"/> frames, which are additive to the protocol: a peer that
+            /// predates them ignores them, so it simply never asks and is never granted. No version bump is required.
+            /// </para>
+            /// <para>
+            /// Protocol v1 has no flow control at all, so there is no window to grow.
+            /// </para>
+            /// </remarks>
+            private bool WindowAutoTuningEnabled =>
+                this.BackpressureSupportEnabled &&
+                this.MultiplexingStream.maxChannelReceivingWindowSize > this.localWindowSize;
+
+            /// <summary>
             /// Immediately terminates the channel and shuts down any ongoing communication.
             /// </summary>
             /// <remarks>
@@ -363,6 +448,16 @@ namespace Nerdbank.Streams
                     // First call to dispose
                     this.isDisposed = true;
                 }
+
+                // Return any window growth this channel had claimed so other channels may use it.
+                long growthToRelease;
+                lock (this.SyncObject)
+                {
+                    growthToRelease = this.reservedWindowGrowth;
+                    this.reservedWindowGrowth = 0;
+                }
+
+                this.MultiplexingStream.ReleaseWindowGrowth(growthToRelease);
 
                 this.acceptanceSource.TrySetCanceled();
                 this.optionsAppliedTaskSource?.TrySetCanceled();
@@ -666,6 +761,76 @@ namespace Nerdbank.Streams
             }
 
             /// <summary>
+            /// Invoked when the remote party reports that it has run out of credit on this channel and has more to send,
+            /// giving us the opportunity to enlarge the window we advertise to it.
+            /// </summary>
+            /// <remarks>
+            /// Growth is optional: declining is always correct and merely costs throughput. We answer either way,
+            /// repeating the current size when we decline, so that the remote party is free to ask again later.
+            /// </remarks>
+            internal void OnWindowGrowthRequested()
+            {
+                lock (this.SyncObject)
+                {
+                    if (this.windowPipeReader?.IsReadPending is not true)
+                    {
+                        // Our reader is busy with data we already have, so we cannot yet tell whether the window or
+                        // our own consumer is the constraint. Defer the answer until our reader runs out of work,
+                        // which is when the distinction becomes observable.
+                        this.windowGrowthRequestOutstanding = true;
+                        return;
+                    }
+                }
+
+                this.AnswerWindowGrowthRequest();
+            }
+
+            /// <summary>
+            /// Invoked when the remote party enlarges the receiving window it has advertised for this channel,
+            /// permitting us to have more unacknowledged bytes in flight to them.
+            /// </summary>
+            /// <param name="newWindowSize">The new (absolute) size of the remote party's receiving window.</param>
+            /// <remarks>
+            /// A window may only grow. A frame that would shrink it is ignored, since data may already be in flight
+            /// against the larger window and the sender cannot retract it.
+            /// </remarks>
+            internal void OnWindowAdjust(long newWindowSize)
+            {
+                Requires.Range(newWindowSize > 0, nameof(newWindowSize), "A positive number is required.");
+                lock (this.SyncObject)
+                {
+                    // Every growth request is answered, including a refusal, which repeats the current size.
+                    // Clearing the flag on either answer is what lets a channel ask again the next time it stalls.
+                    this.windowGrowthRequestPending = false;
+
+                    if (this.remoteWindowSize is not long currentSize || newWindowSize <= currentSize)
+                    {
+                        // A refusal. Back off exponentially so we stop spending frames on a channel
+                        // whose throughput is limited by its remote consumer rather than by its window.
+                        if (this.windowGrowthRefusals < MaxWindowGrowthBackoffShift)
+                        {
+                            this.windowGrowthRefusals++;
+                        }
+
+                        return;
+                    }
+
+                    this.windowGrowthRefusals = 0;
+
+                    this.remoteWindowSize = newWindowSize;
+                    if (this.remoteWindowFilled < newWindowSize)
+                    {
+                        this.remoteWindowHasCapacity.Set();
+                    }
+                }
+
+                if (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Verbose) ?? false)
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Remote receiving window grew to {0} bytes.", newWindowSize);
+                }
+            }
+
+            /// <summary>
             /// Invoked when the remote party acknowledges bytes we previously transmitted as processed,
             /// thereby allowing us to consider that data removed from the remote party's "window"
             /// and thus enables us to send more data to them.
@@ -792,12 +957,22 @@ namespace Nerdbank.Streams
                         }
 
                         var writerRelay = new Pipe();
+
+                        // When the window may grow later, the pipe must be created with room for the largest window
+                        // we could ever advertise, because a Pipe's pause threshold is fixed at construction.
+                        // This costs nothing until the space is used: the threshold is a limit, not an allocation.
+                        // The real bound on buffered data remains the flow control window, since the remote party
+                        // never sends more than the credit we have granted.
+                        long pauseThreshold = this.WindowAutoTuningEnabled
+                            ? this.MultiplexingStream.maxChannelReceivingWindowSize
+                            : this.localWindowSize.Value;
                         Pipe? readerRelay = this.BackpressureSupportEnabled
-                            ? new Pipe(new PipeOptions(pauseWriterThreshold: this.localWindowSize.Value + 1, resumeWriterThreshold: this.localWindowSize.Value)) // +1 prevents pause when remote window is exactly filled
+                            ? new Pipe(new PipeOptions(pauseWriterThreshold: pauseThreshold + 1, resumeWriterThreshold: pauseThreshold)) // +1 prevents pause when remote window is exactly filled
                             : new Pipe();
                         this.mxStreamIOReader = writerRelay.Reader;
                         this.mxStreamIOWriter = readerRelay.Writer;
-                        this.channelIO = new DuplexPipe(this.BackpressureSupportEnabled ? new WindowPipeReader(this, readerRelay.Reader) : readerRelay.Reader, writerRelay.Writer);
+                        this.windowPipeReader = this.BackpressureSupportEnabled ? new WindowPipeReader(this, readerRelay.Reader) : null;
+                        this.channelIO = new DuplexPipe((PipeReader?)this.windowPipeReader ?? readerRelay.Reader, writerRelay.Writer);
                     }
                 }
             }
@@ -831,9 +1006,17 @@ namespace Nerdbank.Streams
 
                     while (!this.Completion.IsCompleted)
                     {
-                        if (!this.remoteWindowHasCapacity.IsSet && this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
+                        if (!this.remoteWindowHasCapacity.IsSet)
                         {
-                            this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Remote window is full. Waiting for remote party to process data before sending more.");
+                            if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Verbose))
+                            {
+                                this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Remote window is full. Waiting for remote party to process data before sending more.");
+                            }
+
+                            // We are about to be throttled by the remote party's receiving window.
+                            // Only the sender can observe this: a receiver that drains promptly never sees its own
+                            // buffer fill up, yet we may still be stalled here waiting for credit to make the round trip.
+                            this.RequestWindowGrowth();
                         }
 
                         await this.remoteWindowHasCapacity.WaitAsync().ConfigureAwait(false);
@@ -1000,6 +1183,110 @@ namespace Nerdbank.Streams
                     CancellationToken.None);
             }
 
+            /// <summary>
+            /// Invoked when our reader has drained everything we have and is waiting for more,
+            /// which is the moment a deferred window growth request can be judged.
+            /// </summary>
+            private void OnReaderStarved()
+            {
+                lock (this.SyncObject)
+                {
+                    if (!this.windowGrowthRequestOutstanding)
+                    {
+                        return;
+                    }
+
+                    this.windowGrowthRequestOutstanding = false;
+                }
+
+                this.AnswerWindowGrowthRequest();
+            }
+
+            /// <summary>
+            /// Answers an outstanding window growth request, growing the window if we can afford to.
+            /// </summary>
+            /// <remarks>
+            /// Only called when our reader is starved, which means it is idle waiting for data the sender is blocked
+            /// from giving it. Both ends are then stalled and only the window stands between them. Were our reader
+            /// instead behind, a larger window would buffer more unread data without moving any more of it, which is
+            /// the memory cost we are trying not to pay.
+            /// </remarks>
+            private void AnswerWindowGrowthRequest()
+            {
+                long newWindowSize;
+                bool grew = false;
+                lock (this.SyncObject)
+                {
+                    if (this.localWindowSize is not long currentSize)
+                    {
+                        return;
+                    }
+
+                    newWindowSize = currentSize;
+                    if (this.WindowAutoTuningEnabled)
+                    {
+                        long proposed = Math.Min(currentSize * 4, this.MultiplexingStream.maxChannelReceivingWindowSize);
+                        if (proposed > currentSize && this.MultiplexingStream.TryReserveWindowGrowth(proposed - currentSize))
+                        {
+                            this.localWindowSize = newWindowSize = proposed;
+                            this.reservedWindowGrowth += proposed - currentSize;
+                            grew = true;
+                        }
+                    }
+                }
+
+                this.MultiplexingStream.SendFrame(
+                    new FrameHeader
+                    {
+                        Code = ControlCode.ChannelWindowAdjust,
+                        ChannelId = this.QualifiedId,
+                    },
+                    this.MultiplexingStream.formatter.SerializeWindowSize(newWindowSize),
+                    CancellationToken.None);
+
+                if (grew && (this.TraceSource?.Switch.ShouldTrace(TraceEventType.Verbose) ?? false))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Verbose, 0, "Local receiving window grew to {0} bytes.", newWindowSize);
+                }
+            }
+
+            /// <summary>
+            /// Asks the remote party to enlarge the receiving window it has advertised for this channel,
+            /// because we have run out of credit and have more to send.
+            /// </summary>
+            private void RequestWindowGrowth()
+            {
+                if (!this.BackpressureSupportEnabled || this.IsDisposed)
+                {
+                    return;
+                }
+
+                lock (this.SyncObject)
+                {
+                    if (this.windowGrowthRequestPending)
+                    {
+                        return;
+                    }
+
+                    if (++this.stallsSinceWindowGrowthRequest < 1 << this.windowGrowthRefusals)
+                    {
+                        return;
+                    }
+
+                    this.stallsSinceWindowGrowthRequest = 0;
+                    this.windowGrowthRequestPending = true;
+                }
+
+                this.MultiplexingStream.SendFrame(
+                    new FrameHeader
+                    {
+                        Code = ControlCode.ChannelWindowGrowthRequest,
+                        ChannelId = this.QualifiedId,
+                    },
+                    default,
+                    CancellationToken.None);
+            }
+
             private void LocalContentExamined(long bytesExamined)
             {
                 Requires.Range(bytesExamined >= 0, nameof(bytesExamined));
@@ -1160,8 +1447,8 @@ namespace Nerdbank.Streams
             {
                 private readonly Channel owner;
                 private readonly PipeReader inner;
-                private readonly long ackThreshold;
                 private ReadResult lastReadResult;
+                private int readsPending;
                 private long bytesProcessed;
                 private SequencePosition lastExaminedPosition;
 
@@ -1169,16 +1456,28 @@ namespace Nerdbank.Streams
                 {
                     this.owner = owner;
                     this.inner = inner;
-
-                    // Acknowledge in fractions of the window rather than in fixed-size frames.
-                    // Every acknowledgement costs a frame on the wire and a wake-up on both sides, so tying the
-                    // rate to the window keeps that cost proportional to the window instead of growing with it.
-                    // The frame length floor preserves the original behavior for small windows, and dividing
-                    // (rather than subtracting) guarantees the threshold never exceeds the window itself, so a
-                    // sender that has filled the window always earns credit once the reader drains it.
                     Assumes.True(owner.localWindowSize.HasValue);
-                    this.ackThreshold = Math.Max(FramePayloadMaxLength, owner.localWindowSize.Value / 8);
                 }
+
+                /// <summary>
+                /// Gets a value indicating whether our consumer is currently waiting inside a read,
+                /// which means it has drained everything we have and wants more.
+                /// </summary>
+                internal bool IsReadPending => Volatile.Read(ref this.readsPending) > 0;
+
+                /// <summary>
+                /// Gets the number of examined bytes that must accumulate before we spend a frame acknowledging them.
+                /// </summary>
+                /// <remarks>
+                /// Acknowledge in fractions of the window rather than in fixed-size frames.
+                /// Every acknowledgement costs a frame on the wire and a wake-up on both sides, so tying the
+                /// rate to the window keeps that cost proportional to the window instead of growing with it.
+                /// The frame length floor preserves the original behavior for small windows, and dividing
+                /// (rather than subtracting) guarantees the threshold never exceeds the window itself, so a
+                /// sender that has filled the window always earns credit once the reader drains it.
+                /// This is read fresh each time because the window may grow while the channel is in use.
+                /// </remarks>
+                private long AckThreshold => Math.Max(FramePayloadMaxLength, this.owner.localWindowSize!.Value / 8);
 
                 public override void AdvanceTo(SequencePosition consumed)
                 {
@@ -1202,9 +1501,18 @@ namespace Nerdbank.Streams
                     this.owner.LocalContentReadingCompleted();
                 }
 
-                public override async ValueTask<ReadResult> ReadAsync(CancellationToken cancellationToken = default)
+                public override ValueTask<ReadResult> ReadAsync(CancellationToken cancellationToken = default)
                 {
-                    return this.lastReadResult = await this.inner.ReadAsync(cancellationToken).ConfigureAwait(false);
+                    ValueTask<ReadResult> readTask = this.inner.ReadAsync(cancellationToken);
+                    if (readTask.IsCompletedSuccessfully)
+                    {
+                        // Data was already waiting, so our consumer is not starved and nothing needs to be reported.
+#pragma warning disable VSTHRD103 // The result is already available, so this does not block.
+                        return new ValueTask<ReadResult>(this.lastReadResult = readTask.Result);
+#pragma warning restore VSTHRD103
+                    }
+
+                    return this.AwaitStarvedReadAsync(readTask);
                 }
 
                 public override bool TryRead(out ReadResult readResult)
@@ -1222,6 +1530,20 @@ namespace Nerdbank.Streams
 
                 [Obsolete]
                 public override void OnWriterCompleted(Action<Exception?, object?> callback, object? state) => this.inner.OnWriterCompleted(callback, state);
+
+                private async ValueTask<ReadResult> AwaitStarvedReadAsync(ValueTask<ReadResult> readTask)
+                {
+                    Interlocked.Increment(ref this.readsPending);
+                    try
+                    {
+                        this.owner.OnReaderStarved();
+                        return this.lastReadResult = await readTask.ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        Interlocked.Decrement(ref this.readsPending);
+                    }
+                }
 
                 private long Consumed(SequencePosition consumed, SequencePosition examined)
                 {
@@ -1243,7 +1565,7 @@ namespace Nerdbank.Streams
                     // to be worth a frame, or if our reader indicates that more data is required before it will examine any more.
                     // Or in some cases of very small receiving windows, when the entire window is empty.
                     long result = 0;
-                    if (this.bytesProcessed >= this.ackThreshold || this.bytesProcessed == this.owner.localWindowSize)
+                    if (this.bytesProcessed >= this.AckThreshold || this.bytesProcessed == this.owner.localWindowSize)
                     {
                         result = this.bytesProcessed;
                         this.bytesProcessed = 0;
