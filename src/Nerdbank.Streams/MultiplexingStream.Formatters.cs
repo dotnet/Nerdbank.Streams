@@ -356,18 +356,17 @@ namespace Nerdbank.Streams
 
             internal override unsafe ReadOnlySequence<byte> Serialize(Channel.OfferParameters offerParameters)
             {
-                var sequence = new Sequence<byte>();
-                Span<byte> buffer = sequence.GetSpan(ControlFrameEncoding.GetMaxByteCount(offerParameters.Name.Length));
+                byte[] buffer = new byte[ControlFrameEncoding.GetMaxByteCount(offerParameters.Name.Length)];
+                int byteLength;
                 fixed (byte* pBuffer = buffer)
                 {
                     fixed (char* pName = offerParameters.Name)
                     {
-                        int byteLength = ControlFrameEncoding.GetBytes(pName, offerParameters.Name.Length, pBuffer, buffer.Length);
-                        sequence.Advance(byteLength);
+                        byteLength = ControlFrameEncoding.GetBytes(pName, offerParameters.Name.Length, pBuffer, buffer.Length);
                     }
                 }
 
-                return sequence;
+                return new ReadOnlySequence<byte>(buffer, 0, byteLength);
             }
 
             internal override unsafe Channel.OfferParameters DeserializeOfferParameters(ReadOnlySequence<byte> payload)
