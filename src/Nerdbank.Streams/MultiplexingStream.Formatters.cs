@@ -27,6 +27,12 @@ namespace Nerdbank.Streams
             protected const int MaxContentProcessedPayloadLength = 10;
 
             /// <summary>
+            /// The maximum number of bytes required to encode a <see cref="Channel.AcceptanceParameters"/> payload:
+            /// a 1-element msgpack array header, plus a 9-byte (worst case) integer.
+            /// </summary>
+            protected const int MaxAcceptanceParametersPayloadLength = 10;
+
+            /// <summary>
             /// The maximum number of bytes required to encode everything in a frame that precedes its payload
             /// (the msgpack array header, control code, channel ID, channel source, and binary payload header).
             /// </summary>
@@ -622,8 +628,8 @@ namespace Nerdbank.Streams
 
             internal override ReadOnlySequence<byte> Serialize(Channel.AcceptanceParameters acceptanceParameters)
             {
-                var sequence = new Sequence<byte>();
-                var writer = new MessagePackWriter(sequence);
+                var bufferWriter = new FixedSizeBufferWriter(MaxAcceptanceParametersPayloadLength);
+                var writer = new MessagePackWriter(bufferWriter);
 
                 if (acceptanceParameters.RemoteWindowSize is long remoteWindowSize)
                 {
@@ -636,7 +642,7 @@ namespace Nerdbank.Streams
                 }
 
                 writer.Flush();
-                return sequence;
+                return bufferWriter.WrittenSequence;
             }
 
             internal override Channel.AcceptanceParameters DeserializeAcceptanceParameters(ReadOnlySequence<byte> payload)
