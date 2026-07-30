@@ -16,6 +16,10 @@ on:
         description: Skip publishing NuGet packages
         type: boolean
         default: false
+      skip_cargo:
+        description: Skip publishing Cargo packages
+        type: boolean
+        default: false
 
 run-name: ${{ github.ref_name }}
 
@@ -126,6 +130,29 @@ jobs:
         node-version: 24
         registry-url: https://registry.npmjs.org
         package-manager-cache: false  # never use caching in release builds
+
+    - name: 🦀 Install Rust 1.85.0
+      uses: dtolnay/rust-toolchain@1.85.0
+
+    # The crate must first be manually published and configured for Trusted
+    # Publishing at crates.io before this OIDC exchange can succeed.
+    - name: 🪪 Authorize crates.io publishing
+      if: ${{ !inputs.skip_cargo }}
+      id: crates-io-auth
+      uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
+
+    - name: 🚀 Push Cargo package
+      if: ${{ !inputs.skip_cargo }}
+      shell: pwsh
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ steps.crates-io-auth.outputs.token }}
+      run: |
+        $crate = (Get-ChildItem ./deployables -Filter 'nerdbank-streams-*.crate' -Recurse)[0].FullName
+        $packageDirectory = Join-Path $PWD 'cargo-package'
+        tar -xzf $crate -C $packageDirectory
+        $manifest = (Get-ChildItem $packageDirectory -Filter Cargo.toml -Recurse)[0].FullName
+        cargo publish --manifest-path $manifest --no-verify --token $env:CARGO_REGISTRY_TOKEN
+      working-directory: ${{ runner.temp }}
 
     - name: 🚀 Push NPM packages
       if: ${{ !inputs.skip_npm }}

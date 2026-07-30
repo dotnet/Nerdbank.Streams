@@ -1,0 +1,32 @@
+[package]
+name = "nerdbank-streams"
+# This placeholder is replaced in the staging copy by tools/Pack-Cargo.ps1
+# using Nerdbank.GitVersioning, before invoking `cargo package`.
+version = "0.0.0-placeholder"
+edition = "2021"
+rust-version = "1.85"
+description = "Tokio implementation of the Nerdbank.Streams multiplexing protocol"
+license = "MIT"
+repository = "https://github.com/AArnott/Nerdbank.Streams"
+homepage = "https://github.com/AArnott/Nerdbank.Streams"
+documentation = "https://docs.rs/nerdbank-streams"
+readme = "README.md"
+keywords = ["tokio", "multiplexing", "streams", "async"]
+categories = ["asynchronous", "network-programming"]
+authors = ["Andrew Arnott"]
+include = ["Cargo.toml", "Cargo.lock", "README.md", "LICENSE", "src/**"]
+
+[dependencies]
+rand = "0.9"
+rmp = "0.8"
+tokio = { version = "1.48", features = ["io-util", "macros", "rt", "sync"] }
+
+[dev-dependencies]
+tokio = { version = "1.48", features = ["io-util", "macros", "rt-multi-thread", "process", "time"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[lints.clippy]
+all = "warn"
