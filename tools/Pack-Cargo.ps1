@@ -32,6 +32,9 @@ $Lockfile = $Lockfile -replace '(?s)(\[\[package\]\]\s+name = "nerdbank-streams"
 Push-Location $PackageSource
 try {
     cargo package --locked
+    if ($LASTEXITCODE) {
+        throw "cargo package failed with exit code $LASTEXITCODE."
+    }
 }
 finally {
     Pop-Location

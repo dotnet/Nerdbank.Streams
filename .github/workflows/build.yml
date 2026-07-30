@@ -102,6 +102,7 @@ jobs:
     - name: 🦀 Package crate
       run: tools/Pack-Cargo.ps1
       shell: pwsh
+      if: runner.os == 'Linux'
 
     - name: 💅🏻 Verify formatted code
       run: dotnet format --verify-no-changes --no-restore
