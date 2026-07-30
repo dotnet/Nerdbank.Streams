@@ -19,7 +19,8 @@ pub(crate) enum Code {
     ChannelTerminated = 4,
     ContentProcessed = 5,
     ContentReadingCompleted = 6,
-    IgnoredExtension = 255,
+    ChannelWindowAdjust = 7,
+    ChannelWindowGrowthRequest = 8,
 }
 
 impl TryFrom<u64> for Code {
@@ -34,7 +35,8 @@ impl TryFrom<u64> for Code {
             4 => Ok(Self::ChannelTerminated),
             5 => Ok(Self::ContentProcessed),
             6 => Ok(Self::ContentReadingCompleted),
-            7 | 8 => Ok(Self::IgnoredExtension),
+            7 => Ok(Self::ChannelWindowAdjust),
+            8 => Ok(Self::ChannelWindowGrowthRequest),
             _ => Err(Error::Protocol(format!(
                 "unsupported MultiplexingStream control code {value}"
             ))),
@@ -306,6 +308,7 @@ pub(crate) fn decode_processed(payload: &[u8]) -> Result<usize, Error> {
             "processed payload has too few elements".into(),
         ));
     }
+
     let result = usize_from_u64(cursor.uint()?)?;
     if !cursor.is_empty() {
         return Err(Error::Protocol(
@@ -313,6 +316,19 @@ pub(crate) fn decode_processed(payload: &[u8]) -> Result<usize, Error> {
         ));
     }
     Ok(result)
+}
+
+/// Encodes an absolute channel receive-window size for `ChannelWindowAdjust`.
+///
+/// Window adjustments intentionally share the one-element integer payload
+/// format used by `ContentProcessed`, matching the .NET formatter.
+pub(crate) fn encode_window_adjust(window: usize) -> Vec<u8> {
+    encode_processed(window)
+}
+
+/// Decodes an absolute channel receive-window size from `ChannelWindowAdjust`.
+pub(crate) fn decode_window_adjust(payload: &[u8]) -> Result<usize, Error> {
+    decode_processed(payload)
 }
 
 pub(crate) fn encode_error(message: &str) -> Vec<u8> {
@@ -777,5 +793,66 @@ impl<'a> SliceReader<'a> {
         };
         String::from_utf8(self.take(length)?.to_vec())
             .map_err(|_| Error::Protocol("MessagePack string is not UTF-8".into()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{decode_window_adjust, encode_window_adjust, read_frame, write_frame, Code, Frame};
+    use crate::multiplexor::{ChannelId, ChannelSource, ProtocolVersion};
+
+    #[tokio::test]
+    async fn window_extension_frames_round_trip_in_v3() {
+        let (mut writer, mut reader) = tokio::io::duplex(128);
+        let channel = ChannelId {
+            id: 5,
+            source: ChannelSource::Local,
+        };
+
+        write_frame(
+            &mut writer,
+            ProtocolVersion::V3,
+            &Frame {
+                code: Code::ChannelWindowAdjust,
+                channel: Some(channel),
+                payload: encode_window_adjust(1024),
+            },
+        )
+        .await
+        .expect("write window adjustment");
+        let adjustment = read_frame(&mut reader, ProtocolVersion::V3, None)
+            .await
+            .expect("read window adjustment")
+            .expect("window adjustment frame");
+        assert_eq!(adjustment.code, Code::ChannelWindowAdjust);
+        assert_eq!(
+            adjustment.channel,
+            Some(ChannelId {
+                id: 5,
+                source: ChannelSource::Remote,
+            })
+        );
+        assert_eq!(
+            decode_window_adjust(&adjustment.payload).expect("decode adjustment"),
+            1024
+        );
+
+        write_frame(
+            &mut writer,
+            ProtocolVersion::V3,
+            &Frame {
+                code: Code::ChannelWindowGrowthRequest,
+                channel: Some(channel),
+                payload: Vec::new(),
+            },
+        )
+        .await
+        .expect("write window growth request");
+        let request = read_frame(&mut reader, ProtocolVersion::V3, None)
+            .await
+            .expect("read window growth request")
+            .expect("window growth request frame");
+        assert_eq!(request.code, Code::ChannelWindowGrowthRequest);
+        assert!(request.payload.is_empty());
     }
 }

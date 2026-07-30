@@ -155,6 +155,7 @@ async fn interop(version: ProtocolVersion) {
         } else {
             Vec::new()
         },
+        ..Options::default()
     };
     let multiplexor = if version == ProtocolVersion::V3 {
         MultiplexingStream::create(transport, options).expect("create v3 multiplexor")
@@ -172,7 +173,10 @@ async fn interop(version: ProtocolVersion) {
         )
         .await
         .expect("client offer accepted");
-    let large_line = "ABCDEF".repeat(48) + "\n";
+    // Both the Rust and .NET peers start with small receive windows here, so
+    // this transfer exercises additive growth frames in each direction on v2
+    // and v3 while retaining baseline behavior on v1.
+    let large_line = "ABCDEF".repeat(512) + "\n";
     client_offer
         .write_all(large_line.as_bytes())
         .await

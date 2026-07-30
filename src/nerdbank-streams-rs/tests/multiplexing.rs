@@ -1,10 +1,18 @@
 //! Behavioral tests for all supported MultiplexingStream protocol versions.
 
-use std::time::Duration;
+use std::{
+    pin::Pin,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    task::{Context, Poll},
+    time::Duration,
+};
 
 use nerdbank_streams::mxstream::{ChannelOptions, MultiplexingStream, Options, ProtocolVersion};
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt, DuplexStream},
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream, ReadBuf},
     time::{sleep, timeout},
 };
 
@@ -12,7 +20,7 @@ fn options(version: ProtocolVersion) -> Options {
     Options {
         protocol_version: version,
         default_receive_window: 32,
-        seeded_channels: Vec::new(),
+        ..Options::default()
     }
 }
 
@@ -34,6 +42,115 @@ async fn connected(
             MultiplexingStream::connect(right, options(version))
         );
         (left.expect("left stream"), right.expect("right stream"))
+    }
+}
+
+async fn connected_with_options(
+    options: Options,
+) -> (
+    MultiplexingStream<DuplexStream>,
+    MultiplexingStream<DuplexStream>,
+) {
+    let (left, right) = tokio::io::duplex(1024 * 1024);
+    if options.protocol_version == ProtocolVersion::V3 {
+        (
+            MultiplexingStream::create(left, options.clone()).expect("left v3 stream"),
+            MultiplexingStream::create(right, options).expect("right v3 stream"),
+        )
+    } else {
+        let (left, right) = tokio::join!(
+            MultiplexingStream::connect(left, options.clone()),
+            MultiplexingStream::connect(right, options)
+        );
+        (left.expect("left stream"), right.expect("right stream"))
+    }
+}
+
+fn growth_options(
+    version: ProtocolVersion,
+    default_receive_window: usize,
+    max_channel_receive_window: usize,
+    max_total_channel_receive_window: usize,
+) -> Options {
+    Options {
+        protocol_version: version,
+        default_receive_window,
+        max_channel_receive_window,
+        max_total_channel_receive_window,
+        ..Options::default()
+    }
+}
+
+async fn open_limited_channel(
+    left: &MultiplexingStream<DuplexStream>,
+    right: &MultiplexingStream<DuplexStream>,
+    receive_window: usize,
+) -> (
+    nerdbank_streams::mxstream::Channel,
+    nerdbank_streams::mxstream::Channel,
+) {
+    let options = ChannelOptions {
+        receive_window: Some(receive_window),
+    };
+    let (offered, accepted) = tokio::join!(
+        left.offer_channel("limited", Some(options.clone())),
+        right.accept_channel("limited", Some(options))
+    );
+    (
+        offered.expect("limited offer accepted"),
+        accepted.expect("limited channel accepted"),
+    )
+}
+
+async fn shutdown_after_drop(
+    left: MultiplexingStream<DuplexStream>,
+    right: MultiplexingStream<DuplexStream>,
+) {
+    let (left_result, right_result) = tokio::join!(left.shutdown(), right.shutdown());
+    left_result.expect("left shutdown");
+    right_result.expect("right shutdown");
+}
+
+struct DroppingWindowFrames {
+    inner: DuplexStream,
+    dropped: Arc<AtomicUsize>,
+}
+
+impl AsyncRead for DroppingWindowFrames {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        context: &mut Context<'_>,
+        buffer: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.inner).poll_read(context, buffer)
+    }
+}
+
+impl AsyncWrite for DroppingWindowFrames {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        context: &mut Context<'_>,
+        buffer: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
+        if matches!(buffer, [0x92..=0x94, 7 | 8, ..]) {
+            self.dropped.fetch_add(1, Ordering::Relaxed);
+            return Poll::Ready(Ok(buffer.len()));
+        }
+        Pin::new(&mut self.inner).poll_write(context, buffer)
+    }
+
+    fn poll_flush(
+        mut self: Pin<&mut Self>,
+        context: &mut Context<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.inner).poll_flush(context)
+    }
+
+    fn poll_shutdown(
+        mut self: Pin<&mut Self>,
+        context: &mut Context<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.inner).poll_shutdown(context)
     }
 }
 
@@ -120,6 +237,7 @@ async fn v3_seeded_channel_has_no_id_collision() {
         protocol_version: ProtocolVersion::V3,
         default_receive_window: 32,
         seeded_channels: vec![ChannelOptions::default()],
+        ..Options::default()
     };
     let (left_transport, right_transport) = tokio::io::duplex(1024 * 1024);
     let left = MultiplexingStream::create(left_transport, options.clone()).expect("left stream");
@@ -185,6 +303,315 @@ async fn flow_control_blocks_until_the_reader_drains() {
     assert_eq!(second, b"efgh");
     left.shutdown().await.expect("shutdown left");
     right.shutdown().await.expect("shutdown right");
+}
+
+#[tokio::test]
+async fn window_growth_increases_usable_send_credit() {
+    let (left, right) =
+        connected_with_options(growth_options(ProtocolVersion::V2, 4, 64, 60)).await;
+    let (offered, mut accepted) = open_limited_channel(&left, &right, 4).await;
+
+    let writer = tokio::spawn(async move {
+        let mut offered = offered;
+        offered
+            .write_all(&[0_u8; 8])
+            .await
+            .expect("write throttled content");
+        offered
+    });
+    sleep(Duration::from_millis(30)).await;
+    assert!(
+        !writer.is_finished(),
+        "the sender should first exhaust the original window"
+    );
+
+    let mut initial_window = [0_u8; 4];
+    accepted
+        .read_exact(&mut initial_window)
+        .await
+        .expect("drain original window");
+    let mut offered = timeout(Duration::from_secs(1), writer)
+        .await
+        .expect("baseline credit should release sender")
+        .expect("writer task");
+    let mut fixed_window = [0_u8; 4];
+    accepted
+        .read_exact(&mut fixed_window)
+        .await
+        .expect("drain the final fixed-window content");
+
+    offered
+        .write_all(&[0_u8; 16])
+        .await
+        .expect("the grown window should carry a full 16-byte transfer");
+    let mut grown_window = [0_u8; 16];
+    accepted
+        .read_exact(&mut grown_window)
+        .await
+        .expect("read content sent with grown credit");
+    offered.shutdown().await.expect("complete writer");
+    drop(offered);
+    drop(accepted);
+    shutdown_after_drop(left, right).await;
+}
+
+#[tokio::test]
+async fn window_growth_is_deferred_until_reader_starves() {
+    let (left, right) =
+        connected_with_options(growth_options(ProtocolVersion::V3, 4, 64, 60)).await;
+    let (offered, mut accepted) = open_limited_channel(&left, &right, 4).await;
+
+    let writer = tokio::spawn(async move {
+        let mut offered = offered;
+        offered
+            .write_all(&[0_u8; 8])
+            .await
+            .expect("write throttled content");
+        offered
+    });
+    sleep(Duration::from_millis(30)).await;
+    assert!(
+        !writer.is_finished(),
+        "a request must not be answered while the consumer still has buffered data"
+    );
+
+    let mut initial_window = [0_u8; 4];
+    accepted
+        .read_exact(&mut initial_window)
+        .await
+        .expect("drain original window");
+    let offered = timeout(Duration::from_secs(1), writer)
+        .await
+        .expect("baseline credit should release first transfer")
+        .expect("writer task");
+
+    let writer = tokio::spawn(async move {
+        let mut offered = offered;
+        offered
+            .write_all(&[0_u8; 8])
+            .await
+            .expect("write second transfer");
+        offered
+    });
+
+    let mut fixed_window = [0_u8; 4];
+    accepted
+        .read_exact(&mut fixed_window)
+        .await
+        .expect("drain the final buffered bytes");
+    let mut second_transfer = [0_u8; 8];
+    accepted
+        .read_exact(&mut second_transfer)
+        .await
+        .expect("drain second fixed-window transfer");
+    let mut offered = timeout(Duration::from_secs(1), writer)
+        .await
+        .expect("baseline credit should complete second transfer")
+        .expect("writer task");
+    offered
+        .write_all(&[0_u8; 16])
+        .await
+        .expect("starved reader should permit growth");
+    let mut grown_window = [0_u8; 16];
+    accepted
+        .read_exact(&mut grown_window)
+        .await
+        .expect("read content sent after growth");
+    drop(offered);
+    drop(accepted);
+    shutdown_after_drop(left, right).await;
+}
+
+#[tokio::test]
+async fn window_growth_is_capped_per_channel() {
+    let (left, right) = connected_with_options(growth_options(ProtocolVersion::V2, 4, 8, 60)).await;
+    let (offered, mut accepted) = open_limited_channel(&left, &right, 4).await;
+
+    let first_writer = tokio::spawn(async move {
+        let mut offered = offered;
+        offered
+            .write_all(&[0_u8; 8])
+            .await
+            .expect("write first transfer");
+        offered
+    });
+    sleep(Duration::from_millis(30)).await;
+    let mut initial_window = [0_u8; 4];
+    accepted
+        .read_exact(&mut initial_window)
+        .await
+        .expect("drain original window");
+    let offered = timeout(Duration::from_secs(1), first_writer)
+        .await
+        .expect("baseline credit should release first transfer")
+        .expect("writer task");
+    let mut first_growth = [0_u8; 4];
+    accepted
+        .read_exact(&mut first_growth)
+        .await
+        .expect("drain final first-transfer content");
+    sleep(Duration::from_millis(30)).await;
+
+    let mut second_writer = tokio::spawn(async move {
+        let mut offered = offered;
+        offered
+            .write_all(&[0_u8; 20])
+            .await
+            .expect("write second transfer");
+        offered
+    });
+    sleep(Duration::from_millis(30)).await;
+    let mut capped_window = [0_u8; 8];
+    accepted
+        .read_exact(&mut capped_window)
+        .await
+        .expect("drain capped window");
+    assert!(
+        timeout(Duration::from_millis(100), &mut second_writer)
+            .await
+            .is_err(),
+        "a repeated-size adjustment must not grant more than the per-channel cap"
+    );
+
+    let mut remaining = [0_u8; 12];
+    accepted
+        .read_exact(&mut remaining)
+        .await
+        .expect("drain remaining fixed-window transfer");
+    let offered = timeout(Duration::from_secs(1), second_writer)
+        .await
+        .expect("writer completes after normal credit is returned")
+        .expect("writer task");
+    drop(offered);
+    drop(accepted);
+    shutdown_after_drop(left, right).await;
+}
+
+#[tokio::test]
+async fn window_does_not_grow_when_stream_budget_is_exhausted() {
+    let (left, right) = connected_with_options(growth_options(ProtocolVersion::V3, 4, 64, 0)).await;
+    let (offered, mut accepted) = open_limited_channel(&left, &right, 4).await;
+
+    let mut writer = tokio::spawn(async move {
+        let mut offered = offered;
+        offered
+            .write_all(&[0_u8; 12])
+            .await
+            .expect("write throttled content");
+        offered
+    });
+    sleep(Duration::from_millis(30)).await;
+    let mut original_window = [0_u8; 4];
+    accepted
+        .read_exact(&mut original_window)
+        .await
+        .expect("drain original window");
+    assert!(
+        timeout(Duration::from_millis(100), &mut writer)
+            .await
+            .is_err(),
+        "a zero stream-wide budget must decline the request"
+    );
+
+    let mut remaining = [0_u8; 8];
+    accepted
+        .read_exact(&mut remaining)
+        .await
+        .expect("drain remaining fixed-window transfer");
+    let offered = timeout(Duration::from_secs(1), writer)
+        .await
+        .expect("writer completes with baseline flow control")
+        .expect("writer task");
+    drop(offered);
+    drop(accepted);
+    shutdown_after_drop(left, right).await;
+}
+
+#[tokio::test]
+async fn dropped_window_frames_fall_back_to_fixed_window_flow_control() {
+    let dropped = Arc::new(AtomicUsize::new(0));
+    let (left_transport, right_transport) = tokio::io::duplex(1024 * 1024);
+    let options = growth_options(ProtocolVersion::V3, 4, 64, 60);
+    let left = MultiplexingStream::create(
+        DroppingWindowFrames {
+            inner: left_transport,
+            dropped: Arc::clone(&dropped),
+        },
+        options.clone(),
+    )
+    .expect("create left stream");
+    let right = MultiplexingStream::create(
+        DroppingWindowFrames {
+            inner: right_transport,
+            dropped: Arc::clone(&dropped),
+        },
+        options,
+    )
+    .expect("create right stream");
+    let receive_options = ChannelOptions {
+        receive_window: Some(4),
+    };
+    let (offered, accepted) = tokio::join!(
+        left.offer_channel("limited", Some(receive_options.clone())),
+        right.accept_channel("limited", Some(receive_options))
+    );
+    let offered = offered.expect("limited offer accepted");
+    let mut accepted = accepted.expect("limited channel accepted");
+
+    let writer = tokio::spawn(async move {
+        let mut offered = offered;
+        offered
+            .write_all(&[0_u8; 20])
+            .await
+            .expect("write fixed-window transfer");
+        offered
+    });
+    sleep(Duration::from_millis(30)).await;
+    let mut received = [0_u8; 20];
+    accepted
+        .read_exact(&mut received)
+        .await
+        .expect("fixed-window transfer completes");
+    let offered = timeout(Duration::from_secs(1), writer)
+        .await
+        .expect("writer completes with returned baseline credit")
+        .expect("writer task");
+    assert_ne!(
+        dropped.load(Ordering::Relaxed),
+        0,
+        "the transfer must have exercised a dropped window frame"
+    );
+
+    drop(offered);
+    drop(accepted);
+    left.shutdown().await.expect("left shutdown");
+    right.shutdown().await.expect("right shutdown");
+}
+
+#[tokio::test]
+async fn v1_remains_unaffected_by_window_growth_options() {
+    let (left, right) = connected_with_options(growth_options(ProtocolVersion::V1, 4, 64, 0)).await;
+    let (offered, mut accepted) = open_limited_channel(&left, &right, 4).await;
+
+    let mut offered = timeout(Duration::from_secs(1), async move {
+        let mut offered = offered;
+        offered
+            .write_all(&[0_u8; 64])
+            .await
+            .expect("v1 write should not be flow controlled");
+        offered
+    })
+    .await
+    .expect("v1 must retain its no-flow-control behavior");
+    let mut received = [0_u8; 64];
+    accepted
+        .read_exact(&mut received)
+        .await
+        .expect("read v1 content");
+    offered.shutdown().await.expect("complete v1 writer");
+    drop(offered);
+    drop(accepted);
+    shutdown_after_drop(left, right).await;
 }
 
 #[tokio::test]
@@ -289,6 +716,7 @@ async fn invalid_seeded_channel_configuration_is_rejected() {
             protocol_version: ProtocolVersion::V2,
             default_receive_window: 1,
             seeded_channels: vec![ChannelOptions::default()],
+            ..Options::default()
         },
     );
     let error = match result {
@@ -298,6 +726,19 @@ async fn invalid_seeded_channel_configuration_is_rejected() {
     assert!(error
         .to_string()
         .contains("seeded channels require protocol v3"));
+}
+
+#[tokio::test]
+async fn invalid_window_growth_configuration_is_rejected() {
+    let (transport, _) = tokio::io::duplex(32);
+    let error =
+        match MultiplexingStream::create(transport, growth_options(ProtocolVersion::V3, 8, 4, 0)) {
+            Ok(_) => panic!("maximum below default should be invalid"),
+            Err(error) => error,
+        };
+    assert!(error
+        .to_string()
+        .contains("maximum channel receive window must be at least"));
 }
 
 #[tokio::test]

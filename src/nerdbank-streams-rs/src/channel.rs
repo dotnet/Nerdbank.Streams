@@ -96,6 +96,8 @@ impl AsyncRead for Channel {
                 .expect("channel I/O is present until it is split"),
         )
         .poll_read(cx, buf);
+        self.state
+            .set_application_read_pending(matches!(result, Poll::Pending));
         if matches!(result, Poll::Ready(Ok(()))) {
             let consumed = buf.filled().len() - before;
             if consumed != 0 {
@@ -185,6 +187,8 @@ impl AsyncRead for ChannelReadHalf {
     ) -> Poll<io::Result<()>> {
         let before = buf.filled().len();
         let result = Pin::new(&mut self.io).poll_read(cx, buf);
+        self.state
+            .set_application_read_pending(matches!(result, Poll::Pending));
         if matches!(result, Poll::Ready(Ok(()))) {
             let consumed = buf.filled().len() - before;
             if consumed != 0 {

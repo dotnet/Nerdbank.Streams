@@ -3,9 +3,9 @@
 `nerdbank-streams` is a Tokio implementation of the
 [Nerdbank.Streams](https://github.com/AArnott/Nerdbank.Streams) multiplexing
 protocol. It supports protocol versions 1, 2, and 3 and interoperates with
-the .NET implementation. It does not implement the later channel-window
-growth extensions (control codes 7 and 8); they are ignored when received for
-compatibility with newer .NET peers.
+the .NET implementation. For protocol v2 and v3, it supports the additive
+channel-window growth extensions (control codes 7 and 8). Peers that predate
+these frames safely retain the fixed-window behavior.
 
 ```rust,no_run
 use nerdbank_streams::mxstream::{MultiplexingStream, Options};
@@ -30,9 +30,20 @@ cannot provide those drop notifications. Protocol v1 cannot notify the peer
 when only its read half is dropped because it has no read-completion frame.
 
 For resource safety, this crate has a local 64 MiB maximum receive-window
-policy. It rejects local configuration and peer offer/accept advertisements
-above that limit; applications requiring larger windows must use another
-implementation or split transfers across channels.
+policy. It rejects local configuration plus peer offer, acceptance, and window
+adjustment advertisements above that limit; applications requiring larger
+windows must use another implementation or split transfers across channels.
+
+`Options::max_channel_receive_window` limits automatic growth for each
+channel, while `Options::max_total_channel_receive_window` is a stream-wide
+budget for growth beyond each channel's initial window. Their defaults are
+16× and 64× the default receive window, respectively. Setting the total
+budget to zero disables growth without changing normal flow control.
+Because Tokio's generic `AsyncRead` trait does not report cancellation of a
+pending read future, applications that frequently cancel reads may cause a
+subsequent growth request to be treated as if that read were still pending.
+The configured per-channel and stream-wide limits continue to bound any
+resulting buffering.
 
 ## Development
 

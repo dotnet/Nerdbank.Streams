@@ -13,14 +13,16 @@ use tokio::{
 use crate::{
     channel::Channel,
     frame::{
-        decode_acceptance, decode_error, decode_processed, encode_acceptance, encode_error,
-        encode_offer, encode_processed, read_frame, read_handshake, write_frame, write_handshake,
-        Code, Frame, MAX_FRAME_PAYLOAD,
+        decode_acceptance, decode_error, decode_processed, decode_window_adjust, encode_acceptance,
+        encode_error, encode_offer, encode_processed, encode_window_adjust, read_frame,
+        read_handshake, write_frame, write_handshake, Code, Frame, MAX_FRAME_PAYLOAD,
     },
 };
 
 const DEFAULT_RECEIVE_WINDOW: usize = 50 * MAX_FRAME_PAYLOAD;
 const MAX_RECEIVE_WINDOW: usize = 64 * 1024 * 1024;
+const DEFAULT_MAX_CHANNEL_RECEIVE_WINDOW: usize = 16 * DEFAULT_RECEIVE_WINDOW;
+const DEFAULT_MAX_TOTAL_CHANNEL_RECEIVE_WINDOW: usize = 64 * DEFAULT_RECEIVE_WINDOW;
 
 /// The wire protocol version used by a [`MultiplexingStream`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -85,6 +87,21 @@ pub struct Options {
     /// This crate applies a local 64 MiB upper bound to receive windows. Peer
     /// advertisements above that bound are rejected as a resource policy.
     pub default_receive_window: usize,
+    /// The largest receive window to which an individual channel may
+    /// automatically grow.
+    ///
+    /// This limit applies only to automatic growth in protocol v2 and v3.
+    /// It must be at least [`default_receive_window`](Self::default_receive_window)
+    /// and no larger than this crate's 64 MiB receive-window limit.
+    pub max_channel_receive_window: usize,
+    /// The total additional receive-window capacity that all channels on this
+    /// stream may reserve through automatic growth.
+    ///
+    /// The budget excludes every channel's initial receive window and is
+    /// released when a channel ends. A value of zero disables automatic
+    /// growth while preserving fixed-window flow control. As an unsigned
+    /// value, it is always non-negative.
+    pub max_total_channel_receive_window: usize,
     /// Channels to make available without an offer/accept exchange in protocol v3.
     pub seeded_channels: Vec<ChannelOptions>,
 }
@@ -94,6 +111,8 @@ impl Default for Options {
         Self {
             protocol_version: ProtocolVersion::V1,
             default_receive_window: DEFAULT_RECEIVE_WINDOW,
+            max_channel_receive_window: DEFAULT_MAX_CHANNEL_RECEIVE_WINDOW,
+            max_total_channel_receive_window: DEFAULT_MAX_TOTAL_CHANNEL_RECEIVE_WINDOW,
             seeded_channels: Vec::new(),
         }
     }
@@ -193,6 +212,7 @@ where
             outbound,
             completion: Completion::default(),
             writer_completion: Completion::default(),
+            remaining_window_growth_budget: Mutex::new(options.max_total_channel_receive_window),
         });
 
         for (id, channel_options) in options.seeded_channels.iter().enumerate() {
@@ -365,6 +385,12 @@ where
 
 fn validate_options(options: &Options) -> Result<(), Error> {
     validate_window(options.default_receive_window)?;
+    validate_window(options.max_channel_receive_window)?;
+    if options.max_channel_receive_window < options.default_receive_window {
+        return Err(Error::Protocol(
+            "maximum channel receive window must be at least the default receive window".into(),
+        ));
+    }
     if options.protocol_version != ProtocolVersion::V3 && !options.seeded_channels.is_empty() {
         return Err(Error::Protocol(
             "seeded channels require protocol v3".into(),
@@ -404,6 +430,7 @@ struct Inner {
     outbound: mpsc::UnboundedSender<Outbound>,
     completion: Completion,
     writer_completion: Completion,
+    remaining_window_growth_budget: Mutex<usize>,
 }
 
 impl Inner {
@@ -429,6 +456,7 @@ impl Inner {
             remote_credit_changed: Notify::new(),
             inbound: Mutex::new(Inbound::default()),
             inbound_changed: Notify::new(),
+            window_tuning: Mutex::new(WindowTuning::default()),
             acceptance: Completion::default(),
             completion: Completion::default(),
             pump_stop: Completion::default(),
@@ -532,6 +560,31 @@ impl Inner {
         self.outbound
             .send(Outbound::Frame(frame))
             .map_err(|_| Error::Closed("multiplexing writer stopped".into()))
+    }
+
+    fn try_reserve_window_growth(&self, bytes: usize) -> bool {
+        let mut budget = self
+            .remaining_window_growth_budget
+            .lock()
+            .expect("window growth budget mutex poisoned");
+        if *budget < bytes {
+            return false;
+        }
+        *budget -= bytes;
+        true
+    }
+
+    fn release_window_growth(&self, bytes: usize) {
+        if bytes == 0 {
+            return;
+        }
+        let mut budget = self
+            .remaining_window_growth_budget
+            .lock()
+            .expect("window growth budget mutex poisoned");
+        *budget = budget
+            .checked_add(bytes)
+            .expect("window growth budget exceeds configured maximum");
     }
 
     fn fail(&self, error: Error) {
@@ -712,6 +765,28 @@ fn dispatch_frame(inner: &Arc<Inner>, frame: Frame) -> Result<(), Error> {
             };
             state.on_remote_reading_completed();
         }
+        Code::ChannelWindowAdjust => {
+            if inner.options.protocol_version == ProtocolVersion::V1 {
+                return Ok(());
+            }
+            let id =
+                id.ok_or_else(|| Error::Protocol("window adjustment has no channel ID".into()))?;
+            let Some(state) = inner.get_channel(id) else {
+                return Ok(());
+            };
+            state.on_window_adjust(decode_window_adjust(&frame.payload)?)?;
+        }
+        Code::ChannelWindowGrowthRequest => {
+            if inner.options.protocol_version == ProtocolVersion::V1 {
+                return Ok(());
+            }
+            let id = id
+                .ok_or_else(|| Error::Protocol("window growth request has no channel ID".into()))?;
+            let Some(state) = inner.get_channel(id) else {
+                return Ok(());
+            };
+            state.on_window_growth_requested();
+        }
         Code::ChannelTerminated => {
             let id = id.ok_or_else(|| Error::Protocol("termination has no channel ID".into()))?;
             let Some(state) = inner.get_channel(id) else {
@@ -728,7 +803,6 @@ fn dispatch_frame(inner: &Arc<Inner>, frame: Frame) -> Result<(), Error> {
                 state.mark_closed("channel terminated by remote endpoint");
             }
         }
-        Code::IgnoredExtension => {}
     }
     Ok(())
 }
@@ -816,6 +890,7 @@ pub(crate) struct ChannelState {
     remote_credit_changed: Notify,
     inbound: Mutex<Inbound>,
     inbound_changed: Notify,
+    window_tuning: Mutex<WindowTuning>,
     acceptance: Completion,
     completion: Completion,
     pump_stop: Completion,
@@ -836,6 +911,16 @@ struct RemoteCredit {
     window: Option<usize>,
     filled: usize,
     reading_completed: bool,
+}
+
+#[derive(Default)]
+struct WindowTuning {
+    growth_request_outstanding: bool,
+    growth_request_pending: bool,
+    application_read_pending: bool,
+    refusals: u8,
+    stalls_since_request: usize,
+    reserved_growth: usize,
 }
 
 #[derive(Default)]
@@ -980,6 +1065,153 @@ impl ChannelState {
         credit.reading_completed = true;
         drop(credit);
         self.remote_credit_changed.notify_waiters();
+    }
+
+    fn on_window_growth_requested(&self) {
+        if self.protocol == ProtocolVersion::V1 || self.is_terminal() {
+            return;
+        }
+
+        let answer_request = {
+            let mut tuning = self
+                .window_tuning
+                .lock()
+                .expect("window tuning mutex poisoned");
+            if tuning.application_read_pending {
+                true
+            } else {
+                tuning.growth_request_outstanding = true;
+                false
+            }
+        };
+        if answer_request {
+            self.answer_window_growth_request();
+        }
+    }
+
+    fn on_window_adjust(&self, new_window: usize) -> Result<(), Error> {
+        if self.protocol == ProtocolVersion::V1 {
+            return Ok(());
+        }
+        validate_window(new_window)?;
+
+        let grew = {
+            let mut credit = self
+                .remote_credit
+                .lock()
+                .expect("remote credit mutex poisoned");
+            match credit.window {
+                Some(current_window) if new_window > current_window => {
+                    credit.window = Some(new_window);
+                    true
+                }
+                _ => false,
+            }
+        };
+
+        let mut tuning = self
+            .window_tuning
+            .lock()
+            .expect("window tuning mutex poisoned");
+        tuning.growth_request_pending = false;
+        if grew {
+            tuning.refusals = 0;
+        } else {
+            tuning.refusals = tuning.refusals.saturating_add(1).min(10);
+        }
+        drop(tuning);
+
+        if grew {
+            self.remote_credit_changed.notify_waiters();
+        }
+        Ok(())
+    }
+
+    pub(crate) fn set_application_read_pending(&self, pending: bool) {
+        let answer_request = {
+            let mut tuning = self
+                .window_tuning
+                .lock()
+                .expect("window tuning mutex poisoned");
+            tuning.application_read_pending = pending;
+            if pending && tuning.growth_request_outstanding {
+                tuning.growth_request_outstanding = false;
+                true
+            } else {
+                false
+            }
+        };
+        if answer_request {
+            self.answer_window_growth_request();
+        }
+    }
+
+    fn answer_window_growth_request(&self) {
+        if self.protocol == ProtocolVersion::V1 || self.is_terminal() {
+            return;
+        }
+        let Some(owner) = self.owner.upgrade() else {
+            return;
+        };
+
+        let mut local_window = self
+            .local_window
+            .lock()
+            .expect("local window mutex poisoned");
+        let current_window = *local_window;
+        let mut new_window = current_window;
+        let proposed_window = current_window
+            .saturating_mul(4)
+            .min(owner.options.max_channel_receive_window)
+            .min(MAX_RECEIVE_WINDOW);
+        if proposed_window > current_window {
+            let growth = proposed_window - current_window;
+            if owner.try_reserve_window_growth(growth) {
+                *local_window = proposed_window;
+                self.window_tuning
+                    .lock()
+                    .expect("window tuning mutex poisoned")
+                    .reserved_growth += growth;
+                new_window = proposed_window;
+                if self.is_terminal() {
+                    drop(local_window);
+                    self.release_reserved_window_growth();
+                    return;
+                }
+            }
+        }
+        drop(local_window);
+
+        let _ = self.send(Code::ChannelWindowAdjust, encode_window_adjust(new_window));
+    }
+
+    fn request_window_growth(&self) {
+        if self.protocol == ProtocolVersion::V1 || self.is_terminal() {
+            return;
+        }
+
+        let should_send = {
+            let mut tuning = self
+                .window_tuning
+                .lock()
+                .expect("window tuning mutex poisoned");
+            if tuning.growth_request_pending {
+                return;
+            }
+
+            tuning.stalls_since_request += 1;
+            let threshold = 1_usize << tuning.refusals;
+            if tuning.stalls_since_request < threshold {
+                false
+            } else {
+                tuning.stalls_since_request = 0;
+                tuning.growth_request_pending = true;
+                true
+            }
+        };
+        if should_send {
+            let _ = self.send(Code::ChannelWindowGrowthRequest, Vec::new());
+        }
     }
 
     pub(crate) fn content_consumed(&self, bytes: usize) {
@@ -1158,12 +1390,26 @@ impl ChannelState {
         };
         self.acceptance.complete(acceptance_result);
         self.completion.complete(result);
+        self.release_reserved_window_growth();
         if stop_pumps {
             self.pump_stop.complete(Ok(()));
             self.stop_pumps();
         }
         if let Some(owner) = self.owner.upgrade() {
             owner.remove_channel(self.id);
+        }
+    }
+
+    fn release_reserved_window_growth(&self) {
+        let reserved_growth = {
+            let mut tuning = self
+                .window_tuning
+                .lock()
+                .expect("window tuning mutex poisoned");
+            std::mem::take(&mut tuning.reserved_growth)
+        };
+        if let Some(owner) = self.owner.upgrade() {
+            owner.release_window_growth(reserved_growth);
         }
     }
 
@@ -1241,6 +1487,7 @@ impl ChannelState {
                     }
                 }
             }
+            self.request_window_growth();
             observed.await;
         }
     }

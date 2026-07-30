@@ -1,7 +1,7 @@
 //! Tokio support for the Nerdbank.Streams multiplexing protocol.
 //!
-//! Protocol versions 1, 2, and 3 are supported. Later additive protocol
-//! extensions are deliberately not emitted or accepted.
+//! Protocol versions 1, 2, and 3 are supported. Protocol v2 and v3 also
+//! support the additive channel receive-window growth extensions.
 
 mod channel;
 mod frame;
