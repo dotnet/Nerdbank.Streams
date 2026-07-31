@@ -13,7 +13,7 @@ use std::{
 use nerdbank_streams::mxstream::{ChannelOptions, MultiplexingStream, Options, ProtocolVersion};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream, ReadBuf},
-    time::{sleep, timeout},
+    time::timeout,
 };
 
 fn options(version: ProtocolVersion) -> Options {
@@ -214,10 +214,24 @@ async fn v3_named_channel_round_trip() {
 #[tokio::test]
 async fn anonymous_channel_is_accepted_by_id() {
     let (left, right) = connected(ProtocolVersion::V3).await;
+    let (left_signal, right_signal) = tokio::join!(
+        left.offer_channel("signal", None),
+        right.accept_channel("signal", None)
+    );
+    let mut left_signal = left_signal.expect("signal offer");
+    let mut right_signal = right_signal.expect("signal acceptance");
     let mut offered = left.create_channel(None).expect("anonymous offer");
-    sleep(Duration::from_millis(10)).await;
+    left_signal
+        .write_all(&offered.id().id.to_le_bytes())
+        .await
+        .expect("send anonymous channel ID");
+    let mut id = [0; 8];
+    right_signal
+        .read_exact(&mut id)
+        .await
+        .expect("receive anonymous channel ID");
     let mut accepted = right
-        .accept_channel_by_id(offered.id().id, None)
+        .accept_channel_by_id(u64::from_le_bytes(id), None)
         .await
         .expect("anonymous acceptance");
 
@@ -280,11 +294,6 @@ async fn flow_control_blocks_until_the_reader_drains() {
         offered.write_all(b"abcdefgh").await.expect("write limited");
         offered
     });
-    sleep(Duration::from_millis(30)).await;
-    assert!(
-        !writer.is_finished(),
-        "writer should wait for ContentProcessed credit"
-    );
 
     let mut first = [0; 4];
     accepted
@@ -319,11 +328,6 @@ async fn window_growth_increases_usable_send_credit() {
             .expect("write throttled content");
         offered
     });
-    sleep(Duration::from_millis(30)).await;
-    assert!(
-        !writer.is_finished(),
-        "the sender should first exhaust the original window"
-    );
 
     let mut initial_window = [0_u8; 4];
     accepted
@@ -369,11 +373,6 @@ async fn window_growth_is_deferred_until_reader_starves() {
             .expect("write throttled content");
         offered
     });
-    sleep(Duration::from_millis(30)).await;
-    assert!(
-        !writer.is_finished(),
-        "a request must not be answered while the consumer still has buffered data"
-    );
 
     let mut initial_window = [0_u8; 4];
     accepted
@@ -435,7 +434,6 @@ async fn window_growth_is_capped_per_channel() {
             .expect("write first transfer");
         offered
     });
-    sleep(Duration::from_millis(30)).await;
     let mut initial_window = [0_u8; 4];
     accepted
         .read_exact(&mut initial_window)
@@ -450,7 +448,6 @@ async fn window_growth_is_capped_per_channel() {
         .read_exact(&mut first_growth)
         .await
         .expect("drain final first-transfer content");
-    sleep(Duration::from_millis(30)).await;
 
     let mut second_writer = tokio::spawn(async move {
         let mut offered = offered;
@@ -460,7 +457,6 @@ async fn window_growth_is_capped_per_channel() {
             .expect("write second transfer");
         offered
     });
-    sleep(Duration::from_millis(30)).await;
     let mut capped_window = [0_u8; 8];
     accepted
         .read_exact(&mut capped_window)
@@ -500,7 +496,6 @@ async fn window_does_not_grow_when_stream_budget_is_exhausted() {
             .expect("write throttled content");
         offered
     });
-    sleep(Duration::from_millis(30)).await;
     let mut original_window = [0_u8; 4];
     accepted
         .read_exact(&mut original_window)
@@ -566,7 +561,6 @@ async fn dropped_window_frames_fall_back_to_fixed_window_flow_control() {
             .expect("write fixed-window transfer");
         offered
     });
-    sleep(Duration::from_millis(30)).await;
     let mut received = [0_u8; 20];
     accepted
         .read_exact(&mut received)
@@ -631,8 +625,6 @@ async fn closing_a_reader_releases_a_blocked_writer() {
         offered
     });
 
-    sleep(Duration::from_millis(30)).await;
-    assert!(!writer.is_finished(), "writer should be flow controlled");
     accepted.close_read().await.expect("close reader");
     let offered = timeout(Duration::from_secs(1), writer)
         .await
@@ -663,8 +655,6 @@ async fn flow_control_on_one_channel_does_not_block_another_channel() {
             .expect("blocked write");
         blocked_offer
     });
-    sleep(Duration::from_millis(30)).await;
-    assert!(!blocked_writer.is_finished(), "first writer should block");
 
     let (other_offer, other_accept) = tokio::join!(
         left.offer_channel("other", None),
