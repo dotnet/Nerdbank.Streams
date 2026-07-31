@@ -83,6 +83,27 @@ jobs:
       run: corepack pnpm lint
       working-directory: src/nerdbank-streams
 
+    - name: 🦀 Install Rust 1.85.0
+      uses: dtolnay/rust-toolchain@1.85.0
+      with:
+        components: rustfmt, clippy
+    - name: 🦀 cargo build
+      run: cargo build --locked
+      working-directory: src/nerdbank-streams-rs
+    - name: 🦀 cargo test
+      run: cargo test --locked
+      working-directory: src/nerdbank-streams-rs
+    - name: 🦀 Verify Rust formatting
+      run: cargo fmt --check
+      working-directory: src/nerdbank-streams-rs
+    - name: 🦀 cargo clippy
+      run: cargo clippy --locked --all-targets -- -D warnings
+      working-directory: src/nerdbank-streams-rs
+    - name: 🦀 Package crate
+      run: tools/Pack-Cargo.ps1
+      shell: pwsh
+      if: runner.os == 'Linux'
+
     - name: 💅🏻 Verify formatted code
       run: dotnet format --verify-no-changes --no-restore
       shell: pwsh

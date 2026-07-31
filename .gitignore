@@ -356,6 +356,11 @@ MigrationBackup/
 # mac-created file to track user view preferences for a directory
 .DS_Store
 
+# Rust build and editor artifacts
+**/target/
+*.rs.bk
+.rust-analyzer/
+
 # Analysis results
 *.sarif
 
