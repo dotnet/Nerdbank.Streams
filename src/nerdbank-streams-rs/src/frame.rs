@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use rand::Rng;
+use rand::RngExt;
 use rmp::encode;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
