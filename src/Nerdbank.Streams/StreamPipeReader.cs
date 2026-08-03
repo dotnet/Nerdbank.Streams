@@ -157,27 +157,25 @@ namespace Nerdbank.Streams
                 memory = this.buffer.GetMemory(this.bufferSize);
             }
 
-            using (var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, this.readCancellationSource!.Token))
+            using CancellationTokenSource? cts = cancellationToken.CanBeCanceled ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, this.readCancellationSource!.Token) : null;
+            try
             {
-                try
+                int bytesRead = await this.stream.ReadAsync(memory, cts?.Token ?? this.readCancellationSource!.Token).ConfigureAwait(false);
+                if (bytesRead == 0)
                 {
-                    int bytesRead = await this.stream.ReadAsync(memory, cts.Token).ConfigureAwait(false);
-                    if (bytesRead == 0)
-                    {
-                        this.CompleteWriting();
-                        return new ReadResult(this.buffer, isCanceled: false, isCompleted: true);
-                    }
+                    this.CompleteWriting();
+                    return new ReadResult(this.buffer, isCanceled: false, isCompleted: true);
+                }
 
-                    lock (this.syncObject)
-                    {
-                        this.buffer.Advance(bytesRead);
-                        return new ReadResult(this.buffer, isCanceled: false, isCompleted: false);
-                    }
-                }
-                catch (OperationCanceledException) when (this.readCancellationSource.Token.IsCancellationRequested)
+                lock (this.syncObject)
                 {
-                    return new ReadResult(this.buffer, isCanceled: true, isCompleted: this.isReaderCompleted);
+                    this.buffer.Advance(bytesRead);
+                    return new ReadResult(this.buffer, isCanceled: false, isCompleted: false);
                 }
+            }
+            catch (OperationCanceledException) when (this.readCancellationSource.Token.IsCancellationRequested)
+            {
+                return new ReadResult(this.buffer, isCanceled: true, isCompleted: this.isReaderCompleted);
             }
         }
 

@@ -18,6 +18,7 @@ namespace Nerdbank.Streams.Benchmark
                 typeof(ContendedChannelsBenchmark),
                 typeof(ChannelLifetimeBenchmark),
                 typeof(LatencyBulkTransferBenchmark),
+                typeof(StreamPipeReaderBenchmark),
             });
             switcher.Run(args);
         }
