@@ -71,7 +71,7 @@ jobs:
         corepack prepare pnpm@11.12.0 --activate
         pnpm --version
     - name: ⚙️ pnpm install
-      run: corepack pnpm install --frozen-lockfile
+      run: corepack pnpm install --frozen-lockfile --fetch-retries=5 --fetch-timeout=120000
       working-directory: src/nerdbank-streams
     - name: 🛠️ pnpm build
       run: corepack pnpm build
