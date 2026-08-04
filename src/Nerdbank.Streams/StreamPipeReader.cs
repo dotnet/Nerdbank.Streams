@@ -11,6 +11,7 @@ namespace Nerdbank.Streams
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft;
+    using Microsoft.VisualStudio.Threading;
 
     /// <summary>
     /// A <see cref="PipeReader"/> that reads from an underlying <see cref="Stream"/> exactly when told to do so
@@ -157,27 +158,25 @@ namespace Nerdbank.Streams
                 memory = this.buffer.GetMemory(this.bufferSize);
             }
 
-            using (var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, this.readCancellationSource!.Token))
+            using CancellationTokenExtensions.CombinedCancellationToken combined = cancellationToken.CombineWith(this.readCancellationSource.Token);
+            try
             {
-                try
+                int bytesRead = await this.stream.ReadAsync(memory, combined.Token).ConfigureAwait(false);
+                if (bytesRead == 0)
                 {
-                    int bytesRead = await this.stream.ReadAsync(memory, cts.Token).ConfigureAwait(false);
-                    if (bytesRead == 0)
-                    {
-                        this.CompleteWriting();
-                        return new ReadResult(this.buffer, isCanceled: false, isCompleted: true);
-                    }
+                    this.CompleteWriting();
+                    return new ReadResult(this.buffer, isCanceled: false, isCompleted: true);
+                }
 
-                    lock (this.syncObject)
-                    {
-                        this.buffer.Advance(bytesRead);
-                        return new ReadResult(this.buffer, isCanceled: false, isCompleted: false);
-                    }
-                }
-                catch (OperationCanceledException) when (this.readCancellationSource.Token.IsCancellationRequested)
+                lock (this.syncObject)
                 {
-                    return new ReadResult(this.buffer, isCanceled: true, isCompleted: this.isReaderCompleted);
+                    this.buffer.Advance(bytesRead);
+                    return new ReadResult(this.buffer, isCanceled: false, isCompleted: false);
                 }
+            }
+            catch (OperationCanceledException) when (this.readCancellationSource.Token.IsCancellationRequested)
+            {
+                return new ReadResult(this.buffer, isCanceled: true, isCompleted: this.isReaderCompleted);
             }
         }
 
