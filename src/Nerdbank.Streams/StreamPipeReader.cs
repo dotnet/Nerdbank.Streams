@@ -11,6 +11,7 @@ namespace Nerdbank.Streams
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft;
+    using Microsoft.VisualStudio.Threading;
 
     /// <summary>
     /// A <see cref="PipeReader"/> that reads from an underlying <see cref="Stream"/> exactly when told to do so
@@ -157,10 +158,10 @@ namespace Nerdbank.Streams
                 memory = this.buffer.GetMemory(this.bufferSize);
             }
 
-            using CancellationTokenSource? cts = cancellationToken.CanBeCanceled ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, this.readCancellationSource!.Token) : null;
+            using CancellationTokenExtensions.CombinedCancellationToken combined = cancellationToken.CombineWith(this.readCancellationSource.Token);
             try
             {
-                int bytesRead = await this.stream.ReadAsync(memory, cts?.Token ?? this.readCancellationSource!.Token).ConfigureAwait(false);
+                int bytesRead = await this.stream.ReadAsync(memory, combined.Token).ConfigureAwait(false);
                 if (bytesRead == 0)
                 {
                     this.CompleteWriting();
