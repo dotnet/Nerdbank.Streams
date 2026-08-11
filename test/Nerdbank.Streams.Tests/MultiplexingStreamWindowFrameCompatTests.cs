@@ -22,7 +22,7 @@ using Xunit;
 /// </remarks>
 public class MultiplexingStreamWindowFrameCompatTests : TestBase
 {
-    private int droppedFrames;
+    private readonly AsyncManualResetEvent windowFrameDropped = new();
 
     public MultiplexingStreamWindowFrameCompatTests(ITestOutputHelper logger)
         : base(logger)
@@ -64,9 +64,9 @@ public class MultiplexingStreamWindowFrameCompatTests : TestBase
             },
             this.TimeoutToken);
 
-        // Let the sender run ahead with nobody reading, so it is certain to exhaust its window and ask for
-        // a larger one. A prompt reader on a zero-latency pipe may never let the sender stall at all.
-        await Task.Delay(ExpectedTimeout, this.TimeoutToken);
+        // Wait until the sender has exhausted its window before reading. A prompt reader on a zero-latency
+        // pipe may otherwise keep up with the sender so well that it never stalls.
+        await this.windowFrameDropped.WaitAsync(this.TimeoutToken);
 
         byte[] received = new byte[TransferSize];
         int bytesRead = 0;
@@ -79,10 +79,6 @@ public class MultiplexingStreamWindowFrameCompatTests : TestBase
 
         await sendTask.WithCancellation(this.TimeoutToken);
         Assert.Equal<byte>(payload, received);
-
-        // Guard against a vacuous pass: the transfer is far larger than the default window,
-        // so the sender must have stalled and asked for a larger one at least once.
-        Assert.NotEqual(0, this.droppedFrames);
 
         await mx1.DisposeAsync();
         await mx2.DisposeAsync();
@@ -108,7 +104,7 @@ public class MultiplexingStreamWindowFrameCompatTests : TestBase
             int code = peek.ReadInt32();
             if (code is ChannelWindowAdjust or ChannelWindowGrowthRequest)
             {
-                Interlocked.Increment(ref this.droppedFrames);
+                this.windowFrameDropped.Set();
                 this.Logger.WriteLine("Dropping frame with control code {0}.", code);
                 continue;
             }
