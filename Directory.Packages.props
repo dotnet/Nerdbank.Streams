@@ -10,6 +10,7 @@
     <VSThreadingVersion>18.7.23</VSThreadingVersion>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Put repo-specific PackageVersion items in this group. -->
     <PackageVersion Include="BenchmarkDotNet.Diagnostics.Windows" Version="$(BenchmarkDotNetVersion)" />
     <PackageVersion Include="BenchmarkDotNet" Version="$(BenchmarkDotNetVersion)" />
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="$(AspNetCoreVersion)" />
