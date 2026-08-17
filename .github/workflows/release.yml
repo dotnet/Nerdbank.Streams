@@ -122,7 +122,7 @@ jobs:
       run: >
         dotnet tool run sign -- code azure-key-vault
         '*.nupkg'
-        --base-directory '${{ runner.temp }}/deployables'
+        --base-directory '${{ runner.temp }}/deployables/NuGet'
         --file-list '${{ github.workspace }}/.github/signfiles.txt'
         --recurse-containers
         --azure-key-vault-url '${{ vars.AZURE_KEY_VAULT_URL }}'
