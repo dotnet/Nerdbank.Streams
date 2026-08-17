@@ -143,6 +143,7 @@ jobs:
         package-manager-cache: false  # never use caching in release builds
 
     - name: 🦀 Install Rust 1.85.0
+      if: ${{ !inputs.skip_cargo }}
       uses: dtolnay/rust-toolchain@1.85.0
 
     # The crate must first be manually published and configured for Trusted
@@ -170,11 +171,17 @@ jobs:
       shell: pwsh
       run: |
         $tgz = (Get-ChildItem ./deployables/npm/*.tgz)[0].FullName
-        npm init -y
-        npm install $tgz
-        Push-Location node_modules/nerdbank-streams
+        $packageMetadata = tar -xOf $tgz package/package.json | ConvertFrom-Json
+        $publishArgs = @($tgz)
+
+        if ($packageMetadata.version -match '-(?<prerelease>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)') {
+          $publishTag = $Matches.prerelease.Split('.')[0]
+          Write-Host "Detected prerelease version $($packageMetadata.version). Publishing with dist-tag '$publishTag'."
+          $publishArgs += "--tag=$publishTag"
+        }
+
         npm set //registry.npmjs.org/:_authToken=${{ secrets.NPM_API_KEY }}
-        npm publish
+        npm publish @publishArgs
       working-directory: ${{ runner.temp }}
 
     - name: 🚀 Push NuGet packages
