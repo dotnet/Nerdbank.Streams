@@ -62,6 +62,6 @@
     "await-semaphore": "^0.1.3",
     "cancellationtoken": "^2.2.0",
     "caught": "^0.1.3",
-    "msgpack-lite": "^0.1.26"
+    "msgpack-lite": "^0.2.0"
   }
 }
