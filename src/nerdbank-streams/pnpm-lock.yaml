@@ -19,7 +19,7 @@ importers:
         version: 0.1.3
       msgpack-lite:
         specifier: ^0.1.26
-        version: 0.1.26
+        version: 0.1.27
     devDependencies:
       '@types/gulp':
         specifier: 4.0.18
@@ -2366,8 +2366,8 @@ packages:
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
-  msgpack-lite@0.1.26:
-    resolution: {integrity: sha512-SZ2IxeqZ1oRFGo0xFGbvBJWMp3yLIY9rlIJyxy8CGrwZn1f0ZK4r6jV/AM1r0FZMDUkWkglOk/eeKIL9g77Nxw==}
+  msgpack-lite@0.1.27:
+    resolution: {integrity: sha512-q/ic+YAXhbEZVEtITloe2hOqnd6Zt75nwrX5vsDlo3mmZm99JUg9poC/wOzgp+Xl7jisbmU586DN1mhBnruWWQ==}
     hasBin: true
 
   mute-stdout@2.0.0:
@@ -5899,7 +5899,7 @@ snapshots:
 
   ms@2.1.3: {}
 
-  msgpack-lite@0.1.26:
+  msgpack-lite@0.1.27:
     dependencies:
       event-lite: 0.1.3
       ieee754: 1.2.1
