@@ -73,8 +73,8 @@ importers:
         specifier: 3.0.1
         version: 3.0.1
       nerdbank-gitversioning:
-        specifier: 3.10.91
-        version: 3.10.91
+        specifier: 3.10.94
+        version: 3.10.94
       path:
         specifier: 0.12.7
         version: 0.12.7
@@ -2437,8 +2437,8 @@ packages:
   neo-async@2.6.2:
     resolution: {integrity: sha512-Yd3UES5mWCSqR+qNT93S3UoYUkqAZ9lLg8a7g9rimsWmYGK8cVToA4/sF3RrshdyV3sAGMXVUmpMYOw+dLpOuw==}
 
-  nerdbank-gitversioning@3.10.91:
-    resolution: {integrity: sha512-uECx6ljRpnU7vWMJmhKnyl8Zn0LAtA6TLZETLmsZ8QQiBAKiGcxZayzmoRkutOzMnQCDf/pr08Bpy0kFBQ3a9g==}
+  nerdbank-gitversioning@3.10.94:
+    resolution: {integrity: sha512-P2Hu93wiRPw2w81K6pQ1zdw15lqdevvp5x/U3p3Z1yZu5H+08pQiaz5uyQwKJChebREuVqb/e8zO1cKLIcsbNQ==}
     hasBin: true
 
   node-exports-info@1.6.2:
@@ -6051,7 +6051,7 @@ snapshots:
 
   neo-async@2.6.2: {}
 
-  nerdbank-gitversioning@3.10.91: {}
+  nerdbank-gitversioning@3.10.94: {}
 
   node-exports-info@1.6.2:
     dependencies:
