@@ -47,7 +47,7 @@
     "eslint-plugin-prettier": "5.5.6",
     "gulp": "5.0.1",
     "gulp-typescript": "6.0.0-alpha.1",
-    "jest": "30.4.2",
+    "jest": "30.5.1",
     "jshint": "2.13.6",
     "mkdirp": "3.0.1",
     "nerdbank-gitversioning": "3.10.91",
