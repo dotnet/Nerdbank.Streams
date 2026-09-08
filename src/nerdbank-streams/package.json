@@ -50,7 +50,7 @@
     "jest": "30.4.2",
     "jshint": "2.13.6",
     "mkdirp": "3.0.1",
-    "nerdbank-gitversioning": "3.10.91",
+    "nerdbank-gitversioning": "3.10.94",
     "path": "0.12.7",
     "prettier": "3.9.6",
     "ts-jest": "29.4.12",
