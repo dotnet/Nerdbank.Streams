@@ -164,6 +164,7 @@ jobs:
       run: |
         $crate = (Get-ChildItem ./deployables -Filter 'nerdbank-streams-*.crate' -Recurse)[0].FullName
         $packageDirectory = Join-Path $PWD 'cargo-package'
+        New-Item -ItemType Directory -Path $packageDirectory | Out-Null
         tar -xzf $crate -C $packageDirectory
         $manifest = (Get-ChildItem $packageDirectory -Filter Cargo.toml -Recurse)[0].FullName
         cargo publish --manifest-path $manifest --no-verify --token $env:CARGO_REGISTRY_TOKEN
