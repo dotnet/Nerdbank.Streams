@@ -36,7 +36,7 @@
     "@types/gulp": "4.0.18",
     "@types/jest": "30.0.0",
     "@types/msgpack-lite": "0.1.12",
-    "@types/node": "24.13.3",
+    "@types/node": "24.13.4",
     "@typescript/native": "npm:typescript@7.0.2",
     "@typescript-eslint/eslint-plugin": "8.70.0",
     "@typescript-eslint/parser": "8.70.0",
