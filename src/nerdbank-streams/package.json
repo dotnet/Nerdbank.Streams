@@ -52,7 +52,7 @@
     "mkdirp": "3.0.1",
     "nerdbank-gitversioning": "3.10.94",
     "path": "0.12.7",
-    "prettier": "3.9.7",
+    "prettier": "3.9.8",
     "ts-jest": "29.4.12",
     "ts-node": "10.9.2",
     "typescript": "npm:@typescript/typescript6@6.0.2",
