@@ -4,7 +4,7 @@
 
 #nullable enable
 
-#if NETSTANDARD2_0
+#if NETSTANDARD2_0 || NETFRAMEWORK
 
 using System.Diagnostics;
 using System.Runtime.CompilerServices;

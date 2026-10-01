@@ -40,3 +40,5 @@
    and thus allows for alloc-free reading across many sequences.
 1. [`DuplexPipe`](https://dotnet.github.io/Nerdbank.Streams/docs/DuplexPipe.html) is a trivial implementation of `IDuplexPipe`.
 1. [`Stream.ReadBlockAsync`](https://dotnet.github.io/Nerdbank.Streams/docs/ReadBlockAsync.html) guarantees to fill the supplied buffer except under certain documented conditions, instead of the regular `ReadAsync` guarantee of supplying at least 1 byte.
+
+1. [`SharedMemoryDuplexPipe`](https://dotnet.github.io/Nerdbank.Streams/docs/SharedMemoryDuplexPipe.html) connects two trusted processes on the same machine using a shared-memory `IDuplexPipe`.

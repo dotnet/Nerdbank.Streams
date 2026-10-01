@@ -4,7 +4,7 @@
 
 #nullable enable
 
-#if NETSTANDARD2_0
+#if NETSTANDARD2_0 || NETFRAMEWORK
 
 #pragma warning disable RS0026 // Do not add multiple public overloads with optional parameters
 
