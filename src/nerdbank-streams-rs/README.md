@@ -1,7 +1,7 @@
 # nerdbank-streams
 
 `nerdbank-streams` is a Tokio implementation of the
-[Nerdbank.Streams](https://github.com/AArnott/Nerdbank.Streams) multiplexing
+[Nerdbank.Streams](https://github.com/dotnet/Nerdbank.Streams) multiplexing
 protocol. It supports protocol versions 1, 2, and 3 and interoperates with
 the .NET implementation. For protocol v2 and v3, it supports the additive
 channel-window growth extensions (control codes 7 and 8). Peers that predate

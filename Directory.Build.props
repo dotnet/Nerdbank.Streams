@@ -34,11 +34,11 @@
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)\release.snk</AssemblyOriginatorKeyFile>
 
-    <PackageProjectUrl>https://github.com/aarnott/Nerdbank.Streams</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/dotnet/Nerdbank.Streams</PackageProjectUrl>
     <Company>Andrew Arnott</Company>
     <Authors>Andrew Arnott</Authors>
     <Copyright>© Andrew Arnott. All rights reserved.</Copyright>
-    <PackageProjectUrl>https://github.com/AArnott/Nerdbank.Streams</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/dotnet/Nerdbank.Streams</PackageProjectUrl>
     <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

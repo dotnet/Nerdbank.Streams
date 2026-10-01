@@ -201,7 +201,7 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
     }
 
     /// <summary>
-    /// Regression test for <see href="https://github.com/AArnott/Nerdbank.Streams/issues/253">#253</see>.
+    /// Regression test for <see href="https://github.com/dotnet/Nerdbank.Streams/issues/253">#253</see>.
     /// </summary>
     /// <devremarks>
     /// This test requires very careful timing with the debugger to actually hit the bug it was designed to identify. Specifically:
