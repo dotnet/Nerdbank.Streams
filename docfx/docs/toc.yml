@@ -7,6 +7,10 @@ items:
   href: AsStream.md
 - name: TextWriter for IBufferWriter<byte>
   href: BufferTextWriter.md
+- name: Shared memory duplex pipe
+  href: SharedMemoryDuplexPipe.md
+- name: Security considerations
+  href: security.md
 - name: DuplexPipe
   href: DuplexPipe.md
 - name: Full-duplex streams

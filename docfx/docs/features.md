@@ -34,5 +34,6 @@
 1. [`SequenceTextReader`](SequenceTextReader.md) is a `TextReader`-derived type that can
    read directly from any `ReadOnlySequence<byte>`, making it more reusable than `StreamReader`
    and thus allows for alloc-free reading across many sequences.
+1. [`SharedMemoryDuplexPipe`](SharedMemoryDuplexPipe.md) lets two trusted processes on one machine exchange bytes through a shared-memory `IDuplexPipe`, with no kernel copy of message data.
 1. [`DuplexPipe`](DuplexPipe.md) is a trivial implementation of `IDuplexPipe`.
 1. [`Stream.ReadBlockAsync`](ReadBlockAsync.md) guarantees to fill the supplied buffer except under certain documented conditions, instead of the regular `ReadAsync` guarantee of supplying at least 1 byte.

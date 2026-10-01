@@ -1,4 +1,4 @@
-﻿// Copyright (c) Andrew Arnott. All rights reserved.
+// Copyright (c) Andrew Arnott. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 namespace Nerdbank.Streams.Benchmark
@@ -13,6 +13,7 @@ namespace Nerdbank.Streams.Benchmark
             var switcher = new BenchmarkSwitcher(new[]
             {
                 typeof(SequenceBenchmark),
+                typeof(SharedMemoryTransportBenchmark),
                 typeof(BulkTransferBenchmark),
                 typeof(DuplexMessagingBenchmark),
                 typeof(ContendedChannelsBenchmark),
