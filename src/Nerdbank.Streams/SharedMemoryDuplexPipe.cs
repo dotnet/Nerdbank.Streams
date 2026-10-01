@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
 using System.IO.Pipelines;
 using System.IO.Pipes;
+using System.Net.Sockets;
 #if NETFRAMEWORK
 using System.Security.AccessControl;
 using System.Security.Principal;
@@ -153,7 +154,14 @@ public sealed class SharedMemoryDuplexPipe : IDuplexPipe, IDisposable
 
             using (cancellationToken.Register(static s => ((PipeStream)s!).Close(), rendezvous))
             {
-                await rendezvous.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    await rendezvous.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (SocketException ex) when (!cancellationToken.IsCancellationRequested)
+                {
+                    throw new IOException("The shared-memory client failed while establishing the rendezvous connection.", ex);
+                }
             }
 
             byte[] ready = new byte[1];
