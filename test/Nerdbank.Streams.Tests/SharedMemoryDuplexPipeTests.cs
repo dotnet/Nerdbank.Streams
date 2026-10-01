@@ -4,12 +4,17 @@
 using System.Buffers;
 using System.IO.Pipelines;
 using System.Runtime.InteropServices;
+#if NETFRAMEWORK
+using System.IO.Pipes;
+using System.Security.AccessControl;
+using System.Security.Principal;
+#endif
 using Nerdbank.Streams;
 using Xunit;
 
 public class SharedMemoryDuplexPipeTests
 {
-#if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER || NETFRAMEWORK
     [Fact]
     public async Task BasicRoundTripOverPair()
     {
@@ -190,6 +195,7 @@ public class SharedMemoryDuplexPipeTests
         }
     }
 
+#if NET8_0_OR_GREATER
     /// <summary>Verifies that other users cannot read or write a waiting listener's backing file.</summary>
     [Fact]
     public async Task UnixBackingFileIsOwnerOnly()
@@ -216,6 +222,8 @@ public class SharedMemoryDuplexPipeTests
             Directory.Delete(directory, recursive: true);
         }
     }
+
+#endif
 
     /// <summary>
     /// Verifies that no file is left on disk once the endpoints are connected, so a crash cannot leave one behind.
@@ -259,12 +267,30 @@ public class SharedMemoryDuplexPipeTests
 #endif
 
 #if NETFRAMEWORK
+    /// <summary>Verifies that the Framework rendezvous pipe grants access only to the current user.</summary>
     [Fact]
-    public async Task UnsupportedNetstandardAssemblyRejectsSharedMemory()
+    public async Task FrameworkRendezvousPipeIsCurrentUserOnly()
     {
-        await Assert.ThrowsAsync<PlatformNotSupportedException>(() => SharedMemoryDuplexPipe.CreatePairAsync());
-        await Assert.ThrowsAsync<PlatformNotSupportedException>(() => SharedMemoryDuplexPipe.ListenAsync("unsupported"));
-        await Assert.ThrowsAsync<PlatformNotSupportedException>(() => SharedMemoryDuplexPipe.ConnectAsync("unsupported"));
+        string channelName = $"test-{Guid.NewGuid():N}";
+        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(10));
+        Task<SharedMemoryDuplexPipe> listen = SharedMemoryDuplexPipe.ListenAsync(channelName, cancellationToken: timeout.Token);
+        using NamedPipeClientStream client = new(".", $"nbjsonrpc-{channelName}", PipeDirection.InOut, System.IO.Pipes.PipeOptions.Asynchronous);
+        await client.ConnectAsync(timeout.Token);
+        PipeSecurity security = client.GetAccessControl();
+        using WindowsIdentity identity = WindowsIdentity.GetCurrent();
+        SecurityIdentifier user = identity.User!;
+        Assert.Equal(user, security.GetOwner(typeof(SecurityIdentifier)));
+        Assert.True(security.AreAccessRulesProtected);
+        AuthorizationRuleCollection rules = security.GetAccessRules(includeExplicit: true, includeInherited: true, typeof(SecurityIdentifier));
+        Assert.NotEmpty(rules);
+        foreach (PipeAccessRule rule in rules)
+        {
+            Assert.Equal(user, rule.IdentityReference);
+            Assert.Equal(AccessControlType.Allow, rule.AccessControlType);
+        }
+
+        await client.WriteAsync(new byte[] { 1 }, 0, 1, timeout.Token);
+        using SharedMemoryDuplexPipe server = await listen;
     }
 #endif
 }

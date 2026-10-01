@@ -4,7 +4,7 @@ Nerdbank.Streams exposes transport primitives. It does not authenticate peers, a
 
 ## Shared memory
 
-<xref:Nerdbank.Streams.SharedMemoryDuplexPipe> is for mutually trusted processes running as the same user, not a boundary between different privilege levels. It restricts the rendezvous to the current user on .NET 8+ and rejects use from netstandard assemblies where this check is unavailable. Windows mappings and named events use the creating process's default security in the current logon session; Unix backing files use owner-only (0600) permissions and are unlinked after mapping.
+<xref:Nerdbank.Streams.SharedMemoryDuplexPipe> is for mutually trusted processes running as the same user, not a boundary between different privilege levels. It restricts the rendezvous to the current user on .NET 8+; on .NET Framework the listener applies a current-user-only ACL and clients verify the listener's owner SID. Netstandard assemblies reject the transport because they cannot enforce the same checks. Windows mappings and named events use the creating process's default security in the current logon session; Unix backing files use owner-only (0600) permissions and are unlinked after mapping.
 
 Another process **running as the same user** that learns the channel name can race to connect first. Generate an unpredictable name and give it only to the intended peer through a trusted path. The listener creates a new mapping rather than adopting an existing name, preventing an attacker from pre-creating its contents. The endpoint verifies the rendezvous peer is the current user, not a particular process or application.
 

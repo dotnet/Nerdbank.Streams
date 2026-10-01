@@ -16,7 +16,7 @@
     <PackageVersion Remove="System.IO.Pipelines" />
     <PackageVersion Remove="System.Runtime.CompilerServices.Unsafe" />
     <PackageVersion Remove="System.Text.Json" />
-    <PackageVersion Remove="Microsoft.Bcl.AsyncInterfaces" />
+    <PackageVersion Remove="Microsoft.Bcl.AsyncInterfaces" Condition="'$(TargetFramework)' != 'net472'" />
   </ItemGroup>
 
   <Import Project="$([MSBuild]::GetPathOfFileAbove($(MSBuildThisFile), $(MSBuildThisFileDirectory)..))" />

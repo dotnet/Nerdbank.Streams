@@ -40,11 +40,7 @@ public class SharedMemoryTransportBenchmark
     private byte[] payload = null!;
 
     /// <summary>Gets or sets the transport being measured.</summary>
-#if NETFRAMEWORK
-    [Params(TransportKind.InMemory, TransportKind.NamedPipe)]
-#else
     [Params(TransportKind.InMemory, TransportKind.NamedPipe, TransportKind.SharedMemory)]
-#endif
     public TransportKind Transport { get; set; }
 
     /// <summary>Gets or sets the bytes sent per request.</summary>
