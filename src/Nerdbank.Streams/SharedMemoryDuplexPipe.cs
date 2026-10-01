@@ -16,6 +16,8 @@ using System.Runtime.InteropServices;
 #if NET
 using System.Runtime.CompilerServices;
 using System.Runtime.Versioning;
+using System.Security.Cryptography;
+using System.Text;
 #endif
 using System.Threading.Tasks.Sources;
 using Microsoft;
@@ -139,7 +141,7 @@ public sealed class SharedMemoryDuplexPipe : IDuplexPipe, IDisposable
         SharedMemoryDuplexPipe server = new(name, isServer: true, capacity, create: true, inProcess: false, options.BaseDirectory);
         try
         {
-            NamedPipeServerStream rendezvous = CreateRendezvousServer(name);
+            NamedPipeServerStream rendezvous = CreateRendezvousServer(GetRendezvousName(name));
 
             server.signaling = signalingMode switch
             {
@@ -196,7 +198,7 @@ public sealed class SharedMemoryDuplexPipe : IDuplexPipe, IDisposable
             var specific => specific,
         };
 
-        NamedPipeClientStream rendezvous = new(".", name, PipeDirection.InOut, RendezvousPipeOptions);
+        NamedPipeClientStream rendezvous = new(".", GetRendezvousName(name), PipeDirection.InOut, RendezvousPipeOptions);
         try
         {
             using (cancellationToken.Register(static s => ((PipeStream)s!).Close(), rendezvous))
@@ -303,6 +305,19 @@ public sealed class SharedMemoryDuplexPipe : IDuplexPipe, IDisposable
 #if NETSTANDARD2_0 || NETSTANDARD2_1
         throw new PlatformNotSupportedException("Shared-memory IPC requires the .NET Framework or .NET 8 or later assembly; the netstandard assembly cannot enforce current-user-only rendezvous pipe security.");
 #endif
+    }
+
+    /// <summary>Returns a short Unix pipe name so the socket path fits macOS's domain-socket limit.</summary>
+    private static string GetRendezvousName(string name)
+    {
+#if NET
+        if (!IsWindows())
+        {
+            byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(name));
+            return $"nbsm-{Convert.ToHexString(hash.AsSpan(0, 16))}";
+        }
+#endif
+        return name;
     }
 
     /// <summary>Creates a rendezvous server limited to the current user.</summary>

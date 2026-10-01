@@ -56,10 +56,12 @@ public class SharedMemoryDuplexPipeTests
         }
     }
 
-    [Fact]
-    public async Task ListenAndConnectRendezvous()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ListenAndConnectRendezvous(bool longName)
     {
-        string channelName = $"test-{Guid.NewGuid():N}";
+        string channelName = $"test-{Guid.NewGuid():N}" + (longName ? new string('x', 72) : string.Empty);
         Task<SharedMemoryDuplexPipe> listenTask = SharedMemoryDuplexPipe.ListenAsync(channelName);
         SharedMemoryDuplexPipe client = await SharedMemoryDuplexPipe.ConnectAsync(channelName);
         SharedMemoryDuplexPipe server = await listenTask;
