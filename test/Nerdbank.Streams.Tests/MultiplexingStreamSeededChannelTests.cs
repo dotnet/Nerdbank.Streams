@@ -16,7 +16,8 @@ using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
 
-public class MultiplexingStreamSeededChannelTests : TestBase, IAsyncDisposable
+[NotInParallel(nameof(MultiplexingStreamSeededChannelTests))]
+public class MultiplexingStreamSeededChannelTests : TestBase, System.IAsyncDisposable
 {
     private Stream transport1;
     private Stream transport2;

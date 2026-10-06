@@ -15,7 +15,8 @@ using Nerdbank.Streams;
 using StreamJsonRpc;
 using Xunit;
 
-public class MultiplexingStreamPerfTests : TestBase, IAsyncDisposable
+[NotInParallel(nameof(MultiplexingStreamPerfTests))]
+public class MultiplexingStreamPerfTests : TestBase, System.IAsyncDisposable
 {
     private const int SegmentSize = 5 * 1024;
     private const int SegmentCount = 100;
@@ -31,7 +32,7 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncDisposable
         this.clientPipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
     }
 
-    [Before(Test)]
+    [Before(HookType.Test)]
     public async Task InitializeAsync()
     {
         Task connectTask = this.serverPipe.WaitForConnectionAsync(this.TimeoutToken);

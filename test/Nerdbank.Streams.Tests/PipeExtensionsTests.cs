@@ -316,7 +316,7 @@ public partial class PipeExtensionsTests : TestBase
         });
     }
 
-    [Fact, Obsolete]
+    [Test, Obsolete]
     public void UsePipe_DoesNotCollapseAdapterStacks()
     {
         (IDuplexPipe, IDuplexPipe) pipes = FullDuplexStream.CreatePipePair();

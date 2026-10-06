@@ -11,13 +11,9 @@ using Nerdbank.Streams;
 using Xunit;
 
 [InheritsTests]
+[NotInParallel(nameof(MultiplexingStreamV2Tests))]
 public class MultiplexingStreamV2Tests : MultiplexingStreamTests
 {
-    public MultiplexingStreamV2Tests()
-        : base(TestOutputHelper.Instance)
-    {
-    }
-
     protected override int ProtocolMajorVersion => 2;
 
     [Test]

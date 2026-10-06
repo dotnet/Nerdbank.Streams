@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using Nerdbank.Streams;
 using Xunit;
 
-public class NestedPipeReaderTests : TestBase, IAsyncDisposable
+public class NestedPipeReaderTests : TestBase, System.IAsyncDisposable
 {
     private static readonly ReadOnlyMemory<byte> OriginalBuffer = Enumerable.Range(1, 10).Select(i => (byte)i).ToArray();
     private readonly Pipe pipe = new Pipe();
@@ -25,7 +25,7 @@ public class NestedPipeReaderTests : TestBase, IAsyncDisposable
         return default;
     }
 
-    [Before(Test)]
+    [Before(HookType.Test)]
     public async Task InitializeAsync()
     {
         await this.pipe.Writer.WriteAsync(OriginalBuffer, this.TimeoutToken);

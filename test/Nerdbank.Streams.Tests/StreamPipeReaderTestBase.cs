@@ -178,7 +178,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
         reader.AdvanceTo(readResult.Buffer.End);
     }
 
-    [Theory, PairwiseData]
+    [Test, MatrixDataSource]
     public async Task ReadAsync_TwiceInARow(bool emptyStream)
     {
         var stream = new MemoryStream(emptyStream ? Array.Empty<byte>() : new byte[3]);
@@ -201,7 +201,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
         }
     }
 
-    [Theory, PairwiseData]
+    [Test, MatrixDataSource]
     public async Task TryRead_TwiceInARow(bool emptyStream)
     {
         var stream = new MemoryStream(emptyStream ? Array.Empty<byte>() : new byte[3]);

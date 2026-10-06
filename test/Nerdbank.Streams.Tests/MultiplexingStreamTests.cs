@@ -12,7 +12,8 @@ using Xunit;
 #pragma warning disable SA1401 // Fields should be private
 #pragma warning disable SA1414 // Tuple types in signatures should have element names
 
-public class MultiplexingStreamTests : TestBase, IAsyncDisposable
+[NotInParallel(nameof(MultiplexingStreamTests))]
+public class MultiplexingStreamTests : TestBase, System.IAsyncDisposable
 {
     protected Stream transport1;
     protected Stream transport2;
@@ -28,7 +29,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncDisposable
 
     protected virtual int ProtocolMajorVersion { get; } = 1;
 
-    [Before(Test)]
+    [Before(HookType.Test)]
     public async Task InitializeAsync()
     {
         await this.ReinitializeMxStreamsAsync(new MultiplexingStream.Options());
@@ -47,7 +48,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncDisposable
         this.Dispose();
     }
 
-    [Fact, Obsolete]
+    [Test, Obsolete]
     public async Task DefaultChannelTraceSourceFactory()
     {
         var factoryArgs = new TaskCompletionSource<(int, string)>();
@@ -276,7 +277,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncDisposable
         Assert.Throws<ObjectDisposedException>(() => this.transport1.Position);
     }
 
-    [Theory, PairwiseData]
+    [Test, MatrixDataSource]
     public async Task Dispose_DisposesChannels(bool channelFaulted)
     {
         await this.ReinitializeMxStreamsAsync(new MultiplexingStream.Options() { FaultOpenChannelsOnStreamDisposal = channelFaulted });
@@ -457,7 +458,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncDisposable
     /// <summary>
     /// Documents behavior when an anonymous channel is created and an accept of an empty named channel is attempted.
     /// </summary>
-    [Theory, PairwiseData]
+    [Test, MatrixDataSource]
     public async Task CreateChannel_AcceptChannelAsync(bool waitForPropagation)
     {
         MultiplexingStream.Channel ch1 = this.mx1.CreateChannel();

@@ -407,13 +407,13 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.True(reader.End);
         }
 
-        [Theory,
-            InlineData(0, false),
-            InlineData(5, false),
-            InlineData(10, false),
-            InlineData(11, true),
-            InlineData(12, true),
-            InlineData(15, true)]
+        [Test,
+            Arguments(0, false),
+            Arguments(5, false),
+            Arguments(10, false),
+            Arguments(11, true),
+            Arguments(12, true),
+            Arguments(15, true)]
         public void ReturnsCorrectCursor(int takes, bool end)
         {
             ReadOnlySequence<T> readableBuffer = Factory.CreateWithContent(GetInputData(10));
@@ -459,10 +459,10 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.Equal(buffer.Length, reader.Consumed);
         }
 
-        [Theory,
-            InlineData(1),
-            InlineData(2),
-            InlineData(3)]
+        [Test,
+            Arguments(1),
+            Arguments(2),
+            Arguments(3)]
         public void Advance_PositionIsCorrect(int advanceBy)
         {
             // Check that advancing through the reader gives the same position

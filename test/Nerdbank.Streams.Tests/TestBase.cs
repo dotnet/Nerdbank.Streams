@@ -10,6 +10,7 @@ using System.Runtime.ExceptionServices;
 using Microsoft;
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
+using TUnit.Core.Exceptions;
 using Xunit;
 using Xunit.Sdk;
 
@@ -194,7 +195,7 @@ public abstract class TestBase : IDisposable
     /// or <see langword="false"/> after the isolated instance of the test has completed execution.
     /// </returns>
     /// <exception cref="Xunit.Sdk.XunitException">Thrown if the isolated test result is a Failure.</exception>
-    /// <exception cref="SkipException">Thrown if on a platform that we do not yet support test isolation on.</exception>
+    /// <exception cref="SkipTestException">Thrown if on a platform that we do not yet support test isolation on.</exception>
     internal Task<bool> ExecuteInIsolationAsync(string testClassName, string testMethodName, ITestOutputHelper logger)
     {
         Requires.NotNullOrEmpty(testClassName, nameof(testClassName));
@@ -329,7 +330,7 @@ public abstract class TestBase : IDisposable
     /// or <see langword="false"/> after the isolated instance of the test has completed execution.
     /// </returns>
     /// <exception cref="Xunit.Sdk.XunitException">Thrown if the isolated test result is a Failure.</exception>
-    /// <exception cref="SkipException">Thrown if on a platform that we do not yet support test isolation on.</exception>
+    /// <exception cref="SkipTestException">Thrown if on a platform that we do not yet support test isolation on.</exception>
     internal Task<bool> ExecuteInIsolationAsync(object testClass, string testMethodName, ITestOutputHelper logger)
     {
         Requires.NotNull(testClass, nameof(testClass));
@@ -396,7 +397,7 @@ public abstract class TestBase : IDisposable
     /// or <see langword="false"/> after the isolated instance of the test has completed execution.
     /// </returns>
     /// <exception cref="Xunit.Sdk.XunitException">Thrown if the isolated test result is a Failure.</exception>
-    /// <exception cref="SkipException">Thrown if on a platform that we do not yet support test isolation on.</exception>
+    /// <exception cref="SkipTestException">Thrown if on a platform that we do not yet support test isolation on.</exception>
     protected Task<bool> ExecuteInIsolationAsync([CallerMemberName] string? testMethodName = null)
     {
         return this.ExecuteInIsolationAsync(this, testMethodName!, this.Logger);
@@ -412,7 +413,7 @@ public abstract class TestBase : IDisposable
     /// or <see langword="false"/> after the isolated instance of the test has completed execution.
     /// </returns>
     /// <exception cref="Xunit.Sdk.XunitException">Thrown if the isolated test result is a Failure.</exception>
-    /// <exception cref="SkipException">Thrown if on a platform that we do not yet support test isolation on.</exception>
+    /// <exception cref="SkipTestException">Thrown if on a platform that we do not yet support test isolation on.</exception>
     protected bool ExecuteInIsolation([CallerMemberName] string? testMethodName = null)
     {
 #pragma warning disable VSTHRD002 // Avoid problematic synchronous waits

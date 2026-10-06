@@ -7,6 +7,7 @@ using System.IO.Pipelines;
 using Nerdbank.Streams;
 using Xunit;
 
+[NotInParallel(nameof(MultiplexingStreamChannelOptionsTests))]
 public class MultiplexingStreamChannelOptionsTests : TestBase
 {
     public MultiplexingStreamChannelOptionsTests()
@@ -83,7 +84,7 @@ public class MultiplexingStreamChannelOptionsTests : TestBase
         options.ExistingPipe = new MockDuplexPipe { Output = pipe.Writer };
     }
 
-    [Fact, Obsolete]
+    [Test, Obsolete]
     public void ReaderPipeOptions()
     {
         PipeOptions expected = new PipeOptions();

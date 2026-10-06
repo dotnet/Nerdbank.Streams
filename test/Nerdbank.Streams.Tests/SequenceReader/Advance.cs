@@ -9,9 +9,9 @@ namespace Nerdbank.Streams.Tests.SequenceReader
 {
     public class Advance
     {
-        [Theory,
-            InlineData(true),
-            InlineData(false)]
+        [Test,
+            Arguments(true),
+            Arguments(false)]
         public void Basic(bool singleSegment)
         {
             byte[] buffer = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 };

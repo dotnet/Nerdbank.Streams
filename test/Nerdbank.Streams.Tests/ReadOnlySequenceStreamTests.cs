@@ -129,7 +129,7 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.True(((IDisposableObservable)this.defaultStream).IsDisposed);
     }
 
-    [Theory, PairwiseData]
+    [Test, MatrixDataSource]
     public void DisposeCallback(bool nullArg)
     {
         bool disposed = false;

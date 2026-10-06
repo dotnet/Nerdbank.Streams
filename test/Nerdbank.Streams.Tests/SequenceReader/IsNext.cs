@@ -9,9 +9,9 @@ namespace Nerdbank.Streams.Tests.SequenceReader
 {
     public class IsNext
     {
-        [Theory,
-            InlineData(true),
-            InlineData(false)]
+        [Test,
+            Arguments(true),
+            Arguments(false)]
         public void IsNext_Empty(bool advancePast)
         {
             var reader = new SequenceReader<char>(ReadOnlySequence<char>.Empty);

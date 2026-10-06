@@ -11,11 +11,11 @@ namespace Nerdbank.Streams.Tests.SequenceReader
 {
     public class ReadTo
     {
-        [Theory,
-            InlineData(false, false),
-            InlineData(false, true),
-            InlineData(true, false),
-            InlineData(true, true)]
+        [Test,
+            Arguments(false, false),
+            Arguments(false, true),
+            Arguments(true, false),
+            Arguments(true, true)]
         public void TryReadTo_Span(bool advancePastDelimiter, bool useEscapeOverload)
         {
             ReadOnlySequence<byte> bytes = SequenceFactory.Create(new byte[][] {
@@ -57,11 +57,11 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             }
         }
 
-        [Theory,
-            InlineData(false, false),
-            InlineData(false, true),
-            InlineData(true, false),
-            InlineData(true, true)]
+        [Test,
+            Arguments(false, false),
+            Arguments(false, true),
+            Arguments(true, false),
+            Arguments(true, true)]
         public void TryReadTo_Sequence(bool advancePastDelimiter, bool useEscapeOverload)
         {
             ReadOnlySequence<byte> bytes = SequenceFactory.Create(new byte[][] {
@@ -141,9 +141,9 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.True(sequenceReader.End);
         }
 
-        [Theory,
-            InlineData(false),
-            InlineData(true)]
+        [Test,
+            Arguments(false),
+            Arguments(true)]
         public void TryReadTo_NotFound_Span(bool advancePastDelimiter)
         {
             ReadOnlySequence<byte> bytes = SequenceFactory.Create(new byte[][] {
@@ -156,9 +156,9 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.False(reader.TryReadTo(out ReadOnlySpan<byte> span, 255, 0, advancePastDelimiter));
         }
 
-        [Theory,
-            InlineData(false),
-            InlineData(true)]
+        [Test,
+            Arguments(false),
+            Arguments(true)]
         public void TryReadTo_NotFound_Sequence(bool advancePastDelimiter)
         {
             ReadOnlySequence<byte> bytes = SequenceFactory.Create(new byte[][] {
