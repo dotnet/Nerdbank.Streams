@@ -109,7 +109,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             }
         }
 
-        [Fact]
+        [Test]
         public void TryReadExact_Sequence()
         {
             ReadOnlySequence<int> data = SequenceFactory.Create(new int[][] {

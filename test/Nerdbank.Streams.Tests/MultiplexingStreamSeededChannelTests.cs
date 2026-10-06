@@ -16,7 +16,7 @@ using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
 
-public class MultiplexingStreamSeededChannelTests : TestBase, IAsyncLifetime
+public class MultiplexingStreamSeededChannelTests : TestBase, IAsyncDisposable
 {
     private Stream transport1;
     private Stream transport2;
@@ -24,8 +24,8 @@ public class MultiplexingStreamSeededChannelTests : TestBase, IAsyncLifetime
     private MultiplexingStream mx2;
     private MultiplexingStream.Options options;
 
-    public MultiplexingStreamSeededChannelTests(ITestOutputHelper logger)
-        : base(logger)
+    public MultiplexingStreamSeededChannelTests()
+        : base(TestOutputHelper.Instance)
     {
         this.options = new MultiplexingStream.Options
         {
@@ -60,11 +60,6 @@ public class MultiplexingStreamSeededChannelTests : TestBase, IAsyncLifetime
         this.mx2 = MultiplexingStream.Create(this.transport2, new MultiplexingStream.Options(this.options) { TraceSource = mx2TraceSource, DefaultChannelTraceSourceFactoryWithQualifier = mx2TraceSourceFactory });
     }
 
-    public ValueTask InitializeAsync()
-    {
-        return default;
-    }
-
     public async ValueTask DisposeAsync()
     {
         await (this.mx1?.DisposeAsync() ?? default);
@@ -78,7 +73,7 @@ public class MultiplexingStreamSeededChannelTests : TestBase, IAsyncLifetime
         this.Dispose();
     }
 
-    [Fact]
+    [Test]
     public async Task SeededChannels_SendContent()
     {
         MultiplexingStream.Channel? channel1_0 = this.mx1.AcceptChannel(0);
@@ -90,7 +85,7 @@ public class MultiplexingStreamSeededChannelTests : TestBase, IAsyncLifetime
         await this.TransmitAndVerifyAsync(channel1_1.AsStream(), channel2_1.AsStream(), new byte[] { 4, 5, 6 });
     }
 
-    [Fact]
+    [Test]
     public async Task SeededChannels_CanBeClosed()
     {
         MultiplexingStream.Channel? channel1 = this.mx1.AcceptChannel(0);
@@ -106,27 +101,27 @@ public class MultiplexingStreamSeededChannelTests : TestBase, IAsyncLifetime
         await channel2.Completion.WithCancellation(this.TimeoutToken);
     }
 
-    [Fact]
+    [Test]
     public void SeededChannels_CannotBeRejected()
     {
         Assert.Throws<InvalidOperationException>(() => this.mx1.RejectChannel(0));
     }
 
-    [Fact]
+    [Test]
     public void SeededChannels_CannotBeAcceptedTwice()
     {
         this.mx1.AcceptChannel(0);
         Assert.Throws<InvalidOperationException>(() => this.mx1.AcceptChannel(0));
     }
 
-    [Fact]
+    [Test]
     public void CreateChannel_DoesNotOverlapSeededChannelIDs()
     {
         MultiplexingStream.Channel? channel = this.mx1.CreateChannel();
         Assert.True(channel.QualifiedId.Id >= (ulong)this.options.SeededChannels.Count);
     }
 
-    [Fact]
+    [Test]
     public void Create_VersionsWithHandshakes()
     {
         (Stream, Stream) pair = FullDuplexStream.CreatePair();

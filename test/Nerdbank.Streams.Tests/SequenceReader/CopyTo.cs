@@ -10,7 +10,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
 {
     public class CopyTo
     {
-        [Fact]
+        [Test]
         public void TryCopyTo_Empty()
         {
             var reader = new SequenceReader<char>(ReadOnlySequence<char>.Empty);
@@ -22,7 +22,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.False(reader.TryCopyTo(new char[1]));
         }
 
-        [Fact]
+        [Test]
         public void TryCopyTo_Multisegment()
         {
             ReadOnlySequence<char> chars = SequenceFactory.Create(new char[][] {

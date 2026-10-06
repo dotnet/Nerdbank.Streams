@@ -13,30 +13,30 @@ using IPC = System.IO.Pipes;
 
 public partial class PipeExtensionsTests : TestBase
 {
-    public PipeExtensionsTests(ITestOutputHelper logger)
-        : base(logger)
+    public PipeExtensionsTests()
+        : base(TestOutputHelper.Instance)
     {
     }
 
-    [Fact]
+    [Test]
     public void UsePipeReader_WebSocket_ThrowsOnNull()
     {
         Assert.Throws<ArgumentNullException>(() => PipeExtensions.UsePipeReader((WebSocket)null!));
     }
 
-    [Fact]
+    [Test]
     public void UsePipeWriter_WebSocket_ThrowsOnNull()
     {
         Assert.Throws<ArgumentNullException>(() => PipeExtensions.UsePipeWriter((WebSocket)null!));
     }
 
-    [Fact]
+    [Test]
     public void UseUtf8TextPipeWriter_WebSocket_ThrowsOnNull()
     {
         Assert.Throws<ArgumentNullException>("webSocket", () => PipeExtensions.UseUtf8TextPipeWriter(null!));
     }
 
-    [Fact]
+    [Test]
     public async Task UsePipe_Stream()
     {
         var ms = new SimplexStream();
@@ -47,7 +47,7 @@ public partial class PipeExtensionsTests : TestBase
         pipe.Input.AdvanceTo(readResult.Buffer.End);
     }
 
-    [Fact]
+    [Test]
     public async Task UsePipe_Stream_Disposal()
     {
         var ms = new SimplexStream();
@@ -64,7 +64,7 @@ public partial class PipeExtensionsTests : TestBase
     /// <remarks>
     /// This is worth a special test because on .NET Framework, IPC stream reads are not cancelable.
     /// </remarks>
-    [Fact]
+    [Test]
     public async Task UsePipe_IpcPipeStream_Disposal()
     {
         string? guid = Guid.NewGuid().ToString();
@@ -105,8 +105,8 @@ public partial class PipeExtensionsTests : TestBase
         await WhenAllSucceedOrAnyFail(ipcClientTask, ipcServerTask);
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task UsePipe_Stream_OneDirectionDoesNotDispose(bool completeOutput)
     {
         var ms = new SimplexStream();
@@ -129,7 +129,7 @@ public partial class PipeExtensionsTests : TestBase
         Assert.False(ms.IsDisposed);
     }
 
-    [Fact]
+    [Test]
     public async Task UsePipe_Stream_PropagatesException()
     {
         var stream = new MockInterruptedFullDuplexStream();
@@ -152,7 +152,7 @@ public partial class PipeExtensionsTests : TestBase
         });
     }
 
-    [Fact]
+    [Test]
     public async Task UsePipe_Stream_ReadOnlyStream()
     {
         (Stream, Stream) streamPair = FullDuplexStream.CreatePair();
@@ -173,7 +173,7 @@ public partial class PipeExtensionsTests : TestBase
         await this.AssertStreamClosesAsync(streamPair.Item1);
     }
 
-    [Fact]
+    [Test]
     public async Task UsePipe_Stream_WriteOnlyStream()
     {
         (Stream, Stream) streamPair = FullDuplexStream.CreatePair();
@@ -205,7 +205,7 @@ public partial class PipeExtensionsTests : TestBase
         await this.AssertStreamClosesAsync(streamPair.Item1);
     }
 
-    [Fact]
+    [Test]
     public async Task UsePipeReader_WebSocket()
     {
         byte[]? expectedBuffer = new byte[] { 4, 5, 6 };
@@ -217,7 +217,7 @@ public partial class PipeExtensionsTests : TestBase
         pipeReader.AdvanceTo(readResult.Buffer.End);
     }
 
-    [Fact]
+    [Test]
     public async Task UsePipeWriter_WebSocket()
     {
         byte[]? expectedBuffer = new byte[] { 4, 5, 6 };
@@ -233,7 +233,7 @@ public partial class PipeExtensionsTests : TestBase
         Assert.Equal(WebSocketMessageType.Binary, message.MessageTypeIfKnown);
     }
 
-    [Fact]
+    [Test]
     public async Task UseUtf8TextPipeWriter_WebSocket()
     {
         byte[]? expectedBuffer = [.. "UTF-8 only! \U0001F605"u8];
@@ -249,7 +249,7 @@ public partial class PipeExtensionsTests : TestBase
         Assert.Equal(WebSocketMessageType.Text, message.MessageTypeIfKnown);
     }
 
-    [Fact]
+    [Test]
     public async Task UsePipe_WebSocket()
     {
         byte[]? expectedBuffer = new byte[] { 4, 5, 6 };
@@ -271,7 +271,7 @@ public partial class PipeExtensionsTests : TestBase
         Assert.Equal(WebSocketMessageType.Binary, message.MessageTypeIfKnown);
     }
 
-    [Fact]
+    [Test]
     public async Task UseUtf8TextPipe_WebSocket()
     {
         byte[]? expectedBuffer = [.. "UTF-8 only! \U0001F605"u8];
@@ -293,7 +293,7 @@ public partial class PipeExtensionsTests : TestBase
         Assert.Equal(WebSocketMessageType.Text, message.MessageTypeIfKnown);
     }
 
-    [Fact]
+    [Test]
     public async Task UsePipe_WebSocket_PropagatesException()
     {
         var webSocket = new MockInterruptedWebSocket();
@@ -326,7 +326,7 @@ public partial class PipeExtensionsTests : TestBase
         Assert.NotSame(pipes.Item1.Output, pipeAgain.Output);
     }
 
-    [Fact]
+    [Test]
     public async Task AsPrebufferedStreamAsync()
     {
         var pipe = new Pipe();

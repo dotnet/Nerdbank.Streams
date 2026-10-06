@@ -9,12 +9,12 @@ using Xunit;
 
 public class MultiplexingStreamChannelOptionsTests : TestBase
 {
-    public MultiplexingStreamChannelOptionsTests(ITestOutputHelper logger)
-        : base(logger)
+    public MultiplexingStreamChannelOptionsTests()
+        : base(TestOutputHelper.Instance)
     {
     }
 
-    [Fact]
+    [Test]
     public void Defaults()
     {
         var options = new MultiplexingStream.ChannelOptions();
@@ -22,7 +22,7 @@ public class MultiplexingStreamChannelOptionsTests : TestBase
         Assert.Null(options.ExistingPipe);
     }
 
-    [Fact]
+    [Test]
     public void TraceSource()
     {
         var src = new TraceSource("name");
@@ -35,7 +35,7 @@ public class MultiplexingStreamChannelOptionsTests : TestBase
         Assert.Null(options.TraceSource);
     }
 
-    [Fact]
+    [Test]
     public void ExistingPipe_Mock()
     {
         var pipe = new Pipe();
@@ -54,7 +54,7 @@ public class MultiplexingStreamChannelOptionsTests : TestBase
         Assert.Null(options.ExistingPipe);
     }
 
-    [Fact]
+    [Test]
     public void ExistingPipe_DuplexPipe()
     {
         var pipe = new Pipe();
@@ -71,7 +71,7 @@ public class MultiplexingStreamChannelOptionsTests : TestBase
         Assert.Null(options.ExistingPipe);
     }
 
-    [Fact]
+    [Test]
     public void ExistingPipe_AcceptsSimplex()
     {
         var options = new MultiplexingStream.ChannelOptions();

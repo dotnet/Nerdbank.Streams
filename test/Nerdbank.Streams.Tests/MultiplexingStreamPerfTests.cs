@@ -15,7 +15,7 @@ using Nerdbank.Streams;
 using StreamJsonRpc;
 using Xunit;
 
-public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
+public class MultiplexingStreamPerfTests : TestBase, IAsyncDisposable
 {
     private const int SegmentSize = 5 * 1024;
     private const int SegmentCount = 100;
@@ -23,15 +23,16 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
     private readonly NamedPipeServerStream serverPipe;
     private readonly NamedPipeClientStream clientPipe;
 
-    public MultiplexingStreamPerfTests(ITestOutputHelper logger)
-        : base(logger)
+    public MultiplexingStreamPerfTests()
+        : base(TestOutputHelper.Instance)
     {
         string pipeName = Guid.NewGuid().ToString();
         this.serverPipe = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
         this.clientPipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
     }
 
-    public async ValueTask InitializeAsync()
+    [Before(Test)]
+    public async Task InitializeAsync()
     {
         Task connectTask = this.serverPipe.WaitForConnectionAsync(this.TimeoutToken);
         await this.clientPipe.ConnectAsync(this.TimeoutToken);
@@ -46,13 +47,13 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
         return default;
     }
 
-    [Fact]
+    [Test]
     public Task JsonRpcPerf_Pipe() => this.JsonRpcPerf(useChannel: false);
 
-    [Fact]
+    [Test]
     public Task JsonRpcPerf_Channel() => this.JsonRpcPerf(useChannel: true);
 
-    [Fact]
+    [Test]
     public async Task SendLargePayloadOnOneStream()
     {
         if (await this.ExecuteInIsolationAsync())
@@ -103,7 +104,7 @@ public class MultiplexingStreamPerfTests : TestBase, IAsyncLifetime
         }
     }
 
-    [Fact]
+    [Test]
     public async Task SendLargePayloadOnManyChannels()
     {
         if (await this.ExecuteInIsolationAsync())

@@ -8,14 +8,15 @@ using NSubstitute.ExceptionExtensions;
 using Xunit;
 
 [Obsolete("Tests functionality that .NET now exposes directly through PipeWriter.Create(Stream)")]
+[InheritsTests]
 public class StreamUseStrictPipeWriterTests : StreamPipeWriterTestBase
 {
-    public StreamUseStrictPipeWriterTests(ITestOutputHelper logger)
-        : base(logger)
+    public StreamUseStrictPipeWriterTests()
+        : base(TestOutputHelper.Instance)
     {
     }
 
-    [Fact]
+    [Test]
     public async Task StreamFails()
     {
         var expectedException = new InvalidOperationException();
@@ -34,7 +35,7 @@ public class StreamUseStrictPipeWriterTests : StreamPipeWriterTestBase
         Assert.Same(expectedException, actualException);
     }
 
-    [Fact]
+    [Test]
     public async Task CancelPendingFlush_WithToken()
     {
         Stream streamMock = Substitute.For<Stream>();
@@ -58,7 +59,7 @@ public class StreamUseStrictPipeWriterTests : StreamPipeWriterTestBase
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => flushTask.AsTask());
     }
 
-    [Fact]
+    [Test]
     public async Task CancelPendingFlush()
     {
         Stream streamMock = Substitute.For<Stream>();
@@ -82,7 +83,7 @@ public class StreamUseStrictPipeWriterTests : StreamPipeWriterTestBase
         Assert.True(flushResult.IsCanceled);
     }
 
-    [Fact]
+    [Test]
     public async Task Write_MultipleBlocks()
     {
         var ms = new MemoryStream();
@@ -95,7 +96,7 @@ public class StreamUseStrictPipeWriterTests : StreamPipeWriterTestBase
         Assert.Equal(1028, ms.Length);
     }
 
-    [Fact] // Not applied to base test class because of https://github.com/dotnet/corefx/issues/31837
+    [Test] // Not applied to base test class because of https://github.com/dotnet/corefx/issues/31837
     public async Task CancelPendingFlush_BeforeFlushDoesNotCancelFutureFlush()
     {
         var stream = new MemoryStream();

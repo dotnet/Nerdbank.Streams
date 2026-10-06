@@ -54,7 +54,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.Equal(4, value);
         }
 
-        [Fact]
+        [Test]
         public void PastEmptySegments()
         {
             ReadOnlySequence<byte> bytes = SequenceFactory.Create(new byte[][] {
@@ -73,7 +73,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.Equal(0, sequence.Length);
         }
 
-        [Fact]
+        [Test]
         public void Advance_Exception()
         {
             ReadOnlySequence<byte> bytes = SequenceFactory.Create(new byte[][] {

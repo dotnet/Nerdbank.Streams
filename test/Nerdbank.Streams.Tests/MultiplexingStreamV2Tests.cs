@@ -10,16 +10,17 @@ using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
 
+[InheritsTests]
 public class MultiplexingStreamV2Tests : MultiplexingStreamTests
 {
-    public MultiplexingStreamV2Tests(ITestOutputHelper logger)
-        : base(logger)
+    public MultiplexingStreamV2Tests()
+        : base(TestOutputHelper.Instance)
     {
     }
 
     protected override int ProtocolMajorVersion => 2;
 
-    [Fact]
+    [Test]
     public async Task Backpressure()
     {
         long backpressureThreshold = this.mx1.DefaultChannelReceivingWindowSize;
@@ -62,7 +63,7 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
         await CompleteChannelsAsync(a, b, c, d);
     }
 
-    [Fact]
+    [Test]
     public async Task ReaderCompletionUnblocksRemoteWriter()
     {
         long backpressureThreshold = this.mx1.DefaultChannelReceivingWindowSize;
@@ -81,7 +82,7 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
         await flushTask.WithCancellation(this.TimeoutToken);
     }
 
-    [Fact]
+    [Test]
     public async Task Backpressure_FullButNeedMoreBytesToProcess()
     {
         (MultiplexingStream.Channel a, MultiplexingStream.Channel b) = await this.EstablishChannelsAsync("a");
@@ -112,7 +113,7 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
         await writeTask;
     }
 
-    [Fact]
+    [Test]
     public async Task Backpressure_ExistingPipe()
     {
         const int backpressureThreshold = 80 * 1024;
@@ -155,7 +156,7 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
         await writeTask;
     }
 
-    [Fact]
+    [Test]
     public async Task AcceptChannelAsync_SmallReceivingWindowSize()
     {
         const int offeredWindowSize = 16;
@@ -178,7 +179,7 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
         await CompleteChannelsAsync(channels);
     }
 
-    [Fact]
+    [Test]
     public async Task Backpressure_CopyToAsync()
     {
         long backpressureThreshold = this.mx1.DefaultChannelReceivingWindowSize;
@@ -209,7 +210,7 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
     /// * mx2 channel must be disposed AFTER Channel.LocalContentExamined's IsDisposed check
     /// * mx2's ChannelTerminated frame must be sent BEFORE LocalContentExamined posts the ContentProcessed frame.
     /// </devremarks>
-    [Fact]
+    [Test]
     public async Task CompleteReadingAfterChannelTerminated()
     {
         long backpressureThreshold = this.mx1.DefaultChannelReceivingWindowSize;
@@ -244,11 +245,11 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
     /// length, since the threshold is clamped at that length and therefore relates to the window
     /// differently on either side of it.
     /// </remarks>
-    [Theory]
-    [InlineData(1024)]
-    [InlineData(20 * 1024)]
-    [InlineData(100 * 1024)]
-    [InlineData(1024 * 1024)]
+    [Test]
+    [Arguments(1024)]
+    [Arguments(20 * 1024)]
+    [Arguments(100 * 1024)]
+    [Arguments(1024 * 1024)]
     public async Task Backpressure_CreditIsReturnedForAnyWindowSize(int windowSize)
     {
         // The window must be set on the stream. A channel may only raise its window above the
@@ -291,7 +292,7 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
     /// before acknowledging it: the sender fills the window and stops, while the reader consumes in
     /// pieces far too small to individually cross the acknowledgement threshold.
     /// </remarks>
-    [Fact]
+    [Test]
     public async Task Backpressure_SmallReadsStillMakeProgress()
     {
         const int windowSize = 1024 * 1024;
@@ -330,7 +331,7 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
     /// Verifies that a channel whose sender is repeatedly throttled by the receiving window
     /// ends up with a larger window than it started with.
     /// </summary>
-    [Fact]
+    [Test]
     public async Task WindowGrows_WhenSenderIsThrottled()
     {
         long initialWindow = this.mx1.DefaultChannelReceivingWindowSize;
@@ -350,7 +351,7 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
     /// <summary>
     /// Verifies that window growth stops at <see cref="MultiplexingStream.Options.MaxChannelReceivingWindowSize"/>.
     /// </summary>
-    [Fact]
+    [Test]
     public async Task WindowGrowth_IsCappedPerChannel()
     {
         await this.ReinitializeMxStreamsAsync(new MultiplexingStream.Options
@@ -378,7 +379,7 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
     /// Verifies that the stream-wide growth budget can veto growth that the channel would otherwise take,
     /// which is what bounds the memory a stream with many busy channels may commit.
     /// </summary>
-    [Fact]
+    [Test]
     public async Task WindowDoesNotGrow_WhenStreamBudgetIsExhausted()
     {
         await this.ReinitializeMxStreamsAsync(new MultiplexingStream.Options
@@ -406,7 +407,7 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
     /// Verifies that a channel that never fills its window is left at its original size,
     /// so that idle or low-rate channels do not consume the stream's growth budget.
     /// </summary>
-    [Fact]
+    [Test]
     public async Task WindowDoesNotGrow_ForUnsaturatedChannel()
     {
         long initialWindow = this.mx1.DefaultChannelReceivingWindowSize;

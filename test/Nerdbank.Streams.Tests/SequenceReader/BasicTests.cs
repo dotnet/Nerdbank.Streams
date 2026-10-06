@@ -7,31 +7,37 @@ using Xunit;
 
 namespace Nerdbank.Streams.Tests.SequenceReader
 {
+    [InheritsTests]
     public class ArrayByte : SingleSegment<byte>
     {
         public ArrayByte() : base(ReadOnlySequenceFactory<byte>.ArrayFactory, s_byteInputData) { }
     }
 
+    [InheritsTests]
     public class ArrayChar : SingleSegment<char>
     {
         public ArrayChar() : base(ReadOnlySequenceFactory<char>.ArrayFactory, s_charInputData) { }
     }
 
+    [InheritsTests]
     public class MemoryByte : SingleSegment<byte>
     {
         public MemoryByte() : base(ReadOnlySequenceFactory<byte>.MemoryFactory, s_byteInputData) { }
     }
 
+    [InheritsTests]
     public class MemoryChar : SingleSegment<char>
     {
         public MemoryChar() : base(ReadOnlySequenceFactory<char>.MemoryFactory, s_charInputData) { }
     }
 
+    [InheritsTests]
     public class SingleSegmentByte : SingleSegment<byte>
     {
         public SingleSegmentByte() : base(s_byteInputData) { }
     }
 
+    [InheritsTests]
     public class SingleSegmentChar : SingleSegment<char>
     {
         public SingleSegmentChar() : base(s_charInputData) { }
@@ -42,7 +48,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
         public SingleSegment(T[] inputData) : base(ReadOnlySequenceFactory<T>.SingleSegmentFactory, inputData) { }
         internal SingleSegment(ReadOnlySequenceFactory<T> factory, T[] inputData) : base(factory, inputData) { }
 
-        [Fact]
+        [Test]
         public void AdvanceSingleBufferSkipsValues()
         {
             SequenceReader<T> reader = new SequenceReader<T>(SequenceFactory.Create(GetInputData(5)));
@@ -71,7 +77,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.Equal(InputData[4], value);
         }
 
-        [Fact]
+        [Test]
         public void TryReadReturnsValueAndAdvances()
         {
             SequenceReader<T> reader = new SequenceReader<T>(Factory.CreateWithContent(GetInputData(2)));
@@ -105,7 +111,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.True(reader.End);
         }
 
-        [Fact]
+        [Test]
         public void DefaultState()
         {
             T[] array = new T[] { default };
@@ -147,11 +153,13 @@ namespace Nerdbank.Streams.Tests.SequenceReader
         }
     }
 
+    [InheritsTests]
     public class SegmentPerByte : ReaderBasicTests<byte>
     {
         public SegmentPerByte() : base(ReadOnlySequenceFactory<byte>.SegmentPerItemFactory, s_byteInputData) { }
     }
 
+    [InheritsTests]
     public class SegmentPerChar : ReaderBasicTests<char>
     {
         public SegmentPerChar() : base(ReadOnlySequenceFactory<char>.SegmentPerItemFactory, s_charInputData) { }
@@ -174,7 +182,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             _inputData = inputData;
         }
 
-        [Fact]
+        [Test]
         public void TryPeekReturnsWithoutMoving()
         {
             SequenceReader<T> reader = new SequenceReader<T>(Factory.CreateWithContent(GetInputData(2)));
@@ -190,7 +198,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.Equal(2, reader.Remaining);
         }
 
-        [Fact]
+        [Test]
         public void CursorIsCorrectAtEnd()
         {
             SequenceReader<T> reader = new SequenceReader<T>(Factory.CreateWithContent(GetInputData(2)));
@@ -199,7 +207,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.True(reader.End);
         }
 
-        [Fact]
+        [Test]
         public void CursorIsCorrectWithEmptyLastBlock()
         {
             SequenceSegment<T> last = new SequenceSegment<T>();
@@ -218,7 +226,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.True(reader.End);
         }
 
-        [Fact]
+        [Test]
         public void TryPeekReturnsDefaultInTheEnd()
         {
             SequenceReader<T> reader = new SequenceReader<T>(Factory.CreateWithContent(GetInputData(2)));
@@ -230,7 +238,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.Equal(default, value);
         }
 
-        [Fact]
+        [Test]
         public void AdvanceToEndThenPeekReturnsDefault()
         {
             SequenceReader<T> reader = new SequenceReader<T>(Factory.CreateWithContent(GetInputData(5)));
@@ -240,7 +248,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.Equal(default, value);
         }
 
-        [Fact]
+        [Test]
         public void AdvancingPastLengthThrows()
         {
             SequenceReader<T> reader = new SequenceReader<T>(Factory.CreateWithContent(GetInputData(5)));
@@ -258,7 +266,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             }
         }
 
-        [Fact]
+        [Test]
         public void CtorFindsFirstNonEmptySegment()
         {
             ReadOnlySequence<T> buffer = Factory.CreateWithContent(GetInputData(1));
@@ -270,7 +278,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.Equal(1, reader.Remaining);
         }
 
-        [Fact]
+        [Test]
         public void EmptySegmentsAreSkippedOnMoveNext()
         {
             ReadOnlySequence<T> buffer = Factory.CreateWithContent(GetInputData(2));
@@ -283,7 +291,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.Equal(InputData[1], value);
         }
 
-        [Fact]
+        [Test]
         public void TryPeekGoesToEndIfAllEmptySegments()
         {
             ReadOnlySequence<T> buffer = SequenceFactory.Create(new[] { new T[] { }, new T[] { }, new T[] { }, new T[] { } });
@@ -294,7 +302,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.True(reader.End);
         }
 
-        [Fact]
+        [Test]
         public void AdvanceTraversesSegments()
         {
             ReadOnlySequence<T> buffer = Factory.CreateWithContent(GetInputData(3));
@@ -306,7 +314,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.Equal(InputData[2], value);
         }
 
-        [Fact]
+        [Test]
         public void AdvanceThrowsPastLengthMultipleSegments()
         {
             ReadOnlySequence<T> buffer = Factory.CreateWithContent(GetInputData(3));
@@ -326,7 +334,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             }
         }
 
-        [Fact]
+        [Test]
         public void TryReadTraversesSegments()
         {
             ReadOnlySequence<T> buffer = Factory.CreateWithContent(GetInputData(3));
@@ -343,7 +351,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.True(reader.End);
         }
 
-        [Fact]
+        [Test]
         public void TryPeekTraversesSegments()
         {
             ReadOnlySequence<T> buffer = Factory.CreateWithContent(GetInputData(2));
@@ -364,7 +372,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.Equal(default, value);
         }
 
-        [Fact]
+        [Test]
         public void PeekWorkesWithEmptySegments()
         {
             ReadOnlySequence<T> buffer = Factory.CreateWithContent(GetInputData(1));
@@ -382,7 +390,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.Equal(default, value);
         }
 
-        [Fact]
+        [Test]
         public void WorksWithEmptyBuffer()
         {
             SequenceReader<T> reader = new SequenceReader<T>(Factory.CreateWithContent(new T[] { }));
@@ -419,7 +427,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.Equal(expected, readableBuffer.Slice(reader.Position).ToArray());
         }
 
-        [Fact]
+        [Test]
         public void SlicingBufferReturnsCorrectCursor()
         {
             ReadOnlySequence<T> buffer = Factory.CreateWithContent(GetInputData(10));
@@ -432,7 +440,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.Equal(0, reader.CurrentSpanIndex);
         }
 
-        [Fact]
+        [Test]
         public void ReaderIndexIsCorrect()
         {
             ReadOnlySequence<T> buffer = Factory.CreateWithContent(GetInputData(10));
@@ -478,7 +486,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             }
         }
 
-        [Fact]
+        [Test]
         public void AdvanceTo()
         {
             // Ensure we can advance to each of the items in the buffer
@@ -495,7 +503,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             }
         }
 
-        [Fact]
+        [Test]
         public void AdvanceTo_AdvancePast()
         {
             // Ensure we can advance to each of the items in the buffer (skipping what we advanced to)
@@ -515,7 +523,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             }
         }
 
-        [Fact]
+        [Test]
         public void CopyToSmallerBufferWorks()
         {
             T[] content = (T[])_inputData.Clone();
