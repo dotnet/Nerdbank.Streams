@@ -8,18 +8,18 @@ using Xunit;
 
 public class MultiplexingStreamBasicTests : TestBase
 {
-    public MultiplexingStreamBasicTests(ITestOutputHelper logger)
-        : base(logger)
+    public MultiplexingStreamBasicTests()
+        : base(TestOutputHelper.Instance)
     {
     }
 
-    [Fact]
+    [Test]
     public async Task Ctor_ThrowsOnNull()
     {
         await Assert.ThrowsAsync<ArgumentNullException>(() => MultiplexingStream.CreateAsync(null!, this.TimeoutToken));
     }
 
-    [Fact]
+    [Test]
     public async Task Stream_CanWriteFalse_Rejected()
     {
         Stream readonlyStreamMock = Substitute.For<Stream>();
@@ -27,7 +27,7 @@ public class MultiplexingStreamBasicTests : TestBase
         await Assert.ThrowsAsync<ArgumentException>(() => MultiplexingStream.CreateAsync(readonlyStreamMock, this.TimeoutToken)).WithCancellation(this.TimeoutToken);
     }
 
-    [Fact]
+    [Test]
     public async Task Stream_CanReadFalse_Rejected()
     {
         Stream writeOnlyStreamMock = Substitute.For<Stream>();

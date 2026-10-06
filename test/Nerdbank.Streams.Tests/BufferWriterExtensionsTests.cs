@@ -8,7 +8,7 @@ using Xunit;
 
 public class BufferWriterExtensionsTests
 {
-    [Fact]
+    [Test]
     public void Write_Default()
     {
         using Sequence<int> seq = new();
@@ -16,7 +16,7 @@ public class BufferWriterExtensionsTests
         Assert.Equal(0, seq.Length);
     }
 
-    [Fact]
+    [Test]
     public void Write_OneBlock()
     {
         int[] array = new int[] { 1, 2, 3 };
@@ -28,7 +28,7 @@ public class BufferWriterExtensionsTests
         Assert.Equal(array, seq.AsReadOnlySequence.ToArray());
     }
 
-    [Fact]
+    [Test]
     public void Write_MultipleBlocks()
     {
         int[] array = new int[] { 1, 2, 3 };

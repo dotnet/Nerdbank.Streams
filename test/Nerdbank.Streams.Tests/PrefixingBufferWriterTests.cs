@@ -25,7 +25,7 @@ public class PrefixingBufferWriterTests
         this.sequence = new Sequence<byte>(this.mockPool);
     }
 
-    [Fact]
+    [Test]
     public void NoPayload()
     {
         var prefixWriter = new PrefixingBufferWriter<byte>(this.sequence, Prefix.Length, 50);
@@ -36,13 +36,13 @@ public class PrefixingBufferWriterTests
         Assert.Equal(Prefix.ToArray(), this.sequence.AsReadOnlySequence.ToArray());
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public void SomePayload(
         bool largArrayPool,
         bool excessSpan,
-        [CombinatorialValues(0, PayloadSize - 1, PayloadSize, PayloadSize + 1)] int sizeHint,
-        [CombinatorialValues(1, 2, 3, PayloadSize)] int stepCount)
+        [Matrix(0, PayloadSize - 1, PayloadSize, PayloadSize + 1)] int sizeHint,
+        [Matrix(1, 2, 3, PayloadSize)] int stepCount)
     {
         this.mockPool.MinArraySizeFactor = largArrayPool ? 2.0 : 1.0;
 
@@ -73,7 +73,7 @@ public class PrefixingBufferWriterTests
         this.PayloadCompleteHelper(prefixWriter);
     }
 
-    [Fact]
+    [Test]
     public void GetSpan_WriteWithHint0()
     {
         var prefixWriter = new PrefixingBufferWriter<byte>(this.sequence, Prefix.Length, 0);
@@ -81,7 +81,7 @@ public class PrefixingBufferWriterTests
         Assert.NotEqual(0, span.Length);
     }
 
-    [Fact]
+    [Test]
     public void GetSpan_WriteFillThenRequest0()
     {
         var prefixWriter = new PrefixingBufferWriter<byte>(this.sequence, Prefix.Length, 0);
@@ -91,7 +91,7 @@ public class PrefixingBufferWriterTests
         Assert.NotEqual(0, span.Length);
     }
 
-    [Fact]
+    [Test]
     public void GetMemory()
     {
         var prefixWriter = new PrefixingBufferWriter<byte>(this.sequence, Prefix.Length, 0);
@@ -102,7 +102,7 @@ public class PrefixingBufferWriterTests
         this.PayloadCompleteHelper(prefixWriter);
     }
 
-    [Fact]
+    [Test]
     public void ReuseAfterComplete()
     {
         var prefixWriter = new PrefixingBufferWriter<byte>(this.sequence, Prefix.Length, 0);
@@ -117,16 +117,16 @@ public class PrefixingBufferWriterTests
         this.PayloadCompleteHelper(prefixWriter);
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-1)]
+    [Test]
+    [Arguments(0)]
+    [Arguments(-1)]
     public void Ctor_NonPositivePrefixHintSizes(int size)
     {
         ArgumentOutOfRangeException? ex = Assert.Throws<ArgumentOutOfRangeException>(() => new PrefixingBufferWriter<byte>(this.sequence, size));
         Assert.Equal("prefixSize", ex.ParamName);
     }
 
-    [Fact]
+    [Test]
     public void Ctor_NullUnderwriter()
     {
         Assert.Throws<ArgumentNullException>(() => new PrefixingBufferWriter<byte>(null!, 5));

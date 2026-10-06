@@ -17,21 +17,21 @@ public class BufferTextWriterTests : TestBase
     private BufferTextWriter bufferTextWriter = new BufferTextWriter();
     private Sequence<byte> sequence = new Sequence<byte>();
 
-    public BufferTextWriterTests(ITestOutputHelper logger)
-        : base(logger)
+    public BufferTextWriterTests()
+        : base(TestOutputHelper.Instance)
     {
         Assert.Throws<InvalidOperationException>(() => this.bufferTextWriter.Encoding);
         this.bufferTextWriter.Initialize(this.sequence, DefaultEncoding);
     }
 
-    [Fact]
+    [Test]
     public void Ctor_ValidatesArguments()
     {
         Assert.Throws<ArgumentNullException>(() => new BufferTextWriter(null!, DefaultEncoding));
         Assert.Throws<ArgumentNullException>(() => new BufferTextWriter(this.sequence, null!));
     }
 
-    [Fact]
+    [Test]
     public void Ctor()
     {
         this.bufferTextWriter = new BufferTextWriter(this.sequence, DefaultEncoding);
@@ -40,36 +40,36 @@ public class BufferTextWriterTests : TestBase
         this.AssertWritten("a");
     }
 
-    [Fact]
+    [Test]
     public void Initialize_ValidatesArgs()
     {
         Assert.Throws<ArgumentNullException>(() => this.bufferTextWriter.Initialize(new Sequence<byte>(), null!));
         Assert.Throws<ArgumentNullException>(() => this.bufferTextWriter.Initialize(null!, Encoding.UTF8));
     }
 
-    [Fact]
+    [Test]
     public void Initialize_ThrowsIfUnflushed()
     {
         this.bufferTextWriter.Write("hi");
         Assert.Throws<InvalidOperationException>(() => this.bufferTextWriter.Initialize(new Sequence<byte>(), DefaultEncoding));
     }
 
-    [Fact]
+    [Test]
     public void Initialize_SameEncoder()
     {
         this.bufferTextWriter.Initialize(new Sequence<byte>(), this.bufferTextWriter.Encoding!);
     }
 
-    [Fact]
+    [Test]
     public void Encoding_AfterInitialize()
     {
         this.bufferTextWriter.Initialize(new Sequence<byte>(), Encoding.Unicode);
         Assert.Same(Encoding.Unicode, this.bufferTextWriter.Encoding);
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
     public void Anything_Uninitialized(bool afterReset)
     {
         BufferTextWriter writer;
@@ -90,26 +90,26 @@ public class BufferTextWriterTests : TestBase
         Assert.Throws<InvalidOperationException>(() => writer.Write("a"));
     }
 
-    [Fact]
+    [Test]
     public void Write_Bool()
     {
         this.bufferTextWriter.Write(true);
         this.AssertWritten("True");
     }
 
-    [Fact]
+    [Test]
     public void Write_Char()
     {
         this.bufferTextWriter.Write('a');
         this.AssertWritten("a");
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(1)]
-    [InlineData(3)]
-    [InlineData(300)]
-    [InlineData(30000)]
+    [Test]
+    [Arguments(0)]
+    [Arguments(1)]
+    [Arguments(3)]
+    [Arguments(300)]
+    [Arguments(30000)]
     public void Write_String(int length)
     {
         string written = new string('a', length);
@@ -117,14 +117,14 @@ public class BufferTextWriterTests : TestBase
         this.AssertWritten(written);
     }
 
-    [Fact]
+    [Test]
     public void Write_String_Null()
     {
         this.bufferTextWriter.Write((string?)null);
         this.AssertWritten(string.Empty);
     }
 
-    [Fact]
+    [Test]
     public void Write_CharThenLongString()
     {
         string longString = new string('b', 10000);
@@ -133,7 +133,7 @@ public class BufferTextWriterTests : TestBase
         this.AssertWritten('a' + longString);
     }
 
-    [Fact]
+    [Test]
     public void FlushAsync_CompletesSynchronously()
     {
         this.bufferTextWriter.Initialize(this.sequence, DefaultEncodingNoPreamble);
@@ -142,7 +142,7 @@ public class BufferTextWriterTests : TestBase
         Assert.Equal(DefaultEncodingNoPreamble.GetBytes("b"), this.sequence.AsReadOnlySequence.ToArray());
     }
 
-    [Fact]
+    [Test]
     public void Dispose_IncludesFlush()
     {
         this.bufferTextWriter.Initialize(this.sequence, DefaultEncodingNoPreamble);
@@ -151,7 +151,7 @@ public class BufferTextWriterTests : TestBase
         Assert.Equal(DefaultEncodingNoPreamble.GetBytes("b"), this.sequence.AsReadOnlySequence.ToArray());
     }
 
-    [Fact]
+    [Test]
     public void Dispose_BeforeInitialize()
     {
         this.bufferTextWriter = new BufferTextWriter();
