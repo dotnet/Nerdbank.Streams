@@ -24,8 +24,8 @@ public class MultiplexingStreamWindowFrameCompatTests : TestBase
 {
     private readonly AsyncManualResetEvent windowFrameDropped = new();
 
-    public MultiplexingStreamWindowFrameCompatTests(ITestOutputHelper logger)
-        : base(logger)
+    public MultiplexingStreamWindowFrameCompatTests()
+        : base(TestOutputHelper.Instance)
     {
     }
 
@@ -33,7 +33,7 @@ public class MultiplexingStreamWindowFrameCompatTests : TestBase
     /// Verifies that a connection whose window tuning frames are all discarded in flight still transfers
     /// every byte correctly and shuts down cleanly, exactly as if neither party had ever implemented them.
     /// </summary>
-    [Fact]
+    [Test]
     public async Task TransferSucceeds_WhenWindowFramesAreDropped()
     {
         (Stream Item1, Stream Item2) left = FullDuplexStream.CreatePair();

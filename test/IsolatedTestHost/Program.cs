@@ -11,7 +11,6 @@ namespace IsolatedTestHost
     using System.Runtime.InteropServices;
     using System.Threading;
     using System.Threading.Tasks;
-    using Xunit;
 
     internal static class Program
     {
@@ -71,9 +70,9 @@ namespace IsolatedTestHost
                 return ExitCodes.TestMethodNotFound;
             }
 
-            bool fact = testMethod.GetCustomAttributesData().Any(a => a.AttributeType.Name == "FactAttribute");
-            bool skippableFact = testMethod.GetCustomAttributesData().Any(a => a.AttributeType.Name == "SkippableFactAttribute");
-            if (fact || skippableFact)
+            // TUnit's [Test] attribute.
+            bool test = testMethod.GetCustomAttributesData().Any(a => a.AttributeType.Name == "TestAttribute");
+            if (test)
             {
                 return ExecuteTest(testClass, testMethod);
             }
@@ -103,29 +102,20 @@ namespace IsolatedTestHost
         {
             try
             {
-                ConstructorInfo? ctorWithLogger = testClass.GetConstructors().FirstOrDefault(
-                    ctor => ctor.GetParameters().Length == 1 && ctor.GetParameters()[0].ParameterType.IsAssignableFrom(typeof(TestOutputHelper)));
                 ConstructorInfo? ctorDefault = testClass.GetConstructor(Type.EmptyTypes);
-                object? testClassInstance =
-                    ctorWithLogger?.Invoke(new object[] { new TestOutputHelper() }) ??
-                    ctorDefault?.Invoke(Type.EmptyTypes);
+                object? testClassInstance = ctorDefault?.Invoke(Type.EmptyTypes);
                 if (testClassInstance == null)
                 {
                     return ExitCodes.TestNotSupported;
                 }
 
-                var asyncLifetime = testClassInstance as IAsyncLifetime;
-                asyncLifetime?.InitializeAsync().GetAwaiter().GetResult();
+                // Mirror TUnit's lifecycle: run [Before(Test)] InitializeAsync, the test, then DisposeAsync or Dispose.
+                InvokeAndWait(testClassInstance, "InitializeAsync");
 
                 object? result = testMethod.Invoke(testClassInstance, Type.EmptyTypes);
-                if (result is Task resultTask)
-                {
-                    resultTask.GetAwaiter().GetResult();
-                }
+                WaitForResult(result);
 
-                asyncLifetime?.DisposeAsync().GetAwaiter().GetResult();
-
-                if (testClassInstance is IDisposable disposableTestClass)
+                if (!InvokeAndWait(testClassInstance, "DisposeAsync") && testClassInstance is IDisposable disposableTestClass)
                 {
                     disposableTestClass.Dispose();
                 }
@@ -134,7 +124,13 @@ namespace IsolatedTestHost
             }
             catch (Exception ex)
             {
-                if (ex.GetType().Name == "SkipException")
+                if (ex is TargetInvocationException { InnerException: { } inner })
+                {
+                    ex = inner;
+                }
+
+                // TUnit's Skip.Test/Skip.When throw SkipTestException.
+                if (ex.GetType().Name == "SkipTestException")
                 {
                     return ExitCodes.TestSkipped;
                 }
@@ -142,6 +138,31 @@ namespace IsolatedTestHost
                 Console.Error.WriteLine("Test failed.");
                 Console.Error.WriteLine(ex);
                 return ExitCodes.TestFailed;
+            }
+        }
+
+        private static bool InvokeAndWait(object instance, string methodName)
+        {
+            MethodInfo? method = instance.GetType().GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
+            if (method is null)
+            {
+                return false;
+            }
+
+            WaitForResult(method.Invoke(instance, Type.EmptyTypes));
+            return true;
+        }
+
+        private static void WaitForResult(object? result)
+        {
+            if (result is Task task)
+            {
+                task.GetAwaiter().GetResult();
+            }
+            else if (result?.GetType().GetMethod("AsTask", Type.EmptyTypes) is MethodInfo asTask)
+            {
+                // ValueTask or ValueTask<T>
+                ((Task)asTask.Invoke(result, Type.EmptyTypes)!).GetAwaiter().GetResult();
             }
         }
 

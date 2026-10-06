@@ -8,16 +8,17 @@ using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using Xunit;
 
+[InheritsTests]
 public class StreamUsePipeReaderTests : StreamPipeReaderTestBase
 {
-    public StreamUsePipeReaderTests(ITestOutputHelper logger)
-        : base(logger)
+    public StreamUsePipeReaderTests()
+        : base(TestOutputHelper.Instance)
     {
     }
 
     protected override bool EmulatePipelinesStreamPipeReader => false;
 
-    [Fact]
+    [Test]
     public async Task StreamFails()
     {
         var expectedException = new InvalidOperationException();
@@ -38,7 +39,7 @@ public class StreamUsePipeReaderTests : StreamPipeReaderTestBase
         Assert.Same(expectedException, actualException);
     }
 
-    [Fact]
+    [Test]
     public async Task Complete_CausesWriterCompletion()
     {
         var stream = new SimplexStream();
@@ -50,7 +51,7 @@ public class StreamUsePipeReaderTests : StreamPipeReaderTestBase
         await writerCompletion.WithCancellation(this.TimeoutToken);
     }
 
-    [Fact]
+    [Test]
     public void NonReadableStream()
     {
         Stream unreadableStream = Substitute.For<Stream>();

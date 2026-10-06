@@ -10,7 +10,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
 {
     public class BinaryExtensions
     {
-        [Fact]
+        [Test]
         public void MultiSegmentBytesReaderNumbers()
         {
             ReadOnlySequence<byte> bytes = SequenceFactory.Create(new byte[][] {
