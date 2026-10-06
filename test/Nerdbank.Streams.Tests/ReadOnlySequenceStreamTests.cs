@@ -30,19 +30,19 @@ public class ReadOnlySequenceStreamTests : TestBase
         MultiBlockSequence = new ReadOnlySequence<byte>(seg1, 0, seg3, seg3.Memory.Length);
     }
 
-    public ReadOnlySequenceStreamTests(ITestOutputHelper logger)
-        : base(logger)
+    public ReadOnlySequenceStreamTests()
+        : base(TestOutputHelper.Instance)
     {
         this.defaultStream = DefaultSequence.AsStream();
     }
 
-    [Fact]
+    [Test]
     public void Read_EmptySequence()
     {
         Assert.Equal(0, this.defaultStream.Read(new byte[1], 0, 1));
     }
 
-    [Fact]
+    [Test]
     public void Length()
     {
         Assert.Equal(0, this.defaultStream.Length);
@@ -50,7 +50,7 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.defaultStream.Length);
     }
 
-    [Fact]
+    [Test]
     public void SetLength()
     {
         Assert.Throws<NotSupportedException>(() => this.defaultStream.SetLength(0));
@@ -58,7 +58,7 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.defaultStream.SetLength(0));
     }
 
-    [Fact]
+    [Test]
     public void CanSeek()
     {
         Assert.True(this.defaultStream.CanSeek);
@@ -66,7 +66,7 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.False(this.defaultStream.CanSeek);
     }
 
-    [Fact]
+    [Test]
     public void CanRead()
     {
         Assert.True(this.defaultStream.CanRead);
@@ -74,7 +74,7 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.False(this.defaultStream.CanRead);
     }
 
-    [Fact]
+    [Test]
     public void CanWrite()
     {
         Assert.False(this.defaultStream.CanWrite);
@@ -82,7 +82,7 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.False(this.defaultStream.CanWrite);
     }
 
-    [Fact]
+    [Test]
     public void CanTimeout()
     {
         Assert.False(this.defaultStream.CanTimeout);
@@ -90,7 +90,7 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.False(this.defaultStream.CanTimeout);
     }
 
-    [Fact]
+    [Test]
     public void Position()
     {
         Assert.Equal(0, this.defaultStream.Position);
@@ -121,7 +121,7 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.Throws<ArgumentOutOfRangeException>(() => multiBlockStream.Position = -1);
     }
 
-    [Fact]
+    [Test]
     public void IsDisposed()
     {
         Assert.False(((IDisposableObservable)this.defaultStream).IsDisposed);
@@ -129,7 +129,7 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.True(((IDisposableObservable)this.defaultStream).IsDisposed);
     }
 
-    [Theory, PairwiseData]
+    [Test, MatrixDataSource]
     public void DisposeCallback(bool nullArg)
     {
         bool disposed = false;
@@ -150,7 +150,7 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.False(disposed);
     }
 
-    [Fact]
+    [Test]
     public void Flush()
     {
         // Flush should be allowed on read-only streams
@@ -160,7 +160,7 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.defaultStream.Flush());
     }
 
-    [Fact]
+    [Test]
     public async Task FlushAsync()
     {
         // FlushAsync should be allowed on read-only streams
@@ -170,7 +170,7 @@ public class ReadOnlySequenceStreamTests : TestBase
         await Assert.ThrowsAsync<ObjectDisposedException>(() => this.defaultStream.FlushAsync());
     }
 
-    [Fact]
+    [Test]
     public void Write()
     {
         Assert.Throws<NotSupportedException>(() => this.defaultStream.Write(new byte[1], 0, 1));
@@ -184,7 +184,7 @@ public class ReadOnlySequenceStreamTests : TestBase
 #endif
     }
 
-    [Fact]
+    [Test]
     public async Task WriteAsync()
     {
         await Assert.ThrowsAsync<NotSupportedException>(() => this.defaultStream.WriteAsync(new byte[1], 0, 1));
@@ -198,7 +198,7 @@ public class ReadOnlySequenceStreamTests : TestBase
 #endif
     }
 
-    [Fact]
+    [Test]
     public void WriteByte()
     {
         Assert.Throws<NotSupportedException>(() => this.defaultStream.WriteByte(1));
@@ -206,7 +206,7 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.defaultStream.WriteByte(1));
     }
 
-    [Fact]
+    [Test]
     public void Seek_EmptyStream()
     {
         Stream? stream = DefaultSequence.AsStream();
@@ -215,7 +215,7 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.Equal(0, stream.Seek(0, SeekOrigin.End));
     }
 
-    [Fact]
+    [Test]
     public void Seek()
     {
         Stream? stream = MultiBlockSequence.AsStream();
@@ -263,7 +263,7 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => stream.Seek(0, SeekOrigin.Begin));
     }
 
-    [Fact]
+    [Test]
     public void ReadByte()
     {
         Stream? stream = MultiBlockSequence.AsStream();
@@ -277,7 +277,7 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.Equal(-1, stream.ReadByte());
     }
 
-    [Fact]
+    [Test]
     public void Read()
     {
         Stream? stream = MultiBlockSequence.AsStream();
@@ -300,7 +300,7 @@ public class ReadOnlySequenceStreamTests : TestBase
 
 #if SPAN_BUILTIN
 
-    [Fact]
+    [Test]
     public void Read_Span()
     {
         Stream? stream = MultiBlockSequence.AsStream();
@@ -323,14 +323,14 @@ public class ReadOnlySequenceStreamTests : TestBase
 
 #endif
 
-    [Fact]
+    [Test]
     public void ReadAsync_ReturnsSynchronously()
     {
         Stream? stream = SimpleSequence.AsStream();
         Assert.True(stream.ReadAsync(new byte[1], 0, 1).IsCompleted);
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsync_ReusesTaskResult()
     {
         Stream? stream = MultiBlockSequence.AsStream();
@@ -345,7 +345,7 @@ public class ReadOnlySequenceStreamTests : TestBase
         Assert.Equal(2, await task3);
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsync_Works()
     {
         Stream? stream = MultiBlockSequence.AsStream();
@@ -368,7 +368,7 @@ public class ReadOnlySequenceStreamTests : TestBase
 
 #if SPAN_BUILTIN
 
-    [Fact]
+    [Test]
     public async Task ReadAsync_Memory_Works()
     {
         Stream? stream = MultiBlockSequence.AsStream();
@@ -391,7 +391,7 @@ public class ReadOnlySequenceStreamTests : TestBase
 
 #endif
 
-    [Fact]
+    [Test]
     public async Task CopyToAsync()
     {
         Stream? stream = MultiBlockSequence.AsStream();

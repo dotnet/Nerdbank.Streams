@@ -15,7 +15,7 @@ using Xunit;
 public class SharedMemoryDuplexPipeTests
 {
 #if NET8_0_OR_GREATER || NETFRAMEWORK
-    [Fact]
+    [Test]
     public async Task BasicRoundTripOverPair()
     {
         (SharedMemoryDuplexPipe client, SharedMemoryDuplexPipe server) = await SharedMemoryDuplexPipe.CreatePairAsync();
@@ -32,7 +32,7 @@ public class SharedMemoryDuplexPipeTests
     }
 
     /// <summary>Verifies that repeatedly suspended reads recover after cancellation and deliver later messages.</summary>
-    [Fact]
+    [Test]
     public async Task PendingReadsRecoverAfterCancellation()
     {
         (SharedMemoryDuplexPipe client, SharedMemoryDuplexPipe server) = await SharedMemoryDuplexPipe.CreatePairAsync();
@@ -56,9 +56,9 @@ public class SharedMemoryDuplexPipeTests
         }
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
     public async Task ListenAndConnectRendezvous(bool longName)
     {
         string channelName = $"test-{Guid.NewGuid():N}" + (longName ? new string('x', 72) : string.Empty);
@@ -83,9 +83,9 @@ public class SharedMemoryDuplexPipeTests
     /// or lags behind (so data wraps around the end of the buffer).
     /// </summary>
     /// <param name="lockstep">Whether to read each message before writing the next one.</param>
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
     public async Task MessagesOfManySizesArriveIntact(bool lockstep)
     {
         const int Capacity = 64;
@@ -170,7 +170,7 @@ public class SharedMemoryDuplexPipeTests
     }
 
     /// <summary>Verifies that a client using the wrong capacity fails without stranding the server's backing file.</summary>
-    [Fact]
+    [Test]
     public async Task RejectedClientDoesNotStrandBackingFile()
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -199,7 +199,7 @@ public class SharedMemoryDuplexPipeTests
 
 #if NET8_0_OR_GREATER
     /// <summary>Verifies that other users cannot read or write a waiting listener's backing file.</summary>
-    [Fact]
+    [Test]
     public async Task UnixBackingFileIsOwnerOnly()
     {
         if (OperatingSystem.IsWindows())
@@ -230,7 +230,7 @@ public class SharedMemoryDuplexPipeTests
     /// <summary>
     /// Verifies that no file is left on disk once the endpoints are connected, so a crash cannot leave one behind.
     /// </summary>
-    [Fact]
+    [Test]
     public async Task NoBackingFileRemainsOnceConnected()
     {
         string directory = Path.Combine(Path.GetTempPath(), $"nbjsonrpc-test-{Guid.NewGuid():N}");
@@ -270,7 +270,7 @@ public class SharedMemoryDuplexPipeTests
 
 #if NETFRAMEWORK
     /// <summary>Verifies that the Framework rendezvous pipe grants access only to the current user.</summary>
-    [Fact]
+    [Test]
     public async Task FrameworkRendezvousPipeIsCurrentUserOnly()
     {
         string channelName = $"test-{Guid.NewGuid():N}";

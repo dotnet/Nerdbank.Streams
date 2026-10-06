@@ -25,17 +25,17 @@ public class PipeStreamTests : TestBase
 
     private Stream stream;
 
-    public PipeStreamTests(ITestOutputHelper logger)
-        : base(logger)
+    public PipeStreamTests()
+        : base(TestOutputHelper.Instance)
     {
         this.pipe = new Pipe();
         this.stream = new LoopbackPipe(this.pipe).AsStream();
     }
 
-    [Fact]
+    [Test]
     public void CanSeek() => Assert.False(this.stream.CanSeek);
 
-    [Fact]
+    [Test]
     public void Length()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.Length);
@@ -43,7 +43,7 @@ public class PipeStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.Length);
     }
 
-    [Fact]
+    [Test]
     public void Position()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.Position);
@@ -53,7 +53,7 @@ public class PipeStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.Position = 0);
     }
 
-    [Fact]
+    [Test]
     public void IsDisposed()
     {
         var disposableObservable = (IDisposableObservable)this.stream;
@@ -62,7 +62,7 @@ public class PipeStreamTests : TestBase
         Assert.True(disposableObservable.IsDisposed);
     }
 
-    [Fact]
+    [Test]
     public async Task Dispose_CompletesWriter()
     {
         TaskCompletionSource<object> completion = new TaskCompletionSource<object>();
@@ -72,7 +72,7 @@ public class PipeStreamTests : TestBase
 #pragma warning restore CS0618 // Type or member is obsolete
     }
 
-    [Fact]
+    [Test]
     public async Task Dispose_CompletesReader()
     {
         TaskCompletionSource<object> completion = new TaskCompletionSource<object>();
@@ -82,7 +82,7 @@ public class PipeStreamTests : TestBase
 #pragma warning restore CS0618 // Type or member is obsolete
     }
 
-    [Fact]
+    [Test]
     public async Task Dispose_DoesNotCompleteWriter_WhenNotOwned()
     {
         this.stream = new LoopbackPipe(this.pipe).AsStream(ownsPipe: false);
@@ -93,7 +93,7 @@ public class PipeStreamTests : TestBase
 #pragma warning restore CS0618 // Type or member is obsolete
     }
 
-    [Fact]
+    [Test]
     public async Task Dispose_DoesNotCompleteReader_WhenNotOwned()
     {
         this.stream = new LoopbackPipe(this.pipe).AsStream(ownsPipe: false);
@@ -104,7 +104,7 @@ public class PipeStreamTests : TestBase
 #pragma warning restore CS0618 // Type or member is obsolete
     }
 
-    [Fact]
+    [Test]
     public void Dispose_NoWriter()
     {
         // Verify that we don't throw when disposing a stream without a writer.
@@ -112,7 +112,7 @@ public class PipeStreamTests : TestBase
         stream.Dispose();
     }
 
-    [Fact]
+    [Test]
     public void Dispose_NoReader()
     {
         // Verify that we don't throw when disposing a stream without a reader.
@@ -120,7 +120,7 @@ public class PipeStreamTests : TestBase
         stream.Dispose();
     }
 
-    [Fact]
+    [Test]
     public void SetLength()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.SetLength(0));
@@ -128,7 +128,7 @@ public class PipeStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.SetLength(0));
     }
 
-    [Fact]
+    [Test]
     public void Seek()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.Seek(0, SeekOrigin.Begin));
@@ -136,7 +136,7 @@ public class PipeStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.Seek(0, SeekOrigin.Begin));
     }
 
-    [Fact]
+    [Test]
     public void CanRead()
     {
         Assert.True(this.stream.CanRead);
@@ -149,7 +149,7 @@ public class PipeStreamTests : TestBase
         Assert.True(stream.CanRead);
     }
 
-    [Fact]
+    [Test]
     public void CanWrite()
     {
         Assert.True(this.stream.CanWrite);
@@ -162,8 +162,8 @@ public class PipeStreamTests : TestBase
         Assert.False(stream.CanWrite);
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task Write_InputValidation(bool useAsync)
     {
         await this.WriteAsync(null!, 0, 0, isAsync: useAsync);
@@ -176,7 +176,7 @@ public class PipeStreamTests : TestBase
         await this.WriteAsync(new byte[5], 5, 0, useAsync);
     }
 
-    [Fact]
+    [Test]
     public async Task Write_ThrowsAfterDisposal()
     {
         this.stream.Dispose();
@@ -187,7 +187,7 @@ public class PipeStreamTests : TestBase
         Assert.Throws<InvalidOperationException>(() => this.stream.Write(new byte[1], 0, 1));
     }
 
-    [Fact]
+    [Test]
     public async Task Write_ThrowsNotSupportedException()
     {
         this.stream = this.pipe.Reader.AsStream();
@@ -198,7 +198,7 @@ public class PipeStreamTests : TestBase
         Assert.Throws<NotSupportedException>(() => this.stream.Write(new byte[1], 0, 1));
     }
 
-    [Fact]
+    [Test]
     public async Task Read_ThrowsAfterDisposal()
     {
         this.stream.Dispose();
@@ -209,7 +209,7 @@ public class PipeStreamTests : TestBase
         Assert.Throws<InvalidOperationException>(() => this.stream.Read(new byte[1], 0, 1));
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsync_Array_DisposedWhileWaiting()
     {
         Task<int> readTask = this.stream.ReadAsync(new byte[1], 0, 1, this.TimeoutToken);
@@ -217,7 +217,7 @@ public class PipeStreamTests : TestBase
         await Assert.ThrowsAsync<InvalidOperationException>(() => readTask);
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsync_Array_CompleteThenReadAgain()
     {
         this.pipe.Writer.Complete();
@@ -227,7 +227,7 @@ public class PipeStreamTests : TestBase
 
 #if SPAN_BUILTIN
 
-    [Fact]
+    [Test]
     public async Task ReadAsync_Memory_DisposedWhileWaiting()
     {
         ValueTask<int> readTask = this.stream.ReadAsync(new byte[1], this.TimeoutToken);
@@ -235,7 +235,7 @@ public class PipeStreamTests : TestBase
         await Assert.ThrowsAsync<InvalidOperationException>(() => readTask.AsTask());
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsync_Memory_CompleteThenReadAgain()
     {
         this.pipe.Writer.Complete();
@@ -245,7 +245,7 @@ public class PipeStreamTests : TestBase
 
 #endif
 
-    [Fact]
+    [Test]
     public async Task Read_ThrowsNotSupportedException()
     {
         this.stream = this.pipe.Writer.AsStream();
@@ -256,8 +256,8 @@ public class PipeStreamTests : TestBase
         Assert.Throws<NotSupportedException>(() => this.stream.Read(new byte[1], 0, 1));
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task WriteThenRead(bool useAsync)
     {
         byte[] sendBuffer = new byte[5];
@@ -270,7 +270,7 @@ public class PipeStreamTests : TestBase
         Assert.Equal(sendBuffer.Take(3), recvBuffer.Take(3));
     }
 
-    [Fact]
+    [Test]
     public async Task ReadThenWrite()
     {
         byte[] recvBuffer = new byte[10];
@@ -286,7 +286,7 @@ public class PipeStreamTests : TestBase
         Assert.Equal(sendBuffer.Take(3), recvBuffer.Take(3));
     }
 
-    [Fact]
+    [Test]
     public async Task ReadLessThanReadResultBuffer()
     {
         await this.pipe.Writer.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);

@@ -32,23 +32,23 @@ public partial class WebSocketStreamTests : TestBase
 
     private Stream stream;
 
-    public WebSocketStreamTests(ITestOutputHelper logger)
-        : base(logger)
+    public WebSocketStreamTests()
+        : base(TestOutputHelper.Instance)
     {
         this.socket = new MockWebSocket();
         this.stream = this.socket.AsStream();
     }
 
-    [Fact]
+    [Test]
     public void Ctor_ThrowsANE()
     {
         Assert.Throws<ArgumentNullException>(() => StreamExtensions.AsStream((WebSocket)null!));
     }
 
-    [Fact]
+    [Test]
     public void CanSeek() => Assert.False(this.stream.CanSeek);
 
-    [Fact]
+    [Test]
     public void Length()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.Length);
@@ -56,7 +56,7 @@ public partial class WebSocketStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.Length);
     }
 
-    [Fact]
+    [Test]
     public void Position()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.Position);
@@ -66,7 +66,7 @@ public partial class WebSocketStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.Position = 0);
     }
 
-    [Fact]
+    [Test]
     public void IsDisposed()
     {
         Assert.False(((IDisposableObservable)this.stream).IsDisposed);
@@ -74,7 +74,7 @@ public partial class WebSocketStreamTests : TestBase
         Assert.True(((IDisposableObservable)this.stream).IsDisposed);
     }
 
-    [Fact]
+    [Test]
     public void SetLength()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.SetLength(0));
@@ -82,7 +82,7 @@ public partial class WebSocketStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.SetLength(0));
     }
 
-    [Fact]
+    [Test]
     public void Seek()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.Seek(0, SeekOrigin.Begin));
@@ -90,7 +90,7 @@ public partial class WebSocketStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.Seek(0, SeekOrigin.Begin));
     }
 
-    [Fact]
+    [Test]
     public void CanRead()
     {
         Assert.True(this.stream.CanRead);
@@ -98,7 +98,7 @@ public partial class WebSocketStreamTests : TestBase
         Assert.False(this.stream.CanRead);
     }
 
-    [Fact]
+    [Test]
     public void CanWrite()
     {
         Assert.True(this.stream.CanWrite);
@@ -106,16 +106,16 @@ public partial class WebSocketStreamTests : TestBase
         Assert.False(this.stream.CanWrite);
     }
 
-    [Fact]
+    [Test]
     public void Flush()
     {
         this.stream.Flush();
         Assert.True(this.stream.FlushAsync().IsCompleted);
     }
 
-    [Theory]
-    [InlineData(5)]
-    [InlineData(100 * 1024)] // exceeds expected buffer size
+    [Test]
+    [Arguments(5)]
+    [Arguments(100 * 1024)] // exceeds expected buffer size
     public async Task WriteAsync_SendsToSocket(int bufferSize)
     {
         byte[] buffer = new byte[bufferSize];
@@ -125,9 +125,9 @@ public partial class WebSocketStreamTests : TestBase
         Assert.Equal(buffer, message.Buffer.ToArray());
     }
 
-    [Theory]
-    [InlineData(5)]
-    [InlineData(100 * 1024)] // exceeds expected buffer size
+    [Test]
+    [Arguments(5)]
+    [Arguments(100 * 1024)] // exceeds expected buffer size
     public async Task ReadAsync_ReadsFromSocket(int bufferSize)
     {
         byte[] buffer = new byte[bufferSize];
@@ -146,7 +146,7 @@ public partial class WebSocketStreamTests : TestBase
         Assert.Equal(buffer, readBuffer);
     }
 
-    [Fact]
+    [Test]
     public async Task WriteAsync_ThrowsObjectDisposedException()
     {
         this.stream.Dispose();
@@ -154,7 +154,7 @@ public partial class WebSocketStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.Write(new byte[1], 0, 1));
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsync_ThrowsObjectDisposedException()
     {
         this.stream.Dispose();
@@ -162,14 +162,14 @@ public partial class WebSocketStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.Read(new byte[1], 0, 1));
     }
 
-    [Fact]
+    [Test]
     public void Dispose_DisposesSocket()
     {
         this.stream.Dispose();
         Assert.Equal(1, this.socket.DisposalCount);
     }
 
-    [Fact]
+    [Test]
     public void Dispose_DoesNotSendCloseWebSocketPacket()
     {
         this.stream.Dispose();
@@ -177,7 +177,7 @@ public partial class WebSocketStreamTests : TestBase
         Assert.Equal(0, this.socket.ReadQueue.Count);
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsync_ReturnsEmptyBufferWhenSocketIsClosed()
     {
         this.socket.EnqueueRead(new byte[0]);
@@ -191,7 +191,7 @@ public partial class WebSocketStreamTests : TestBase
         Assert.Equal(0, bytesRead);
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsync_ReturnsEmptyBufferWhenSocketIsClosed_ASPNETCore()
     {
         WebSocket clientSocket;
@@ -210,7 +210,7 @@ public partial class WebSocketStreamTests : TestBase
         Assert.False(((IDisposableObservable)this.stream).IsDisposed);
     }
 
-    [Fact(Skip = "Unstable test. I'm not sure how valuable it is to verify that we get server messages *after* we've closed the connection anyway.")]
+    [Test, Skip("Unstable test. I'm not sure how valuable it is to verify that we get server messages *after* we've closed the connection anyway.")]
     public async Task ReadAsync_ReturnsMessagesBeforeClosing_ASPNETCore()
     {
         WebSocket clientSocket;
@@ -234,7 +234,7 @@ public partial class WebSocketStreamTests : TestBase
         Assert.False(((IDisposableObservable)this.stream).IsDisposed);
     }
 
-    [Fact]
+    [Test]
     public async Task WriteAsync_ManyTimesWithoutAwaiting()
     {
         WebSocket clientSocket;

@@ -7,19 +7,19 @@ using Xunit;
 
 public class MultiplexingProtocolExceptionTests : TestBase
 {
-    public MultiplexingProtocolExceptionTests(ITestOutputHelper logger)
-        : base(logger)
+    public MultiplexingProtocolExceptionTests()
+        : base(TestOutputHelper.Instance)
     {
     }
 
-    [Fact]
+    [Test]
     public void Ctor_Default_ProducesNonEmptyMessage()
     {
         var ex = new MultiplexingProtocolException();
         Assert.False(string.IsNullOrEmpty(ex.Message));
     }
 
-    [Fact]
+    [Test]
     public void Ctor_Message()
     {
         string expected = "foo";
@@ -27,7 +27,7 @@ public class MultiplexingProtocolExceptionTests : TestBase
         Assert.Equal(expected, ex.Message);
     }
 
-    [Fact]
+    [Test]
     public void Ctor_MessageInner()
     {
         string expectedMessage = "foo";

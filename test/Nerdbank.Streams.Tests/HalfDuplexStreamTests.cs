@@ -24,22 +24,22 @@ public class HalfDuplexStreamTests : TestBase
 
     private HalfDuplexStream stream = new HalfDuplexStream(ResumeThreshold, PauseThreshold);
 
-    public HalfDuplexStreamTests(ITestOutputHelper logger)
-        : base(logger)
+    public HalfDuplexStreamTests()
+        : base(TestOutputHelper.Instance)
     {
     }
 
-    [Fact]
+    [Test]
     public void DefaultCtor()
     {
         var stream = new HalfDuplexStream();
         stream.Dispose();
     }
 
-    [Fact]
+    [Test]
     public void CanSeek() => Assert.False(this.stream.CanSeek);
 
-    [Fact]
+    [Test]
     public void Length()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.Length);
@@ -47,7 +47,7 @@ public class HalfDuplexStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.Length);
     }
 
-    [Fact]
+    [Test]
     public void Position()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.Position);
@@ -57,7 +57,7 @@ public class HalfDuplexStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.Position = 0);
     }
 
-    [Fact]
+    [Test]
     public void IsDisposed()
     {
         Assert.False(this.stream.IsDisposed);
@@ -65,7 +65,7 @@ public class HalfDuplexStreamTests : TestBase
         Assert.True(this.stream.IsDisposed);
     }
 
-    [Fact]
+    [Test]
     public void SetLength()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.SetLength(0));
@@ -73,7 +73,7 @@ public class HalfDuplexStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.SetLength(0));
     }
 
-    [Fact]
+    [Test]
     public void Seek()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.Seek(0, SeekOrigin.Begin));
@@ -81,7 +81,7 @@ public class HalfDuplexStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.Seek(0, SeekOrigin.Begin));
     }
 
-    [Fact]
+    [Test]
     public void CanRead()
     {
         Assert.True(this.stream.CanRead);
@@ -89,7 +89,7 @@ public class HalfDuplexStreamTests : TestBase
         Assert.False(this.stream.CanRead);
     }
 
-    [Fact]
+    [Test]
     public void CanWrite()
     {
         Assert.True(this.stream.CanWrite);
@@ -97,15 +97,15 @@ public class HalfDuplexStreamTests : TestBase
         Assert.False(this.stream.CanWrite);
     }
 
-    [Fact]
+    [Test]
     public void Flush()
     {
         this.stream.Flush();
         Assert.True(this.stream.FlushAsync().IsCompleted);
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task WriteThenRead(bool useAsync)
     {
         byte[] sendBuffer = this.GetRandomBuffer(20);
@@ -116,8 +116,8 @@ public class HalfDuplexStreamTests : TestBase
         Assert.Equal(sendBuffer, recvBuffer);
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task Write_InputValidation(bool useAsync)
     {
         await Assert.ThrowsAsync<ArgumentNullException>(() => this.WriteAsync(null!, 0, 0, isAsync: useAsync));
@@ -130,17 +130,17 @@ public class HalfDuplexStreamTests : TestBase
         await this.WriteAsync(new byte[5], 5, 0, useAsync);
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task Write_ThrowsObjectDisposedException(bool useAsync)
     {
         this.stream.Dispose();
         await Assert.ThrowsAsync<ObjectDisposedException>(() => this.WriteAsync(new byte[1], 0, 1, useAsync));
     }
 
-    [Theory]
-    [CombinatorialData]
-    public async Task WriteManyThenRead([CombinatorialValues(PauseThreshold / 2, PauseThreshold - 1)] int bytes, [CombinatorialValues(1, 2, 3)] int steps, bool useAsync)
+    [Test]
+    [MatrixDataSource]
+    public async Task WriteManyThenRead([Matrix(PauseThreshold / 2, PauseThreshold - 1)] int bytes, [Matrix(1, 2, 3)] int steps, bool useAsync)
     {
         int typicalWriteSize = bytes / steps;
         byte[] sendBuffer = this.GetRandomBuffer(bytes);
@@ -160,9 +160,9 @@ public class HalfDuplexStreamTests : TestBase
         Assert.Equal(sendBuffer, recvBuffer);
     }
 
-    [Theory]
-    [CombinatorialData]
-    public async Task WriteWriteRead_Loop_WriteRead([CombinatorialValues(2, 2.1, 2.9, 3, 4, 5, 6)] float stepsPerBuffer)
+    [Test]
+    [MatrixDataSource]
+    public async Task WriteWriteRead_Loop_WriteRead([Matrix(2, 2.1, 2.9, 3, 4, 5, 6)] float stepsPerBuffer)
     {
         bool useAsync = true;
         const int maxBufferMultiplier = 3;
@@ -197,8 +197,8 @@ public class HalfDuplexStreamTests : TestBase
         Assert.Equal(sendBuffer, recvBuffer);
     }
 
-    [Theory]
-    [CombinatorialData]
+    [Test]
+    [MatrixDataSource]
     public async Task Write_ThenReadMore(bool useAsync)
     {
         byte[] sendBuffer = new byte[] { 0x1, 0x2 };
@@ -219,7 +219,7 @@ public class HalfDuplexStreamTests : TestBase
         Assert.Equal(sendBuffer, recvBuffer.Take(bytesRead));
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsyncThenWriteAsync()
     {
         byte[] sendBuffer = this.GetRandomBuffer(20);
@@ -231,7 +231,7 @@ public class HalfDuplexStreamTests : TestBase
         Assert.Equal(sendBuffer, recvBuffer);
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsync0LengthBufferThenWriteAsync()
     {
         byte[] sendBuffer = this.GetRandomBuffer(20);
@@ -246,8 +246,8 @@ public class HalfDuplexStreamTests : TestBase
         Assert.Equal(sendBuffer, recvBuffer);
     }
 
-    [Theory]
-    [CombinatorialData]
+    [Test]
+    [MatrixDataSource]
     public async Task CompleteWriting(bool useAsync)
     {
         await this.WriteAsync(new byte[3], 0, 3, useAsync);
@@ -258,7 +258,7 @@ public class HalfDuplexStreamTests : TestBase
         Assert.Equal(0, this.stream.Read(recvbuffer, 3, 2));
     }
 
-    [Fact]
+    [Test]
     public async Task StreamAsBufferWriter()
     {
         IBufferWriter<byte> writer = this.stream;
