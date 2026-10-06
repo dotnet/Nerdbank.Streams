@@ -26,13 +26,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-        - os: ubuntu-24.04
-          rid: linux
-        - os: macOS-15
-          rid: osx
-        - os: windows-2025
-          rid: win
+        os:
+        - ubuntu-26.04
+        - macOS-15
+        - windows-2025
 
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -52,14 +49,11 @@ jobs:
     - name: ⚙️ Set pipeline variables based on source
       run: tools/variables/_define.ps1
       shell: pwsh
-    - name: 🛠 dotnet build
-      run: dotnet build -t:build,pack --no-restore -c ${{ env.BUILDCONFIGURATION }} -warnAsError -warnNotAsError:NU1901,NU1902,NU1903,NU1904 /bl:"${{ runner.temp }}/_artifacts/build_logs/build.binlog"
-    - name: 🧪 dotnet test
-      run: tools/dotnet-test-cloud.ps1 -Configuration ${{ env.BUILDCONFIGURATION }} -Agent ${{ runner.os }}
+    - name: 🛠 build
+      run: dotnet build tools/dirs.proj -t:build,pack,publish --no-restore -c ${{ env.BUILDCONFIGURATION }} -warnAsError -warnNotAsError:NU1901,NU1902,NU1903,NU1904 /bl:"${{ runner.temp }}/_artifacts/build_logs/build.binlog"
+    - name: 🧪 test
+      run: tools/dotnet-test-cloud.ps1 -Configuration ${{ env.BUILDCONFIGURATION }} -Agent ${{ runner.os }} -IncludeNativeAOT
       shell: pwsh
-    - name: 🧪 NativeAOT test
-      run: dotnet publish -c Release -r ${{ matrix.rid }}-x64 -warnaserror
-      working-directory: test/NativeAOTCompatibility
 
     - name: ⚙️ Use Node.js 24.x
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
@@ -127,10 +121,10 @@ jobs:
 
   docs:
     name: 📃 Docs
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - name: 🔗 Markup Link Checker (mlc)
-      uses: becheran/mlc@7ec24825cefe0c9c8c6bac48430e1f69e3ec356e # v1.2.0
+      uses: becheran/mlc@b0d0d353e04fcbcfd1d86716103d78a61e5b25dd # v1.2.2
       with:
         args: --do-not-warn-for-redirect-to https://learn.microsoft.com*,https://dotnet.microsoft.com/*,https://dev.azure.com/*,https://app.codecov.io/*,https://dotnetfoundation.org/*,https://docs.github.com/* -i https://www.npmjs.com/package/*,https://get.dot.net/ -p docfx,ext
