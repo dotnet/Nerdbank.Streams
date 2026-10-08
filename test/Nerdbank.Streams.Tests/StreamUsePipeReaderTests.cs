@@ -59,5 +59,26 @@ public class StreamUsePipeReaderTests : StreamPipeReaderTestBase
         _ = unreadableStream.Received().CanRead;
     }
 
+#if NETFRAMEWORK
+    [Test]
+    public async Task PipeStreamUsesApmDirectly()
+    {
+        using var stream = new ApmTrackingPipeStream(new byte[] { 1 });
+        PipeReader reader = this.CreatePipeReader(stream, hintSize: 1);
+
+        ReadResult result = await reader.ReadAsync(this.TimeoutToken);
+        Assert.Equal(1, result.Buffer.Length);
+        reader.AdvanceTo(result.Buffer.End);
+
+        result = await reader.ReadAsync(this.TimeoutToken);
+        Assert.True(result.IsCompleted);
+        reader.AdvanceTo(result.Buffer.End);
+        reader.Complete();
+
+        Assert.Equal(0, stream.ReadAsyncCallCount);
+        Assert.True(stream.BeginReadCallCount > 0);
+    }
+#endif
+
     protected override PipeReader CreatePipeReader(Stream stream, int hintSize = 0) => stream.UsePipeReader(hintSize);
 }
