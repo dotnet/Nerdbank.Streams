@@ -925,6 +925,15 @@ namespace Nerdbank.Streams
                     {
                         this.TraceSource.TraceEvent(TraceEventType.Error, (int)TraceEventId.FatalError, $"Exception thrown in {nameof(MultiplexingStream)}.{nameof(this.ReadStreamAsync)} leading to stream shutdown: {{0}}", ex);
                     }
+
+                    if (ex is OperationCanceledException)
+                    {
+                        // The transport reported failure by throwing OperationCanceledException (for instance a WebSocket aborted by its
+                        // keep-alive timeout), but we were not asked to stop. Rethrowing leaves this task in the Canceled state,
+                        // which DisposeSelfOnFailure does not treat as a failure, so the stream would never complete.
+                        // Fault explicitly so that Completion completes and all channels are released.
+                        this.Fault(ex);
+                    }
                 }
 
                 throw;
