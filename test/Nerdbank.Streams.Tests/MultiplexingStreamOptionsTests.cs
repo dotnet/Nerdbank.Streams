@@ -12,7 +12,7 @@ public class MultiplexingStreamOptionsTests
 {
     private MultiplexingStream.Options options = new MultiplexingStream.Options();
 
-    [Fact]
+    [Test]
     public void DefaultChannelReceivingWindowSize()
     {
         Assert.True(this.options.DefaultChannelReceivingWindowSize > 0);
@@ -22,7 +22,7 @@ public class MultiplexingStreamOptionsTests
         Assert.Throws<ArgumentOutOfRangeException>(() => this.options.DefaultChannelReceivingWindowSize = -1);
     }
 
-    [Fact]
+    [Test]
     public void ProtocolMajorVersion()
     {
         Assert.Equal(1, this.options.ProtocolMajorVersion);
@@ -33,7 +33,7 @@ public class MultiplexingStreamOptionsTests
         Assert.Throws<ArgumentOutOfRangeException>(() => this.options.ProtocolMajorVersion = -1);
     }
 
-    [Fact]
+    [Test]
     public void TraceSource()
     {
         Assert.NotNull(this.options.TraceSource);
@@ -45,7 +45,7 @@ public class MultiplexingStreamOptionsTests
         Assert.Same(traceSource, this.options.TraceSource);
     }
 
-    [Fact]
+    [Test]
     public void DefaultChannelTraceSourceFactory()
     {
         Assert.Null(this.options.DefaultChannelTraceSourceFactory);
@@ -53,7 +53,7 @@ public class MultiplexingStreamOptionsTests
         Assert.NotNull(this.options.DefaultChannelTraceSourceFactory);
     }
 
-    [Fact]
+    [Test]
     public void DefaultChannelTraceSourceFactoryWithQualifier()
     {
         Assert.Null(this.options.DefaultChannelTraceSourceFactoryWithQualifier);
@@ -61,7 +61,7 @@ public class MultiplexingStreamOptionsTests
         Assert.NotNull(this.options.DefaultChannelTraceSourceFactoryWithQualifier);
     }
 
-    [Fact]
+    [Test]
     public void SeededChannels()
     {
         Assert.Empty(this.options.SeededChannels);
@@ -73,7 +73,7 @@ public class MultiplexingStreamOptionsTests
         Assert.Equal(2, this.options.SeededChannels.Count);
     }
 
-    [Fact]
+    [Test]
     public void IsFrozen()
     {
         Assert.False(this.options.IsFrozen);
@@ -83,7 +83,7 @@ public class MultiplexingStreamOptionsTests
         Assert.False(this.options.IsFrozen);
     }
 
-    [Fact]
+    [Test]
     public void CopyConstructor()
     {
         Assert.Throws<ArgumentNullException>(() => new MultiplexingStream.Options(null!));
@@ -114,7 +114,7 @@ public class MultiplexingStreamOptionsTests
         Assert.Equal<MultiplexingStream.ChannelOptions>(original.SeededChannels, copy.SeededChannels);
     }
 
-    [Fact]
+    [Test]
     public void Frozen_ThrowsOnChanges()
     {
         MultiplexingStream.Options? frozen = this.options.GetFrozenCopy();
@@ -129,7 +129,7 @@ public class MultiplexingStreamOptionsTests
         Assert.Throws<NotSupportedException>(() => frozen.SeededChannels.Add(new MultiplexingStream.ChannelOptions()));
     }
 
-    [Fact]
+    [Test]
     public void CopyOfFrozenIsNotFrozen()
     {
         MultiplexingStream.Options frozen = this.options.GetFrozenCopy();

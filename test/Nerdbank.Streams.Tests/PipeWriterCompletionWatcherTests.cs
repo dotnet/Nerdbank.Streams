@@ -14,20 +14,20 @@ public class PipeWriterCompletionWatcherTests : TestBase
     private readonly object state = new object();
     private readonly TaskCompletionSource<Exception?> completionException = new TaskCompletionSource<Exception?>();
 
-    public PipeWriterCompletionWatcherTests(ITestOutputHelper logger)
-        : base(logger)
+    public PipeWriterCompletionWatcherTests()
+        : base(TestOutputHelper.Instance)
     {
         this.monitored = this.writer.OnCompleted(this.OnCompleted, this.state);
     }
 
-    [Fact]
+    [Test]
     public void OnCompleted_NullWriter()
     {
         PipeWriter? writer = null;
         Assert.Throws<ArgumentNullException>(() => writer!.OnCompleted((e, s) => { }));
     }
 
-    [Fact]
+    [Test]
     public async Task NullState()
     {
         var tcs = new TaskCompletionSource<Exception?>();
@@ -43,7 +43,7 @@ public class PipeWriterCompletionWatcherTests : TestBase
         Assert.Same(expectedException, await tcs.Task);
     }
 
-    [Fact]
+    [Test]
     public async Task Complete_Twice()
     {
         this.monitored.Complete();

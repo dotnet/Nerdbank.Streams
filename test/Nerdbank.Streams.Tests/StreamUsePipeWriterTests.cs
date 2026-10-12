@@ -8,14 +8,15 @@ using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using Xunit;
 
+[InheritsTests]
 public class StreamUsePipeWriterTests : StreamPipeWriterTestBase
 {
-    public StreamUsePipeWriterTests(ITestOutputHelper logger)
-        : base(logger)
+    public StreamUsePipeWriterTests()
+        : base(TestOutputHelper.Instance)
     {
     }
 
-    [Fact]
+    [Test]
     public async Task StreamFails()
     {
         var expectedException = new InvalidOperationException();

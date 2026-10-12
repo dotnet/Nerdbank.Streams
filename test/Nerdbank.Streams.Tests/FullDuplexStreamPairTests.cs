@@ -20,8 +20,8 @@ public class FullDuplexStreamPairTests : TestBase
 
     private readonly Stream stream2;
 
-    public FullDuplexStreamPairTests(ITestOutputHelper logger)
-        : base(logger)
+    public FullDuplexStreamPairTests()
+        : base(TestOutputHelper.Instance)
     {
         (Stream, Stream) tuple = FullDuplexStream.CreatePair();
         Assert.NotNull(tuple.Item1);
@@ -31,7 +31,7 @@ public class FullDuplexStreamPairTests : TestBase
         this.stream2 = tuple.Item2;
     }
 
-    [Fact]
+    [Test]
     public void Write_InvalidArgs()
     {
         this.stream1.Write(null!, 0, 0);
@@ -42,7 +42,7 @@ public class FullDuplexStreamPairTests : TestBase
         Assert.Throws<ArgumentOutOfRangeException>(() => this.stream1.Write(new byte[1], 0, 2));
     }
 
-    [Fact]
+    [Test]
     public void Write_CanBeReadOnOtherStream()
     {
         byte[] sentBuffer = Data3Bytes;
@@ -55,7 +55,7 @@ public class FullDuplexStreamPairTests : TestBase
         Assert.Equal<byte>(sentBuffer, buffer);
     }
 
-    [Fact]
+    [Test]
     public void Read_InSmallerBlocks()
     {
         byte[] sentBuffer = Data5Bytes;
@@ -76,7 +76,7 @@ public class FullDuplexStreamPairTests : TestBase
         Assert.Equal(sentBuffer.Skip(4), buffer.Take(1));
     }
 
-    [Fact]
+    [Test]
     public async Task Read_BeforeWrite()
     {
         byte[] buffer = new byte[5];
@@ -90,7 +90,7 @@ public class FullDuplexStreamPairTests : TestBase
         Assert.Equal(Data3Bytes, buffer.Take(bytesRead));
     }
 
-    [Fact]
+    [Test]
     public async Task Read_ConcurrentWrite()
     {
         byte[] readBuffer = new byte[5];
@@ -128,7 +128,7 @@ public class FullDuplexStreamPairTests : TestBase
         Assert.Equal(Data5Bytes, readBuffer);
     }
 
-    [Fact]
+    [Test]
     public async Task Read_ReturnsNoBytesWhenRemoteStreamClosed()
     {
         // Verify that closing the transmitting stream after reading has been requested
@@ -145,7 +145,7 @@ public class FullDuplexStreamPairTests : TestBase
         Assert.Equal(0, bytesRead);
     }
 
-    [Fact]
+    [Test]
     public async Task Write_EmptyBufferDoesNotTerminateOtherStream()
     {
         await this.stream1.WriteAsync(Data3Bytes, 0, 0).WithCancellation(this.TimeoutToken);
@@ -154,7 +154,7 @@ public class FullDuplexStreamPairTests : TestBase
             () => this.stream2.ReadAsync(buffer, 0, buffer.Length, ExpectedTimeoutToken)).WithCancellation(this.TimeoutToken);
     }
 
-    [Fact]
+    [Test]
     public void Write_TwiceThenRead()
     {
         this.stream1.Write(Data3Bytes, 0, Data3Bytes.Length);
@@ -175,25 +175,25 @@ public class FullDuplexStreamPairTests : TestBase
         Assert.Equal(Data5Bytes, receiveBuffer.Skip(Data3Bytes.Length));
     }
 
-    [Fact]
+    [Test]
     public void Write_EmptyBuffer()
     {
         this.stream1.Write(new byte[0], 0, 0);
     }
 
-    [Fact]
+    [Test]
     public void Write_EmptyTrailingEdgeOfBuffer()
     {
         this.stream1.Write(new byte[1], 1, 0);
     }
 
-    [Fact]
+    [Test]
     public void Write_TrailingEdgeOfBuffer()
     {
         this.stream1.Write(new byte[2], 1, 1);
     }
 
-    [Fact]
+    [Test]
     public async Task Read_APM()
     {
         byte[] readBuffer = new byte[10];
@@ -208,7 +208,7 @@ public class FullDuplexStreamPairTests : TestBase
         Assert.Equal(Data3Bytes, readBuffer.Take(bytesRead));
     }
 
-    [Fact]
+    [Test]
     public async Task Write_APM()
     {
         await Task.Factory.FromAsync(
@@ -222,7 +222,7 @@ public class FullDuplexStreamPairTests : TestBase
         Assert.Equal(Data3Bytes, readBuffer.Take(bytesRead));
     }
 
-    [Fact]
+    [Test]
     public void Position_Throws()
     {
         Assert.Throws<NotSupportedException>(() => this.stream1.Position);
@@ -235,7 +235,7 @@ public class FullDuplexStreamPairTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream1.Position = 0);
     }
 
-    [Fact]
+    [Test]
     public void Length_ThrowsObjectDisposedException()
     {
         Assert.Throws<NotSupportedException>(() => this.stream1.Length);
@@ -245,7 +245,7 @@ public class FullDuplexStreamPairTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream1.Length);
     }
 
-    [Fact]
+    [Test]
     public void CanSeek()
     {
         Assert.False(this.stream1.CanSeek);
@@ -255,7 +255,7 @@ public class FullDuplexStreamPairTests : TestBase
         Assert.False(this.stream1.CanSeek);
     }
 
-    [Fact]
+    [Test]
     public void CanWrite()
     {
         Assert.True(this.stream1.CanWrite);
@@ -265,7 +265,7 @@ public class FullDuplexStreamPairTests : TestBase
         Assert.False(this.stream1.CanWrite);
     }
 
-    [Fact]
+    [Test]
     public void CanRead()
     {
         Assert.True(this.stream1.CanRead);
@@ -275,7 +275,7 @@ public class FullDuplexStreamPairTests : TestBase
         Assert.False(this.stream1.CanRead);
     }
 
-    [Fact]
+    [Test]
     public void Seek()
     {
         Assert.Throws<NotSupportedException>(() => this.stream1.Seek(0, SeekOrigin.Begin));
@@ -285,7 +285,7 @@ public class FullDuplexStreamPairTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream1.Seek(0, SeekOrigin.Begin));
     }
 
-    [Fact]
+    [Test]
     public void SetLength()
     {
         Assert.Throws<NotSupportedException>(() => this.stream1.SetLength(0));
@@ -295,7 +295,7 @@ public class FullDuplexStreamPairTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream1.SetLength(0));
     }
 
-    [Fact]
+    [Test]
     public void Read_ThrowsInvalidOperationException()
     {
         this.stream1.Dispose();
@@ -303,7 +303,7 @@ public class FullDuplexStreamPairTests : TestBase
         Assert.Throws<InvalidOperationException>(() => this.stream1.Read(buffer, 0, buffer.Length));
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsync_ThrowsAfterDisposal()
     {
         this.stream1.Dispose();
@@ -311,7 +311,7 @@ public class FullDuplexStreamPairTests : TestBase
         await Assert.ThrowsAsync<InvalidOperationException>(() => this.stream1.ReadAsync(buffer, 0, buffer.Length).WithCancellation(this.TimeoutToken));
     }
 
-    [Fact]
+    [Test]
     public void Write_ThrowsAfterDisposal()
     {
         this.stream1.Dispose();
@@ -319,7 +319,7 @@ public class FullDuplexStreamPairTests : TestBase
         Assert.Throws<InvalidOperationException>(() => this.stream1.Write(buffer, 0, buffer.Length));
     }
 
-    [Fact]
+    [Test]
     public async Task WriteAsync_ThrowsAfterDisposal()
     {
         this.stream1.Dispose();
@@ -327,7 +327,7 @@ public class FullDuplexStreamPairTests : TestBase
         await Assert.ThrowsAsync<InvalidOperationException>(() => this.stream1.WriteAsync(buffer, 0, buffer.Length).WithCancellation(this.TimeoutToken));
     }
 
-    [Fact]
+    [Test]
     public void Dispose_TwiceDoesNotThrow()
     {
         this.stream1.Dispose();
@@ -336,14 +336,14 @@ public class FullDuplexStreamPairTests : TestBase
         this.stream2.Dispose();
     }
 
-    [Fact]
+    [Test]
     public void ReadByte_ThrowsAfterDisposal()
     {
         this.stream1.Dispose();
         Assert.Throws<InvalidOperationException>(() => this.stream1.ReadByte());
     }
 
-    [Fact]
+    [Test]
     public void Dispose_LeadsOtherStreamToEnd()
     {
         this.stream1.Dispose();
@@ -351,7 +351,7 @@ public class FullDuplexStreamPairTests : TestBase
         Assert.Equal(0, this.stream2.Read(buffer, 0, 1));
     }
 
-    [Fact]
+    [Test]
     public async Task StreamPairWithUsePipe()
     {
         System.IO.Pipelines.IDuplexPipe? pipe1 = this.stream1.UsePipe();
@@ -380,7 +380,7 @@ public class FullDuplexStreamPairTests : TestBase
 #pragma warning restore CS0618 // Type or member is obsolete
     }
 
-    [Fact]
+    [Test]
     public async Task PipePair()
     {
         (System.IO.Pipelines.IDuplexPipe party1, System.IO.Pipelines.IDuplexPipe party2) = FullDuplexStream.CreatePipePair();

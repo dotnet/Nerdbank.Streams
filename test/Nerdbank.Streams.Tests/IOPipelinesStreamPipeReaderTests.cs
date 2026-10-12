@@ -4,10 +4,11 @@
 using System.IO.Pipelines;
 using Xunit;
 
+[InheritsTests]
 public class IOPipelinesStreamPipeReaderTests : StreamPipeReaderTestBase
 {
-    public IOPipelinesStreamPipeReaderTests(ITestOutputHelper logger)
-        : base(logger)
+    public IOPipelinesStreamPipeReaderTests()
+        : base(TestOutputHelper.Instance)
     {
     }
 

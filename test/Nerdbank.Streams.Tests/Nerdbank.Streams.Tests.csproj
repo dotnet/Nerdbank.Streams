@@ -6,13 +6,18 @@
     <OutputType>Exe</OutputType>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <RootNamespace />
+    <!-- NSubstitute (Castle dynamic proxies), StreamJsonRpc and the ASP.NET Core test host are not NativeAOT-compatible.
+         NativeAOT compatibility of Nerdbank.Streams itself is validated by test/AotCompatibilityTest. -->
+    <PublishNativeAOTTests>false</PublishNativeAOTTests>
+    <!-- TUnit's implicit `using static TUnit.Core.HookType` makes `Assembly` ambiguous with System.Reflection.Assembly. Usings.cs imports TUnit.Core instead. -->
+    <TUnitImplicitUsings>false</TUnitImplicitUsings>
 
     <!-- https://github.com/tonerdo/coverlet -->
     <!-- Do not collect by default -->
     <CollectCoverage>false</CollectCoverage>
     <CoverletOutputFormat>opencover</CoverletOutputFormat>
     <!--<CoverletOutput>$(OutDir)code_coverage.xml</CoverletOutput>-->
-    <Exclude>[xunit.*]*,[IsolatedTestHost]*</Exclude>
+    <Exclude>[xunit.*]*,[TUnit.*]*,[IsolatedTestHost]*</Exclude>
 
     <!-- Security vulnerabilities in the test project aren't that interesting, at least until we can remove/upgrade the ASP.NET Core tests. -->
     <NoWarn>$(NoWarn);NU1902;NU1904</NoWarn>
@@ -34,8 +39,8 @@
     <PackageReference Include="PInvoke.Kernel32" />
     <PackageReference Include="StreamJsonRpc" />
     <PackageReference Include="System.IO.Pipes" />
-    <PackageReference Include="xunit.combinatorial" />
-    <PackageReference Include="xunit.v3.mtp-v2" />
+    <PackageReference Include="TUnit.Engine" />
+    <PackageReference Include="xunit.v3.assert" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\IsolatedTestHost\IsolatedTestHost.csproj">

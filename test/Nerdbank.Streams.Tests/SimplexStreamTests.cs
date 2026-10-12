@@ -20,22 +20,22 @@ public class SimplexStreamTests : TestBase
 
     private SimplexStream stream = new SimplexStream(ResumeThreshold, PauseThreshold);
 
-    public SimplexStreamTests(ITestOutputHelper logger)
-        : base(logger)
+    public SimplexStreamTests()
+        : base(TestOutputHelper.Instance)
     {
     }
 
-    [Fact]
+    [Test]
     public void DefaultCtor()
     {
         var stream = new SimplexStream();
         stream.Dispose();
     }
 
-    [Fact]
+    [Test]
     public void CanSeek() => Assert.False(this.stream.CanSeek);
 
-    [Fact]
+    [Test]
     public void Length()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.Length);
@@ -43,7 +43,7 @@ public class SimplexStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.Length);
     }
 
-    [Fact]
+    [Test]
     public void Position()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.Position);
@@ -53,7 +53,7 @@ public class SimplexStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.Position = 0);
     }
 
-    [Fact]
+    [Test]
     public void IsDisposed()
     {
         Assert.False(this.stream.IsDisposed);
@@ -61,7 +61,7 @@ public class SimplexStreamTests : TestBase
         Assert.True(this.stream.IsDisposed);
     }
 
-    [Fact]
+    [Test]
     public void SetLength()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.SetLength(0));
@@ -69,7 +69,7 @@ public class SimplexStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.SetLength(0));
     }
 
-    [Fact]
+    [Test]
     public void Seek()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.Seek(0, SeekOrigin.Begin));
@@ -77,7 +77,7 @@ public class SimplexStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.Seek(0, SeekOrigin.Begin));
     }
 
-    [Fact]
+    [Test]
     public void CanRead()
     {
         Assert.True(this.stream.CanRead);
@@ -85,7 +85,7 @@ public class SimplexStreamTests : TestBase
         Assert.False(this.stream.CanRead);
     }
 
-    [Fact]
+    [Test]
     public void CanWrite()
     {
         Assert.True(this.stream.CanWrite);
@@ -93,15 +93,15 @@ public class SimplexStreamTests : TestBase
         Assert.False(this.stream.CanWrite);
     }
 
-    [Fact]
+    [Test]
     public void Flush()
     {
         this.stream.Flush();
         Assert.True(this.stream.FlushAsync().IsCompleted);
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task WriteThenRead(bool useAsync)
     {
         byte[] sendBuffer = this.GetRandomBuffer(20);
@@ -112,8 +112,8 @@ public class SimplexStreamTests : TestBase
         Assert.Equal(sendBuffer, recvBuffer);
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task Write_InputValidation(bool useAsync)
     {
         await Assert.ThrowsAsync<ArgumentNullException>(() => this.WriteAsync(null!, 0, 0, isAsync: useAsync));
@@ -126,17 +126,17 @@ public class SimplexStreamTests : TestBase
         await this.WriteAsync(new byte[5], 5, 0, useAsync);
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task Write_ThrowsObjectDisposedException(bool useAsync)
     {
         this.stream.Dispose();
         await Assert.ThrowsAsync<ObjectDisposedException>(() => this.WriteAsync(new byte[1], 0, 1, useAsync));
     }
 
-    [Theory]
-    [CombinatorialData]
-    public async Task WriteManyThenRead([CombinatorialValues(PauseThreshold / 2, PauseThreshold - 1)] int bytes, [CombinatorialValues(1, 2, 3)] int steps, bool useAsync)
+    [Test]
+    [MatrixDataSource]
+    public async Task WriteManyThenRead([Matrix(PauseThreshold / 2, PauseThreshold - 1)] int bytes, [Matrix(1, 2, 3)] int steps, bool useAsync)
     {
         int typicalWriteSize = bytes / steps;
         byte[] sendBuffer = this.GetRandomBuffer(bytes);
@@ -156,9 +156,9 @@ public class SimplexStreamTests : TestBase
         Assert.Equal(sendBuffer, recvBuffer);
     }
 
-    [Theory]
-    [CombinatorialData]
-    public async Task WriteWriteRead_Loop_WriteRead([CombinatorialValues(2, 2.1, 2.9, 3, 4, 5, 6)] float stepsPerBuffer)
+    [Test]
+    [MatrixDataSource]
+    public async Task WriteWriteRead_Loop_WriteRead([Matrix(2, 2.1, 2.9, 3, 4, 5, 6)] float stepsPerBuffer)
     {
         bool useAsync = true;
         const int maxBufferMultiplier = 3;
@@ -193,8 +193,8 @@ public class SimplexStreamTests : TestBase
         Assert.Equal(sendBuffer, recvBuffer);
     }
 
-    [Theory]
-    [CombinatorialData]
+    [Test]
+    [MatrixDataSource]
     public async Task Write_ThenReadMore(bool useAsync)
     {
         byte[] sendBuffer = new byte[] { 0x1, 0x2 };
@@ -215,7 +215,7 @@ public class SimplexStreamTests : TestBase
         Assert.Equal(sendBuffer, recvBuffer.Take(bytesRead));
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsyncThenWriteAsync()
     {
         byte[] sendBuffer = this.GetRandomBuffer(20);
@@ -227,7 +227,7 @@ public class SimplexStreamTests : TestBase
         Assert.Equal(sendBuffer, recvBuffer);
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsync0LengthBufferThenWriteAsync()
     {
         byte[] sendBuffer = this.GetRandomBuffer(20);
@@ -242,8 +242,8 @@ public class SimplexStreamTests : TestBase
         Assert.Equal(sendBuffer, recvBuffer);
     }
 
-    [Theory]
-    [CombinatorialData]
+    [Test]
+    [MatrixDataSource]
     public async Task CompleteWriting(bool useAsync)
     {
         await this.WriteAsync(new byte[3], 0, 3, useAsync);
@@ -254,7 +254,7 @@ public class SimplexStreamTests : TestBase
         Assert.Equal(0, this.stream.Read(recvbuffer, 3, 2));
     }
 
-    [Fact]
+    [Test]
     public async Task StreamAsBufferWriter()
     {
         IBufferWriter<byte> writer = this.stream;
@@ -267,14 +267,14 @@ public class SimplexStreamTests : TestBase
         Assert.Equal(Enumerable.Range(1, 9).Select(i => (byte)i), readBuffer.Take(bytesRead));
     }
 
-    [Fact]
+    [Test]
     public void CompleteWriting_ErrorCanBeSetAndIsRethrown()
     {
         this.stream.CompleteWriting(new InvalidOperationException("Test error"));
         Assert.Throws<InvalidOperationException>(() => this.stream.Read(new byte[1], 0, 1));
     }
 
-    [Fact]
+    [Test]
     public void CompleteWriting_ErrorIsRethrownAfterAllDataRead()
     {
         byte[] expected = [1, 2, 3];
@@ -287,7 +287,7 @@ public class SimplexStreamTests : TestBase
         Assert.Throws<InvalidOperationException>(() => this.stream.Read(buffer, 0, buffer.Length));
     }
 
-    [Fact]
+    [Test]
     public void CompleteWriting_ErrorPreservesStackTrace()
     {
         InternalMethodSettingErrorWithCallStack();
@@ -312,7 +312,7 @@ public class SimplexStreamTests : TestBase
         }
     }
 
-    [Fact]
+    [Test]
     public void CompleteWriting_NullError()
     {
         this.stream.CompleteWriting(null);
@@ -320,7 +320,7 @@ public class SimplexStreamTests : TestBase
         Assert.Equal(0, this.stream.Read(buffer, 0, buffer.Length));
     }
 
-    [Fact]
+    [Test]
     public void CompleteWriting_FirstErrorIsCaptured()
     {
         this.stream.CompleteWriting(new InvalidOperationException("Test error"));
@@ -329,7 +329,7 @@ public class SimplexStreamTests : TestBase
         Assert.Throws<InvalidOperationException>(() => this.stream.Read(buffer, 0, buffer.Length));
     }
 
-    [Fact]
+    [Test]
     public void CompleteWriting_SubmitErrorThenCompleteNormally()
     {
         this.stream.CompleteWriting(new InvalidOperationException("Test error"));
@@ -338,7 +338,7 @@ public class SimplexStreamTests : TestBase
         Assert.Throws<InvalidOperationException>(() => this.stream.Read(buffer, 0, buffer.Length));
     }
 
-    [Fact]
+    [Test]
     public void CompleteWriting_CompleteSuccessfullyThenWithError()
     {
         this.stream.CompleteWriting();
@@ -347,8 +347,8 @@ public class SimplexStreamTests : TestBase
         Assert.Equal(0, this.stream.Read(buffer, 0, buffer.Length));
     }
 
-    [Theory]
-    [CombinatorialData]
+    [Test]
+    [MatrixDataSource]
     public async Task AutoFlush_OccursAfter4KB(bool useAsync)
     {
         // Use a stream with larger thresholds to avoid blocking
@@ -371,8 +371,8 @@ public class SimplexStreamTests : TestBase
         Assert.Equal(sendBuffer, recvBuffer);
     }
 
-    [Theory]
-    [CombinatorialData]
+    [Test]
+    [MatrixDataSource]
     public async Task AutoFlush_DoesNotOccurBelow4KB(bool useAsync)
     {
         // Use a stream with larger thresholds
@@ -403,8 +403,8 @@ public class SimplexStreamTests : TestBase
         Assert.Equal(sendBuffer, recvBuffer);
     }
 
-    [Theory]
-    [CombinatorialData]
+    [Test]
+    [MatrixDataSource]
     public async Task AutoFlush_AccumulatesAcrossMultipleWrites(bool useAsync)
     {
         // Use a stream with larger thresholds to avoid blocking
@@ -455,7 +455,7 @@ public class SimplexStreamTests : TestBase
         Assert.Equal(sendBuffer.Skip(AutoFlushThreshold).Take(2048), recvBuffer);
     }
 
-    [Fact]
+    [Test]
     public async Task BackpressureWorks_WithAutoFlush()
     {
         // This test verifies that the pauseWriterThreshold works correctly with auto-flush
@@ -502,7 +502,7 @@ public class SimplexStreamTests : TestBase
         }
     }
 
-    [Fact]
+    [Test]
     public async Task Issue918_LargeWriteSmallReadWithDispose()
     {
         // This is the scenario from issue #918

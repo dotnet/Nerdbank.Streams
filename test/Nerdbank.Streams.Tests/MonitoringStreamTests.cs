@@ -15,21 +15,21 @@ public class MonitoringStreamTests : TestBase
 
     private byte[] buffer;
 
-    public MonitoringStreamTests(ITestOutputHelper logger)
-        : base(logger)
+    public MonitoringStreamTests()
+        : base(TestOutputHelper.Instance)
     {
         this.underlyingStream = new MemoryStream(new byte[] { 1, 2, 3, 4, 5 });
         this.monitoringStream = new MonitoringStream(this.underlyingStream);
         this.buffer = new byte[] { 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
     }
 
-    [Fact]
+    [Test]
     public void Ctor_ThrowsOnNull()
     {
         Assert.Throws<ArgumentNullException>(() => new MonitoringStream(null!));
     }
 
-    [Fact]
+    [Test]
     public async Task OperationsWithNoEvents()
     {
         this.monitoringStream.Read(this.buffer, 0, 1);
@@ -47,7 +47,7 @@ public class MonitoringStreamTests : TestBase
         this.monitoringStream.Dispose();
     }
 
-    [Fact]
+    [Test]
     public void Read_RaisesEvents()
     {
         int willReadInvoked = 0;
@@ -93,7 +93,7 @@ public class MonitoringStreamTests : TestBase
         Assert.Equal(1, didReadAnyInvoked);
     }
 
-    [Fact]
+    [Test]
     public void Read_RaisesEndOfStream()
     {
         bool wasReadEndOfStreamInvoked = false;
@@ -109,7 +109,7 @@ public class MonitoringStreamTests : TestBase
         Assert.True(wasReadEndOfStreamInvoked);
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsync_RaisesEvents()
     {
         bool willReadInvoked = false;
@@ -155,7 +155,7 @@ public class MonitoringStreamTests : TestBase
         Assert.Equal(1, didReadAnyInvoked);
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsync_RaisesEndOfStream()
     {
         bool wasReadEndOfStreamInvoked = false;
@@ -171,7 +171,7 @@ public class MonitoringStreamTests : TestBase
         Assert.True(wasReadEndOfStreamInvoked);
     }
 
-    [Fact]
+    [Test]
     public void ReadByte_RaisesEvents()
     {
         bool willReadInvoked = false;
@@ -215,7 +215,7 @@ public class MonitoringStreamTests : TestBase
         Assert.Equal(1, didReadAnyInvoked);
     }
 
-    [Fact]
+    [Test]
     public void ReadByte_RaisesEndOfStream()
     {
         bool wasReadEndOfStreamInvoked = false;
@@ -233,7 +233,7 @@ public class MonitoringStreamTests : TestBase
         Assert.True(wasReadEndOfStreamInvoked);
     }
 
-    [Fact]
+    [Test]
     public void Write_RaisesEvents()
     {
         bool willWriteInvoked = false;
@@ -278,7 +278,7 @@ public class MonitoringStreamTests : TestBase
         Assert.Equal(new byte[] { 8, 9, 10, 4, 5 }, this.underlyingStream.ToArray());
     }
 
-    [Fact]
+    [Test]
     public async Task WriteAsync_RaisesEvents()
     {
         bool willWriteInvoked = false;
@@ -323,7 +323,7 @@ public class MonitoringStreamTests : TestBase
         Assert.Equal(new byte[] { 8, 9, 10, 4, 5 }, this.underlyingStream.ToArray());
     }
 
-    [Fact]
+    [Test]
     public void WriteByte_RaisesEvents()
     {
         bool willWriteInvoked = false;
@@ -366,7 +366,7 @@ public class MonitoringStreamTests : TestBase
         Assert.Equal(11, this.underlyingStream.ToArray()[0]);
     }
 
-    [Fact]
+    [Test]
     public void Seek_RaisesEvents()
     {
         bool didSeekInvoked = false;
@@ -381,7 +381,7 @@ public class MonitoringStreamTests : TestBase
         Assert.True(didSeekInvoked);
     }
 
-    [Fact]
+    [Test]
     public void SetLength_RaisesEvents()
     {
         bool willSetLengthInvoked = false;
@@ -406,7 +406,7 @@ public class MonitoringStreamTests : TestBase
         Assert.True(willSetLengthInvoked);
     }
 
-    [Fact]
+    [Test]
     public void Dispose_RaisesEvent()
     {
         bool disposeInvoked = false;
@@ -421,7 +421,7 @@ public class MonitoringStreamTests : TestBase
         Assert.True(disposeInvoked);
     }
 
-    [Fact]
+    [Test]
     public void CanSeek()
     {
         Assert.True(this.monitoringStream.CanSeek);
@@ -429,7 +429,7 @@ public class MonitoringStreamTests : TestBase
         Assert.False(this.monitoringStream.CanSeek);
     }
 
-    [Fact]
+    [Test]
     public void CanWrite()
     {
         Assert.True(this.monitoringStream.CanWrite);
@@ -437,7 +437,7 @@ public class MonitoringStreamTests : TestBase
         Assert.False(this.monitoringStream.CanWrite);
     }
 
-    [Fact]
+    [Test]
     public void CanRead()
     {
         Assert.True(this.monitoringStream.CanRead);
@@ -445,7 +445,7 @@ public class MonitoringStreamTests : TestBase
         Assert.False(this.monitoringStream.CanRead);
     }
 
-    [Fact]
+    [Test]
     public void CanTimeout()
     {
         Stream mockedUnderlyingStream = Substitute.For<Stream>();
@@ -456,7 +456,7 @@ public class MonitoringStreamTests : TestBase
         Assert.False(monitoringStream.CanTimeout);
     }
 
-    [Fact]
+    [Test]
     public void ReadTimeout()
     {
         Stream mockedUnderlyingStream = Substitute.For<Stream>();
@@ -467,7 +467,7 @@ public class MonitoringStreamTests : TestBase
         Assert.Equal(13, mockedUnderlyingStream.ReadTimeout);
     }
 
-    [Fact]
+    [Test]
     public void WriteTimeout()
     {
         Stream mockedUnderlyingStream = Substitute.For<Stream>();
@@ -478,7 +478,7 @@ public class MonitoringStreamTests : TestBase
         Assert.Equal(13, mockedUnderlyingStream.WriteTimeout);
     }
 
-    [Fact]
+    [Test]
     public void Flush()
     {
         Stream mockedUnderlyingStream = Substitute.For<Stream>();
@@ -490,7 +490,7 @@ public class MonitoringStreamTests : TestBase
         mockedUnderlyingStream.Received().Flush();
     }
 
-    [Fact]
+    [Test]
     public async Task FlushAsync()
     {
         Stream mockedUnderlyingStream = Substitute.For<Stream>();
@@ -502,13 +502,13 @@ public class MonitoringStreamTests : TestBase
         await mockedUnderlyingStream.Received().FlushAsync(CancellationToken.None);
     }
 
-    [Fact]
+    [Test]
     public void Length()
     {
         Assert.Equal(this.underlyingStream.Length, this.monitoringStream.Length);
     }
 
-    [Fact]
+    [Test]
     public void Position()
     {
         Assert.Equal(this.underlyingStream.Position, this.monitoringStream.Position);
@@ -517,7 +517,7 @@ public class MonitoringStreamTests : TestBase
         Assert.Equal(1, this.monitoringStream.Position);
     }
 
-    [Fact]
+    [Test]
     public void IsDisposed()
     {
         Assert.False(this.monitoringStream.IsDisposed);
@@ -527,7 +527,7 @@ public class MonitoringStreamTests : TestBase
 
 #if SPAN_BUILTIN
 
-    [Fact]
+    [Test]
     public void Read_Span_RaisesEvents()
     {
         int willReadSpanInvoked = 0;
@@ -584,7 +584,7 @@ public class MonitoringStreamTests : TestBase
         Assert.Equal(1, didReadAnyInvoked);
     }
 
-    [Fact]
+    [Test]
     public void Read_Span_RaisesEndOfStream()
     {
         bool wasReadEndOfStreamInvoked = false;
@@ -600,7 +600,7 @@ public class MonitoringStreamTests : TestBase
         Assert.True(wasReadEndOfStreamInvoked);
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsync_Memory_RaisesEvents()
     {
         bool willReadInvoked = false;
@@ -657,7 +657,7 @@ public class MonitoringStreamTests : TestBase
         Assert.Equal(1, didReadAnyInvoked);
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsync_Memory_RaisesEndOfStream()
     {
         bool wasReadEndOfStreamInvoked = false;
@@ -673,7 +673,7 @@ public class MonitoringStreamTests : TestBase
         Assert.True(wasReadEndOfStreamInvoked);
     }
 
-    [Fact]
+    [Test]
     public void Write_Span_RaisesEvents()
     {
         bool willWriteInvoked = false;
@@ -729,7 +729,7 @@ public class MonitoringStreamTests : TestBase
         Assert.Equal(new byte[] { 8, 9, 10, 4, 5 }, this.underlyingStream.ToArray());
     }
 
-    [Fact]
+    [Test]
     public async Task WriteAsync_Memory_RaisesEvents()
     {
         int willWriteInvoked = 0;

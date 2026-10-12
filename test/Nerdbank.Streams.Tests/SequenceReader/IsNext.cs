@@ -9,9 +9,9 @@ namespace Nerdbank.Streams.Tests.SequenceReader
 {
     public class IsNext
     {
-        [Theory,
-            InlineData(true),
-            InlineData(false)]
+        [Test,
+            Arguments(true),
+            Arguments(false)]
         public void IsNext_Empty(bool advancePast)
         {
             var reader = new SequenceReader<char>(ReadOnlySequence<char>.Empty);
@@ -28,7 +28,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.Equal(0, reader.Consumed);
         }
 
-        [Fact]
+        [Test]
         public void IsNext_Span()
         {
             ReadOnlySequence<byte> bytes = SequenceFactory.Create(new byte[][] {
@@ -65,7 +65,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.True(reader.End);
         }
 
-        [Fact]
+        [Test]
         public void IsNext_Value()
         {
             ReadOnlySequence<char> chars = SequenceFactory.Create(new char[][] {

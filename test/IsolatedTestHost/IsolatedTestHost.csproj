@@ -6,8 +6,4 @@
     <IsTestProject>false</IsTestProject>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="xunit.v3.extensibility.core" ExcludeAssets="build" />
-  </ItemGroup>
-
 </Project>

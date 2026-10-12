@@ -18,21 +18,21 @@ public class BufferWriterStreamTests : TestBase
 
     private Stream stream;
 
-    public BufferWriterStreamTests(ITestOutputHelper logger)
-        : base(logger)
+    public BufferWriterStreamTests()
+        : base(TestOutputHelper.Instance)
     {
         this.sequence = new Sequence<byte>();
         this.stream = this.sequence.AsStream();
     }
 
-    [Fact]
+    [Test]
     public void Null_Throws()
     {
         IBufferWriter<byte>? writer = null;
         Assert.Throws<ArgumentNullException>(() => writer!.AsStream());
     }
 
-    [Fact]
+    [Test]
     public void Length()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.Length);
@@ -40,7 +40,7 @@ public class BufferWriterStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.Length);
     }
 
-    [Fact]
+    [Test]
     public void SetLength()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.SetLength(0));
@@ -48,7 +48,7 @@ public class BufferWriterStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.SetLength(0));
     }
 
-    [Fact]
+    [Test]
     public void CanSeek()
     {
         Assert.False(this.stream.CanSeek);
@@ -56,7 +56,7 @@ public class BufferWriterStreamTests : TestBase
         Assert.False(this.stream.CanSeek);
     }
 
-    [Fact]
+    [Test]
     public void CanRead()
     {
         Assert.False(this.stream.CanRead);
@@ -64,7 +64,7 @@ public class BufferWriterStreamTests : TestBase
         Assert.False(this.stream.CanRead);
     }
 
-    [Fact]
+    [Test]
     public void CanWrite()
     {
         Assert.True(this.stream.CanWrite);
@@ -72,7 +72,7 @@ public class BufferWriterStreamTests : TestBase
         Assert.False(this.stream.CanWrite);
     }
 
-    [Fact]
+    [Test]
     public void CanTimeout()
     {
         Assert.False(this.stream.CanTimeout);
@@ -80,7 +80,7 @@ public class BufferWriterStreamTests : TestBase
         Assert.False(this.stream.CanTimeout);
     }
 
-    [Fact]
+    [Test]
     public void Position()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.Position = 0);
@@ -90,7 +90,7 @@ public class BufferWriterStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.Position);
     }
 
-    [Fact]
+    [Test]
     public void IsDisposed()
     {
         Assert.False(((IDisposableObservable)this.stream).IsDisposed);
@@ -98,7 +98,7 @@ public class BufferWriterStreamTests : TestBase
         Assert.True(((IDisposableObservable)this.stream).IsDisposed);
     }
 
-    [Fact]
+    [Test]
     public void Flush()
     {
         this.stream.Flush(); // no-op shouldn't throw.
@@ -106,7 +106,7 @@ public class BufferWriterStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.Flush());
     }
 
-    [Fact]
+    [Test]
     public async Task FlushAsync()
     {
         await this.stream.FlushAsync(); // no-op shouldn't throw.
@@ -114,7 +114,7 @@ public class BufferWriterStreamTests : TestBase
         await Assert.ThrowsAsync<ObjectDisposedException>(() => this.stream.FlushAsync());
     }
 
-    [Fact]
+    [Test]
     public async Task Write_Disposed()
     {
         this.stream.Dispose();
@@ -123,7 +123,7 @@ public class BufferWriterStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.WriteByte(1));
     }
 
-    [Fact]
+    [Test]
     public async Task Write_BadArgs()
     {
         Assert.Throws<ArgumentNullException>(() => this.stream.Write(null!, 0, 1));
@@ -135,7 +135,7 @@ public class BufferWriterStreamTests : TestBase
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this.stream.WriteAsync(new byte[1], -1, 1));
     }
 
-    [Fact]
+    [Test]
     public void Write()
     {
         this.stream.Write(new byte[] { 1, 2, 3, 4, 5 }, 1, 3);
@@ -149,7 +149,7 @@ public class BufferWriterStreamTests : TestBase
 
 #if SPAN_BUILTIN
 
-    [Fact]
+    [Test]
     public void Write_Span()
     {
         this.stream.Write(new byte[] { 1, 2, 3, 4, 5 }.AsSpan(1, 3));
@@ -163,13 +163,13 @@ public class BufferWriterStreamTests : TestBase
 
 #endif
 
-    [Fact]
+    [Test]
     public void WriteAsync_ReturnsSynchronously()
     {
         Assert.True(this.stream.WriteAsync(new byte[] { 1, 2, 3, 4, 5 }, 1, 3).IsCompleted);
     }
 
-    [Fact]
+    [Test]
     public async Task WriteAsync()
     {
         await this.stream.WriteAsync(new byte[] { 1, 2, 3, 4, 5 }, 1, 3);
@@ -183,7 +183,7 @@ public class BufferWriterStreamTests : TestBase
 
 #if SPAN_BUILTIN
 
-    [Fact]
+    [Test]
     public async Task WriteAsync_Memory()
     {
         await this.stream.WriteAsync(new byte[] { 1, 2, 3, 4, 5 }.AsMemory(1, 3));
@@ -197,7 +197,7 @@ public class BufferWriterStreamTests : TestBase
 
 #endif
 
-    [Fact]
+    [Test]
     public void WriteByte()
     {
         this.stream.WriteByte(1);
@@ -206,7 +206,7 @@ public class BufferWriterStreamTests : TestBase
         Assert.Equal(new byte[] { 1, 2 }, this.sequence.AsReadOnlySequence.ToArray());
     }
 
-    [Fact]
+    [Test]
     public void Seek_IsNotSupported()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.Seek(0, SeekOrigin.Begin));
@@ -214,7 +214,7 @@ public class BufferWriterStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.Seek(0, SeekOrigin.Begin));
     }
 
-    [Fact]
+    [Test]
     public void ReadByte_IsNotSupported()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.ReadByte());
@@ -222,7 +222,7 @@ public class BufferWriterStreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.stream.ReadByte());
     }
 
-    [Fact]
+    [Test]
     public void Read_IsNotSupported()
     {
         Assert.Throws<NotSupportedException>(() => this.stream.Read(new byte[1], 0, 1));
@@ -236,7 +236,7 @@ public class BufferWriterStreamTests : TestBase
 #endif
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsync_IsNotSupported()
     {
         await Assert.ThrowsAsync<NotSupportedException>(() => this.stream.ReadAsync(new byte[1], 0, 1));

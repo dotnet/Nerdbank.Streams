@@ -15,13 +15,13 @@ public abstract class StreamPipeWriterTestBase : TestBase
     {
     }
 
-    [Fact]
+    [Test]
     public void ThrowsOnNull()
     {
         Assert.Throws<ArgumentNullException>(() => this.CreatePipeWriter(null!));
     }
 
-    [Fact]
+    [Test]
     public void NonReadableStream()
     {
         Stream unreadableStream = Substitute.For<Stream>();
@@ -29,7 +29,7 @@ public abstract class StreamPipeWriterTestBase : TestBase
         _ = unreadableStream.Received().CanWrite;
     }
 
-    [Fact]
+    [Test]
     public async Task Stream()
     {
         byte[] expectedBuffer = this.GetRandomBuffer(2048);
@@ -48,7 +48,7 @@ public abstract class StreamPipeWriterTestBase : TestBase
         Assert.Equal(expectedBuffer, stream.ToArray());
     }
 
-    [Fact]
+    [Test]
     public async Task TryWriteAfterComplete()
     {
         byte[] expectedBuffer = this.GetRandomBuffer(2048);
@@ -61,7 +61,7 @@ public abstract class StreamPipeWriterTestBase : TestBase
         writer.Advance(0);
     }
 
-    [Fact]
+    [Test]
     public async Task Flush_Precanceled()
     {
         byte[] expectedBuffer = this.GetRandomBuffer(2048);
@@ -73,7 +73,7 @@ public abstract class StreamPipeWriterTestBase : TestBase
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => writer.FlushAsync(new CancellationToken(true)).AsTask());
     }
 
-    [Fact]
+    [Test]
     public async Task OnReaderCompleted()
     {
         var stream = new MemoryStream();
@@ -85,7 +85,7 @@ public abstract class StreamPipeWriterTestBase : TestBase
         await readerCompleted.WithCancellation(this.TimeoutToken);
     }
 
-    [Fact]
+    [Test]
     public async Task Complete_WithUnflushedWrittenBytes()
     {
         var stream = new MemoryStream();

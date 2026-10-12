@@ -7,20 +7,17 @@ using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
 using Xunit;
 
+[InheritsTests]
+[NotInParallel(nameof(MultiplexingStreamV3Tests))]
 public class MultiplexingStreamV3Tests : MultiplexingStreamV2Tests
 {
-    public MultiplexingStreamV3Tests(ITestOutputHelper logger)
-        : base(logger)
-    {
-    }
-
     protected override int ProtocolMajorVersion => 3;
 
     /// <summary>
     /// Verify the <see cref="MultiplexingStream.Create(System.IO.Stream, MultiplexingStream.Options?)"/> method,
     /// since all the inherited tests run based on the <see cref="MultiplexingStream.CreateAsync(System.IO.Stream, MultiplexingStream.Options?, System.Threading.CancellationToken)"/> method.
     /// </summary>
-    [Fact]
+    [Test]
     public async Task Create()
     {
         (Stream, Stream) pair = FullDuplexStream.CreatePair();
@@ -32,7 +29,7 @@ public class MultiplexingStreamV3Tests : MultiplexingStreamV2Tests
         await mx2.DisposeAsync();
     }
 
-    [Fact]
+    [Test]
     public override async Task SeededChannels()
     {
         (Stream, Stream) pair = FullDuplexStream.CreatePair();

@@ -15,8 +15,8 @@ public class StreamExtensionsTests : TestBase
 
     private byte[] buffer = new byte[10];
 
-    public StreamExtensionsTests(ITestOutputHelper logger)
-        : base(logger)
+    public StreamExtensionsTests()
+        : base(TestOutputHelper.Instance)
     {
         var seq = new Sequence<byte>();
         seq.Write(new byte[] { 1, 2 });
@@ -25,7 +25,7 @@ public class StreamExtensionsTests : TestBase
         this.dataStream = new ChunkyReadStream(seq);
     }
 
-    [Fact]
+    [Test]
     public async Task ReadBlockAsync_AmpleBytes()
     {
         int bytesRead = await this.dataStream.ReadBlockAsync(this.buffer.AsMemory(0, 3));
@@ -33,7 +33,7 @@ public class StreamExtensionsTests : TestBase
         Assert.Equal(new byte[] { 1, 2, 3 }, this.buffer.AsMemory(0, 3).ToArray());
     }
 
-    [Fact]
+    [Test]
     public async Task ReadBlockAsync_ExactByteCount()
     {
         int bytesRead = await this.dataStream.ReadBlockAsync(this.buffer.AsMemory(0, 5));
@@ -41,7 +41,7 @@ public class StreamExtensionsTests : TestBase
         Assert.Equal(new byte[] { 1, 2, 3, 4, 5 }, this.buffer.AsMemory(0, 5).ToArray());
     }
 
-    [Fact]
+    [Test]
     public async Task ReadBlockAsync_InsufficientBytes()
     {
         int bytesRead = await this.dataStream.ReadBlockAsync(this.buffer.AsMemory(0, 6));
@@ -49,21 +49,21 @@ public class StreamExtensionsTests : TestBase
         Assert.Equal(new byte[] { 1, 2, 3, 4, 5 }, this.buffer.AsMemory(0, 5).ToArray());
     }
 
-    [Fact]
+    [Test]
     public async Task ReadBlockOrThrowAsync_AmpleBytes()
     {
         await this.dataStream.ReadBlockOrThrowAsync(this.buffer.AsMemory(0, 3));
         Assert.Equal(new byte[] { 1, 2, 3 }, this.buffer.AsMemory(0, 3).ToArray());
     }
 
-    [Fact]
+    [Test]
     public async Task ReadBlockOrThrowAsync_ExactByteCount()
     {
         await this.dataStream.ReadBlockOrThrowAsync(this.buffer.AsMemory(0, 5));
         Assert.Equal(new byte[] { 1, 2, 3, 4, 5 }, this.buffer.AsMemory(0, 5).ToArray());
     }
 
-    [Fact]
+    [Test]
     public async Task ReadBlockOrThrowAsync_InsufficientBytes()
     {
         await Assert.ThrowsAsync<EndOfStreamException>(() => this.dataStream.ReadBlockOrThrowAsync(this.buffer.AsMemory(0, 6)).AsTask());

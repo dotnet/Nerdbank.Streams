@@ -13,12 +13,12 @@ public class FullDuplexStreamCombineTests : TestBase
 {
     private readonly Stream nullDuplex = FullDuplexStream.Splice(Stream.Null, Stream.Null);
 
-    public FullDuplexStreamCombineTests(ITestOutputHelper logger)
-        : base(logger)
+    public FullDuplexStreamCombineTests()
+        : base(TestOutputHelper.Instance)
     {
     }
 
-    [Fact]
+    [Test]
     public void JoinStreams_NullArgs()
     {
         Assert.Throws<ArgumentNullException>(() => FullDuplexStream.Splice(null!, null!));
@@ -26,7 +26,7 @@ public class FullDuplexStreamCombineTests : TestBase
         Assert.Throws<ArgumentNullException>(() => FullDuplexStream.Splice(Stream.Null, null!));
     }
 
-    [Fact]
+    [Test]
     public void JoinStreams_ReadableWritableMismatch()
     {
         Stream readableMock = Substitute.For<Stream>();
@@ -42,7 +42,7 @@ public class FullDuplexStreamCombineTests : TestBase
         FullDuplexStream.Splice(readableMock, writableMock);
     }
 
-    [Fact]
+    [Test]
     public void CanRead()
     {
         Assert.True(this.nullDuplex.CanRead);
@@ -50,7 +50,7 @@ public class FullDuplexStreamCombineTests : TestBase
         Assert.False(this.nullDuplex.CanRead);
     }
 
-    [Fact]
+    [Test]
     public void CanWrite()
     {
         Assert.True(this.nullDuplex.CanWrite);
@@ -58,7 +58,7 @@ public class FullDuplexStreamCombineTests : TestBase
         Assert.False(this.nullDuplex.CanWrite);
     }
 
-    [Fact]
+    [Test]
     public void CanSeek()
     {
         Assert.False(this.nullDuplex.CanSeek);
@@ -66,7 +66,7 @@ public class FullDuplexStreamCombineTests : TestBase
         Assert.False(this.nullDuplex.CanSeek);
     }
 
-    [Fact]
+    [Test]
     public void Seek_IsNotSupported()
     {
         Assert.Throws<NotSupportedException>(() => this.nullDuplex.Seek(0, SeekOrigin.Begin));
@@ -77,7 +77,7 @@ public class FullDuplexStreamCombineTests : TestBase
     /// <summary>
     /// Verifies that the duplex stream claims it can timeout if either or both half-duplex streams can.
     /// </summary>
-    [Fact]
+    [Test]
     public void CanTimeout()
     {
         Stream readableMock = Substitute.For<Stream>();
@@ -102,7 +102,7 @@ public class FullDuplexStreamCombineTests : TestBase
         Assert.False(duplex.CanTimeout);
     }
 
-    [Fact]
+    [Test]
     public void ReadTimeout()
     {
         Stream readableMock = Substitute.For<Stream>();
@@ -113,7 +113,7 @@ public class FullDuplexStreamCombineTests : TestBase
         Assert.Equal(8, readableMock.ReadTimeout);
     }
 
-    [Fact]
+    [Test]
     public void WriteTimeout()
     {
         Stream writableMock = Substitute.For<Stream>();
@@ -124,7 +124,7 @@ public class FullDuplexStreamCombineTests : TestBase
         Assert.Equal(8, writableMock.WriteTimeout);
     }
 
-    [Fact]
+    [Test]
     public void Length()
     {
         Assert.Throws<NotSupportedException>(() => this.nullDuplex.Length);
@@ -132,7 +132,7 @@ public class FullDuplexStreamCombineTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.nullDuplex.Length);
     }
 
-    [Fact]
+    [Test]
     public void SetLength()
     {
         Assert.Throws<NotSupportedException>(() => this.nullDuplex.SetLength(0));
@@ -140,7 +140,7 @@ public class FullDuplexStreamCombineTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.nullDuplex.SetLength(0));
     }
 
-    [Fact]
+    [Test]
     public void Position()
     {
         Assert.Throws<NotSupportedException>(() => this.nullDuplex.Position = 0);
@@ -150,7 +150,7 @@ public class FullDuplexStreamCombineTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => this.nullDuplex.Position);
     }
 
-    [Fact]
+    [Test]
     public void Read()
     {
         Stream readableMock = Substitute.For<Stream>();
@@ -162,7 +162,7 @@ public class FullDuplexStreamCombineTests : TestBase
         readableMock.Received().Read(buffer, 2, 1);
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsync_PassesThroughAsync()
     {
         Stream readableMock = Substitute.For<Stream>();
@@ -176,7 +176,7 @@ public class FullDuplexStreamCombineTests : TestBase
         await readableMock.Received().ReadAsync(buffer, 2, 1, cts.Token);
     }
 
-    [Fact]
+    [Test]
     public void ReadByte()
     {
         Stream readableMock = Substitute.For<Stream>();
@@ -187,7 +187,7 @@ public class FullDuplexStreamCombineTests : TestBase
         readableMock.Received().ReadByte();
     }
 
-    [Fact]
+    [Test]
     public void Write()
     {
         Stream writableMock = Substitute.For<Stream>();
@@ -198,7 +198,7 @@ public class FullDuplexStreamCombineTests : TestBase
         writableMock.Received().Write(buffer, 2, 1);
     }
 
-    [Fact]
+    [Test]
     public async Task WriteAsync()
     {
         Stream writableMock = Substitute.For<Stream>();
@@ -213,7 +213,7 @@ public class FullDuplexStreamCombineTests : TestBase
     }
 
 #if SPAN_BUILTIN
-    [Fact]
+    [Test]
     public async Task ReadAsync_Memory()
     {
         Stream readableMock = Substitute.For<Stream>();
@@ -227,7 +227,7 @@ public class FullDuplexStreamCombineTests : TestBase
         await readableMock.Received().ReadAsync(buffer, cts.Token);
     }
 
-    [Fact]
+    [Test]
     public async Task WriteAsync_ReadOnlyMemory()
     {
         Stream writableMock = Substitute.For<Stream>();
@@ -241,7 +241,7 @@ public class FullDuplexStreamCombineTests : TestBase
         await writableMock.Received().WriteAsync(buffer, cts.Token);
     }
 
-    [Fact(Skip = "NSubstitute lacks support for testing ReadOnlySpan<T> overloads")]
+    [Test, Skip("NSubstitute lacks support for testing ReadOnlySpan<T> overloads")]
     public void Write_ReadOnlySpan()
     {
         Stream writableMock = Substitute.For<Stream>();
@@ -253,7 +253,7 @@ public class FullDuplexStreamCombineTests : TestBase
     }
 #endif
 
-    [Fact]
+    [Test]
     public void WriteByte()
     {
         Stream writableMock = Substitute.For<Stream>();
@@ -264,7 +264,7 @@ public class FullDuplexStreamCombineTests : TestBase
         writableMock.Received().WriteByte(5);
     }
 
-    [Fact]
+    [Test]
     public void Flush()
     {
         Stream writableMock = Substitute.For<Stream>();
@@ -276,7 +276,7 @@ public class FullDuplexStreamCombineTests : TestBase
         writableMock.Received().Flush();
     }
 
-    [Fact]
+    [Test]
     public async Task FlushAsync()
     {
         Stream writableMock = Substitute.For<Stream>();
@@ -290,7 +290,7 @@ public class FullDuplexStreamCombineTests : TestBase
         await writableMock.Received().FlushAsync(cts.Token);
     }
 
-    [Fact]
+    [Test]
     public void IsDisposed()
     {
         Assert.False(((IDisposableObservable)this.nullDuplex).IsDisposed);
@@ -298,7 +298,7 @@ public class FullDuplexStreamCombineTests : TestBase
         Assert.True(((IDisposableObservable)this.nullDuplex).IsDisposed);
     }
 
-    [Fact]
+    [Test]
     public async Task CopyToAsync()
     {
         Stream readableMock = Substitute.For<Stream>();
@@ -312,7 +312,7 @@ public class FullDuplexStreamCombineTests : TestBase
         await readableMock.Received().CopyToAsync(ms, 867, cts.Token);
     }
 
-    [Fact]
+    [Test]
     public void Close()
     {
         Stream readableMock = Substitute.For<Stream>();
@@ -327,7 +327,7 @@ public class FullDuplexStreamCombineTests : TestBase
         writableMock.Received().Close();
     }
 
-    [Fact]
+    [Test]
     public void Dispose_PassesThrough()
     {
         var readable = new MemoryStream();

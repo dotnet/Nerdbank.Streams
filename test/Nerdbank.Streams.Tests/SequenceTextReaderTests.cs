@@ -18,20 +18,20 @@ public class SequenceTextReaderTests : TestBase
     private readonly SequenceTextReader sequenceTextReader = new SequenceTextReader();
     private readonly TextReader baselineReader = new StringReader(CharactersToRead);
 
-    public SequenceTextReaderTests(ITestOutputHelper logger)
-        : base(logger)
+    public SequenceTextReaderTests()
+        : base(TestOutputHelper.Instance)
     {
         var ros = new ReadOnlySequence<byte>(DefaultEncoding.GetBytes(CharactersToRead));
         this.sequenceTextReader.Initialize(ros, DefaultEncoding);
     }
 
-    [Fact]
+    [Test]
     public void Ctor_ValidatesArguments()
     {
         Assert.Throws<ArgumentNullException>(() => new SequenceTextReader(default, null!));
     }
 
-    [Fact]
+    [Test]
     public void Ctor()
     {
         var reader = new SequenceTextReader(default, DefaultEncoding);
@@ -42,13 +42,13 @@ public class SequenceTextReaderTests : TestBase
         Assert.Equal('A', reader.Read());
     }
 
-    [Fact]
+    [Test]
     public void Initialize_ValidatesArgs()
     {
         Assert.Throws<ArgumentNullException>(() => this.sequenceTextReader.Initialize(default, null!));
     }
 
-    [Fact]
+    [Test]
     public void Read_SkipsPreamble()
     {
         byte[] preamble = Encoding.UTF8.GetPreamble();
@@ -59,7 +59,7 @@ public class SequenceTextReaderTests : TestBase
         Assert.Equal(-1, this.sequenceTextReader.Read());
     }
 
-    [Fact]
+    [Test]
     public void Read_SkipsPreamble_NoBody()
     {
         byte[] preamble = Encoding.UTF8.GetPreamble();
@@ -67,9 +67,9 @@ public class SequenceTextReaderTests : TestBase
         Assert.Equal(-1, this.sequenceTextReader.Read());
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
     public void Anything_Uninitialized(bool afterReset)
     {
         SequenceTextReader reader;
@@ -89,7 +89,7 @@ public class SequenceTextReaderTests : TestBase
         Assert.Equal(string.Empty, reader.ReadToEnd());
     }
 
-    [Fact]
+    [Test]
     public void Read()
     {
         int actual, expected;
@@ -102,7 +102,7 @@ public class SequenceTextReaderTests : TestBase
         while (actual != -1);
     }
 
-    [Fact]
+    [Test]
     public void PeekAndRead()
     {
         int actual, expected;
@@ -119,13 +119,13 @@ public class SequenceTextReaderTests : TestBase
         while (actual != -1);
     }
 
-    [Fact]
+    [Test]
     public void ReadToEnd()
     {
         Assert.Equal(this.baselineReader.ReadToEnd(), this.sequenceTextReader.ReadToEnd());
     }
 
-    [Fact]
+    [Test]
     public void ReadLine()
     {
         string? actual, expected;
@@ -138,11 +138,11 @@ public class SequenceTextReaderTests : TestBase
         while (actual != null);
     }
 
-    [Theory]
-    [InlineData(0, 0)]
-    [InlineData(1, 0)]
-    [InlineData(0, 1)]
-    [InlineData(2, 1)]
+    [Test]
+    [Arguments(0, 0)]
+    [Arguments(1, 0)]
+    [Arguments(0, 1)]
+    [Arguments(2, 1)]
     public void ReadBlock(int bufferOffset, int bufferSlack)
     {
         const int BlockLength = 5;
@@ -157,11 +157,11 @@ public class SequenceTextReaderTests : TestBase
         while (actualResult > 0);
     }
 
-    [Theory]
-    [InlineData(0, 0)]
-    [InlineData(1, 0)]
-    [InlineData(0, 1)]
-    [InlineData(2, 1)]
+    [Test]
+    [Arguments(0, 0)]
+    [Arguments(1, 0)]
+    [Arguments(0, 1)]
+    [Arguments(2, 1)]
     public void Read_Buffer(int bufferOffset, int bufferSlack)
     {
         const int BlockLength = 5;
@@ -176,14 +176,14 @@ public class SequenceTextReaderTests : TestBase
         while (actualResult > 0);
     }
 
-    [Fact]
+    [Test]
     public void Read_Buffer_Empty()
     {
         Assert.Equal(0, this.sequenceTextReader.Read(new char[0], 0, 0));
         Assert.Equal(0, this.sequenceTextReader.Read(new char[1], 1, 0));
     }
 
-    [Fact]
+    [Test]
     public void Read_Buffer_InvalidInputs()
     {
         Assert.Throws<ArgumentNullException>(() => this.sequenceTextReader.Read(null!, 0, 0));
@@ -195,7 +195,7 @@ public class SequenceTextReaderTests : TestBase
         Assert.Throws<ArgumentException>(() => this.sequenceTextReader.Read(new char[2], 3, 0));
     }
 
-    [Fact]
+    [Test]
     public void Read_VeryLarge()
     {
         byte[]? smallBytes = DefaultEncoding.GetBytes(CharactersToRead);
@@ -221,8 +221,8 @@ public class SequenceTextReaderTests : TestBase
         while (charsRead > 0);
     }
 
-    [Theory]
-    [CombinatorialData]
+    [Test]
+    [MatrixDataSource]
     public void SurrogatePairsAtBufferBoundary(bool surrogatePairsStartOnOddIndex)
     {
         // Fill a buffer large enough that it surely exceeds the internal char[] size inside the SequenceTextReader.

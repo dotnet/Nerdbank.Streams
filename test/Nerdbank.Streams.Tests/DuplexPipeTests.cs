@@ -9,7 +9,7 @@ using Xunit;
 
 public class DuplexPipeTests
 {
-    [Fact]
+    [Test]
     public void Ctor()
     {
         var pipe = new Pipe();
@@ -18,7 +18,7 @@ public class DuplexPipeTests
         Assert.Same(pipe.Writer, duplexPipe.Output);
     }
 
-    [Fact]
+    [Test]
     public void Ctor_ReplacesNullsWithCompleted()
     {
         var duplex = new DuplexPipe(null, null);
@@ -26,7 +26,7 @@ public class DuplexPipeTests
         Assert.NotNull(duplex.Output);
     }
 
-    [Fact]
+    [Test]
     public async Task ReaderOnly()
     {
         var pipe = new Pipe();
@@ -62,7 +62,7 @@ public class DuplexPipeTests
         duplex.Output.Complete();
     }
 
-    [Fact]
+    [Test]
     public async Task WriterOnly()
     {
         var pipe = new Pipe();

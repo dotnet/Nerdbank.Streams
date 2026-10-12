@@ -16,16 +16,16 @@ public abstract class StreamPipeReaderTestBase : TestBase
 
     protected virtual bool EmulatePipelinesStreamPipeReader => true;
 
-    [Fact]
+    [Test]
     public void ThrowsOnNull()
     {
         Assert.Throws<ArgumentNullException>(() => this.CreatePipeReader((Stream)null!));
     }
 
-    [Fact]
+    [Test]
     public async Task Stream()
     {
-        Assert.SkipWhen(this is IOPipelinesStreamPipeReaderTests, "OnWriterCompleted isn't supported.");
+        Skip.When(this is IOPipelinesStreamPipeReaderTests, "OnWriterCompleted isn't supported.");
 
         byte[] expectedBuffer = this.GetRandomBuffer(2048);
         var stream = new MemoryStream(expectedBuffer);
@@ -77,7 +77,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
         Assert.Equal(expectedBuffer, actualBuffer);
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsyncAfterExamining()
     {
         byte[] expectedBuffer = this.GetRandomBuffer(2048);
@@ -115,7 +115,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
         Assert.True(result3.Buffer.Length > 0);
     }
 
-    [Fact]
+    [Test]
     public async Task TryRead()
     {
         byte[] expectedBuffer = this.GetRandomBuffer(2048);
@@ -133,7 +133,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
         reader.AdvanceTo(result.Buffer.End);
     }
 
-    [Fact]
+    [Test]
     public void TryRead_FalseStillTurnsOnReadingMode()
     {
         PipeReader? reader = this.CreatePipeReader(new MemoryStream(new byte[] { 1, 2, 3 }));
@@ -150,7 +150,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
         reader.AdvanceTo(readResult.Buffer.End);
     }
 
-    [Fact]
+    [Test]
     public void TryRead_FalseCanBeCalledRepeatedly()
     {
         // Arrange for the read stream to never respond so that the test doesn't randomly fail in the StreamUsePipeReaderTests derived test class.
@@ -166,7 +166,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
         Assert.False(reader.TryRead(out readResult));
     }
 
-    [Fact]
+    [Test]
     public async Task TryRead_AdvanceTo_AfterEndReached()
     {
         PipeReader? reader = this.CreatePipeReader(new MemoryStream(new byte[] { 1, 2, 3 }));
@@ -178,7 +178,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
         reader.AdvanceTo(readResult.Buffer.End);
     }
 
-    [Theory, PairwiseData]
+    [Test, MatrixDataSource]
     public async Task ReadAsync_TwiceInARow(bool emptyStream)
     {
         var stream = new MemoryStream(emptyStream ? Array.Empty<byte>() : new byte[3]);
@@ -201,7 +201,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
         }
     }
 
-    [Theory, PairwiseData]
+    [Test, MatrixDataSource]
     public async Task TryRead_TwiceInARow(bool emptyStream)
     {
         var stream = new MemoryStream(emptyStream ? Array.Empty<byte>() : new byte[3]);
@@ -222,7 +222,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
         }
     }
 
-    [Fact]
+    [Test]
     public void AdvanceTo_BeforeRead()
     {
         var stream = new MemoryStream();
@@ -240,10 +240,10 @@ public abstract class StreamPipeReaderTestBase : TestBase
         Assert.True(ex is InvalidCastException || ex is InvalidOperationException);
     }
 
-    [Fact]
+    [Test]
     public async Task OnWriterCompleted()
     {
-        Assert.SkipWhen(this is IOPipelinesStreamPipeReaderTests, "OnWriterCompleted isn't supported.");
+        Skip.When(this is IOPipelinesStreamPipeReaderTests, "OnWriterCompleted isn't supported.");
         byte[] expectedBuffer = this.GetRandomBuffer(50);
         var stream = new MemoryStream(expectedBuffer);
         PipeReader? reader = this.CreatePipeReader(stream, sizeHint: 50);
@@ -276,7 +276,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
 #pragma warning restore CS0618 // Type or member is obsolete
     }
 
-    [Fact]
+    [Test]
     public async Task CancelPendingRead_WithCancellationToken()
     {
         var stream = new SimplexStream();
@@ -288,7 +288,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => readTask.AsTask());
     }
 
-    [Fact]
+    [Test]
     public async Task Complete_MayCauseStreamDisposal()
     {
         var stream = new SimplexStream();
@@ -308,7 +308,7 @@ public abstract class StreamPipeReaderTestBase : TestBase
         }
     }
 
-    [Fact]
+    [Test]
     public async Task CancelPendingRead()
     {
         var stream = new SimplexStream();

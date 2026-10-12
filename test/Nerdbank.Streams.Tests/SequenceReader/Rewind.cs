@@ -9,7 +9,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
 {
     public class Rewind
     {
-        [Fact]
+        [Test]
         public void Rewind_Full()
         {
             ReadOnlySequence<byte> bytes = SequenceFactory.Create(new byte[][] {
@@ -35,7 +35,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             }
         }
 
-        [Fact]
+        [Test]
         public void Rewind_ByOne()
         {
             ReadOnlySequence<byte> bytes = SequenceFactory.Create(new byte[][] {
@@ -68,7 +68,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             }
         }
 
-        [Fact]
+        [Test]
         public void Rewind_Exception()
         {
             ReadOnlySequence<byte> bytes = SequenceFactory.Create(new byte[][] {
@@ -105,7 +105,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.Equal(1, reader.Consumed);
         }
 
-        [Fact]
+        [Test]
         public void RewindEmptyFirstSpan()
         {
             // This is to hit the "if (memory.Length == 0)" branch in ResetReader.

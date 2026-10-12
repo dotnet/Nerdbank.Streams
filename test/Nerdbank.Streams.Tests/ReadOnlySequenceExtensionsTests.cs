@@ -8,7 +8,7 @@ using Xunit;
 
 public class ReadOnlySequenceExtensionsTests
 {
-    [Fact]
+    [Test]
     public void Clone()
     {
         int[] array = new[] { 1, 2, 3 };
@@ -22,7 +22,7 @@ public class ReadOnlySequenceExtensionsTests
         Assert.NotSame(seqFirstSegment.Array, copyFirstSegment.Array);
     }
 
-    [Fact]
+    [Test]
     public void SequenceEqual()
     {
         ReadOnlySequence<byte> empty1 = default;

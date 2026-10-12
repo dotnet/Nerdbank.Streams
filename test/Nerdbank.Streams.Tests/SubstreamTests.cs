@@ -11,45 +11,45 @@ public class SubstreamTests : TestBase
     internal const int DefaultBufferSize = 4096;
     private MemoryStream underlyingStream = new MemoryStream();
 
-    public SubstreamTests(ITestOutputHelper logger)
-        : base(logger)
+    public SubstreamTests()
+        : base(TestOutputHelper.Instance)
     {
     }
 
-    [Fact]
+    [Test]
     public void WriteSubstream_Null()
     {
         Assert.Throws<ArgumentNullException>(() => StreamExtensions.WriteSubstream(null!));
     }
 
-    [Fact]
+    [Test]
     public void ReadSubstream_Null()
     {
         Assert.Throws<ArgumentNullException>(() => StreamExtensions.ReadSubstream(null!));
     }
 
-    [Fact]
+    [Test]
     public void CanRead()
     {
         Assert.True(this.underlyingStream.ReadSubstream().CanRead);
         Assert.False(this.underlyingStream.WriteSubstream().CanRead);
     }
 
-    [Fact]
+    [Test]
     public void CanWrite()
     {
         Assert.False(this.underlyingStream.ReadSubstream().CanWrite);
         Assert.True(this.underlyingStream.WriteSubstream().CanWrite);
     }
 
-    [Fact]
+    [Test]
     public void CanSeek()
     {
         Assert.False(this.underlyingStream.ReadSubstream().CanSeek);
         Assert.False(this.underlyingStream.WriteSubstream().CanSeek);
     }
 
-    [Fact]
+    [Test]
     public void ReadSubstream_Position()
     {
         Stream? substream = this.underlyingStream.ReadSubstream();
@@ -60,8 +60,8 @@ public class SubstreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => substream.Position);
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task WriteSubstream_Position(bool async)
     {
         Substream? substream = this.underlyingStream.WriteSubstream();
@@ -72,7 +72,7 @@ public class SubstreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => substream.Position);
     }
 
-    [Fact]
+    [Test]
     public void ReadSubstream_Length()
     {
         Stream? substream = this.underlyingStream.ReadSubstream();
@@ -81,8 +81,8 @@ public class SubstreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => substream.Length);
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task WriteSubstream_Length(bool async)
     {
         Substream? substream = this.underlyingStream.WriteSubstream();
@@ -91,8 +91,8 @@ public class SubstreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => substream.Length);
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task WriteSubstream_Seek(bool async)
     {
         Substream? substream = this.underlyingStream.WriteSubstream();
@@ -101,7 +101,7 @@ public class SubstreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => substream.Seek(0, SeekOrigin.Begin));
     }
 
-    [Fact]
+    [Test]
     public void ReadSubstream_Seek()
     {
         Stream? substream = this.underlyingStream.ReadSubstream();
@@ -110,8 +110,8 @@ public class SubstreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => substream.Seek(0, SeekOrigin.Begin));
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task WriteSubstream_SetLength(bool async)
     {
         Substream? substream = this.underlyingStream.WriteSubstream();
@@ -120,7 +120,7 @@ public class SubstreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => substream.SetLength(0));
     }
 
-    [Fact]
+    [Test]
     public void ReadSubstream_SetLength()
     {
         Stream? substream = this.underlyingStream.ReadSubstream();
@@ -129,7 +129,7 @@ public class SubstreamTests : TestBase
         Assert.Throws<ObjectDisposedException>(() => substream.SetLength(0));
     }
 
-    [Fact]
+    [Test]
     public void CanTimeout()
     {
         Assert.False(this.underlyingStream.ReadSubstream().CanTimeout);
@@ -144,8 +144,8 @@ public class SubstreamTests : TestBase
         Assert.True(mockStream.WriteSubstream().CanTimeout);
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task ReadSubstream_Write(bool async)
     {
         Stream? substream = this.underlyingStream.ReadSubstream();
@@ -154,8 +154,8 @@ public class SubstreamTests : TestBase
         await Assert.ThrowsAsync<ObjectDisposedException>(() => this.WriteSyncOrAsync(substream, async, new byte[1], 0, 1));
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task ReadSubstream_Flush(bool async)
     {
         Stream? substream = this.underlyingStream.ReadSubstream();
@@ -166,8 +166,8 @@ public class SubstreamTests : TestBase
         await Assert.ThrowsAsync<ObjectDisposedException>(() => this.FlushSyncOrAsync(substream, async));
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task WriteSubstream_Read(bool async)
     {
         Substream? substream = this.underlyingStream.WriteSubstream();
@@ -176,9 +176,9 @@ public class SubstreamTests : TestBase
         await Assert.ThrowsAsync<ObjectDisposedException>(() => this.ReadSyncOrAsync(substream, async, new byte[1], 0, 1));
     }
 
-    [Theory]
-    [PairwiseData]
-    public async Task Write_Read([CombinatorialValues(0, 1, 3, 8 * 1024)] int substreamLength, bool async)
+    [Test]
+    [MatrixDataSource]
+    public async Task Write_Read([Matrix(0, 1, 3, 8 * 1024)] int substreamLength, bool async)
     {
         Substream? substream = this.underlyingStream.WriteSubstream();
         byte[]? substreamBuffer = this.GetRandomBuffer(substreamLength);
@@ -202,8 +202,8 @@ public class SubstreamTests : TestBase
         Assert.Equal(0xaa, readBuffer[0]);
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task WriteInManySmallChunks_ReadInLargeOnes(bool async)
     {
         int bufferSize = 64;
@@ -233,8 +233,8 @@ public class SubstreamTests : TestBase
         Assert.Equal(substreamBuffer, readBuffer.Take(substreamBuffer.Length));
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task Flush_WritesOutSmallBuffers(bool async)
     {
         int bufferSize = 64;
@@ -272,8 +272,8 @@ public class SubstreamTests : TestBase
         Assert.Equal(substreamBuffer, readBuffer.Take(substreamBuffer.Length));
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task Flush_RepeatedlyDoesNotWriteMore(bool async)
     {
         Substream? substream = this.underlyingStream.WriteSubstream();
@@ -282,8 +282,8 @@ public class SubstreamTests : TestBase
         Assert.Equal(0, this.underlyingStream.Length);
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task Dispose_FlushesFinalBytes(bool async)
     {
         var monitoredStream = new MonitoringStream(this.underlyingStream);
@@ -303,8 +303,8 @@ public class SubstreamTests : TestBase
         Assert.Equal(2, lastOperation);
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task Flush_FlushesUnderlyingStream(bool async)
     {
         var monitoredStream = new MonitoringStream(this.underlyingStream);
@@ -320,8 +320,8 @@ public class SubstreamTests : TestBase
         Assert.Equal(1, flushed);
     }
 
-    [Theory]
-    [PairwiseData]
+    [Test]
+    [MatrixDataSource]
     public async Task Write_AfterDisposeThrows(bool async)
     {
         Substream? substream = this.underlyingStream.WriteSubstream();

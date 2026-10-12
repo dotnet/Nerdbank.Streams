@@ -10,7 +10,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
 {
     public class SkipDelimiter
     {
-        [Fact]
+        [Test]
         public void TryReadTo_SkipDelimiter()
         {
             byte[] expected = Encoding.UTF8.GetBytes("This is our ^|understanding^|");
@@ -162,7 +162,7 @@ namespace Nerdbank.Streams.Tests.SequenceReader
             Assert.Equal(4, reader.Consumed);
         }
 
-        [Fact]
+        [Test]
         public void TryReadTo_SkipDelimiter_Runs()
         {
             ReadOnlySequence<byte> bytes = SequenceFactory.CreateUtf8("abc^^|def");

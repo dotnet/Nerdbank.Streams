@@ -13,12 +13,12 @@ using Xunit;
 
 public class SequenceTests : TestBase
 {
-    public SequenceTests(ITestOutputHelper logger)
-        : base(logger)
+    public SequenceTests()
+        : base(TestOutputHelper.Instance)
     {
     }
 
-    [Fact]
+    [Test]
     public void Empty()
     {
         var seq = new Sequence<byte>();
@@ -26,7 +26,7 @@ public class SequenceTests : TestBase
         Assert.True(ros.IsEmpty);
     }
 
-    [Fact]
+    [Test]
     public void GetMemory_Sizes()
     {
         var seq = new Sequence<char>(new MockMemoryPool<char>());
@@ -44,7 +44,7 @@ public class SequenceTests : TestBase
         Assert.Throws<ArgumentOutOfRangeException>(() => seq.GetMemory(-1));
     }
 
-    [Fact]
+    [Test]
     public void Reset_AfterPartialAdvance()
     {
         var seq = new Sequence<object>(new MockMemoryPool<object> { Contents = { new object[4] } });
@@ -53,7 +53,7 @@ public class SequenceTests : TestBase
         seq.Reset();
     }
 
-    [Fact]
+    [Test]
     public void MemoryPool_ReleasesReferenceOnRecycle()
     {
         var seq = new Sequence<object>(new MockMemoryPool<object>());
@@ -63,7 +63,7 @@ public class SequenceTests : TestBase
         Assert.False(weakReference.IsAlive);
     }
 
-    [Fact]
+    [Test]
     public void ArrayPool_ReleasesReferenceOnRecycle()
     {
         var seq = new Sequence<object>(new MockArrayPool<object>());
@@ -73,7 +73,7 @@ public class SequenceTests : TestBase
         Assert.False(weakReference.IsAlive);
     }
 
-    [Fact]
+    [Test]
     public void ArrayPool_ReleasesReferenceInStructsOnRecycle()
     {
         var seq = new Sequence<ValueTuple<object>>(new MockArrayPool<ValueTuple<object>>());
@@ -83,10 +83,10 @@ public class SequenceTests : TestBase
         Assert.False(weakReference.IsAlive);
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(1)]
-    [InlineData(2)]
+    [Test]
+    [Arguments(0)]
+    [Arguments(1)]
+    [Arguments(2)]
     public void GetMemory_TwiceInARowRecyclesOldArray(int leadingBlocks)
     {
         MockMemoryPool<char> mockPool = new MockMemoryPool<char>();
@@ -115,7 +115,7 @@ public class SequenceTests : TestBase
     /// the header later.
     /// </summary>
     /// <seealso href="https://github.com/dotnet/corefx/issues/34259"/>
-    [Fact]
+    [Test]
     public void GetSpan_ReservesHeaderSpaceForWritingLater()
     {
         var seq = new Sequence<char>();
@@ -132,14 +132,14 @@ public class SequenceTests : TestBase
         Assert.Equal("abcd0123456789", new string(seq.AsReadOnlySequence.ToArray()));
     }
 
-    [Fact]
+    [Test]
     public void Advance_BeforeGetMemory()
     {
         var seq = new Sequence<char>();
         Assert.Throws<InvalidOperationException>(() => seq.Advance(1));
     }
 
-    [Fact]
+    [Test]
     public void Advance_OneBlock()
     {
         var seq = new Sequence<char>();
@@ -151,7 +151,7 @@ public class SequenceTests : TestBase
         Assert.Equal("ab".ToCharArray(), seq.AsReadOnlySequence.ToArray());
     }
 
-    [Fact]
+    [Test]
     public void Advance_TwoBlocks_Advance()
     {
         var seq = new Sequence<char>();
@@ -174,7 +174,7 @@ public class SequenceTests : TestBase
         Assert.Equal("d".ToCharArray(), seq.AsReadOnlySequence.ToArray());
     }
 
-    [Fact]
+    [Test]
     public void Advance_EmptyBlock()
     {
         var seq = new Sequence<char>();
@@ -184,7 +184,7 @@ public class SequenceTests : TestBase
         Assert.True(seq.AsReadOnlySequence.IsEmpty);
     }
 
-    [Fact]
+    [Test]
     public void Advance_InvalidArgs()
     {
         var seq = new Sequence<char>();
@@ -193,7 +193,7 @@ public class SequenceTests : TestBase
         Assert.Throws<ArgumentOutOfRangeException>(() => seq.Advance(-1));
     }
 
-    [Fact]
+    [Test]
     public void Advance_TooFar()
     {
         var seq = new Sequence<char>();
@@ -201,7 +201,7 @@ public class SequenceTests : TestBase
         Assert.Throws<ArgumentOutOfRangeException>(() => seq.Advance(mem1.Length + 1));
     }
 
-    [Fact]
+    [Test]
     public void AdvanceTo_EmptySequence()
     {
         using var seq = new Sequence<byte>();
@@ -209,7 +209,7 @@ public class SequenceTests : TestBase
         Assert.Equal(0, seq.Length);
     }
 
-    [Fact]
+    [Test]
     public void AdvanceTo_DefaultSequencePosition()
     {
         using var seq = new Sequence<byte>();
@@ -218,7 +218,7 @@ public class SequenceTests : TestBase
         seq.AdvanceTo(default);
     }
 
-    [Fact]
+    [Test]
     public void AdvanceTo_ReturnsArraysToPool()
     {
         MockMemoryPool<char> mockPool = new MockMemoryPool<char>();
@@ -261,7 +261,7 @@ public class SequenceTests : TestBase
         mockPool.AssertContents(mem1, mem2, mem3);
     }
 
-    [Fact]
+    [Test]
     public void AdvanceTo_PriorPositionWithinBlock()
     {
         MockMemoryPool<char> mockPool = new MockMemoryPool<char>();
@@ -285,7 +285,7 @@ public class SequenceTests : TestBase
         Assert.Equal(4, ros.Length);
     }
 
-    [Fact]
+    [Test]
     public void AdvanceTo_PriorPositionInPriorBlock()
     {
         MockMemoryPool<char> mockPool = new MockMemoryPool<char>();
@@ -310,7 +310,7 @@ public class SequenceTests : TestBase
         Assert.Equal(ros.Length, seq.Length);
     }
 
-    [Fact]
+    [Test]
     public void AdvanceTo_PositionFromUnrelatedSequence()
     {
         MockMemoryPool<char> mockPool = new MockMemoryPool<char>();
@@ -334,7 +334,7 @@ public class SequenceTests : TestBase
         Assert.Equal(3, seqB.AsReadOnlySequence.Length);
     }
 
-    [Fact]
+    [Test]
     public void AdvanceTo_LaterPositionInCurrentBlock()
     {
         ReadOnlySpan<char> original = "abcdefg".ToCharArray();
@@ -350,7 +350,7 @@ public class SequenceTests : TestBase
         Assert.Equal(0, seq.AsReadOnlySequence.Length);
     }
 
-    [Fact]
+    [Test]
     public void AdvanceTo_InterweavedWith_Advance()
     {
         ReadOnlySpan<char> original = "abcdefg".ToCharArray();
@@ -379,7 +379,7 @@ public class SequenceTests : TestBase
         Assert.Equal(origLastChar, seq.AsReadOnlySequence.Slice(origLastCharPosition, 1).First.Span[0]);
     }
 
-    [Fact]
+    [Test]
     public void AdvanceTo_InterweavedWith_Advance2()
     {
         // use the mock pool so that we can predict the actual array size will not exceed what we ask for.
@@ -404,7 +404,7 @@ public class SequenceTests : TestBase
         Assert.Equal(10 - 3 + 10 + 10, seq.AsReadOnlySequence.Length);
     }
 
-    [Fact]
+    [Test]
     public void AdvanceTo_ReleasesReferences()
     {
         var seq = new Sequence<object>();
@@ -418,13 +418,13 @@ public class SequenceTests : TestBase
         Assert.False(tracker.IsAlive);
     }
 
-    [Theory]
-    [InlineData(-1)]
-    [InlineData(1)]
-    [InlineData(5)]
-    [InlineData(64)]
-    [InlineData(2048)]
-    [InlineData(4096)]
+    [Test]
+    [Arguments(-1)]
+    [Arguments(1)]
+    [Arguments(5)]
+    [Arguments(64)]
+    [Arguments(2048)]
+    [Arguments(4096)]
     public void MinimumSpanLength(int minLength)
     {
         var seq = new Sequence<int>();
@@ -438,7 +438,7 @@ public class SequenceTests : TestBase
         Assert.Equal(minLength, seq.MinimumSpanLength);
     }
 
-    [Fact]
+    [Test]
     public void MinimumSpanLength_DoesNotAllocateIfThereAreBytesLeft()
     {
         var pool = new MockMemoryPool<byte>();
@@ -456,7 +456,7 @@ public class SequenceTests : TestBase
         Assert.Equal(1, pool.RentCallCount);
     }
 
-    [Fact]
+    [Test]
     public void MinimumSpanLength_ZeroGetsPoolRecommendation()
     {
         var pool = new MockMemoryPool<int>();
@@ -466,7 +466,7 @@ public class SequenceTests : TestBase
         Assert.Equal(pool.DefaultLength, span.Length);
     }
 
-    [Fact]
+    [Test]
     public void Dispose_ReturnsArraysToPool_MemoryPool()
     {
         MockMemoryPool<char> mockPool = new MockMemoryPool<char>();
@@ -484,7 +484,7 @@ public class SequenceTests : TestBase
         mockPool.AssertContents(expected);
     }
 
-    [Fact]
+    [Test]
     public void Dispose_ReturnsArraysToPool_ArrayPool()
     {
         MockArrayPool<char> mockPool = new MockArrayPool<char>();
@@ -503,7 +503,7 @@ public class SequenceTests : TestBase
         mockPool.AssertContents(expected);
     }
 
-    [Fact]
+    [Test]
     public void Dispose_CanHappenTwice()
     {
         var seq = new Sequence<char>();
@@ -512,7 +512,7 @@ public class SequenceTests : TestBase
         seq.Dispose();
     }
 
-    [Fact]
+    [Test]
     public void Dispose_ClearsAndAllowsReuse()
     {
         var seq = new Sequence<char>();
@@ -523,7 +523,7 @@ public class SequenceTests : TestBase
         Assert.Equal(3, seq.AsReadOnlySequence.Length);
     }
 
-    [Fact]
+    [Test]
     public void Append()
     {
         int[]? first = new int[] { 1, 2, 3 };
@@ -575,7 +575,7 @@ public class SequenceTests : TestBase
         Assert.DoesNotContain(second, arrayPool.Contents);
     }
 
-    [Fact]
+    [Test]
     public void Append_Empty()
     {
         var arrayPool = new MockArrayPool<int> { MinArraySizeFactor = 2 };
@@ -596,13 +596,13 @@ public class SequenceTests : TestBase
         Assert.Equal(new int[] { 1, 2, 3 }, seq.AsReadOnlySequence.ToArray());
     }
 
-    [Fact]
+    [Test]
     public void AutoIncreaseMinimumSpanLength_Default()
     {
         Assert.True(new Sequence<byte>().AutoIncreaseMinimumSpanLength);
     }
 
-    [Fact]
+    [Test]
     public void AutoIncreaseMinimumSpanLength_TrueBehavior()
     {
         var sequence = new Sequence<int>(new MockArrayPool<int>()) { AutoIncreaseMinimumSpanLength = true, MinimumSpanLength = 4 };
@@ -647,7 +647,7 @@ public class SequenceTests : TestBase
         Assert.Equal(48 * 1024, span.Length);
     }
 
-    [Fact]
+    [Test]
     public void AutoIncreaseMinimumSpanLength_DoesNotResetWhenClearingSequence()
     {
         var sequence = new Sequence<int>(new MockArrayPool<int>()) { AutoIncreaseMinimumSpanLength = true, MinimumSpanLength = 4 };
@@ -658,7 +658,7 @@ public class SequenceTests : TestBase
         Assert.Equal(8, sequence.MinimumSpanLength);
     }
 
-    [Fact]
+    [Test]
     public void AutoIncreaseMinimumSpanLength_DoesNotReduceSpanFromMinSizePools()
     {
         var sequence = new Sequence<int>(new MockMemoryPool<int> { DefaultLength = 32 }) { AutoIncreaseMinimumSpanLength = true };
@@ -674,7 +674,7 @@ public class SequenceTests : TestBase
         sequence.Advance(1);
     }
 
-    [Fact]
+    [Test]
     public void AutoIncreaseMinimumSpanLength_FalseBehavior()
     {
         var sequence = new Sequence<int>(new MockArrayPool<int>()) { AutoIncreaseMinimumSpanLength = false, MinimumSpanLength = 4 };
@@ -699,7 +699,7 @@ public class SequenceTests : TestBase
         Assert.Equal(4, span.Length);
     }
 
-    [Fact]
+    [Test]
     public void SequenceOfManagedType()
     {
         var seq = new Sequence<object>();

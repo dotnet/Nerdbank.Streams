@@ -22,6 +22,7 @@
     <File Path="test/.editorconfig" />
     <File Path="test/Directory.Build.props" />
     <File Path="test/Directory.Build.targets" />
+    <Project Path="test/AotCompatibilityTest/AotCompatibilityTest.csproj" />
     <Project Path="test/IsolatedTestHost/IsolatedTestHost.csproj" />
     <Project Path="test/Nerdbank.Streams.Benchmark/Nerdbank.Streams.Benchmark.csproj" />
     <Project Path="test/Nerdbank.Streams.Interop.Tests/Nerdbank.Streams.Interop.Tests.csproj" />

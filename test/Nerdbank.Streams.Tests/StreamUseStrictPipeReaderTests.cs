@@ -10,14 +10,15 @@ using NSubstitute.ExceptionExtensions;
 using Xunit;
 
 [Obsolete("Tests functionality that .NET now exposes directly through PipeReader.Create(Stream)")]
+[InheritsTests]
 public class StreamUseStrictPipeReaderTests : StreamPipeReaderTestBase
 {
-    public StreamUseStrictPipeReaderTests(ITestOutputHelper logger)
-        : base(logger)
+    public StreamUseStrictPipeReaderTests()
+        : base(TestOutputHelper.Instance)
     {
     }
 
-    [Fact]
+    [Test]
     public async Task StreamFails()
     {
         var expectedException = new InvalidOperationException();
@@ -36,7 +37,7 @@ public class StreamUseStrictPipeReaderTests : StreamPipeReaderTestBase
         Assert.Same(expectedException, actualException);
     }
 
-    [Fact]
+    [Test]
     public void Read()
     {
         MemoryStream ms = new(new byte[] { 1, 2, 3 });
@@ -54,7 +55,7 @@ public class StreamUseStrictPipeReaderTests : StreamPipeReaderTestBase
         Assert.True(result.IsCompleted);
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsync_NonCancellableCaller_ReusesReaderCancellationToken()
     {
         var stream = new RecordingReadStream(blockReads: false);
@@ -71,7 +72,7 @@ public class StreamUseStrictPipeReaderTests : StreamPipeReaderTestBase
         reader.Complete();
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsync_NonCancellableCaller_ObservesCancelPendingRead()
     {
         var stream = new RecordingReadStream(blockReads: true);
@@ -87,7 +88,7 @@ public class StreamUseStrictPipeReaderTests : StreamPipeReaderTestBase
         reader.Complete();
     }
 
-    [Fact]
+    [Test]
     public async Task ReadAsync_CancellableCaller_LinksCancellationToken()
     {
         var stream = new RecordingReadStream(blockReads: true);

@@ -62,3 +62,11 @@ dotnet_diagnostic.SA1611.severity = silent
 
 # xUnit1051: Calls to methods which accept CancellationToken should use TestContext.Current.CancellationToken
 dotnet_diagnostic.xUnit1051.severity = suggestion
+
+# TUnit0018: Test methods should not assign instance data
+# TUnit creates a new instance of the test class for each test (as xunit did), so assigning fields in a test is safe.
+dotnet_diagnostic.TUnit0018.severity = silent
+
+# TUnit0023: Disposable fields should be disposed within a clean up method
+# These fields were not disposed under xunit either; most are in-memory streams/sequences.
+dotnet_diagnostic.TUnit0023.severity = suggestion
