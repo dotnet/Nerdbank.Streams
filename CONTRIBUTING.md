@@ -1,11 +1,23 @@
 # Contributing
 
+This project has adopted the [Microsoft Open Source Code of
+Conduct](https://opensource.microsoft.com/codeofconduct/).
+For more information see the [Code of Conduct
+FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
+contact [opencode@microsoft.com](mailto:opencode@microsoft.com)
+with any additional questions or comments.
+
 ## Best practices
 
-- Use Windows PowerShell or [PowerShell Core][pwsh] (including on Linux/OSX) to run .ps1 scripts.
+* Use Windows PowerShell or [PowerShell Core][pwsh] (including on Linux/OSX) to run .ps1 scripts.
   Some scripts set environment variables to help you, but they are only retained if you use PowerShell as your shell.
 
 ## Prerequisites
+
+All dependencies can be installed by running the `init.ps1` script at the root of the repository
+using Windows PowerShell or [PowerShell Core][pwsh] (on any OS).
+Some dependencies installed by `init.ps1` may only be discoverable from the same command line environment the init script was run from due to environment variables, so be sure to launch Visual Studio or build the repo from that same environment.
+Alternatively, run `init.ps1 -InstallLocality Machine` (which may require elevation) in order to install dependencies at machine-wide locations so Visual Studio and builds work everywhere.
 
 The only prerequisite for building, testing, and deploying from this repository
 is the [.NET SDK](https://get.dot.net/).
@@ -15,11 +27,6 @@ For example if 2.2.300 is specified, you may install 2.2.300, 2.2.301, or 2.2.31
 while the 2.2.400 version would not be considered compatible by .NET SDK.
 See [.NET Core Versioning](https://learn.microsoft.com/dotnet/core/versions/) for more information.
 
-All dependencies can be installed by running the `init.ps1` script at the root of the repository
-using Windows PowerShell or [PowerShell Core][pwsh] (on any OS).
-
-This repository can be built on Windows, Linux, and OSX.
-
 ## Package restore
 
 The easiest way to restore packages may be to run `init.ps1` which automatically authenticates
@@ -27,6 +34,8 @@ to the feeds that packages for this repo come from, if any.
 `dotnet restore` or `nuget restore` also work but may require extra steps to authenticate to any applicable feeds.
 
 ## Building
+
+This repository can be built on Windows, Linux, and OSX.
 
 Building, testing, and packing this repository can be done by using the standard dotnet CLI commands (e.g. `dotnet build`, `dotnet test`, `dotnet pack`, etc.).
 
@@ -36,9 +45,9 @@ You can use `dotnet test` to build and/or test the repo.
 
 There may be tests that are known to be unstable or have special requirements. These can be avoided by running tests using the [dotnet-test-cloud.ps1](tools/dotnet-test-cloud.ps1) script *after* running `dotnet build`.
 
-To build both managed and NativeAOT tests, run `dotnet publish tools/dirs.proj -c Release`.
+To build both managed and NativeAOT tests, run `dotnet publish test -c Release`.
 Then run `./tools/dotnet-test-cloud.ps1 -Configuration Release -IncludeNativeAOT`.
-The traversal projects discover projects under `src` and `test`, and publish each eligible test framework targeting .NET 8 or later.
+The traversal project publishes each eligible test framework targeting .NET; this repository's `Nerdbank.Streams.Tests` project targets `net8.0`.
 Keep test projects in the solution as well: managed test runs still use the solution, while NativeAOT runs use the traversal's evaluated executable paths.
 Test projects can opt out of NativeAOT publishing with `<PublishNativeAOTTests>false</PublishNativeAOTTests>`.
 One restore includes all test target frameworks, runtime identifiers, and NativeAOT compiler dependencies.
