@@ -299,7 +299,9 @@ public abstract class TestBase : IDisposable
         return allDone.ContinueWith(
             _ =>
             {
+#pragma warning disable VSTHRD002
                 IsolatedTestHost.ExitCodes result = processExitCode.Task.Result;
+#pragma warning restore VSTHRD002
                 switch (result)
                 {
                     case IsolatedTestHost.ExitCodes.TestSkipped:
