@@ -118,7 +118,6 @@ jobs:
         }
       shell: pwsh
       timeout-minutes: 3
-
   docs:
     name: 📃 Docs
     runs-on: ubuntu-26.04
