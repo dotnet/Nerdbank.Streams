@@ -7,7 +7,7 @@
     <MicrosoftTestingPlatformVersion>2.4.1</MicrosoftTestingPlatformVersion>
     <BenchmarkDotNetVersion>0.15.8</BenchmarkDotNetVersion>
     <AspNetCoreVersion>2.3.13</AspNetCoreVersion>
-    <VSThreadingVersion>18.7.23</VSThreadingVersion>
+    <VSThreadingVersion>18.12.1</VSThreadingVersion>
   </PropertyGroup>
   <ItemGroup>
     <!-- Put repo-specific PackageVersion items in this group. -->
