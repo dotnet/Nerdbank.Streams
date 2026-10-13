@@ -46,7 +46,7 @@ internal class ProcessJobTracker : IDisposable
         //  If it's not null, it has to be unique. Use SysInternals' Handle command-line
         //  utility: handle -a ChildProcessTracker
         string jobName = nameof(ProcessJobTracker) + Process.GetCurrentProcess().Id;
-        this.jobHandle = CreateJobObject(IntPtr.Zero, jobName);
+        this.jobHandle = CreateJobObject((nint)0, jobName);
 
         var extendedInfo = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION
         {
@@ -57,9 +57,9 @@ internal class ProcessJobTracker : IDisposable
         };
 
         // This code can be a lot simpler if we use pointers, but since this class is so generally interesting
-        // and may be copied and pasted to other projects that prefer to avoid unsafe code, we use Marshal and IntPtr's instead.
+        // and may be copied and pasted to other projects that prefer to avoid unsafe code, we use Marshal and native integer types instead.
         int length = Marshal.SizeOf(extendedInfo);
-        IntPtr pExtendedInfo = Marshal.AllocHGlobal(length);
+        nint pExtendedInfo = Marshal.AllocHGlobal(length);
         try
         {
             Marshal.StructureToPtr(extendedInfo, pExtendedInfo, fDeleteOld: false);
