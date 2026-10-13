@@ -46,7 +46,8 @@ internal class ProcessJobTracker : IDisposable
         //  If it's not null, it has to be unique. Use SysInternals' Handle command-line
         //  utility: handle -a ChildProcessTracker
         string jobName = nameof(ProcessJobTracker) + Process.GetCurrentProcess().Id;
-        this.jobHandle = CreateJobObject((nint)0, jobName);
+#pragma warning disable SA1121 // IntPtr is required by the cross-target P/Invoke API, while the analyzer does not recognize nint on macOS.
+        this.jobHandle = CreateJobObject(IntPtr.Zero, jobName);
 
         var extendedInfo = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION
         {
@@ -57,9 +58,10 @@ internal class ProcessJobTracker : IDisposable
         };
 
         // This code can be a lot simpler if we use pointers, but since this class is so generally interesting
-        // and may be copied and pasted to other projects that prefer to avoid unsafe code, we use Marshal and native integer types instead.
+        // and may be copied and pasted to other projects that prefer to avoid unsafe code, we use Marshal and IntPtr's instead.
         int length = Marshal.SizeOf(extendedInfo);
-        nint pExtendedInfo = Marshal.AllocHGlobal(length);
+        IntPtr pExtendedInfo = Marshal.AllocHGlobal(length);
+#pragma warning restore SA1121
         try
         {
             Marshal.StructureToPtr(extendedInfo, pExtendedInfo, fDeleteOld: false);
