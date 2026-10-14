@@ -38,5 +38,30 @@ public class StreamUsePipeWriterTests : StreamPipeWriterTestBase
         Assert.Same(expectedException, actualException);
     }
 
+#if NETFRAMEWORK
+    [Test]
+    public async Task PipeStreamUsesApmDirectly()
+    {
+        using var stream = new ApmTrackingPipeStream();
+        PipeWriter writer = this.CreatePipeWriter(stream);
+
+        await writer.WriteAsync(new byte[] { 1 }, this.TimeoutToken);
+        while (stream.BeginWriteCallCount < 1)
+        {
+            await Task.Delay(10, this.TimeoutToken);
+        }
+
+        await writer.WriteAsync(new byte[] { 2 }, this.TimeoutToken);
+        writer.Complete();
+#pragma warning disable CS0618 // Type or member is obsolete
+        await writer.WaitForReaderCompletionAsync().WithCancellation(this.TimeoutToken);
+#pragma warning restore CS0618 // Type or member is obsolete
+
+        Assert.Equal(new byte[] { 1, 2 }, stream.ToArray());
+        Assert.Equal(0, stream.WriteAsyncCallCount);
+        Assert.True(stream.BeginWriteCallCount > 0);
+    }
+#endif
+
     protected override PipeWriter CreatePipeWriter(Stream stream) => stream.UsePipeWriter();
 }

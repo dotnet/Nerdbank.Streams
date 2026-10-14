@@ -12,6 +12,7 @@ namespace Nerdbank.Streams
     using System.Threading.Tasks;
     using Microsoft;
     using Microsoft.VisualStudio.Threading;
+    using PipeStream = System.IO.Pipes.PipeStream;
 
     /// <summary>
     /// Stream extension methods.
@@ -143,6 +144,9 @@ namespace Nerdbank.Streams
             Requires.Argument(stream.CanWrite, nameof(stream), "Stream must be writable.");
 
             var pipe = new Pipe(pipeOptions ?? PipeOptions.Default);
+#if !SPAN_BUILTIN
+            PipeStreamOperation? pipeStreamOperation = stream is PipeStream ? new PipeStreamOperation() : null;
+#endif
             Task.Run(
                 async delegate
                 {
@@ -156,7 +160,18 @@ namespace Nerdbank.Streams
                             {
                                 foreach (ReadOnlyMemory<byte> segment in readResult.Buffer)
                                 {
+#if SPAN_BUILTIN
                                     await stream.WriteAsync(segment, cancellationToken).ConfigureAwait(false);
+#else
+                                    if (pipeStreamOperation is not null)
+                                    {
+                                        await pipeStreamOperation.WriteAsync((PipeStream)stream, segment, cancellationToken).ConfigureAwait(false);
+                                    }
+                                    else
+                                    {
+                                        await stream.WriteAsync(segment, cancellationToken).ConfigureAwait(false);
+                                    }
+#endif
                                 }
 
                                 await stream.FlushIfNecessaryAsync(cancellationToken).ConfigureAwait(false);
@@ -591,6 +606,9 @@ namespace Nerdbank.Streams
             }
 #pragma warning restore CS0618 // Type or member is obsolete
 
+#if !SPAN_BUILTIN
+            PipeStreamOperation? pipeStreamOperation = stream is PipeStream ? new PipeStreamOperation() : null;
+#endif
             Task.Run(
                 async delegate
                 {
@@ -599,7 +617,13 @@ namespace Nerdbank.Streams
                         Memory<byte> memory = pipe.Writer.GetMemory(sizeHint);
                         try
                         {
+#if SPAN_BUILTIN
                             int bytesRead = await stream.ReadAsync(memory, combinedTokenSource.Token).ConfigureAwait(false);
+#else
+                            int bytesRead = pipeStreamOperation is not null
+                                ? await pipeStreamOperation.ReadAsync((PipeStream)stream, memory, combinedTokenSource.Token).ConfigureAwait(false)
+                                : await stream.ReadAsync(memory, combinedTokenSource.Token).ConfigureAwait(false);
+#endif
                             if (bytesRead == 0)
                             {
                                 break;
