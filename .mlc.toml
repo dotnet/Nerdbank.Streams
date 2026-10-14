@@ -1,0 +1,13 @@
+do-not-warn-for-redirect-to = [
+    "https://learn.microsoft.com*",
+    "https://dotnet.microsoft.com/*",
+    "https://dev.azure.com/*",
+    "https://app.codecov.io/*",
+    "https://dotnetfoundation.org/*",
+    "https://docs.github.com/*",
+]
+ignore-path = ["docfx", "ext"]
+ignore-links = [
+    "https://www.npmjs.com/package/*",
+    "https://get.dot.net/",
+]
