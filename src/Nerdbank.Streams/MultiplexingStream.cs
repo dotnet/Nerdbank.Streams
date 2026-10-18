@@ -411,10 +411,14 @@ namespace Nerdbank.Streams
                 throw new InvalidOperationException(Strings.ListeningHasAlreadyStarted);
             }
 
+            // Listening counts as started before the read loop begins. The loop can raise ChannelOffered for an offer that is already
+            // waiting in the transport before this method returns, and the handlers of that event call methods (AcceptChannel,
+            // AcceptChannelAsync, RejectChannel) that are refused until listening has started.
+            this.listeningStarted = true;
+
             // Initiate reading from the transport stream. This will not end until the stream does, or we're disposed.
             // If reading the stream fails, we'll dispose ourselves.
             this.DisposeSelfOnFailure(this.ReadStreamAsync());
-            this.listeningStarted = true;
         }
 
         /// <summary>

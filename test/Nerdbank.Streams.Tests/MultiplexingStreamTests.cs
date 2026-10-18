@@ -953,6 +953,98 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         await invoked.WaitAsync(this.TimeoutToken);
     }
 
+    /// <summary>
+    /// A handler of <see cref="MultiplexingStream.ChannelOffered"/> can accept, by name, a channel that the remote party offered before
+    /// <see cref="MultiplexingStream.StartListening"/> was called. The event is raised from within that call, once the read loop is
+    /// running, so accepting must already be allowed.
+    /// </summary>
+    [Fact]
+    public async Task ChannelOffered_AlreadyOfferedByRemote_HandlerCanAcceptByName()
+    {
+        (this.transport1, this.transport2) = FullDuplexStream.CreatePair(new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024));
+        Task<MultiplexingStream>? mx1Task = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion }, this.TimeoutToken);
+        Task<MultiplexingStream>? mx2Task = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, StartSuspended = true }, this.TimeoutToken);
+        using MultiplexingStream? mx1 = await mx1Task;
+        using MultiplexingStream? mx2 = await mx2Task;
+
+        Task<MultiplexingStream.Channel> offered = mx1.OfferChannelAsync("channel", this.TimeoutToken);
+        await Task.Delay(ExpectedTimeout); // simulate a slow receiving party
+        var acceptTask = new TaskCompletionSource<Task<MultiplexingStream.Channel>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        mx2.ChannelOffered += (sender, args) => acceptTask.TrySetResult(mx2.AcceptChannelAsync(args.Name, this.TimeoutToken));
+        mx2.StartListening();
+
+        MultiplexingStream.Channel ch2 = await (await acceptTask.Task.WithCancellation(this.TimeoutToken)).WithCancellation(this.TimeoutToken);
+        MultiplexingStream.Channel ch1 = await offered.WithCancellation(this.TimeoutToken);
+        Assert.Equal(ch1.QualifiedId.Id, ch2.QualifiedId.Id);
+    }
+
+    /// <summary>
+    /// A handler of <see cref="MultiplexingStream.ChannelOffered"/> can accept, by ID, an anonymous channel that the remote party
+    /// created before <see cref="MultiplexingStream.StartListening"/> was called.
+    /// </summary>
+    [Fact]
+    public async Task ChannelOffered_AlreadyOfferedByRemote_HandlerCanAcceptById()
+    {
+        (this.transport1, this.transport2) = FullDuplexStream.CreatePair(new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024));
+        Task<MultiplexingStream>? mx1Task = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion }, this.TimeoutToken);
+        Task<MultiplexingStream>? mx2Task = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, StartSuspended = true }, this.TimeoutToken);
+        using MultiplexingStream? mx1 = await mx1Task;
+        using MultiplexingStream? mx2 = await mx2Task;
+
+        MultiplexingStream.Channel ch1 = mx1.CreateChannel();
+        await Task.Delay(ExpectedTimeout); // simulate a slow receiving party
+        var accepted = new TaskCompletionSource<MultiplexingStream.Channel>(TaskCreationOptions.RunContinuationsAsynchronously);
+        mx2.ChannelOffered += (sender, args) =>
+        {
+            try
+            {
+                accepted.TrySetResult(mx2.AcceptChannel(args.QualifiedId.Id));
+            }
+            catch (Exception ex)
+            {
+                accepted.TrySetException(ex);
+            }
+        };
+        mx2.StartListening();
+
+        MultiplexingStream.Channel ch2 = await accepted.Task.WithCancellation(this.TimeoutToken);
+        Assert.Equal(ch1.QualifiedId.Id, ch2.QualifiedId.Id);
+    }
+
+    /// <summary>
+    /// A handler of <see cref="MultiplexingStream.ChannelOffered"/> can reject a channel that the remote party offered before
+    /// <see cref="MultiplexingStream.StartListening"/> was called.
+    /// </summary>
+    [Fact]
+    public async Task ChannelOffered_AlreadyOfferedByRemote_HandlerCanReject()
+    {
+        (this.transport1, this.transport2) = FullDuplexStream.CreatePair(new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024));
+        Task<MultiplexingStream>? mx1Task = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion }, this.TimeoutToken);
+        Task<MultiplexingStream>? mx2Task = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, StartSuspended = true }, this.TimeoutToken);
+        using MultiplexingStream? mx1 = await mx1Task;
+        using MultiplexingStream? mx2 = await mx2Task;
+
+        MultiplexingStream.Channel ch1 = mx1.CreateChannel();
+        await Task.Delay(ExpectedTimeout); // simulate a slow receiving party
+        var rejected = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        mx2.ChannelOffered += (sender, args) =>
+        {
+            try
+            {
+                mx2.RejectChannel(args.QualifiedId.Id);
+                rejected.TrySetResult(true);
+            }
+            catch (Exception ex)
+            {
+                rejected.TrySetException(ex);
+            }
+        };
+        mx2.StartListening();
+
+        await rejected.Task.WithCancellation(this.TimeoutToken);
+        await Assert.ThrowsAnyAsync<Exception>(() => ch1.Acceptance.WithCancellation(this.TimeoutToken));
+    }
+
     [Fact]
     public void StartListening_CalledWithoutStartSuspension()
     {
