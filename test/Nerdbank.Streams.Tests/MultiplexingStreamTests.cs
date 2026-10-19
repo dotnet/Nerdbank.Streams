@@ -1042,7 +1042,7 @@ public class MultiplexingStreamTests : TestBase, IAsyncLifetime
         mx2.StartListening();
 
         await rejected.Task.WithCancellation(this.TimeoutToken);
-        await Assert.ThrowsAnyAsync<Exception>(() => ch1.Acceptance.WithCancellation(this.TimeoutToken));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ch1.Acceptance).WithCancellation(this.TimeoutToken);
     }
 
     [Fact]
