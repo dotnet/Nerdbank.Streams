@@ -67,8 +67,7 @@ namespace Nerdbank.Streams
             {
                 Verify.NotDisposed(this);
 
-                return this.underlyingStream.CanSeek ?
-                    this.length : throw new NotSupportedException();
+                return this.underlyingStream.CanSeek ? this.length : throw new NotSupportedException();
             }
         }
 

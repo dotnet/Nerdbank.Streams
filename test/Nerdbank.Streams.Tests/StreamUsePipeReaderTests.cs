@@ -59,5 +59,5 @@ public class StreamUsePipeReaderTests : StreamPipeReaderTestBase
         _ = unreadableStream.Received().CanRead;
     }
 
-    protected override PipeReader CreatePipeReader(Stream stream, int hintSize = 0) => stream.UsePipeReader(hintSize);
+    protected override PipeReader CreatePipeReader(Stream stream, int sizeHint = 0) => stream.UsePipeReader(sizeHint);
 }

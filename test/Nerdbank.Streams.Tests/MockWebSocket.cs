@@ -43,7 +43,7 @@ internal class MockWebSocket : WebSocket
 
     public override void Dispose() => this.DisposalCount++;
 
-    public override async Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> output, CancellationToken cancellationToken)
+    public override async Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken cancellationToken)
     {
         Message? input = this.readingInProgress;
         if (this.readingInProgress == null)
@@ -51,8 +51,8 @@ internal class MockWebSocket : WebSocket
             input = this.readingInProgress = await this.ReadQueue.DequeueAsync(cancellationToken);
         }
 
-        int bytesToCopy = Math.Min(input!.Buffer.Length, output.Count);
-        input.Buffer.Slice(0, bytesToCopy).CopyTo(output.Array.AsMemory(output.Offset, output.Count));
+        int bytesToCopy = Math.Min(input!.Buffer.Length, buffer.Count);
+        input.Buffer.Slice(0, bytesToCopy).CopyTo(buffer.Array.AsMemory(buffer.Offset, buffer.Count));
         bool finishedMessage = bytesToCopy == input.Buffer.Length;
         if (finishedMessage)
         {
@@ -72,19 +72,19 @@ internal class MockWebSocket : WebSocket
         return result;
     }
 
-    public override Task SendAsync(ArraySegment<byte> input, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken)
+    public override Task SendAsync(ArraySegment<byte> buffer, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken)
     {
         if (this.writingInProgress == null)
         {
-            byte[] bufferCopy = new byte[input.Count];
-            Buffer.BlockCopy(input.Array!, input.Offset, bufferCopy, 0, input.Count);
+            byte[] bufferCopy = new byte[buffer.Count];
+            Buffer.BlockCopy(buffer.Array!, buffer.Offset, bufferCopy, 0, buffer.Count);
             this.writingInProgress = new Message { Buffer = new ArraySegment<byte>(bufferCopy), MessageTypeIfKnown = messageType };
         }
         else
         {
-            Memory<byte> memory = new byte[this.writingInProgress.Buffer.Length + input.Count];
+            Memory<byte> memory = new byte[this.writingInProgress.Buffer.Length + buffer.Count];
             this.writingInProgress.Buffer.CopyTo(memory);
-            input.Array.CopyTo(memory.Slice(this.writingInProgress.Buffer.Length));
+            buffer.Array.CopyTo(memory.Slice(this.writingInProgress.Buffer.Length));
             this.writingInProgress.Buffer = memory;
         }
 

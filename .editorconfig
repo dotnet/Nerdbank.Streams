@@ -171,6 +171,9 @@ csharp_prefer_braces = true:silent
 # SA1130: Use lambda syntax
 dotnet_diagnostic.SA1130.severity = silent
 
+# SA1504: All accessors should be single-line or multi-line
+dotnet_diagnostic.SA1504.severity = silent
+
 # SA1600: Elements should be documented
 dotnet_diagnostic.SA1600.severity = suggestion
 
