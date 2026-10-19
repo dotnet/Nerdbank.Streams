@@ -32,7 +32,7 @@ jobs:
     permissions:
       actions: read # Required to download artifacts
       contents: write # Upload artifacts to Release
-      id-token: write # Required for Azure and NuGet OIDC authentication
+      id-token: write # Required for Azure, NuGet, and npm OIDC authentication
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       with:
@@ -184,7 +184,8 @@ jobs:
           $publishArgs += "--tag=$publishTag"
         }
 
-        npm set //registry.npmjs.org/:_authToken=${{ secrets.NPM_API_KEY }}
+        # Authenticates via npm Trusted Publishing (OIDC); requires npm 11.5.1+.
+        npm --version
         npm publish @publishArgs
       working-directory: ${{ runner.temp }}
 
