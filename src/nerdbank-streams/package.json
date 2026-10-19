@@ -53,7 +53,7 @@
     "nerdbank-gitversioning": "3.11.202-beta",
     "path": "0.12.7",
     "prettier": "3.9.10",
-    "ts-jest": "29.4.14",
+    "ts-jest": "29.4.15",
     "ts-node": "10.9.2",
     "typescript": "npm:@typescript/typescript6@6.0.2",
     "vscode-jsonrpc": "9.0.3"
