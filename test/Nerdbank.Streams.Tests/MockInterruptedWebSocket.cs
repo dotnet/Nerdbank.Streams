@@ -27,9 +27,9 @@ internal class MockInterruptedWebSocket : WebSocket
     {
     }
 
-    public override Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> output, CancellationToken cancellationToken) =>
+    public override Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken cancellationToken) =>
         throw new WebSocketException(WebSocketError.ConnectionClosedPrematurely);
 
-    public override Task SendAsync(ArraySegment<byte> input, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken) =>
+    public override Task SendAsync(ArraySegment<byte> buffer, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken) =>
         throw new WebSocketException(WebSocketError.ConnectionClosedPrematurely);
 }

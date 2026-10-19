@@ -1015,9 +1015,11 @@ public sealed class SharedMemoryDuplexPipe : IDuplexPipe, IDisposable
             int offset = (int)(this.consumedTotal & (ring.Capacity - 1));
             int contiguous = (int)Math.Min(available, ring.Capacity - offset);
 
-            this.current = available == 0 ? default
-                : contiguous == available ? this.CreateSequence(offset, contiguous)
-                : this.CreateWrappedSequence(offset, contiguous, (int)(available - contiguous));
+            this.current = available == 0
+                ? default
+                : contiguous == available
+                    ? this.CreateSequence(offset, contiguous)
+                    : this.CreateWrappedSequence(offset, contiguous, (int)(available - contiguous));
 
             bool wasCanceled = this.canceled;
             this.canceled = false;

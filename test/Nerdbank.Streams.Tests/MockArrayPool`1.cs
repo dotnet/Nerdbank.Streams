@@ -20,21 +20,21 @@ internal class MockArrayPool<T> : ArrayPool<T>
     /// </summary>
     public double MinArraySizeFactor { get; set; } = 1.0;
 
-    public override T[] Rent(int minBufferSize)
+    public override T[] Rent(int minimumLength)
     {
-        Requires.Range(minBufferSize >= 0, nameof(minBufferSize));
+        Requires.Range(minimumLength >= 0, nameof(minimumLength));
 
-        if (minBufferSize == 0)
+        if (minimumLength == 0)
         {
             return Array.Empty<T>();
         }
 
-        minBufferSize = (int)(minBufferSize * this.MinArraySizeFactor);
-        T[]? result = this.Contents.FirstOrDefault(a => a.Length >= minBufferSize);
+        minimumLength = (int)(minimumLength * this.MinArraySizeFactor);
+        T[]? result = this.Contents.FirstOrDefault(a => a.Length >= minimumLength);
 
         if (result == null)
         {
-            result = new T[minBufferSize == -1 ? DefaultLength : minBufferSize];
+            result = new T[minimumLength == -1 ? DefaultLength : minimumLength];
         }
         else
         {

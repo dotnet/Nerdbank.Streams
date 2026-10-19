@@ -1515,11 +1515,11 @@ namespace Nerdbank.Streams
                     return this.AwaitStarvedReadAsync(readTask);
                 }
 
-                public override bool TryRead(out ReadResult readResult)
+                public override bool TryRead(out ReadResult result)
                 {
-                    bool result = this.inner.TryRead(out readResult);
-                    this.lastReadResult = readResult;
-                    return result;
+                    bool boolResult = this.inner.TryRead(out result);
+                    this.lastReadResult = result;
+                    return boolResult;
                 }
 
                 public override async ValueTask CompleteAsync(Exception? exception = null)
@@ -1556,8 +1556,9 @@ namespace Nerdbank.Streams
                     // If the entirety of the buffer was examined for the first time, just use the buffer length as a perf optimization.
                     // Otherwise, slice the buffer from last examined to new examined to get the number of freshly examined bytes.
                     long bytesJustProcessed =
-                        lastExamined.Equals(this.lastReadResult.Buffer.Start) && this.lastReadResult.Buffer.End.Equals(examined) ? this.lastReadResult.Buffer.Length :
-                        this.lastReadResult.Buffer.Slice(lastExamined, examined).Length;
+                        lastExamined.Equals(this.lastReadResult.Buffer.Start) && this.lastReadResult.Buffer.End.Equals(examined)
+                            ? this.lastReadResult.Buffer.Length
+                            : this.lastReadResult.Buffer.Slice(lastExamined, examined).Length;
 
                     this.bytesProcessed += bytesJustProcessed;
 

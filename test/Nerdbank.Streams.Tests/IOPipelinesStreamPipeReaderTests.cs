@@ -12,5 +12,5 @@ public class IOPipelinesStreamPipeReaderTests : StreamPipeReaderTestBase
     {
     }
 
-    protected override PipeReader CreatePipeReader(Stream stream, int hintSize = 0) => PipeReader.Create(stream, new StreamPipeReaderOptions(bufferSize: hintSize == 0 ? -1 : hintSize));
+    protected override PipeReader CreatePipeReader(Stream stream, int sizeHint = 0) => PipeReader.Create(stream, new StreamPipeReaderOptions(bufferSize: sizeHint == 0 ? -1 : sizeHint));
 }
