@@ -955,6 +955,98 @@ public class MultiplexingStreamTests : TestBase, System.IAsyncDisposable
         await invoked.WaitAsync(this.TimeoutToken);
     }
 
+    /// <summary>
+    /// A handler of <see cref="MultiplexingStream.ChannelOffered"/> can accept, by name, a channel that the remote party offered before
+    /// <see cref="MultiplexingStream.StartListening"/> was called. The event is raised from within that call, once the read loop is
+    /// running, so accepting must already be allowed.
+    /// </summary>
+    [Test]
+    public async Task ChannelOffered_AlreadyOfferedByRemote_HandlerCanAcceptByName()
+    {
+        (this.transport1, this.transport2) = FullDuplexStream.CreatePair(new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024));
+        Task<MultiplexingStream>? mx1Task = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion }, this.TimeoutToken);
+        Task<MultiplexingStream>? mx2Task = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, StartSuspended = true }, this.TimeoutToken);
+        using MultiplexingStream? mx1 = await mx1Task;
+        using MultiplexingStream? mx2 = await mx2Task;
+
+        Task<MultiplexingStream.Channel> offered = mx1.OfferChannelAsync("channel", this.TimeoutToken);
+        await Task.Delay(ExpectedTimeout); // simulate a slow receiving party
+        var acceptTask = new TaskCompletionSource<Task<MultiplexingStream.Channel>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        mx2.ChannelOffered += (sender, args) => acceptTask.TrySetResult(mx2.AcceptChannelAsync(args.Name, this.TimeoutToken));
+        mx2.StartListening();
+
+        MultiplexingStream.Channel ch2 = await (await acceptTask.Task.WithCancellation(this.TimeoutToken)).WithCancellation(this.TimeoutToken);
+        MultiplexingStream.Channel ch1 = await offered.WithCancellation(this.TimeoutToken);
+        Assert.Equal(ch1.QualifiedId.Id, ch2.QualifiedId.Id);
+    }
+
+    /// <summary>
+    /// A handler of <see cref="MultiplexingStream.ChannelOffered"/> can accept, by ID, an anonymous channel that the remote party
+    /// created before <see cref="MultiplexingStream.StartListening"/> was called.
+    /// </summary>
+    [Test]
+    public async Task ChannelOffered_AlreadyOfferedByRemote_HandlerCanAcceptById()
+    {
+        (this.transport1, this.transport2) = FullDuplexStream.CreatePair(new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024));
+        Task<MultiplexingStream>? mx1Task = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion }, this.TimeoutToken);
+        Task<MultiplexingStream>? mx2Task = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, StartSuspended = true }, this.TimeoutToken);
+        using MultiplexingStream? mx1 = await mx1Task;
+        using MultiplexingStream? mx2 = await mx2Task;
+
+        MultiplexingStream.Channel ch1 = mx1.CreateChannel();
+        await Task.Delay(ExpectedTimeout); // simulate a slow receiving party
+        var accepted = new TaskCompletionSource<MultiplexingStream.Channel>(TaskCreationOptions.RunContinuationsAsynchronously);
+        mx2.ChannelOffered += (sender, args) =>
+        {
+            try
+            {
+                accepted.TrySetResult(mx2.AcceptChannel(args.QualifiedId.Id));
+            }
+            catch (Exception ex)
+            {
+                accepted.TrySetException(ex);
+            }
+        };
+        mx2.StartListening();
+
+        MultiplexingStream.Channel ch2 = await accepted.Task.WithCancellation(this.TimeoutToken);
+        Assert.Equal(ch1.QualifiedId.Id, ch2.QualifiedId.Id);
+    }
+
+    /// <summary>
+    /// A handler of <see cref="MultiplexingStream.ChannelOffered"/> can reject a channel that the remote party offered before
+    /// <see cref="MultiplexingStream.StartListening"/> was called.
+    /// </summary>
+    [Test]
+    public async Task ChannelOffered_AlreadyOfferedByRemote_HandlerCanReject()
+    {
+        (this.transport1, this.transport2) = FullDuplexStream.CreatePair(new PipeOptions(pauseWriterThreshold: 2 * 1024 * 1024));
+        Task<MultiplexingStream>? mx1Task = MultiplexingStream.CreateAsync(this.transport1, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion }, this.TimeoutToken);
+        Task<MultiplexingStream>? mx2Task = MultiplexingStream.CreateAsync(this.transport2, new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion, StartSuspended = true }, this.TimeoutToken);
+        using MultiplexingStream? mx1 = await mx1Task;
+        using MultiplexingStream? mx2 = await mx2Task;
+
+        MultiplexingStream.Channel ch1 = mx1.CreateChannel();
+        await Task.Delay(ExpectedTimeout); // simulate a slow receiving party
+        var rejected = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        mx2.ChannelOffered += (sender, args) =>
+        {
+            try
+            {
+                mx2.RejectChannel(args.QualifiedId.Id);
+                rejected.TrySetResult(true);
+            }
+            catch (Exception ex)
+            {
+                rejected.TrySetException(ex);
+            }
+        };
+        mx2.StartListening();
+
+        await rejected.Task.WithCancellation(this.TimeoutToken);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ch1.Acceptance).WithCancellation(this.TimeoutToken);
+    }
+
     [Test]
     public void StartListening_CalledWithoutStartSuspension()
     {
@@ -1265,6 +1357,71 @@ public class MultiplexingStreamTests : TestBase, System.IAsyncDisposable
         await this.ReadAtLeastAsync(mx2Baseline.Input, 3);
     }
 
+    /// <summary>
+    /// A transport that is torn down underneath a pending read (for example a <see cref="System.Net.WebSockets.WebSocket"/>
+    /// aborted by its keep-alive timeout) reports that by throwing <see cref="OperationCanceledException"/> from its read.
+    /// That is a transport failure, not a request by the <see cref="MultiplexingStream"/> to stop, so the stream must complete.
+    /// See https://github.com/dotnet/Nerdbank.Streams/issues/1261.
+    /// </summary>
+    [Test]
+    public async Task Completion_Completes_WhenTransportReadThrowsOperationCanceledException()
+    {
+        (Stream, Stream) pair = FullDuplexStream.CreatePair();
+        var failingTransport = new ReadFailureInjectingStream(pair.Item1);
+        var options = new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion };
+        Task<MultiplexingStream> createTask1 = MultiplexingStream.CreateAsync(failingTransport, options, this.TimeoutToken);
+        Task<MultiplexingStream> createTask2 = MultiplexingStream.CreateAsync(pair.Item2, options, this.TimeoutToken);
+        await using MultiplexingStream failingMx = await createTask1;
+        await using MultiplexingStream otherMx = await createTask2;
+
+        failingTransport.FailReads(new OperationCanceledException("The transport was aborted."));
+
+        Task winner = await Task.WhenAny(failingMx.Completion, Task.Delay(TimeSpan.FromSeconds(10)));
+        Assert.Same(failingMx.Completion, winner);
+        Exception completionException = await Assert.ThrowsAnyAsync<Exception>(() => failingMx.Completion);
+        Assert.IsAssignableFrom<OperationCanceledException>(completionException);
+    }
+
+    /// <summary>
+    /// The control for <see cref="Completion_Completes_WhenTransportReadThrowsOperationCanceledException"/>:
+    /// other transport failures have always completed the stream.
+    /// </summary>
+    [Test]
+    public async Task Completion_Completes_WhenTransportReadThrowsIOException()
+    {
+        (Stream, Stream) pair = FullDuplexStream.CreatePair();
+        var failingTransport = new ReadFailureInjectingStream(pair.Item1);
+        var options = new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion };
+        Task<MultiplexingStream> createTask1 = MultiplexingStream.CreateAsync(failingTransport, options, this.TimeoutToken);
+        Task<MultiplexingStream> createTask2 = MultiplexingStream.CreateAsync(pair.Item2, options, this.TimeoutToken);
+        await using MultiplexingStream failingMx = await createTask1;
+        await using MultiplexingStream otherMx = await createTask2;
+
+        failingTransport.FailReads(new IOException("The transport failed."));
+
+        Task winner = await Task.WhenAny(failingMx.Completion, Task.Delay(TimeSpan.FromSeconds(10)));
+        Assert.Same(failingMx.Completion, winner);
+        await Assert.ThrowsAnyAsync<IOException>(() => failingMx.Completion);
+    }
+
+    /// <summary>
+    /// Disposing the <see cref="MultiplexingStream"/> cancels its own read loop, which must keep completing successfully.
+    /// </summary>
+    [Test]
+    public async Task Completion_CompletesSuccessfully_WhenDisposedWhileReading()
+    {
+        (Stream, Stream) pair = FullDuplexStream.CreatePair();
+        var options = new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion };
+        Task<MultiplexingStream> createTask1 = MultiplexingStream.CreateAsync(pair.Item1, options, this.TimeoutToken);
+        Task<MultiplexingStream> createTask2 = MultiplexingStream.CreateAsync(pair.Item2, options, this.TimeoutToken);
+        MultiplexingStream mx = await createTask1;
+        await using MultiplexingStream otherMx = await createTask2;
+
+        await mx.DisposeAsync();
+        await mx.Completion.WithCancellation(this.TimeoutToken);
+        AssertNoFault(mx);
+    }
+
     protected static async Task VerifyChannelCompleted(MultiplexingStream.Channel channel, string? expectedErrMsg)
     {
         if (expectedErrMsg != null)
@@ -1417,6 +1574,68 @@ public class MultiplexingStreamTests : TestBase, System.IAsyncDisposable
             // We don't have a reader that consumers of this mock need to worry about,
             // so just say we're done when the writing is done.
             this.Completion.ContinueWith(c => callback(c.Exception, state), TaskScheduler.Default).Forget();
+        }
+    }
+
+    /// <summary>A stream whose pending and future reads can be made to throw on demand.</summary>
+    private sealed class ReadFailureInjectingStream : Stream
+    {
+        private readonly Stream inner;
+        private readonly TaskCompletionSource<int> failure = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public ReadFailureInjectingStream(Stream inner) => this.inner = inner;
+
+        public override bool CanRead => this.inner.CanRead;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => this.inner.CanWrite;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public void FailReads(Exception exception) => this.failure.TrySetException(exception);
+
+        public override void Flush() => this.inner.Flush();
+
+        public override Task FlushAsync(CancellationToken cancellationToken) => this.inner.FlushAsync(cancellationToken);
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            Task<int> read = this.inner.ReadAsync(buffer, offset, count, cancellationToken);
+            Task completed = await Task.WhenAny(read, this.failure.Task).ConfigureAwait(false);
+            if (completed == this.failure.Task)
+            {
+                // Rethrows the injected exception as-is, like a transport that is aborted underneath a pending read.
+                await this.failure.Task.ConfigureAwait(false);
+            }
+
+            return await read.ConfigureAwait(false);
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => this.inner.Write(buffer, offset, count);
+
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) => this.inner.WriteAsync(buffer, offset, count, cancellationToken);
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                this.inner.Dispose();
+            }
+
+            base.Dispose(disposing);
         }
     }
 }

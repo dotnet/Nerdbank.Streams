@@ -411,10 +411,14 @@ namespace Nerdbank.Streams
                 throw new InvalidOperationException(Strings.ListeningHasAlreadyStarted);
             }
 
+            // Listening counts as started before the read loop begins. The loop can raise ChannelOffered for an offer that is already
+            // waiting in the transport before this method returns, and the handlers of that event call methods (AcceptChannel,
+            // AcceptChannelAsync, RejectChannel) that are refused until listening has started.
+            this.listeningStarted = true;
+
             // Initiate reading from the transport stream. This will not end until the stream does, or we're disposed.
             // If reading the stream fails, we'll dispose ourselves.
             this.DisposeSelfOnFailure(this.ReadStreamAsync());
-            this.listeningStarted = true;
         }
 
         /// <summary>
@@ -925,6 +929,15 @@ namespace Nerdbank.Streams
                     {
                         this.TraceSource.TraceEvent(TraceEventType.Error, (int)TraceEventId.FatalError, $"Exception thrown in {nameof(MultiplexingStream)}.{nameof(this.ReadStreamAsync)} leading to stream shutdown: {{0}}", ex);
                     }
+
+                    if (ex is OperationCanceledException)
+                    {
+                        // The transport reported failure by throwing OperationCanceledException (for instance a WebSocket aborted by its
+                        // keep-alive timeout), but we were not asked to stop. Rethrowing leaves this task in the Canceled state,
+                        // which DisposeSelfOnFailure does not treat as a failure, so the stream would never complete.
+                        // Fault explicitly so that Completion completes and all channels are released.
+                        this.Fault(ex);
+                    }
                 }
 
                 throw;
@@ -1377,9 +1390,9 @@ namespace Nerdbank.Streams
                             // But backpressure frames *can* come in 'late' because even after both sides have finished writing, they may still be reading
                             // what they've received.
                             // In such cases, we should just suppress transmission of the frame because the other side does not care.
-                            // ContentWritingCompleted can be sent to SendFrame after a ChannelTerminated message such that neither have been transmitted yet
-                            // and thus wasn't in the termination collection until later, so forgive that too.
-                            if (header.Code is ControlCode.ContentProcessed or ControlCode.ContentWritingCompleted)
+                            // Reader and writer completion notifications can be queued behind a ChannelTerminated message
+                            // before either is transmitted, so forgive those too.
+                            if (header.Code is ControlCode.ContentProcessed or ControlCode.ContentWritingCompleted or ControlCode.ContentReadingCompleted)
                             {
                                 this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.FrameSendSkipped, "Skipping {0} frame for channel {1} because we're about to terminate it.", header.Code, header.ChannelId);
                                 return;
