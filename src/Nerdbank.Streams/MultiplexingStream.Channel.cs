@@ -1173,6 +1173,11 @@ namespace Nerdbank.Streams
                     this.localContentReadingCompletedSent = true;
                 }
 
+                if (this.TraceSource!.Switch.ShouldTrace(TraceEventType.Information))
+                {
+                    this.TraceSource.TraceEvent(TraceEventType.Information, 0, "Local reader completed.");
+                }
+
                 this.MultiplexingStream.SendFrame(
                     new FrameHeader
                     {
