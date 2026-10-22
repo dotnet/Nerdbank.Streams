@@ -2,11 +2,13 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Buffers;
+using System.Diagnostics;
 using System.IO.Pipelines;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.Threading;
 using Nerdbank.Streams;
+using NSubstitute;
 using Xunit;
 
 public class MultiplexingStreamV2Tests : MultiplexingStreamTests
@@ -78,6 +80,74 @@ public class MultiplexingStreamV2Tests : MultiplexingStreamTests
         await b.Input.CompleteAsync();
 
         await flushTask.WithCancellation(this.TimeoutToken);
+    }
+
+    [Theory]
+    [PairwiseData]
+    public async Task ReaderCompletionRacingChannelDisposalDoesNotCloseStream(bool completeAsync)
+    {
+        await this.mx1.DisposeAsync();
+        await this.mx2.DisposeAsync();
+        (this.transport1, this.transport2) = FullDuplexStream.CreatePair();
+        var monitoredTransport = new MonitoringStream(this.transport2);
+        var options = new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion };
+        Task<MultiplexingStream> mx1Task = MultiplexingStream.CreateAsync(this.transport1, options, this.TimeoutToken);
+        Task<MultiplexingStream> mx2Task = MultiplexingStream.CreateAsync(monitoredTransport, options, this.TimeoutToken);
+        this.mx1 = await mx1Task;
+        this.mx2 = await mx2Task;
+
+        (MultiplexingStream.Channel control1, MultiplexingStream.Channel control2) = await this.EstablishChannelsAsync("control");
+        var traceSource = new TraceSource("closing", SourceLevels.Information);
+        TraceListener listener = Substitute.For<TraceListener>();
+        traceSource.Listeners.Add(listener);
+        Task<MultiplexingStream.Channel> offerTask = this.mx1.OfferChannelAsync(
+            "closing", new MultiplexingStream.ChannelOptions { TraceSource = traceSource }, this.TimeoutToken);
+        Task<MultiplexingStream.Channel> acceptTask = this.mx2.AcceptChannelAsync("closing", this.TimeoutToken);
+        MultiplexingStream.Channel a = await offerTask;
+        MultiplexingStream.Channel b = await acceptTask;
+
+        // Terminate after the notification is prepared, but before it enters the send queue.
+        listener.When(l => l.TraceEvent(
+            Arg.Any<TraceEventCache?>(), Arg.Any<string>(), TraceEventType.Information, 0, "Local reader completed."))
+            .Do(_ => a.Dispose());
+
+        var readingPaused = new AsyncManualResetEvent();
+        using var resumeReading = new ManualResetEventSlim();
+        monitoredTransport.WillReadAny += PauseReading;
+        byte[] payload = new byte[] { 1, 2, 3 };
+        try
+        {
+            // Keep the peer from acknowledging termination before the late notification is sent.
+            await control1.Output.WriteAsync(payload, this.TimeoutToken);
+            await readingPaused.WaitAsync(this.TimeoutToken);
+            if (completeAsync)
+            {
+                await a.Input.CompleteAsync();
+            }
+            else
+            {
+                a.Input.Complete();
+            }
+
+            Assert.True(a.IsDisposed);
+            Assert.False(this.mx1.Completion.IsFaulted, this.mx1.Completion.Exception?.ToString());
+        }
+        finally
+        {
+            monitoredTransport.WillReadAny -= PauseReading;
+            resumeReading.Set();
+        }
+
+        await b.Completion.WithCancellation(this.TimeoutToken);
+        await this.ReadAtLeastAsync(control2.Input, payload.Length);
+        await this.TransmitAndVerifyAsync(control1.AsStream(), control2.AsStream(), payload);
+
+        void PauseReading(object sender, ReadOnlySpan<byte> buffer)
+        {
+            monitoredTransport.WillReadAny -= PauseReading;
+            readingPaused.Set();
+            resumeReading.Wait(this.TimeoutToken);
+        }
     }
 
     [Fact]

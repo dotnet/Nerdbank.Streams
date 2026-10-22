@@ -1275,9 +1275,9 @@ namespace Nerdbank.Streams
                             // But backpressure frames *can* come in 'late' because even after both sides have finished writing, they may still be reading
                             // what they've received.
                             // In such cases, we should just suppress transmission of the frame because the other side does not care.
-                            // ContentWritingCompleted can be sent to SendFrame after a ChannelTerminated message such that neither have been transmitted yet
-                            // and thus wasn't in the termination collection until later, so forgive that too.
-                            if (header.Code is ControlCode.ContentProcessed or ControlCode.ContentWritingCompleted)
+                            // Reader and writer completion notifications can be queued behind a ChannelTerminated message
+                            // before either is transmitted, so forgive those too.
+                            if (header.Code is ControlCode.ContentProcessed or ControlCode.ContentWritingCompleted or ControlCode.ContentReadingCompleted)
                             {
                                 this.TraceSource.TraceEvent(TraceEventType.Information, (int)TraceEventId.FrameSendSkipped, "Skipping {0} frame for channel {1} because we're about to terminate it.", header.Code, header.ChannelId);
                                 return;
