@@ -8,6 +8,14 @@
 	"labels": ["dependencies"],
 	"packageRules": [
 		{
+			"description": "Older Node.js LTS lines tested for compatibility in build.yml stay on their major version; only the primary Node.js version gets major updates.",
+			"matchDepNames": ["node"],
+			"matchFileNames": [".github/workflows/build.yml"],
+			"matchCurrentValue": "/^(22|24)\\.x$/",
+			"matchUpdateTypes": ["major"],
+			"enabled": false
+		},
+		{
 			"description": "Generated agentic workflow lock files are managed by 'gh aw compile' and must not be directly updated by Renovate.",
 			"matchFileNames": [".github/workflows/*.lock.yml"],
 			"enabled": false
