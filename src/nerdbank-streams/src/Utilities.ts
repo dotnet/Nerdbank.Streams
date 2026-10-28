@@ -131,7 +131,11 @@ function readAtMostAsync(stream: NodeJS.ReadableStream, maxBytes?: number, cance
  */
 function readSyncAtMost(stream: NodeJS.ReadableStream, maxBytes?: number): string | Buffer | null {
 	if (maxBytes === undefined) {
-		return stream.read() as string | Buffer | null
+		// Node.js 26+ returns only the first buffered chunk from a parameterless read(),
+		// so ask explicitly for everything that is buffered to preserve our 'read all available' semantics.
+		const readable = stream as Readable
+		const buffered = readable.readableObjectMode ? 0 : readable.readableLength
+		return (buffered > 0 ? stream.read(buffered) : stream.read()) as string | Buffer | null
 	}
 
 	if (maxBytes === 0) {
