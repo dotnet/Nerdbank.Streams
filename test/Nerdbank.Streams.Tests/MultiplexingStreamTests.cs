@@ -219,13 +219,15 @@ public class MultiplexingStreamTests : TestBase, System.IAsyncDisposable
     [Test]
     public async Task OfferNullErrorCompletedPipe()
     {
-        string localErrMsg = "Exception of type 'System.NullReferenceException' was thrown.";
+        // The message of an exception without one comes from the runtime and differs between .NET versions
+        var error = new NullReferenceException(null);
+        string localErrMsg = error.Message;
         string remoteErrMsg = $"Received error from remote side: {nameof(NullReferenceException)}: {localErrMsg}";
 
         // Prepare a readonly pipe that is completed with an error
         var pipe = new Pipe();
         await pipe.Writer.WriteAsync(new byte[] { 1, 2, 3 }, this.TimeoutToken);
-        pipe.Writer.Complete(new NullReferenceException(null));
+        pipe.Writer.Complete(error);
 
         // Offer the error pipe to the remote side and get the remote side to try to accept the channel
         MultiplexingStream.Channel localChannel = this.mx1.CreateChannel(new MultiplexingStream.ChannelOptions { ExistingPipe = new DuplexPipe(pipe.Reader) });
