@@ -3,6 +3,7 @@
 
 using System;
 using System.Buffers;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO.Pipelines;
 using System.Linq;
@@ -17,6 +18,32 @@ using Xunit;
 public class MultiplexingStreamV2Tests : MultiplexingStreamTests
 {
     protected override int ProtocolMajorVersion => 2;
+
+    [Test]
+    public async Task ReadBufferStartsSmallAndGrowsForLargeFrames()
+    {
+        for (int iteration = 0; iteration < 2; iteration++)
+        {
+            await this.mx1.DisposeAsync();
+            await this.mx2.DisposeAsync();
+            (this.transport1, this.transport2) = FullDuplexStream.CreatePair();
+            var readSizes = new ConcurrentQueue<int>();
+            var monitoredTransport = new MonitoringStream(this.transport1);
+            monitoredTransport.WillReadAny += (_, buffer) => readSizes.Enqueue(buffer.Length);
+            var options = new MultiplexingStream.Options { ProtocolMajorVersion = this.ProtocolMajorVersion };
+            Task<MultiplexingStream> mx1Task = MultiplexingStream.CreateAsync(monitoredTransport, options, this.TimeoutToken);
+            Task<MultiplexingStream> mx2Task = MultiplexingStream.CreateAsync(this.transport2, options, this.TimeoutToken);
+            this.mx1 = await mx1Task;
+            this.mx2 = await mx2Task;
+
+            (MultiplexingStream.Channel a, MultiplexingStream.Channel b) = await this.EstablishChannelsAsync("buffer");
+            Assert.Equal(4 * 1024, readSizes.First());
+            await this.TransmitAndVerifyAsync(b.AsStream(), a.AsStream(), new byte[] { 1, 2, 3 });
+
+            await this.TransmitAndVerifyAsync(b.AsStream(), a.AsStream(), this.GetRandomBuffer(128 * 1024));
+            Assert.Contains(readSizes, size => size > 4 * 1024);
+        }
+    }
 
     [Test]
     public async Task Backpressure()
