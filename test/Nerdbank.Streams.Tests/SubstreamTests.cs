@@ -168,6 +168,18 @@ public class SubstreamTests : TestBase
 
     [Test]
     [MatrixDataSource]
+    public async Task WriteSubstream_DisposeTwice(bool firstAsync, bool secondAsync)
+    {
+        Substream substream = this.underlyingStream.WriteSubstream();
+        substream.WriteByte(1);
+        await this.DisposeSyncOrAsync(substream, firstAsync);
+        long lengthAfterFirstDispose = this.underlyingStream.Length;
+        await this.DisposeSyncOrAsync(substream, secondAsync);
+        Assert.Equal(lengthAfterFirstDispose, this.underlyingStream.Length);
+    }
+
+    [Test]
+    [MatrixDataSource]
     public async Task WriteSubstream_Read(bool async)
     {
         Substream? substream = this.underlyingStream.WriteSubstream();

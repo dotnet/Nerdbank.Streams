@@ -78,6 +78,11 @@ new // https://github.com/dotnet/csharplang/issues/3613: There's no way to *over
         /// <returns>A task to represent the async operation.</returns>
         public async ValueTask DisposeAsync(CancellationToken cancellationToken = default)
         {
+            if (this.IsDisposed)
+            {
+                return;
+            }
+
             // Write out and clear any buffered data.
             await this.FlushAsync(flushUnderlyingStream: false, cancellationToken).ConfigureAwait(false);
 
