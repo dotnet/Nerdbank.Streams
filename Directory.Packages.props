@@ -4,7 +4,7 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
-    <MicrosoftTestingPlatformVersion>2.5.1</MicrosoftTestingPlatformVersion>
+    <MicrosoftTestingPlatformVersion>2.5.2</MicrosoftTestingPlatformVersion>
     <BenchmarkDotNetVersion>0.15.8</BenchmarkDotNetVersion>
     <AspNetCoreVersion>2.3.13</AspNetCoreVersion>
     <VSThreadingVersion>18.12.1</VSThreadingVersion>
@@ -36,7 +36,7 @@
     <PackageVersion Include="Microsoft.Testing.Extensions.HangDump" Version="$(MicrosoftTestingPlatformVersion)" />
     <PackageVersion Include="Microsoft.Testing.Extensions.Telemetry" Version="$(MicrosoftTestingPlatformVersion)" />
     <PackageVersion Include="Microsoft.Testing.Extensions.TrxReport" Version="$(MicrosoftTestingPlatformVersion)" />
-    <PackageVersion Include="TUnit.Engine" Version="1.76.28" />
+    <PackageVersion Include="TUnit.Engine" Version="1.78.0" />
     <PackageVersion Include="xunit.v3.assert" Version="4.0.2" />
     <PackageVersion Include="xunit.v3.assert.aot" Version="4.0.2" />
   </ItemGroup>
