@@ -70,6 +70,10 @@ jobs:
     - name: 🛠️ pnpm build
       run: corepack pnpm build
       working-directory: src/nerdbank-streams
+      env:
+        # nbgv (used by the build to stamp the package version) targets net10.0, but MSBuildLocator
+        # only finds SDKs that match the running runtime, and only the .NET 11 SDK is installed.
+        DOTNET_ROLL_FORWARD: Major
     - name: 🧪 pnpm test
       run: corepack pnpm test
       working-directory: src/nerdbank-streams
