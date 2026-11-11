@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net8.0</TargetFrameworks>
+    <TargetFrameworks>net10.0</TargetFrameworks>
     <TargetFrameworks Condition="$([MSBuild]::IsOsPlatform('Windows'))">$(TargetFrameworks);net472</TargetFrameworks>
     <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
     <OutputType>Exe</OutputType>
@@ -38,7 +38,7 @@
     </PackageReference>
     <PackageReference Include="PInvoke.Kernel32" />
     <PackageReference Include="StreamJsonRpc" />
-    <PackageReference Include="System.IO.Pipes" />
+    <PackageReference Include="System.IO.Pipes" Condition="'$(TargetFramework)' == 'net472'" />
     <PackageReference Include="TUnit.Engine" />
     <PackageReference Include="xunit.v3.assert" />
   </ItemGroup>
