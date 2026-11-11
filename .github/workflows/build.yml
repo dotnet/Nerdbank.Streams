@@ -121,6 +121,9 @@ jobs:
       run: tools/Pack-Cargo.ps1
       shell: pwsh
       if: runner.os == 'Linux'
+      env:
+        # The nbgv tool locates MSBuild via MSBuildLocator, which only finds SDKs matching the running runtime; only the .NET 11 SDK is installed.
+        DOTNET_ROLL_FORWARD: LatestMajor
 
     - name: 💅🏻 Verify formatted code
       run: dotnet format --verify-no-changes --no-restore
