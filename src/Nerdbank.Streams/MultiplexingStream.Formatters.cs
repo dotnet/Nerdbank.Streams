@@ -411,7 +411,7 @@ namespace Nerdbank.Streams
             internal V2Formatter(PipeWriter writer, Stream readingStream)
                 : base(writer)
             {
-                this.reader = new MessagePackStreamReader(readingStream, leaveOpen: false);
+                this.reader = new MessagePackStreamReader(readingStream, leaveOpen: false, minimumSpanLength: 4 * 1024);
             }
 
             public override async ValueTask DisposeAsync()
