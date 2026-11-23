@@ -90,3 +90,22 @@ If the repo owner is unsure about NativeAOT support, you might offer to test the
 
 In the event the user elects for NativeAOT targeting, make efforts to get tests to work under NativeAOT as well so the shipping code can confidently advertise its NativeAOT compatibility.
 If aspects of the library or tests make successful builds, publish or test runs problematic, discuss this with the repo owner before making significant changes or giving up on NativeAOT support.
+
+## Targeting .NET 10
+
+.NET 8 and 9 are no longer supported by Microsoft.
+All projects in the repo that target these runtimes should be updated to target .NET 10.
+When retargeting, search source code for `#if` expressions that mention `NET8`, `NET9` or `NET10` and simplify them as follows:
+* Assume exact .NET 8 and 9 checks evaluate to false, since these will never be targets and simplify the expressions as such.
+* Simplify any check for `NET10_0_OR_LATER` to just `NET` since all supported .NET targets are always .NET 10 or later.
+* Remove any code rendered dead by these changes.
+
+## Docfx homepage shares the docs navigation
+
+`docfx/index.md` is a normal documentation page and the site homepage. It no longer uses `_layout: landing`, which hid the left sidebar. `docfx/docs/toc.yml` lists that page first as Overview, ahead of Features and Getting Started, with `href: ../index.md`. The top-level menu stays Docs and API.
+
+When merging into a repo that already customized the landing page or the docs table of contents:
+
+* Keep the repo's own pitch, install snippet, and feature highlights in `docfx/index.md`.
+* Drop `_layout: landing` and any "Click Docs across the top to get started" line so `/` shows the same top navbar and left docs sidebar as the other docs pages.
+* Insert Overview at the top of `docfx/docs/toc.yml` if it is missing, and keep the repo's existing entries after it.
