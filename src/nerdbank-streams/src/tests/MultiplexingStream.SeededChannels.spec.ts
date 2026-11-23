@@ -3,6 +3,7 @@ import { FullDuplexStream } from '../FullDuplexStream'
 import { MultiplexingStream } from '../MultiplexingStream'
 import { getBufferFrom } from '../Utilities'
 import { ChannelOptions } from '../ChannelOptions'
+import { timeout } from './Timeout'
 ;[3].forEach(protocolMajorVersion => {
 	describe(`MultiplexingStream v${protocolMajorVersion} seeded channels`, () => {
 		let mx1: MultiplexingStream
@@ -54,6 +55,21 @@ import { ChannelOptions } from '../ChannelOptions'
 
 			await Promise.all([ch1.completion, ch2.completion])
 		}, 120000)
+
+		it('completes when the remote party disconnects', async () => {
+			const channel = mx1.acceptChannel(0)
+			mx2.dispose()
+			await timeout(mx1.completion, 2000)
+			await timeout(channel.completion, 2000)
+			expect(channel.isDisposed).toBe(true)
+		})
+
+		it('completes when the multiplexing stream is disposed locally', async () => {
+			const channel = mx1.acceptChannel(0)
+			mx1.dispose()
+			await timeout(channel.completion, 2000)
+			expect(channel.isDisposed).toBe(true)
+		})
 
 		it('cannot be rejected', () => {
 			expect(() => mx1.rejectChannel(0)).toThrow()
