@@ -387,7 +387,7 @@ export abstract class MultiplexingStream implements IDisposableObservable {
 		this._completionSource.resolve()
 
 		this.formatter.end()
-		;[this.locallyOfferedOpenChannels, this.remotelyOfferedOpenChannels].forEach(cb => {
+		;[this.locallyOfferedOpenChannels, this.remotelyOfferedOpenChannels, this.seededOpenChannels].forEach(cb => {
 			for (const channelId in cb) {
 				if (cb.hasOwnProperty(channelId)) {
 					const channel = cb[channelId]
