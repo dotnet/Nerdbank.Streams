@@ -9,7 +9,7 @@
     <Description>$(Summary)</Description>
     <PackageTags>Stream full-duplex websocket multiplexing</PackageTags>
     <!-- Enable warnings regarding AOT compatibility. Learn more about testing strategies at https://devblogs.microsoft.com/dotnet/creating-aot-compatible-libraries/ -->
-    <IsAotCompatible Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net8.0'))">true</IsAotCompatible>
+    <IsAotCompatible Condition="'$([MSBuild]::GetTargetFrameworkIdentifier($(TargetFramework)))'=='.NETCoreApp'">true</IsAotCompatible>
   </PropertyGroup>
 
   <ItemGroup>

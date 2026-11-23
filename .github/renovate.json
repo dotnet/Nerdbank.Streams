@@ -2,6 +2,7 @@
 	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
 	"extends": [
 		"config:best-practices",
+		"helpers:pinGitHubActionDigestsToSemver",
 		"github>microsoft/vs-renovate-presets:dotnet_packages_LTS"
 	],
 	"semanticCommits": "disabled",
