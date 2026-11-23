@@ -58,7 +58,7 @@ jobs:
       run: tools/dotnet-test-cloud.ps1 -Configuration ${{ env.BUILDCONFIGURATION }} -Agent ${{ runner.os }}
       shell: pwsh
     - name: 🧪 NativeAOT test
-      run: dotnet publish -c Release -r ${{ matrix.rid }}-x64 -warnaserror
+      run: dotnet publish -c Release -r ${{ matrix.rid }}-x64 -warnaserror -warnNotAsError:NU1901,NU1902,NU1903,NU1904
       working-directory: test/NativeAOTCompatibility
 
     - name: ⚙️ Use Node.js 24.x
