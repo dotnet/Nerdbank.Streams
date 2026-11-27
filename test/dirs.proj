@@ -1,9 +1,12 @@
 <Project Sdk="Microsoft.Build.Traversal">
   <ItemGroup>
     <ProjectReference Include="**\*.csproj" Publish="false" />
-    <!-- This project validates the shipping assembly by running the NativeAOT compiler, so CI must publish it. -->
-    <ProjectReference Update="AotCompatibilityTest\AotCompatibilityTest.csproj" Publish="true" />
   </ItemGroup>
+
+  <!-- This project validates the shipping assembly by running the NativeAOT compiler, so CI must publish it for each target framework. -->
+  <Target Name="PublishAotCompatibilityTest" AfterTargets="Publish">
+    <MSBuild Projects="AotCompatibilityTest\AotCompatibilityTest.csproj" Targets="PublishAllTargetFrameworks" />
+  </Target>
 
   <Target Name="GetNativeAOTTests" Returns="@(_NativeAOTTest)">
     <MSBuild Projects="@(ProjectReference)" Targets="GetNativeAOTTestVariants" BuildInParallel="true">

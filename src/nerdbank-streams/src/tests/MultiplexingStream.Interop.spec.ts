@@ -6,7 +6,7 @@ import { MultiplexingStream } from '../MultiplexingStream'
 ;[1, 2, 3].forEach(protocolMajorVersion => {
 	describe(`MultiplexingStream v${protocolMajorVersion} (interop) `, () => {
 		const projectPath = `${__dirname}/../../../../test/Nerdbank.Streams.Interop.Tests`
-		const entrypointDllPath = `${__dirname}/../../../../bin/Nerdbank.Streams.Interop.Tests/Debug/net8.0/Nerdbank.Streams.Interop.Tests.dll`
+		const entrypointDllPath = `${__dirname}/../../../../bin/Nerdbank.Streams.Interop.Tests/Debug/net10.0/Nerdbank.Streams.Interop.Tests.dll`
 		let mx: MultiplexingStream
 		let proc: ChildProcess | null
 		let procExited: Deferred<any>

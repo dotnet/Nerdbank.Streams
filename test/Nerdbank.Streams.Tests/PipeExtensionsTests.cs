@@ -68,11 +68,13 @@ public partial class PipeExtensionsTests : TestBase
     public async Task UsePipe_IpcPipeStream_Disposal()
     {
         string? guid = Guid.NewGuid().ToString();
+        var serverConnected = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var ipcServerTask = Task.Run(async delegate
         {
             using var ipcServerPipe = new NamedPipeServerStream(guid, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, IPC.PipeOptions.Asynchronous);
             await ipcServerPipe.WaitForConnectionAsync(this.TimeoutToken);
+            serverConnected.SetResult(null);
             int bytesRead = await ipcServerPipe.ReadAsync(new byte[1], 0, 1, this.TimeoutToken).WithCancellation(this.TimeoutToken);
             ipcServerPipe.Dispose();
             this.Logger.WriteLine("The server stream closed.");
@@ -81,6 +83,9 @@ public partial class PipeExtensionsTests : TestBase
         {
             using var ipcClientPipe = new NamedPipeClientStream(".", guid, IPC.PipeDirection.InOut, IPC.PipeOptions.Asynchronous);
             await ipcClientPipe.ConnectAsync(this.TimeoutToken);
+
+            // The client can close before the server observes the connection.
+            await serverConnected.Task.WithCancellation(this.TimeoutToken);
 
             // We need to time this so that we don't call Complete() until reading from the PipeStream has already started.
             // Use our MonitoringStream for this purpose, and also to know when Dispose is called.
