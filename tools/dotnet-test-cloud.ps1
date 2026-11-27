@@ -59,6 +59,8 @@ if (Test-Path -LiteralPath $testLogs) {
 
 $globalJson = Get-Content $PSScriptRoot/../global.json | ConvertFrom-Json
 $isMTP = $globalJson.test.runner -eq 'Microsoft.Testing.Platform'
+# Consumers can append MSBuild properties here, e.g. '-p:Platform=NonWindows'.
+$msbuildArgs = @()
 $extraArgs = @()
 $failedTests = 0
 
@@ -100,6 +102,7 @@ if ($isMTP) {
         --no-build `
         -c $Configuration `
         -bl:"$testBinLog" `
+        @msbuildArgs `
         -- `
         --treenode-filter '/**[Category!=FailsInCloudTest]' `
         @mtpArgs `
@@ -152,6 +155,7 @@ if ($isMTP) {
         --blame-hang-timeout 60s `
         --blame-crash `
         -bl:"$testBinLog" `
+        @msbuildArgs `
         --diag "$testDiagLog;TraceLevel=info" `
         --logger trx `
         @coverageArgs `

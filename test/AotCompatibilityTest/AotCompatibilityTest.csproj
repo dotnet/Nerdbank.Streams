@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFrameworks>net11.0;net10.0</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <IsTestProject>false</IsTestProject>
     <RuntimeIdentifier>$(DefaultRuntimeIdentifier)</RuntimeIdentifier>
@@ -16,4 +16,13 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Nerdbank.Streams\Nerdbank.Streams.csproj" />
   </ItemGroup>
+
+  <!-- The SDK's Publish target doesn't support multi-targeting, so publish each target framework separately. -->
+  <Target Name="PublishAllTargetFrameworks">
+    <ItemGroup>
+      <_PublishTargetFramework Include="$(TargetFrameworks)" />
+    </ItemGroup>
+    <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="Publish"
+             Properties="TargetFramework=%(_PublishTargetFramework.Identity)" BuildInParallel="true" />
+  </Target>
 </Project>

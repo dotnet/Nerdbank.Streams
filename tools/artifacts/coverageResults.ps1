@@ -1,12 +1,23 @@
 $RepoRoot = Resolve-Path "$PSScriptRoot\..\.."
 
-$coverageFilesUnderRoot = @(Get-ChildItem "$RepoRoot/*.cobertura.xml" -Recurse | Where-Object {$_.FullName -notlike "*/In/*"  -and $_.FullName -notlike "*\In\*" })
-
-# Under MTP, coverage files are written directly to the artifacts output directory,
-# so we need to look there too.
 $ArtifactStagingFolder = & "$PSScriptRoot/../Get-ArtifactsStagingDirectory.ps1"
 $directTestLogs = Join-Path $ArtifactStagingFolder test_logs
-$coverageFilesUnderArtifacts = if (Test-Path $directTestLogs) { @(Get-ChildItem "$directTestLogs/*.cobertura.xml" -Recurse) } else { @() }
+$testLogsPrefix = [IO.Path]::GetFullPath($directTestLogs).Replace('\', '/').TrimEnd('/') + '/'
+
+$coverageFilesUnderRoot = @(Get-ChildItem "$RepoRoot/*.cobertura.xml" -Recurse | Where-Object {
+    $_.FullName -notmatch '[\\/]In[\\/]' -and
+    !$_.FullName.Replace('\', '/').StartsWith($testLogsPrefix, [StringComparison]::OrdinalIgnoreCase)
+})
+
+# MTP writes both a standalone cobertura report and a TRX-attachment copy under In/.
+$coverageFilesUnderArtifacts = @()
+if (Test-Path $directTestLogs) {
+    $reports = @(Get-ChildItem "$directTestLogs/*.cobertura.xml" -Recurse)
+    $standaloneNames = @($reports | Where-Object { $_.FullName -notmatch '[\\/]In[\\/]' } | ForEach-Object { $_.Name })
+    $coverageFilesUnderArtifacts = @($reports | Where-Object {
+        $_.FullName -notmatch '[\\/]In[\\/]' -or $standaloneNames -notcontains $_.Name
+    })
+}
 
 # Prepare code coverage reports for merging on another machine
 Write-Host "Substituting $repoRoot with `"{reporoot}`""
@@ -19,7 +30,7 @@ if (!((Test-Path $RepoRoot\bin) -and (Test-Path $RepoRoot\obj))) { return }
 
 @{
     $directTestLogs = $coverageFilesUnderArtifacts;
-    $RepoRoot = (
+    "$RepoRoot" = (
         $coverageFilesUnderRoot +
         (Get-ChildItem "$RepoRoot\obj\*.cs" -Recurse)
     );

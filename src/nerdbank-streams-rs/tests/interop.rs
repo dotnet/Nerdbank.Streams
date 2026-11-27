@@ -71,7 +71,7 @@ async fn peer_path() -> PathBuf {
     let root = repository_root();
     for configuration in ["Release", "Debug"] {
         let path = root.join(format!(
-            "bin/Nerdbank.Streams.Interop.Tests/{configuration}/net8.0/Nerdbank.Streams.Interop.Tests.dll"
+            "bin/Nerdbank.Streams.Interop.Tests/{configuration}/net10.0/Nerdbank.Streams.Interop.Tests.dll"
         ));
         if path.exists() {
             return path;
@@ -94,7 +94,7 @@ async fn peer_path() -> PathBuf {
         String::from_utf8_lossy(&output.stderr)
     );
     root.join(
-        "bin/Nerdbank.Streams.Interop.Tests/Release/net8.0/Nerdbank.Streams.Interop.Tests.dll",
+        "bin/Nerdbank.Streams.Interop.Tests/Release/net10.0/Nerdbank.Streams.Interop.Tests.dll",
     )
 }
 
