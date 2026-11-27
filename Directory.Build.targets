@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project>
+  <PropertyGroup>
+    <Features Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)','net11.0'))">$(Features);runtime-async=on</Features>
+  </PropertyGroup>
   <ItemGroup>
     <!-- Avoid compile error about missing namespace when combining ImplicitUsings with .NET Framework target frameworks. -->
     <Using Remove="System.Net.Http" Condition="'$(TargetFrameworkIdentifier)'=='.NETFramework'" />
